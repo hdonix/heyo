@@ -1,0 +1,172 @@
+// What component styles are assembled from.
+
+@use "sass:map";
+@use "sass:math";
+@use "sass:list";
+@use "scales" as *;
+
+/// Text at a size of the scale: its size, line height and letter spacing.
+@mixin text($size, $weight: null) {
+  font-size: var(--text-#{$size});
+  line-height: var(--leading-#{$size});
+  letter-spacing: var(--tracking-#{$size});
+  @if $weight {
+    font-weight: map.get($weights, $weight);
+  }
+}
+
+/// One line, cut off with an ellipsis.
+@mixin truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/// One line that fades out at the end instead of being cut off. For text
+/// in a box wider than itself (a short text never reaches the fade).
+@mixin fade-end($width: 24px) {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - #{$width}), transparent);
+}
+
+/// A scrolling area whose contents fade at its top and bottom edges.
+@mixin scroll-fade($size: 8px) {
+  mask-image: linear-gradient(to bottom, transparent, #000 $size, #000 calc(100% - #{$size}), transparent);
+}
+
+/// Transitions of the given properties, at the system's pace.
+@mixin transition($properties...) {
+  $value: ();
+  @each $property in $properties {
+    $value: list.append($value, $property var(--duration-fast) var(--ease-out), comma);
+  }
+  transition: $value;
+}
+
+/// Where the keyboard is, on a control that draws its own edge.
+@mixin focus-ring {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--color-accent), var(--ring);
+}
+
+/// The states of something one clicks, as rising fills: resting, hovered,
+/// pressed. Disabled looks spent and does nothing.
+@mixin interactive($rest: transparent, $hover: var(--fill-2), $active: var(--fill-3)) {
+  background-color: $rest;
+  cursor: pointer;
+  @include transition(background-color, color, box-shadow, transform);
+
+  &:hover {
+    background-color: $hover;
+  }
+
+  &:active {
+    background-color: $active;
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    background-color: $rest;
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+  }
+}
+
+/// The frame of a control: a height from the scale, its text centred.
+@mixin control($height: "md") {
+  display: inline-flex;
+  align-items: center;
+  height: map.get($heights, $height);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font: inherit;
+  @include text(sm);
+}
+
+/// A field one types in or picks from.
+@mixin field {
+  @include control(lg);
+  padding: 0 space(2.5);
+  outline: none;
+  background-color: var(--fill-2);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  @include transition(box-shadow, background-color);
+
+  &:hover {
+    background-color: var(--fill-3);
+  }
+
+  &:focus,
+  &:focus-visible {
+    background-color: var(--fill-2);
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+  }
+
+  &::placeholder {
+    color: var(--color-text-faint);
+  }
+}
+
+/// A select drawn here rather than by the toolkit, which ignores the theme.
+@mixin select {
+  @include field;
+  padding-right: space(7);
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 11px) 50%;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+/// A sheet of paper on the window's background: settings cards, keycaps.
+@mixin card($radius: "lg") {
+  border-radius: var(--radius-#{$radius});
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+/// Something floating above the rest: menus, dialogs.
+@mixin floating {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+
+/// The shadow a window of Heyo's casts into the transparent margin kept
+/// around it, for the element that holds that margin. `$radius` names the
+/// window's corner radius. It is a picture (scripts/window-shadow.py), drawn
+/// as a border image: only the edges, so that nothing redrawn inside the
+/// window has it drawn again.
+@mixin window-shadow($radius) {
+  position: relative;
+
+  &::before {
+    $slice: $window-margin + map.get($radii, $radius);
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: $slice solid transparent;
+    // The pictures are drawn at twice the size.
+    border-image: var(--window-shadow-#{$radius}) #{math.div($slice, 1px) * 2} / #{$slice} stretch;
+    pointer-events: none;
+  }
+}
+
+/// Numbers that keep their columns.
+@mixin numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/// Appears by an animation of the given name, once.
+@mixin enter($name, $duration: "base", $easing: "out") {
+  animation: $name var(--duration-#{$duration}) var(--ease-#{$easing}) both;
+}

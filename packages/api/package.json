@@ -1,0 +1,28 @@
+{
+  "name": "@heyo/api",
+  "version": "0.1.0",
+  "description": "The Heyo extension API: everything of @raycast/api, and windows, the screen, dictation, the clipboard history, files and the system on top.",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hdonix/heyo.git",
+    "directory": "packages/api"
+  },
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@raycast/api": ">=1.80.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "heyo": {
+    "apiVersion": 1
+  }
+}

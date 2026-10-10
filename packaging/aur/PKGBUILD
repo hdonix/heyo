@@ -1,0 +1,69 @@
+# Maintainer: hdonix <cpage31@gmail.com>
+#
+# Builds Heyo from a release's source archive. Not yet built or tried with
+# makepkg (see packaging/README.md): before it is published, fill in what is
+# marked TODO, run `makepkg -si` in a clean chroot, and `namcap` on the
+# result.
+pkgname=heyo
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Command palette launcher that runs Raycast extensions'
+arch=('x86_64' 'aarch64')
+url='https://github.com/hdonix/heyo'
+license=('GPL-3.0-only')
+depends=(
+  'webkit2gtk-4.1'
+  'gtk3'
+  'libayatana-appindicator'
+  'xdg-utils'
+  # Extensions, dictation and text recognition run in Node.js 22 or newer.
+  # Arch follows the current release, so it is simply required here.
+  'nodejs'
+)
+makedepends=('rust' 'pnpm' 'nodejs')
+optdepends=(
+  'npm: installing the text recognition engine'
+  'libnotify: notifications'
+  'curl: listing the models of a local model server'
+  'libpulse: choosing the microphone for dictation (pactl)'
+  'gnome-screenshot: screenshots on GNOME Wayland'
+)
+# TODO: the release archive and its checksum.
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+# The binary is stripped by its own release profile, and lto there is
+# cargo's; makepkg's would be applied twice.
+options=('!lto')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  pnpm install --frozen-lockfile
+  cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  # The program alone: the files are laid out below, as `tauri build
+  # --bundles deb` would lay them out.
+  pnpm tauri build --no-bundle -- --locked
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  pnpm exec vitest run
+  cargo test --locked --manifest-path src-tauri/Cargo.toml
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 src-tauri/target/release/heyo "$pkgdir/usr/bin/heyo"
+  # Where a Tauri program in /usr/bin looks for its resources.
+  install -Dm644 -t "$pkgdir/usr/lib/Heyo" runtime/dist/heyo-runtime.cjs runtime/dist/heyo-dictation.cjs runtime/dist/heyo-ocr.cjs runtime/dist/heyo-dev.cjs runtime/dist/heyo-embed.cjs
+  sed -e 's|{{name}}|Heyo|' -e 's|{{exec}}|heyo|' -e 's|{{icon}}|heyo|' packaging/linux/heyo.desktop |
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/heyo.desktop"
+  install -Dm644 src-tauri/icons/32x32.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/heyo.png"
+  install -Dm644 src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/heyo.png"
+  install -Dm644 'src-tauri/icons/128x128@2x.png' "$pkgdir/usr/share/icons/hicolor/256x256/apps/heyo.png"
+  install -Dm644 src-tauri/icons/icon.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/heyo.png"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

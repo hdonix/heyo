@@ -1,0 +1,11 @@
+{
+ "Form": [
+  "enableDrafts"
+ ],
+ "Form.TextArea": [
+  "enableMarkdown"
+ ],
+ "MenuBarExtra.Item": [
+  "alternate"
+ ]
+}

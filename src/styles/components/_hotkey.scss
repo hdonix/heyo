@@ -1,0 +1,55 @@
+@use "../abstracts" as *;
+
+/* --- Hotkey recorder ----------------------------------------------------- */
+
+.hotkey {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hotkey-field {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 118px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  outline: none;
+  background: var(--color-selected);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.hotkey-field:hover {
+  background: var(--fill-4);
+}
+
+.hotkey-field.recording {
+  border-color: var(--color-accent);
+  box-shadow: var(--ring);
+}
+
+.hotkey-placeholder {
+  color: var(--color-text-muted);
+  @include text(sm);
+}
+
+.icon-button {
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--color-selected);
+  color: var(--color-text);
+}

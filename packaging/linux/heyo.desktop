@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment=Command palette launcher that runs Raycast extensions
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+StartupNotify=false
+Categories=Utility;
+Keywords=launcher;search;command;palette;raycast;

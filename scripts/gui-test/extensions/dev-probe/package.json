@@ -1,0 +1,7 @@
+{
+  "name": "dev-probe",
+  "title": "Dev Probe",
+  "description": "An extension in source form, for testing heyo dev in the sandbox.",
+  "author": "heyo",
+  "commands": [{ "name": "hello", "title": "Dev Probe Hello", "mode": "view" }]
+}

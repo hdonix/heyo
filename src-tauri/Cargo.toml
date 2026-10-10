@@ -1,0 +1,69 @@
+[package]
+name = "heyo"
+version = "0.1.0"
+description = "A cross-platform command palette launcher"
+authors = ["hdonix <cpage31@gmail.com>"]
+license = "GPL-3.0-only"
+repository = "https://github.com/hdonix/heyo"
+homepage = "https://github.com/hdonix/heyo"
+edition = "2021"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "heyo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Lets Heyo fetch and install its own new versions. Only release builds that
+# also say where releases are published turn it on (packaging/README.md).
+updater = ["dep:tauri-plugin-updater"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+nucleo-matcher = "0.3"
+shlex = "1"
+walkdir = "2"
+ignore = "0.4"
+rusqlite = { version = "0.37", features = ["bundled"] }
+chrono = "0.4"
+regex = "1"
+tauri-plugin-clipboard-manager = "2"
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
+ts-rs = "12.0.1"
+tauri-plugin-updater = { version = "2", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Registry", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+# For COM alone (UI Automation, to read the selected text), which windows-sys
+# does not wrap. Tauri builds this crate anyway; only these features are added.
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Com", "Win32_System_Variant", "Win32_UI_Accessibility", "Win32_UI_Shell"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = "5"
+freedesktop-icons = "0.4"
+arboard = "3.6"
+x11rb = { version = "0.13", features = ["xfixes", "xinput", "xkb", "xtest"] }
+# What character a key produces under the keyboard layout in use (snippet
+# expansion). Links the system's libxkbcommon, which GTK needs anyway.
+xkbcommon = { version = "0.8", default-features = false }
+gtk = "0.18"
+gdkx11 = "0.18"
+libc = "0.2"
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

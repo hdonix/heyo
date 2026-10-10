@@ -1,0 +1,13 @@
+{
+  "name": "api-probe-bare",
+  "title": "Bare Probe",
+  "description": "An extension as the Raycast Store has them, with no heyo field in its manifest: what it is refused, and what it is asked about.",
+  "author": "heyo",
+  "commands": [
+    {
+      "name": "bare",
+      "title": "Probe Without a Manifest",
+      "mode": "no-view"
+    }
+  ]
+}

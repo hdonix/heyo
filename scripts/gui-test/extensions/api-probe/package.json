@@ -1,0 +1,91 @@
+{
+  "name": "api-probe",
+  "title": "API Probe",
+  "description": "Calls parts of the extension API and writes down what came back, for the sandbox tests.",
+  "author": "heyo",
+  "heyo": {
+    "apiVersion": 1,
+    "permissions": [
+      "windows",
+      "screen.capture",
+      "screen.text",
+      "microphone",
+      "clipboard.history",
+      "memory.read",
+      "files.search",
+      "system",
+      "input.paste",
+      "ai"
+    ]
+  },
+  "commands": [
+    {
+      "name": "windows",
+      "title": "Probe Windows",
+      "mode": "no-view"
+    },
+    {
+      "name": "greet",
+      "title": "Probe Arguments",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "name",
+          "type": "text",
+          "placeholder": "Name",
+          "required": true
+        },
+        {
+          "name": "tone",
+          "type": "dropdown",
+          "placeholder": "Tone",
+          "data": [
+            {
+              "title": "Warm",
+              "value": "warm"
+            },
+            {
+              "title": "Curt",
+              "value": "curt"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "heyo-info",
+      "title": "Probe Heyo: What There Is",
+      "mode": "no-view"
+    },
+    {
+      "name": "heyo-windows",
+      "title": "Probe Heyo: Windows",
+      "mode": "no-view"
+    },
+    {
+      "name": "heyo-screen",
+      "title": "Probe Heyo: Screen",
+      "mode": "no-view"
+    },
+    {
+      "name": "heyo-selection",
+      "title": "Probe Heyo: Select an Area",
+      "mode": "no-view"
+    },
+    {
+      "name": "heyo-memory",
+      "title": "Probe Heyo: Memory and Clipboard History",
+      "mode": "no-view"
+    },
+    {
+      "name": "heyo-system",
+      "title": "Probe Heyo: Files, System, Paste, Dictation",
+      "mode": "no-view"
+    },
+    {
+      "name": "heyo-asked",
+      "title": "Probe Heyo: Being Asked",
+      "mode": "no-view"
+    }
+  ]
+}

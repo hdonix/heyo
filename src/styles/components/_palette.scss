@@ -1,0 +1,309 @@
+// The palette: the panel, its search field, the list of results, the footer.
+
+@use "../abstracts" as *;
+
+// The palette's window keeps a transparent margin for the panel's shadow.
+// A click there is a click outside (main.tsx hides the palette).
+.floating-window #root {
+  padding: var(--window-margin);
+  @include window-shadow("2xl");
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--radius-2xl);
+  background: var(--color-bg);
+  box-shadow: inset 0 1px 0 var(--color-highlight), 0 0 0 1px var(--color-border-strong);
+  overflow: hidden;
+
+  .floating-window & {
+    box-shadow: inset 0 1px 0 var(--color-highlight), var(--shadow-window);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  // A view taking over from another fades in. (Only a fade, and a quick
+  // one: moving or scaling a whole view is redrawn frame by frame by the web
+  // view, which cannot keep that smooth.)
+  > .body,
+  > .list,
+  > .form {
+    @include enter(fade-in, fast);
+  }
+
+  // Compact: only as tall as the search field, at the top of the window.
+  &.compact {
+    height: auto;
+  }
+}
+
+.search-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: space(2);
+  height: 60px;
+  padding-right: space(4);
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 space(5);
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  @include text(xl);
+  caret-color: var(--color-accent);
+
+  &::placeholder {
+    color: var(--color-text-faint);
+  }
+}
+
+// The root search's field sits in a label, which is nothing to the layout
+// until the selected item's arguments follow the field. Then it is only as
+// wide as the text typed: a hidden copy of the text (`data-text`) gives the
+// label its width, and the field fills it.
+.search-fit {
+  display: contents;
+
+  &.fitted {
+    display: inline-grid;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 100%;
+
+    &::after {
+      content: attr(data-text);
+      grid-area: 1 / 1;
+      visibility: hidden;
+      overflow: hidden;
+      padding: 0 space(2) 0 space(5);
+      white-space: pre;
+      @include text(xl);
+    }
+
+    .search {
+      grid-area: 1 / 1;
+      // No width of its own (a field's is some twenty characters), and all
+      // of the label's.
+      width: 0;
+      min-width: 100%;
+      padding-right: space(2);
+    }
+  }
+}
+
+// Keeps the arguments next to the text rather than spread over the row.
+.search-spacer {
+  flex: 1;
+}
+
+// At the end of the search field: what Tab does with what is typed.
+.search-hint {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: space(2);
+  height: 28px;
+  padding: 0 space(1) 0 space(2);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-faint);
+  @include text(row);
+  @include interactive(transparent, var(--fill-1), var(--fill-2));
+}
+
+.list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  // Room at the end for the actions, which float over it.
+  padding: 0 space(2) 56px;
+  list-style: none;
+  overflow-y: auto;
+  // The rows fade out under them rather than end at a bar.
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent calc(100% - 8px));
+  // The selection is kept clear of the actions, and of the fade.
+  scroll-padding: space(8) 0 56px;
+
+  > li {
+    list-style: none;
+  }
+}
+
+// What marks the selected row. It is one element that slides between rows
+// (SelectionIndicator.tsx) rather than a background each row turns on.
+.selection-indicator {
+  position: absolute;
+  top: 0;
+  left: space(2);
+  right: space(2);
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  pointer-events: none;
+  transition: transform var(--duration-fast) var(--ease-out), height var(--duration-fast) var(--ease-out), opacity var(--duration-instant) linear;
+
+  // The first time, and after the list changes: there, not sliding in.
+  &.still {
+    transition: none;
+  }
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: space(3);
+  height: 38px;
+  padding: 0 space(2);
+  border-radius: var(--radius-lg);
+  @include text(row);
+  cursor: default;
+  user-select: none;
+
+  // The row under the pointer is the selected row, so there is one
+  // highlight and no separate hover: two of them moving at once flicker.
+  &:active {
+    background: var(--fill-2);
+  }
+
+  // Lists without a sliding indicator mark the row itself.
+  &.selected {
+    background: var(--color-selected);
+  }
+
+  .has-indicator &.selected,
+  .has-indicator &:active {
+    background: transparent;
+  }
+}
+
+// An application's own icon.
+.icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+// A command's icon, on a tile, which sets it apart from applications at a
+// glance; and an application without an icon, as its initial.
+.icon-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+
+  // A command: its symbol in white on its own colour, lit from above.
+  &.symbol {
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--tile-color), #fff 14%), var(--tile-color));
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 1px var(--shadow-near-color);
+    color: #fff;
+  }
+
+  &.initial {
+    background: color-mix(in srgb, var(--tile-color, var(--color-text-muted)) 18%, transparent);
+    color: var(--tile-color, var(--color-text-muted));
+    @include text(xs, semibold);
+    text-transform: uppercase;
+  }
+}
+
+// A symbol that labels a row inside a command: plain, in the text's colour.
+.icon-plain {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--color-text-muted);
+
+  .selected > & {
+    color: var(--color-text);
+  }
+}
+
+.title {
+  flex: none;
+  max-width: 60%;
+  font-weight: 500;
+  @include truncate;
+}
+
+.subtitle {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-muted);
+  @include fade-end;
+}
+
+.kind {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  // What a thing is, at the size of its name.
+  @include text(row);
+}
+
+.empty {
+  padding: space(6);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.footer[hidden] {
+  display: none;
+}
+
+.footer {
+  // Not a bar: what it holds floats over the end of the view.
+  position: absolute;
+  left: space(2);
+  right: space(2);
+  bottom: space(2);
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: space(2);
+  height: 38px;
+  color: var(--color-text-muted);
+  @include text(sm);
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+// A key of the keyboard.
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 space(1);
+  border-radius: var(--radius-sm);
+  // An outline, no more: a key, not a button.
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  @include text(xs, medium);
+  line-height: 1;
+  @include numeric;
+}

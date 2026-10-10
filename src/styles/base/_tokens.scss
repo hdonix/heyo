@@ -1,0 +1,127 @@
+// Design tokens as custom properties, generated from the scales.
+//
+// Colours follow `color-scheme`: the system's by default, or the one chosen
+// in the settings (`data-theme` on the root, set by theme.ts). Parts of the
+// interface that float over other things (the screenshot tools, the
+// dictation pill) are given `data-theme="dark"` and so stay dark.
+//
+// Component styles use these (`--color-*`, `--fill-*`, …) through the
+// mixins, never colours or sizes of their own.
+
+@use "sass:map";
+@use "sass:list";
+@use "../abstracts" as *;
+
+@function pair($pair) {
+  @return light-dark(#{list.nth($pair, 1)}, #{list.nth($pair, 2)});
+}
+
+:root {
+  color-scheme: light dark;
+
+  --color-white: #fff;
+  // What floats over the screen itself, in either scheme.
+  --color-hud: rgba(20, 20, 22, 0.9);
+
+  @each $name, $pair in $colors {
+    @if $name == "tint" {
+      --tint: #{pair($pair)};
+    } @else {
+      --color-#{$name}: #{pair($pair)};
+    }
+  }
+
+  @each $level, $pair in $fills {
+    --fill-#{$level}: #{pair($pair)};
+  }
+  --color-selected: var(--fill-3);
+  --color-input: var(--fill-2);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 16%, transparent);
+
+  @each $name, $pair in $raycast {
+    --raycast-#{$name}: #{pair($pair)};
+  }
+
+  @each $name, $pair in $shadows {
+    --shadow-#{$name}-color: #{pair($pair)};
+  }
+  // Kept for what still asks for them by these names.
+  --shadow-color: var(--shadow-far-color);
+  --shadow-color-soft: var(--shadow-near-color);
+
+  // A hairline and the faintest lift: cards, keycaps.
+  --shadow-card: 0 0 0 1px var(--color-border), 0 1px 2px var(--shadow-near-color);
+  // What floats over the end of a list: the actions.
+  --shadow-pill: 0 0 0 1px var(--color-border), 0 2px 8px var(--shadow-near-color), 0 6px 20px var(--shadow-near-color);
+  // A control one presses: a card with a lit top edge.
+  --shadow-control: var(--shadow-card), inset 0 1px 0 var(--color-highlight);
+  // Menus and dialogs: an edge, a close shadow and a distant one.
+  --shadow-overlay: 0 0 0 1px var(--color-border-strong), 0 4px 12px var(--shadow-near-color), 0 16px 40px var(--shadow-far-color);
+  // A window of Heyo's on the desktop: its edge. The shadow it casts
+  // (0 2px 4px near, 0 8px 24px far) is a picture laid around the window,
+  // the `window-shadow` mixin; scripts/window-shadow.py draws it and says why.
+  --shadow-window: 0 0 0 1px var(--shadow-hairline-color);
+  --window-shadow-2xl: url("../../assets/shadows/window-2xl-light.png");
+  --window-shadow-xl: url("../../assets/shadows/window-xl-light.png");
+  --ring: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
+
+  // The system's own face on each platform, then ones that have Chinese.
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans", "Noto Sans CJK SC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, "Noto Sans Mono", "Noto Sans Mono CJK SC", monospace;
+
+  @each $name, $values in $type {
+    --text-#{$name}: #{list.nth($values, 1)};
+    --leading-#{$name}: #{list.nth($values, 2)};
+    --tracking-#{$name}: #{list.nth($values, 3)};
+  }
+
+  @each $name, $value in $radii {
+    --radius-#{$name}: #{$value};
+  }
+  --radius-card: var(--radius-xl);
+
+  @each $name, $value in $durations {
+    --duration-#{$name}: #{$value};
+  }
+  --duration: var(--duration-base);
+  @each $name, $value in $easings {
+    --ease-#{$name}: #{$value};
+  }
+  --ease: var(--ease-out);
+
+  --window-margin: #{$window-margin};
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+// Pictures cannot follow `color-scheme` the way colours do.
+@mixin dark-pictures {
+  --window-shadow-2xl: url("../../assets/shadows/window-2xl-dark.png");
+  --window-shadow-xl: url("../../assets/shadows/window-xl-dark.png");
+}
+
+:root[data-theme="dark"] {
+  @include dark-pictures;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    @include dark-pictures;
+  }
+}
+
+// More contrast where it is asked for.
+@media (prefers-contrast: more) {
+  :root {
+    --color-text-muted: light-dark(#4a4a4f, #c2c2c8);
+    --color-text-faint: light-dark(#5f5f66, #a1a1aa);
+    --color-border: light-dark(rgba(0, 0, 0, 0.3), rgba(255, 255, 255, 0.3));
+    --color-border-strong: light-dark(rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0.5));
+  }
+}

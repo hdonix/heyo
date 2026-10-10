@@ -1,0 +1,61 @@
+// The page itself: type, the reset, scrollbars, selection, focus.
+
+@use "../abstracts" as *;
+
+:root {
+  font-family: var(--font-sans);
+  @include text(md, regular);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  // Inter's contextual alternates off: they turn "=>" into an arrow, and
+  // what is shown here is other people's text, to be shown as it is.
+  font-feature-settings: "calt" 0;
+  // Chinese beside Latin without the two touching.
+  text-autospace: normal;
+}
+
+* {
+  box-sizing: border-box;
+  // Thin scrollbars in the interface's own tones.
+  scrollbar-width: thin;
+  scrollbar-color: var(--fill-4) transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  // The window is transparent; only the panel paints.
+  background: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+// Moving through the interface with the keyboard shows where one is.
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

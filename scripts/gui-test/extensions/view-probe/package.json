@@ -1,0 +1,38 @@
+{
+  "name": "view-probe",
+  "title": "View Probe",
+  "description": "Views that exercise form fields, file picking, the action panel's extras, typing and a menu bar item, for the sandbox tests (views.sh).",
+  "author": "heyo",
+  "commands": [
+    {
+      "name": "stored-form",
+      "title": "Probe Stored Form",
+      "mode": "view"
+    },
+    {
+      "name": "stored-list",
+      "title": "Probe Stored Dropdown",
+      "mode": "view"
+    },
+    {
+      "name": "file-picker",
+      "title": "Probe File Picker",
+      "mode": "view"
+    },
+    {
+      "name": "actions",
+      "title": "Probe Action Extras",
+      "mode": "view"
+    },
+    {
+      "name": "typing",
+      "title": "Probe Typing",
+      "mode": "view"
+    },
+    {
+      "name": "counter",
+      "title": "Probe Menu Bar Counter",
+      "mode": "menu-bar"
+    }
+  ]
+}

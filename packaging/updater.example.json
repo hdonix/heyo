@@ -1,0 +1,11 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://releases.example.invalid/heyo/{{target}}-{{arch}}/latest.json"],
+      "pubkey": "REPLACE WITH THE CONTENTS OF THE PUBLIC KEY FILE"
+    }
+  }
+}

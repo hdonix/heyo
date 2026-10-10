@@ -1,0 +1,66 @@
+// Grids of tiles: emoji, images, colours.
+
+@use "../abstracts" as *;
+
+.grid {
+  display: grid;
+  gap: space(2);
+  padding: 0 2px space(2);
+}
+
+.grid-item {
+  min-width: 0;
+  padding: space(1.5);
+  border-radius: var(--radius-lg);
+  cursor: default;
+  @include transition(background-color, box-shadow, transform);
+
+  &:hover {
+    background: var(--fill-1);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  // A ring in the accent: a fill would hide what the tile shows.
+  &.selected {
+    background: var(--fill-2);
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+  }
+}
+
+.grid-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  // Inside the item's corner by its padding.
+  border-radius: var(--radius-sm);
+  background: var(--fill-2);
+
+  .grid-image:is(img, span:not(.glyph)) {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  &.fit-fill .grid-image:is(img) {
+    object-fit: cover;
+  }
+}
+
+.grid-title,
+.grid-subtitle {
+  margin-top: space(1);
+  @include text(xs);
+  @include truncate;
+}
+
+.grid-title {
+  font-weight: 500;
+}
+
+.grid-subtitle {
+  margin-top: 0;
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,178 @@
+@use "../abstracts" as *;
+
+/* --- Root search extras ------------------------------------------------- */
+
+
+.calc-row {
+  padding-bottom: 4px;
+}
+
+.calc {
+  display: flex;
+  align-items: center;
+  gap: space(3);
+  min-height: 112px;
+  padding: space(3) space(4);
+  border-radius: var(--radius-xl);
+  background: var(--fill-2);
+  cursor: default;
+  @include transition(background-color);
+
+  &.selected {
+    background: var(--fill-3);
+  }
+}
+
+.calc-side {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  text-align: center;
+}
+
+.calc-value {
+  max-width: 100%;
+  overflow: hidden;
+  @include text(2xl);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+// What the number is, on a chip.
+.calc-label {
+  padding: 2px space(2);
+  border-radius: var(--radius-sm);
+  background: var(--fill-3);
+  color: var(--color-text);
+  @include text(xs, medium);
+}
+
+.calc-arrow {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.tag.alias {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  @include text(2xs);
+}
+
+.favorite-star {
+  color: var(--color-warning);
+  fill: var(--color-warning);
+}
+
+.subtitle.argument {
+  color: var(--color-accent);
+}
+
+// An activity in progress: its timer or progress, as the host renders it.
+.activity-value {
+  flex: none;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  @include text(row);
+}
+
+.tag.attention {
+  color: var(--color-warning);
+  @include text(2xs);
+}
+
+// Its content may be out of date, or it has ended and is on its way out.
+.item.stale,
+.item.ended {
+  opacity: 0.6;
+}
+
+// An argument of the selected item: a field in the search bar, after what
+// was typed there.
+.argument {
+  flex: none;
+  max-width: 30%;
+  @include field;
+  @include text(md);
+
+  // Required, and left empty when Enter was pressed.
+  &.missing:not(:focus) {
+    box-shadow: inset 0 0 0 1px var(--color-danger);
+  }
+
+  &.choice {
+    @include select;
+    @include text(md);
+    max-width: 100%;
+    @include truncate;
+  }
+
+  &.unset {
+    color: var(--color-text-faint);
+  }
+}
+
+.argument-choice {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  max-width: 30%;
+}
+
+// The choices of a dropdown argument, open under it.
+.argument-menu {
+  position: absolute;
+  top: calc(100% + #{space(1)});
+  left: 0;
+  z-index: 3;
+  min-width: 100%;
+  max-height: 240px;
+  margin: 0;
+  padding: space(1);
+  list-style: none;
+  overflow-y: auto;
+  @include floating;
+
+  li {
+    padding: space(1.5) space(2.5);
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    cursor: pointer;
+    @include text(sm);
+
+    &:hover {
+      background: var(--fill-2);
+    }
+
+    &.selected {
+      background: var(--fill-3);
+    }
+  }
+}
+
+.alert.prompt {
+  text-align: left;
+}
+
+.alert.prompt .field-input {
+  margin-top: 12px;
+}
+
+.prompt-hotkey {
+  margin-top: 14px;
+}
+
+.prompt-hint {
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  @include text(xs);
+  line-height: 1.4;
+}
+
+.item .shortcut {
+  margin-left: 0;
+}
