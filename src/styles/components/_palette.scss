@@ -7,6 +7,11 @@
 .floating-window #root {
   padding: var(--window-margin);
   @include window-shadow("2xl");
+
+  // Compact: the shadow ends where the panel does, not at the window's edge.
+  &:has(> .panel.compact) {
+    height: auto;
+  }
 }
 
 .panel {
