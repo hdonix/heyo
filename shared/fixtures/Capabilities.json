@@ -1,0 +1,19 @@
+{
+  "capture": "full",
+  "clipboardWatch": "limited",
+  "extension": "none",
+  "holdKey": "full",
+  "holdKeys": [
+    {
+      "title": "Right Control",
+      "value": "Control_R"
+    }
+  ],
+  "hotkeys": "none",
+  "overlay": "limited",
+  "paste": "full",
+  "selection": "limited",
+  "session": "x11",
+  "snippetExpansion": "full",
+  "windows": "full"
+}

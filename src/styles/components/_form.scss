@@ -1,0 +1,131 @@
+// Forms an extension asks to be filled in.
+
+@use "../abstracts" as *;
+
+.form {
+  overflow-y: auto;
+  padding: space(4) space(6) 56px;
+}
+
+.form-row {
+  display: flex;
+  gap: space(4);
+  margin-bottom: space(3);
+}
+
+.form-label {
+  flex: 0 0 30%;
+  // Level with the text inside the field beside it.
+  padding-top: 6px;
+  color: var(--color-text-muted);
+  text-align: right;
+  @include text(sm);
+}
+
+.form-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-input {
+  width: 100%;
+  @include field;
+  @include text(md);
+
+  &.textarea {
+    height: auto;
+    min-height: 72px;
+    padding: space(1.5) space(2.5);
+    resize: vertical;
+  }
+}
+
+select.field-input {
+  @include select;
+  @include text(md);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: space(2);
+  min-height: 32px;
+
+  input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--color-accent);
+  }
+}
+
+.tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: space(1.5);
+  padding-top: space(1.5);
+  outline: none;
+}
+
+// What a file picker has chosen, and the button that opens the browser.
+.file-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: space(1.5);
+  min-height: 32px;
+}
+
+.tag.file {
+  max-width: 100%;
+  height: 24px;
+  padding-right: space(1);
+}
+
+.file-name {
+  @include truncate;
+}
+
+.file-remove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  color: inherit;
+  @include interactive;
+}
+
+.file-choose {
+  @include control(md);
+  padding: 0 space(2.5);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  @include interactive(var(--fill-2), var(--fill-3), var(--fill-4));
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.form-description {
+  padding-top: 6px;
+  white-space: pre-wrap;
+}
+
+.form-error,
+.form-info {
+  margin-top: space(1);
+  @include text(xs);
+}
+
+.form-error {
+  color: var(--color-danger);
+}
+
+.form-info {
+  color: var(--color-text-muted);
+}

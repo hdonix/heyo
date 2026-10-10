@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The palette, the dictation pill and the screenshot overlay: events, and nothing of the window's own. Which of Heyo's commands each window may invoke is decided in src/commands/access.rs.",
+  "windows": [
+    "main",
+    "dictation",
+    "screenshot"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

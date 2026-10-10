@@ -1,0 +1,169 @@
+// Searches for the entries of corpus.jsonl, written by hand, by the kind of query.
+{"query": "发票", "bucket": "keyword", "expect": [2, 56]}
+{"query": "invoice", "bucket": "keyword", "expect": 30}
+{"query": "会议纪要", "bucket": "keyword", "expect": 4}
+{"query": "docker compose", "bucket": "keyword", "expect": 6}
+{"query": "rebase", "bucket": "keyword", "expect": 7}
+{"query": "收货地址", "bucket": "keyword", "expect": 9}
+{"query": "guest network", "bucket": "keyword", "expect": 10}
+{"query": "年假", "bucket": "keyword", "expect": 47}
+{"query": "nginx", "bucket": "keyword", "expect": 32}
+{"query": "火锅", "bucket": "keyword", "expect": 59}
+{"query": "dentist", "bucket": "keyword", "expect": 23}
+{"query": "refund policy", "bucket": "keyword", "expect": 45}
+{"query": "体检", "bucket": "keyword", "expect": 50}
+{"query": "ffmpeg", "bucket": "keyword", "expect": 44}
+{"query": "护照", "bucket": "keyword", "expect": 53}
+{"query": "standup", "bucket": "keyword", "expect": 108}
+{"query": "房租", "bucket": "keyword", "expect": 42}
+{"query": "tracking number", "bucket": "keyword", "expect": 22}
+{"query": "周报", "bucket": "keyword", "expect": 28}
+{"query": "rate limit", "bucket": "keyword", "expect": 98}
+{"query": "猫粮", "bucket": "keyword", "expect": 75}
+{"query": "warranty", "bucket": "keyword", "expect": 125}
+{"query": "停车位", "bucket": "keyword", "expect": 85}
+{"query": "domain", "bucket": "keyword", "expect": 111}
+{"query": "10.0.3.17", "bucket": "exact", "expect": [1, 127]}
+{"query": "heyo/issues", "bucket": "exact", "expect": 3}
+{"query": "SF12345", "bucket": "exact", "expect": 22}
+{"query": "91310115", "bucket": "exact", "expect": 18}
+{"query": "CA1832", "bucket": "exact", "expect": 20}
+{"query": "G1234", "bucket": "exact", "expect": 35}
+{"query": "BV1xx411c7mD", "bucket": "exact", "expect": 43}
+{"query": "2402.05672", "bucket": "exact", "expect": 65}
+{"query": "192.168.1.1", "bucket": "exact", "expect": 78}
+{"query": "E12345678", "bucket": "exact", "expect": 53}
+{"query": "HEYO-7F3K", "bucket": "exact", "expect": 62}
+{"query": "ENOSPC", "bucket": "exact", "expect": 14}
+{"query": "ERESOLVE", "bucket": "exact", "expect": 54}
+{"query": "DE89 3704", "bucket": "exact", "expect": 27}
+{"query": "98765432100", "bucket": "exact", "expect": 55}
+{"query": "token=9f8e", "bucket": "exact", "expect": 116}
+{"query": "0x7ffee4b3c8a0", "bucket": "exact", "expect": 60}
+{"query": "HEAD~1", "bucket": "exact", "expect": 123}
+{"query": "昨天 ssh", "bucket": "hinted", "expect": 1}
+{"query": "from firefox arxiv", "bucket": "hinted", "expect": 65}
+{"query": "昨天的周报", "bucket": "hinted", "expect": 28}
+{"query": "yesterday zoom", "bucket": "hinted", "expect": 55}
+{"query": "上周 收货地址", "bucket": "hinted", "expect": 9}
+{"query": "last week nginx", "bucket": "hinted", "expect": 32}
+{"query": "上周的房租", "bucket": "hinted", "expect": 42}
+{"query": "今天 取件码", "bucket": "hinted", "expect": 124}
+{"query": "today lunch", "bucket": "hinted", "expect": 80}
+{"query": "code里的 debounce", "bucket": "hinted", "expect": 5}
+{"query": "from slack postpone", "bucket": "hinted", "expect": 52}
+{"query": "from wechat 火锅", "bucket": "hinted", "expect": 59}
+{"query": "前天 rebase", "bucket": "hinted", "expect": 7}
+{"query": "3天前 发票", "bucket": "hinted", "expect": 2}
+{"query": "this week standup", "bucket": "hinted", "expect": 108}
+{"query": "delayed on the road", "bucket": "paraphrase", "expect": 74}
+{"query": "push back the release", "bucket": "paraphrase", "expect": 52}
+{"query": "disk is full", "bucket": "paraphrase", "expect": 14}
+{"query": "账单邮寄了", "bucket": "paraphrase", "expect": 2}
+{"query": "休假期间找谁", "bucket": "paraphrase", "expect": 47}
+{"query": "经费缩减 不再招人", "bucket": "paraphrase", "expect": 121}
+{"query": "失去焦点后打不了字", "bucket": "paraphrase", "expect": 25}
+{"query": "慢 SQL 拖垮了服务", "bucket": "paraphrase", "expect": 72}
+{"query": "take back my latest check-in", "bucket": "paraphrase", "expect": [122, 123]}
+{"query": "money back rules", "bucket": "paraphrase", "expect": 45}
+{"query": "parcel given to next door", "bucket": "paraphrase", "expect": 49}
+{"query": "site was down at night", "bucket": "paraphrase", "expect": 68}
+{"query": "earbuds dropping connection", "bucket": "paraphrase", "expect": 102}
+{"query": "they want to hire me", "bucket": "paraphrase", "expect": 105}
+{"query": "medicine dosage", "bucket": "paraphrase", "expect": 113}
+{"query": "hike distance and climb", "bucket": "paraphrase", "expect": 86}
+{"query": "how long until my order arrives", "bucket": "paraphrase", "expect": 71}
+{"query": "应聘者表现怎么样", "bucket": "paraphrase", "expect": 38}
+{"query": "什么时候把钱还我", "bucket": "paraphrase", "expect": 94}
+{"query": "咖啡馆推荐", "bucket": "paraphrase", "expect": 106}
+{"query": "锻炼安排", "bucket": "paraphrase", "expect": 115}
+{"query": "pancake ingredients", "bucket": "paraphrase", "expect": 93}
+{"query": "tax on selling investments", "bucket": "paraphrase", "expect": 77}
+{"query": "server login command", "bucket": "description", "expect": [1, 127]}
+{"query": "wireless login for visitors", "bucket": "description", "expect": 10}
+{"query": "bank transfer details", "bucket": "description", "expect": 27}
+{"query": "that css centering snippet", "bucket": "description", "expect": 107}
+{"query": "react timer hook", "bucket": "description", "expect": 87}
+{"query": "video compression command", "bucket": "description", "expect": 44}
+{"query": "virtual environment setup", "bucket": "description", "expect": 57}
+{"query": "query for most active buyers", "bucket": "description", "expect": 12}
+{"query": "archive my home folders", "bucket": "description", "expect": 51}
+{"query": "火车票信息", "bucket": "description", "expect": 35}
+{"query": "报销填的单位信息", "bucket": "description", "expect": 56}
+{"query": "学校开会时间", "bucket": "description", "expect": 69}
+{"query": "租金怎么付", "bucket": "description", "expect": 42}
+{"query": "医院检查结果", "bucket": "description", "expect": 50}
+{"query": "出国证件", "bucket": "description", "expect": 53}
+{"query": "要交的入职材料", "bucket": "description", "expect": 97}
+{"query": "package install conflict", "bucket": "description", "expect": 54}
+{"query": "frontend null reference crash", "bucket": "description", "expect": 37}
+{"query": "shell script header", "bucket": "description", "expect": 84}
+{"query": "graphics card usage command", "bucket": "description", "expect": 92}
+{"query": "how many todos in the code", "bucket": "description", "expect": 104}
+{"query": "decode an encoded string in terminal", "bucket": "description", "expect": 110}
+{"query": "regular expression for mail addresses", "bucket": "description", "expect": 48}
+{"query": "new mobile contact", "bucket": "description", "expect": 83}
+{"query": "product key", "bucket": "description", "expect": 62}
+{"query": "who to email while away", "bucket": "description", "expect": 96}
+{"query": "家里上网设备怎么登录", "bucket": "description", "expect": 78}
+{"query": "employment verification letter", "bucket": "description", "expect": 58}
+{"query": "invoice sent last month", "bucket": "cross-language", "expect": 2}
+{"query": "meeting minutes", "bucket": "cross-language", "expect": 4}
+{"query": "shipping address", "bucket": "cross-language", "expect": 9}
+{"query": "weekly report", "bucket": "cross-language", "expect": 28}
+{"query": "train ticket", "bucket": "cross-language", "expect": 35}
+{"query": "hotpot dinner reservation", "bucket": "cross-language", "expect": 59}
+{"query": "annual leave", "bucket": "cross-language", "expect": 47}
+{"query": "medical checkup results", "bucket": "cross-language", "expect": 50}
+{"query": "passport number", "bucket": "cross-language", "expect": 53}
+{"query": "parking spot", "bucket": "cross-language", "expect": 85}
+{"query": "router settings page", "bucket": "cross-language", "expect": 78}
+{"query": "tomato egg recipe", "bucket": "cross-language", "expect": 21}
+{"query": "interview feedback", "bucket": "cross-language", "expect": 38}
+{"query": "rent payment", "bucket": "cross-language", "expect": 42}
+{"query": "verification code", "bucket": "cross-language", "expect": 31}
+{"query": "printer setup", "bucket": "cross-language", "expect": 109}
+{"query": "year-end review outline", "bucket": "cross-language", "expect": 100}
+{"query": "parent teacher meeting", "bucket": "cross-language", "expect": 69}
+{"query": "cat food", "bucket": "cross-language", "expect": 75}
+{"query": "workout plan", "bucket": "cross-language", "expect": 115}
+{"query": "pickup code for parcel", "bucket": "cross-language", "expect": 124}
+{"query": "季度报告截止", "bucket": "cross-language", "expect": 8}
+{"query": "生日祝福", "bucket": "cross-language", "expect": 40}
+{"query": "牙医预约", "bucket": "cross-language", "expect": 23}
+{"query": "航班信息", "bucket": "cross-language", "expect": 20}
+{"query": "退货政策", "bucket": "cross-language", "expect": 45}
+{"query": "迟到了", "bucket": "cross-language", "expect": 74}
+{"query": "午餐订单", "bucket": "cross-language", "expect": 80}
+{"query": "录用通知", "bucket": "cross-language", "expect": 105}
+{"query": "域名续费", "bucket": "cross-language", "expect": 111}
+{"query": "重置密码链接", "bucket": "cross-language", "expect": 116}
+{"query": "访客无线密码", "bucket": "cross-language", "expect": 10}
+{"query": "撤销上一次提交", "bucket": "cross-language", "expect": [122, 123]}
+{"query": "磁盘空间不足", "bucket": "cross-language", "expect": 14}
+{"query": "合同已签", "bucket": "cross-language", "expect": 89}
+{"query": "会议室预订", "bucket": "cross-language", "expect": 34}
+{"query": "接口限流", "bucket": "cross-language", "expect": 98}
+{"query": "sunflower harbor", "bucket": "partial", "expect": 10}
+{"query": "beef noodle", "bucket": "partial", "expect": 80}
+{"query": "fern twice a week", "bucket": "partial", "expect": 64}
+{"query": "博云路", "bucket": "partial", "expect": 9}
+{"query": "海底捞", "bucket": "partial", "expect": 59}
+{"query": "愚园路 拿铁", "bucket": "partial", "expect": 106}
+{"query": "黑暗森林", "bucket": "partial", "expect": 118}
+{"query": "ring road traffic", "bucket": "partial", "expect": 74}
+{"query": "rough edges onboarding", "bucket": "partial", "expect": 52}
+{"query": "sunflower 24 harbour", "bucket": "partial", "expect": 10}
+{"query": "博云路3号", "bucket": "partial", "expect": 9}
+{"query": "beef noodles and dumpling", "bucket": "partial", "expect": 80}
+{"query": "fifteen min late", "bucket": "partial", "expect": 74}
+{"query": "wedding invitation", "bucket": "nothing to find"}
+{"query": "汽车保险", "bucket": "nothing to find"}
+{"query": "electric guitar tabs", "bucket": "nothing to find"}
+{"query": "股票代码", "bucket": "nothing to find"}
+{"query": "visa application for japan", "bucket": "nothing to find"}
+{"query": "毕业论文致谢", "bucket": "nothing to find"}
+{"query": "chess opening", "bucket": "nothing to find"}
+{"query": "滑雪装备清单", "bucket": "nothing to find"}
+{"query": "mortgage interest rate", "bucket": "nothing to find"}
+{"query": "dog vaccination schedule", "bucket": "nothing to find"}

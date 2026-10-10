@@ -1,0 +1,47 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import process from "node:process";
+import fs from "node:fs";
+const host = process.env.TAURI_DEV_HOST;
+
+/// In development, `src/dev/bench.ts` reports what it measured here, and it
+/// is appended to the file `HEYO_BENCH_OUT` names (see scripts/gui-test/scroll.sh).
+const record = (server: any) => {
+  server.middlewares.use("/__bench", (request: any, response: any) => {
+    const out = process.env.HEYO_BENCH_OUT;
+    if (out) fs.appendFileSync(out, decodeURIComponent(String(request.url).replace(/^\/?\??/, "")) + "\n");
+    response.end("ok");
+  });
+};
+// `vite preview` too, for measuring the frontend as it is built for release.
+const bench = { name: "heyo-bench", configureServer: record, configurePreviewServer: record };
+
+// https://vite.dev/config/
+export default defineConfig(() => ({
+  plugins: [react(), bench],
+
+  // Other checkouts of this repository may sit under .claude/.
+  test: { exclude: ["**/node_modules/**", "**/dist/**", ".claude/**"] },
+
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent Vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell Vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
+    },
+  },
+}));

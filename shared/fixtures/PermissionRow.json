@@ -1,0 +1,5 @@
+{
+  "allows": "take pictures of the screen",
+  "permission": "screen.capture",
+  "state": "allowed"
+}

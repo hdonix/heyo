@@ -1,0 +1,161 @@
+// The scales everything is sized, spaced and timed by. Sass maps here are
+// the single source: base/_tokens.scss turns them into custom properties,
+// and the mixins read them.
+
+@use "sass:map";
+
+// --- Colour ---------------------------------------------------------------
+//
+// Two tones: neutrals for everything, one accent for what is active. Each
+// colour is a (light, dark) pair, emitted as `light-dark()` so that it
+// follows `color-scheme`.
+
+$colors: (
+  // What fills are tinted with: ink on paper, light on dark.
+  "tint": (#000, #fff),
+
+  "text": (#1a1918, #f4f3f2),
+  "text-muted": (#76726f, #a39f9c),
+  // Quieter still: placeholders, the kind of an item.
+  "text-faint": (#a5a09d, #76726f),
+
+  // Surfaces, from the back forward. The palette is slightly translucent.
+  "bg": (rgba(245, 242, 241, 0.985), rgba(30, 28, 28, 0.975)),
+  "bg-solid": (#ffffff, #1c1b1b),
+  "surface": (#ffffff, #2b2929),
+  "surface-raised": (#ffffff, #322f2f),
+  // A card on the solid background: paper on light, a lift on dark.
+  "card": (#f7f6f5, #262424),
+  // The edge light catches along the top of a raised thing.
+  "highlight": (rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.07)),
+
+  "border": (rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.09)),
+  "border-strong": (rgba(0, 0, 0, 0.16), rgba(255, 255, 255, 0.18)),
+  // Between the rows of a list: barely there.
+  "divider": (rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.06)),
+
+  "accent": (#d9471f, #ff6b3d),
+  "on-accent": (#fff, #1c1210),
+  "danger": (#d92d20, #ff453a),
+  "success": (#188a52, #59d499),
+  "warning": (#a86a00, #ffc531),
+
+  "scrim": (rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.4)),
+);
+
+// Fills: hover, pressed, selected, controls. The tint at rising strengths.
+$fills: (
+  1: (rgba(30, 20, 15, 0.035), rgba(255, 250, 245, 0.04)),
+  2: (rgba(30, 20, 15, 0.055), rgba(255, 250, 245, 0.065)),
+  3: (rgba(30, 20, 15, 0.09), rgba(255, 250, 245, 0.1)),
+  4: (rgba(30, 20, 15, 0.14), rgba(255, 250, 245, 0.16)),
+);
+
+// What shadows are made of, from the faintest up.
+$shadows: (
+  "hairline": (rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.6)),
+  "near": (rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3)),
+  "far": (rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0.55)),
+);
+
+// The colours extensions name (Raycast's `Color`).
+$raycast: (
+  "blue": (#0a7fd6, #56c2ff),
+  "green": (#188a52, #59d499),
+  "magenta": (#d1309a, #ff63c3),
+  "orange": (#d2601a, #ff8c42),
+  "purple": (#8a48d6, #c88cff),
+  "red": (#d93636, #ff6363),
+  "yellow": (#a86a00, #ffc531),
+  "brown": (#8a5a2b, #c8935a),
+);
+
+// --- Space ----------------------------------------------------------------
+//
+// A 4 px grid. `space(3)` is 12px; halves (`space(1.5)`) are for the inside
+// of small controls only.
+
+$unit: 4px;
+
+@function space($steps) {
+  @return $steps * $unit;
+}
+
+// --- Type -----------------------------------------------------------------
+//
+// Each size with the line height it is set on (which keeps text on the grid)
+// and how its letters are spaced: large text a little tighter, small labels
+// a little looser.
+
+$type: (
+  "2xs": (11px, 16px, 0.02em),
+  "xs": (12px, 16px, 0.01em),
+  "sm": (13px, 18px, 0),
+  "md": (14px, 20px, -0.006em),
+  // Rows of the palette: the size things are read at.
+  "row": (15px, 20px, -0.009em),
+  "lg": (15px, 22px, -0.01em),
+  "xl": (18px, 24px, -0.014em),
+  "2xl": (22px, 28px, -0.018em),
+);
+
+$weights: (
+  "regular": 400,
+  "medium": 500,
+  "semibold": 600,
+);
+
+// --- Shape ----------------------------------------------------------------
+//
+// Nested corners follow "outer = inner + the gap between them": rows (md)
+// sit 8px inside the panel (2xl); controls (md) 4px inside a card (lg).
+
+$radii: (
+  "xs": 4px,
+  "sm": 6px,
+  "md": 8px,
+  "lg": 10px,
+  "xl": 16px,
+  // The palette itself: generously round, as the windows around it now are.
+  "2xl": 22px,
+  "full": 999px,
+);
+
+// How tall things one clicks are.
+$heights: (
+  "sm": 24px,
+  "md": 28px,
+  "lg": 32px,
+  "row": 40px,
+);
+
+$icons: (
+  "sm": 14px,
+  "md": 16px,
+  "lg": 18px,
+  // An application's icon, or the tile a command's icon sits in.
+  "tile": 24px,
+);
+
+// --- Motion ---------------------------------------------------------------
+
+$durations: (
+  "instant": 80ms,
+  "fast": 120ms,
+  "base": 160ms,
+  "slow": 240ms,
+);
+
+$easings: (
+  // Things arriving and moving: quick off the mark, settling gently.
+  "out": cubic-bezier(0.2, 0, 0, 1),
+  // Things leaving.
+  "in": cubic-bezier(0.4, 0, 1, 1),
+  // A little past and back, for what pops up.
+  "spring": cubic-bezier(0.34, 1.3, 0.64, 1),
+);
+
+// The transparent margin the palette's window keeps around the panel for
+// its shadow to fall in. (The window in tauri.conf.json is this much larger
+// on every side.)
+$window-margin: 32px;

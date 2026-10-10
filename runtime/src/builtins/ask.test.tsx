@@ -1,0 +1,87 @@
+// Ask AI, rendered as the runtime renders it: the question becomes a kept
+// conversation, and AI Chat takes it up from there.
+import { createElement } from "react";
+import { afterAll, expect, test, vi } from "vitest";
+
+const data = await vi.hoisted(async () => {
+  const [fs, os, path] = await Promise.all([import("node:fs"), import("node:os"), import("node:path")]);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-ask-"));
+  process.env.HEYO_DATA_DIR = dir;
+  return { remove: () => fs.rmSync(dir, { recursive: true, force: true }) };
+});
+
+// The protocol takes over stdout when loaded; here it records what is sent.
+const wire = vi.hoisted(() => ({ sent: [] as any[] }));
+vi.mock("../protocol", () => ({ request: vi.fn(async () => undefined), send: (message: unknown) => wire.sent.push(message), on: vi.fn() }));
+const model = vi.hoisted(() => ({ calls: [] as { prompt: string; onText(text: string): void; finish(answer: string): void }[] }));
+vi.mock("../ai", () => ({
+  describeClaudeError: (error: unknown) => String(error),
+  pasteable: (text: string) => text,
+  streamClaude: (options: { prompt: string; onText(text: string): void }) => new Promise<string>((finish) => model.calls.push({ ...options, finish })),
+}));
+
+import { Navigator } from "../api/navigation";
+import { foreground } from "../context";
+import { dispatch, mount, visibleChildren, type Container, type HostNode } from "../renderer";
+import { close } from "../session";
+import { AskAi } from "./ask";
+import { chats } from "./chat";
+import { builtinExtension } from "./index";
+
+afterAll(() => {
+  close();
+  data.remove();
+});
+
+const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a question asked is a conversation kept, which AI Chat continues", async () => {
+  const errors: unknown[] = [];
+  const container: Container = { children: [], onCommit() {} };
+  const unmount = mount(createElement(Navigator, { root: createElement(AskAi, { fallbackText: " Why is the sky blue? " }), onPopRoot() {}, expose() {} }), container, (e) => errors.push(e));
+  await settle();
+  const all = () => {
+    const out: HostNode[] = [];
+    const visit = (node: HostNode) => {
+      out.push(node);
+      visibleChildren(node).forEach(visit);
+    };
+    container.children.forEach(visit);
+    return out;
+  };
+  const titles = () => all().filter((n) => n.type === "Action").map((n) => n.props.title);
+  const detail = () => all().find((n) => n.type === "Detail")!;
+
+  expect(errors).toEqual([]);
+  // Asked once, and kept at once.
+  expect(model.calls.map((c) => c.prompt)).toEqual(["Why is the sky blue?"]);
+  const [kept] = chats().store.list();
+  expect(kept).toMatchObject({ title: "Why is the sky blue?", messages: [{ role: "user", content: "Why is the sky blue?" }] });
+  expect(detail().props).toMatchObject({ isLoading: true, markdown: "> Why is the sky blue?\n\n…", untrusted: true });
+  expect(titles()).toEqual(["Stop Answering"]);
+
+  model.calls[0].onText("Rayleigh");
+  await settle(200);
+  expect(detail().props.markdown).toBe("> Why is the sky blue?\n\nRayleigh");
+
+  model.calls[0].finish("Rayleigh scattering.");
+  await settle(100);
+  expect(detail().props).toMatchObject({ isLoading: false, markdown: "> Why is the sky blue?\n\nRayleigh scattering." });
+  expect(titles()).toEqual(["Continue in AI Chat", "Copy Answer", "Paste Answer", "Try Again"]);
+  expect(chats().store.get(kept.id)?.messages).toHaveLength(2);
+
+  // Continuing starts AI Chat, on this conversation.
+  foreground.value = { extension: builtinExtension, command: "ask-ai", launchType: "userInitiated" };
+  wire.sent.length = 0;
+  dispatch(all().find((n) => n.props.title === "Continue in AI Chat")!.id, "onAction", []);
+  await settle(100);
+  unmount();
+  expect(wire.sent.find((m) => m.type === "launched")).toMatchObject({ title: "AI Chat" });
+  const shown = wire.sent.filter((m) => m.type === "render" && m.view).at(-1).view;
+  // On top of the list of conversations.
+  expect(shown.depth).toBe(2);
+  const list = shown.nodes.find((n: { type: string }) => n.type === "List");
+  expect(list.props).toMatchObject({ navigationTitle: "Why is the sky blue?", isShowingDetail: true });
+  expect(shown.nodes.find((n: { type: string }) => n.type === "List.Item.Detail").props.markdown).toBe("> Why is the sky blue?\n\nRayleigh scattering.");
+  expect(errors).toEqual([]);
+});

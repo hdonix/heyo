@@ -1,0 +1,10 @@
+{
+  "installed": true,
+  "installing": false,
+  "microphones": [
+    {
+      "description": "USB Microphone",
+      "name": "alsa_input.usb"
+    }
+  ]
+}

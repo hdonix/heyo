@@ -1,0 +1,133 @@
+// Made-up clipboard entries to measure the search on (`heyo --clipboard-eval cases.jsonl --corpus corpus.jsonl`).
+// None of it was ever copied by anyone. The cases are asked on a Saturday afternoon.
+{"now": "2026-10-10T15:00:00"}
+{"id": 1, "text": "ssh deploy@10.0.3.17 -p 2222", "app": "org.gnome.Terminal", "ago": "1d"}
+{"id": 2, "text": "上个月的发票已经寄出，请查收", "app": "wechat", "ago": "3d"}
+{"id": 3, "text": "https://github.com/heyo-app/heyo/issues/42", "app": "firefox", "ago": "2d"}
+{"id": 4, "text": "会议纪要：周三下午讨论 Wayland 支持，结论是先做 GNOME，KDE 排到下个季度", "app": "feishu", "ago": "3d"}
+{"id": 5, "text": "const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };", "app": "Code", "ago": "5d"}
+{"id": 6, "text": "docker compose up -d --build", "app": "org.gnome.Terminal", "ago": "6h"}
+{"id": 7, "text": "git rebase --onto main feature~3 feature", "app": "org.gnome.Terminal", "ago": "2d"}
+{"id": 8, "text": "The quarterly report is due on Friday; please send me your numbers by Wednesday noon.", "app": "thunderbird", "ago": "4d"}
+{"id": 9, "text": "收货地址：上海市浦东新区张江高科技园区博云路2号 3楼，联系人王磊，电话 13800138000", "app": "wechat", "ago": "9d"}
+{"id": 10, "text": "Wi-Fi password for the office guest network: sunflower-42-harbor", "app": "slack", "ago": "12d"}
+{"id": 11, "text": "kubectl get pods -n staging --sort-by=.status.startTime", "app": "org.gnome.Terminal", "ago": "1d"}
+{"id": 12, "text": "SELECT user_id, count(*) FROM orders WHERE created_at > now() - interval '7 days' GROUP BY user_id ORDER BY 2 DESC LIMIT 20;", "app": "Code", "ago": "8d"}
+{"id": 13, "text": "明天上午十点和设计组过一下新版设置页的交互稿", "app": "feishu", "ago": "20h"}
+{"id": 14, "text": "Error: ENOSPC: no space left on device, write", "app": "org.gnome.Terminal", "ago": "7d"}
+{"id": 15, "text": "Thanks for the quick turnaround! I'll review the pull request tonight and get back to you tomorrow morning.", "app": "slack", "ago": "2d"}
+{"id": 16, "text": "#3b82f6", "app": "Code", "ago": "10d"}
+{"id": 17, "text": "/home/user/Documents/tax-return-2025.pdf", "app": "firefox", "ago": "14d"}
+{"id": 18, "text": "营业执照统一社会信用代码：91310115MA1K4XYZ3N", "app": "wechat", "ago": "15d"}
+{"id": 19, "text": "pnpm exec vitest run --reporter=verbose src/selection.test.ts", "app": "org.gnome.Terminal", "ago": "3h"}
+{"id": 20, "text": "Flight CA1832 Beijing PEK → Shanghai SHA, departs 08:30, gate closes 08:10, seat 23A", "app": "firefox", "ago": "6d"}
+{"id": 21, "text": "番茄炒蛋：鸡蛋三个打散，番茄两个切块，先炒蛋盛出，再炒番茄出汁，倒回鸡蛋，加盐和一点糖", "app": "wechat", "ago": "25d"}
+{"id": 22, "text": "tracking number: SF1234567890123", "app": "firefox", "ago": "11d"}
+{"id": 23, "text": "Reminder: dentist appointment on October 21 at 3:30 pm, Dr. Chen, bring the insurance card", "app": "thunderbird", "ago": "5d"}
+{"id": 24, "text": "export ANTHROPIC_BASE_URL=http://127.0.0.1:8000/v1", "app": "org.gnome.Terminal", "ago": "4d"}
+{"id": 25, "text": "这个 bug 的原因是窗口失焦时没有释放键盘抓取，导致整个桌面无法输入", "app": "feishu", "ago": "2d"}
+{"id": 26, "text": "https://docs.rs/rusqlite/latest/rusqlite/struct.Connection.html", "app": "firefox", "ago": "1d"}
+{"id": 27, "text": "IBAN: DE89 3704 0044 0532 0130 00, BIC COBADEFFXXX, account holder Heyo Software GmbH", "app": "thunderbird", "ago": "30d"}
+{"id": 28, "text": "周报：本周完成剪贴板历史迁移到 SQLite，修复了中文两字搜索；下周计划做语义检索评测", "app": "feishu", "ago": "1d"}
+{"id": 29, "text": "fn dot(a: &[f32], b: &[f32]) -> f32 { a.iter().zip(b).map(|(x, y)| x * y).sum() }", "app": "Code", "ago": "40m"}
+{"id": 30, "text": "Could you resend the invoice for September? The PDF attachment was corrupted.", "app": "thunderbird", "ago": "3d"}
+{"id": 31, "text": "验证码 482913，5分钟内有效，请勿泄露给他人", "app": "wechat", "ago": "2h"}
+{"id": 32, "text": "sudo systemctl restart nginx && sudo journalctl -u nginx -f", "app": "org.gnome.Terminal", "ago": "9d"}
+{"id": 33, "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", "app": "Code", "ago": "18d"}
+{"id": 34, "text": "The meeting room on the 5th floor is booked from 2 to 4 pm for the design review.", "app": "slack", "ago": "1d"}
+{"id": 35, "text": "高铁 G1234 北京南 → 上海虹桥，10月15日 09:00 发车，05车 12F", "app": "wechat", "ago": "2d"}
+{"id": 36, "text": "rsync -avz --delete ./dist/ deploy@files.example.com:/var/www/heyo/", "app": "org.gnome.Terminal", "ago": "13d"}
+{"id": 37, "text": "TypeError: Cannot read properties of undefined (reading 'map')", "app": "firefox", "ago": "5h"}
+{"id": 38, "text": "面试反馈：候选人算法基础扎实，系统设计经验偏少，沟通清晰，建议进入下一轮", "app": "feishu", "ago": "16d"}
+{"id": 39, "text": "curl -s https://api.github.com/repos/tauri-apps/tauri/releases/latest | jq .tag_name", "app": "org.gnome.Terminal", "ago": "6d"}
+{"id": 40, "text": "Happy birthday! Wishing you a wonderful year ahead, full of good health and great adventures.", "app": "wechat", "ago": "22d"}
+{"id": 41, "text": "padding: 12px 16px; border-radius: 8px; background: var(--surface-2);", "app": "Code", "ago": "2d"}
+{"id": 42, "text": "房租 6500 元每月，押一付三，10月5日前转账，房东张阿姨", "app": "wechat", "ago": "8d"}
+{"id": 43, "text": "https://www.bilibili.com/video/BV1xx411c7mD", "app": "firefox", "ago": "4d"}
+{"id": 44, "text": "ffmpeg -i input.mov -vf scale=1280:-2 -c:v libx264 -crf 23 -preset slow output.mp4", "app": "org.gnome.Terminal", "ago": "19d"}
+{"id": 45, "text": "Our refund policy: items can be returned within 30 days of delivery in their original packaging.", "app": "firefox", "ago": "14d"}
+{"id": 46, "text": "localhost:5432 postgres / dev_password_123 (development database only)", "app": "Code", "ago": "27d"}
+{"id": 47, "text": "下周一开始休年假五天，紧急事情请联系李娜", "app": "feishu", "ago": "2d"}
+{"id": 48, "text": "regex for email: ^[\\w.+-]+@[\\w-]+\\.[\\w.-]+$", "app": "Code", "ago": "33d"}
+{"id": 49, "text": "The package was left with the neighbour at number 14 because nobody answered the door.", "app": "thunderbird", "ago": "10d"}
+{"id": 50, "text": "体检报告：血压 118/76，空腹血糖 5.1，总胆固醇偏高，建议三个月后复查", "app": "wechat", "ago": "45d"}
+{"id": 51, "text": "tar -czf backup-$(date +%F).tar.gz ~/Documents ~/Pictures", "app": "org.gnome.Terminal", "ago": "21d"}
+{"id": 52, "text": "I think we should postpone the launch by two weeks; the onboarding flow still has too many rough edges.", "app": "slack", "ago": "3d"}
+{"id": 53, "text": "护照号码 E12345678，有效期至 2031年6月", "app": "wechat", "ago": "60d"}
+{"id": 54, "text": "npm ERR! code ERESOLVE unable to resolve dependency tree", "app": "org.gnome.Terminal", "ago": "12d"}
+{"id": 55, "text": "Zoom link for the weekly sync: https://zoom.us/j/98765432100?pwd=abc123", "app": "slack", "ago": "1d"}
+{"id": 56, "text": "打车发票抬头：海克软件（上海）有限公司，税号 91310000MA1FL0XX1X", "app": "wechat", "ago": "5d"}
+{"id": 57, "text": "python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt", "app": "org.gnome.Terminal", "ago": "15d"}
+{"id": 58, "text": "To whom it may concern: I am writing to confirm that Ms. Li has been employed with us since March 2021.", "app": "thunderbird", "ago": "35d"}
+{"id": 59, "text": "今晚想吃火锅，七点海底捞中山公园店，已经订了四人位", "app": "wechat", "ago": "1d"}
+{"id": 60, "text": "0x7ffee4b3c8a0", "app": "Code", "ago": "6d"}
+{"id": 61, "text": "margin of error ±3.2%, sample size n = 1,024, confidence level 95%", "app": "firefox", "ago": "17d"}
+{"id": 62, "text": "license key: HEYO-7F3K-9QWE-22XD-PL0M", "app": "thunderbird", "ago": "50d"}
+{"id": 63, "text": "这段代码的时间复杂度是 O(n log n)，瓶颈在排序，可以用堆优化到 O(n log k)", "app": "feishu", "ago": "7d"}
+{"id": 64, "text": "Don't forget to water the plants while I'm away — the fern needs it twice a week.", "app": "wechat", "ago": "6d"}
+{"id": 65, "text": "https://arxiv.org/abs/2402.05672", "app": "firefox", "ago": "3h"}
+{"id": 66, "text": "chmod +x scripts/install.sh && ./scripts/install.sh", "app": "org.gnome.Terminal", "ago": "2h"}
+{"id": 67, "text": "产品需求：搜索框支持自然语言时间表达，例如“上周三下午复制的链接”", "app": "feishu", "ago": "9d"}
+{"id": 68, "text": "The server returned 502 Bad Gateway for about ten minutes around midnight UTC.", "app": "slack", "ago": "4d"}
+{"id": 69, "text": "孩子家长会改到周五下午四点，三楼会议室，记得带成绩单回执", "app": "wechat", "ago": "1d"}
+{"id": 70, "text": "awk -F, '{ sum += $3 } END { print sum / NR }' sales.csv", "app": "org.gnome.Terminal", "ago": "23d"}
+{"id": 71, "text": "Standard shipping takes 5–7 business days; express delivery arrives in 2 days for an extra $12.", "app": "firefox", "ago": "14d"}
+{"id": 72, "text": "数据库连接池耗尽：最大连接数 20，慢查询把连接占满了，先把超时调到 5 秒", "app": "feishu", "ago": "4d"}
+{"id": 73, "text": "git log --oneline --graph --decorate -20", "app": "org.gnome.Terminal", "ago": "30m"}
+{"id": 74, "text": "I'm running about fifteen minutes late, stuck in traffic on the ring road. Start without me.", "app": "wechat", "ago": "2d"}
+{"id": 75, "text": "猫粮：皇家室内成猫粮 2kg，上次买是 9 月 12 日，大概六周吃完", "app": "wechat", "ago": "28d"}
+{"id": 76, "text": "interface ClipboardEntry { id: number; kind: 'text' | 'link' | 'image'; copiedAt: number }", "app": "Code", "ago": "3d"}
+{"id": 77, "text": "The capital gains tax rate for assets held longer than a year is lower than for short-term holdings.", "app": "firefox", "ago": "40d"}
+{"id": 78, "text": "路由器管理地址 192.168.1.1，账号 admin，密码贴在机身背面", "app": "wechat", "ago": "55d"}
+{"id": 79, "text": "xdg-mime default org.gnome.Nautilus.desktop inode/directory", "app": "org.gnome.Terminal", "ago": "26d"}
+{"id": 80, "text": "Lunch order: two beef noodle soups, one vegetarian dumplings, no cilantro", "app": "slack", "ago": "5h"}
+{"id": 81, "text": "论文摘要：我们提出一种弱监督对比学习方法训练多语言文本向量模型，在检索任务上超过了 BM25", "app": "firefox", "ago": "3h"}
+{"id": 82, "text": "journalctl --user -u heyo.service --since '10 minutes ago'", "app": "org.gnome.Terminal", "ago": "1d"}
+{"id": 83, "text": "My new phone number is +44 7700 900123, the old one stops working at the end of the month.", "app": "wechat", "ago": "18d"}
+{"id": 84, "text": "#!/usr/bin/env bash\nset -euo pipefail\ncd \"$(dirname \"$0\")/..\"\npnpm install && pnpm build", "app": "Code", "ago": "11d"}
+{"id": 85, "text": "停车位 B2-137，电梯出来右转第三排", "app": "wechat", "ago": "3d"}
+{"id": 86, "text": "The trail is 12 km round trip with 600 m of elevation gain; allow four to five hours.", "app": "firefox", "ago": "20d"}
+{"id": 87, "text": "useEffect(() => { const id = setInterval(tick, 1000); return () => clearInterval(id); }, []);", "app": "Code", "ago": "4d"}
+{"id": 88, "text": "保修期到 2027年3月，序列号 SN-C02XK1ABJG5H", "app": "firefox", "ago": "70d"}
+{"id": 89, "text": "Please find attached the signed contract; the countersigned copy should reach you by courier next week.", "app": "thunderbird", "ago": "6d"}
+{"id": 90, "text": "rgb(34, 197, 94)", "app": "Code", "ago": "10d"}
+{"id": 91, "text": "明早八点半的站会改成线上，腾讯会议号 123 456 789", "app": "feishu", "ago": "18h"}
+{"id": 92, "text": "nvidia-smi --query-gpu=memory.used,memory.total --format=csv", "app": "org.gnome.Terminal", "ago": "8d"}
+{"id": 93, "text": "The recipe needs 250 g flour, 2 eggs, 300 ml milk and a pinch of salt; rest the batter for half an hour.", "app": "firefox", "ago": "32d"}
+{"id": 94, "text": "已收到您的退款申请，款项将在 3–5 个工作日内原路退回", "app": "wechat", "ago": "7d"}
+{"id": 95, "text": "cargo test --release clipboard::store::tests::speed -- --ignored --nocapture", "app": "org.gnome.Terminal", "ago": "1h"}
+{"id": 96, "text": "Out of office until Monday; for anything urgent please contact support@example.com.", "app": "thunderbird", "ago": "2d"}
+{"id": 97, "text": "身份证复印件、户口本、一寸照片两张，周四前交给人事", "app": "feishu", "ago": "5d"}
+{"id": 98, "text": "The API rate limit is 60 requests per minute per token; bursts above that get HTTP 429.", "app": "firefox", "ago": "9d"}
+{"id": 99, "text": "export PATH=\"$HOME/.cargo/bin:$HOME/.local/bin:$PATH\"", "app": "org.gnome.Terminal", "ago": "44d"}
+{"id": 100, "text": "年终总结提纲：一、今年做成了什么；二、没做成的和原因；三、明年的三个重点", "app": "obsidian", "ago": "12d"}
+{"id": 101, "text": "https://maps.google.com/?q=31.2304,121.4737", "app": "firefox", "ago": "8d"}
+{"id": 102, "text": "Bluetooth headphones keep disconnecting after the last firmware update; rolling back to 4.1.2 fixed it.", "app": "firefox", "ago": "16d"}
+{"id": 103, "text": "水电燃气缴费户号：电 3101 2345 6789，燃气 880123456", "app": "wechat", "ago": "38d"}
+{"id": 104, "text": "grep -rn \"TODO\\|FIXME\" src/ --include='*.rs' | wc -l", "app": "org.gnome.Terminal", "ago": "5d"}
+{"id": 105, "text": "We'd like to offer you the position of Senior Engineer; the offer letter with compensation details is attached.", "app": "thunderbird", "ago": "75d"}
+{"id": 106, "text": "这家店的拿铁不错，地址在愚园路 1088 弄，周末人多要排队", "app": "wechat", "ago": "13d"}
+{"id": 107, "text": "transform: translate(-50%, -50%) scale(1.05); transition: transform 120ms ease-out;", "app": "Code", "ago": "1d"}
+{"id": 108, "text": "The standup notes: Ana is blocked on the payment gateway sandbox, Ben ships the export feature today.", "app": "slack", "ago": "20h"}
+{"id": 109, "text": "打印机 IP 10.0.8.45，驱动选 HP LaserJet Pro M404，默认双面打印", "app": "feishu", "ago": "24d"}
+{"id": 110, "text": "base64 -d <<< 'aGVsbG8gd29ybGQ='", "app": "org.gnome.Terminal", "ago": "29d"}
+{"id": 111, "text": "Remember to renew the domain heyo.dev before November 3; auto-renew is off.", "app": "obsidian", "ago": "15d"}
+{"id": 112, "text": "译文：这份合同自双方签字之日起生效，有效期两年", "app": "firefox", "ago": "6d"}
+{"id": 113, "text": "The patient should take one tablet twice daily after meals for seven days.", "app": "firefox", "ago": "48d"}
+{"id": 114, "text": "sqlite3 history.db \"select count(*) from entries\"", "app": "org.gnome.Terminal", "ago": "2d"}
+{"id": 115, "text": "健身计划：周一胸、周三背、周五腿，每次四十五分钟，结束后拉伸十分钟", "app": "obsidian", "ago": "19d"}
+{"id": 116, "text": "Password reset link expires in 30 minutes: https://accounts.example.com/reset?token=9f8e7d6c", "app": "thunderbird", "ago": "4h"}
+{"id": 117, "text": "wmctrl -l | grep -i firefox", "app": "org.gnome.Terminal", "ago": "36d"}
+{"id": 118, "text": "这本书叫《三体》，刘慈欣写的，第二部《黑暗森林》最好看", "app": "wechat", "ago": "10d"}
+{"id": 119, "text": "Total: $1,284.50 (subtotal $1,180.00 + tax $104.50), due on receipt", "app": "thunderbird", "ago": "7d"}
+{"id": 120, "text": "let mut best: Vec<(u64, f32)> = Vec::with_capacity(count + 1);", "app": "Code", "ago": "50m"}
+{"id": 121, "text": "老板说下季度预算砍百分之二十，招聘名额冻结，出差要提前两周审批", "app": "wechat", "ago": "3d"}
+{"id": 122, "text": "How do I undo the last commit but keep the changes staged?", "app": "firefox", "ago": "7d"}
+{"id": 123, "text": "git reset --soft HEAD~1", "app": "org.gnome.Terminal", "ago": "7d"}
+{"id": 124, "text": "快递驿站取件码 8-3-2046，晚上九点关门", "app": "wechat", "ago": "6h"}
+{"id": 125, "text": "The warranty does not cover damage caused by water, drops, or unauthorized repairs.", "app": "firefox", "ago": "70d"}
+{"id": 126, "text": "英语角每周四晚七点，图书馆二楼，这周话题是旅行", "app": "wechat", "ago": "2d"}
+{"id": 127, "text": "scp -P 2222 ./build/heyo_0.1.0_arm64.deb deploy@10.0.3.17:/tmp/", "app": "org.gnome.Terminal", "ago": "1d"}
+{"id": 128, "text": "Customer feedback: the search is fast but people cannot find things they copied last month.", "app": "slack", "ago": "9d"}
+{"id": 129, "text": "二维码付款失败，提示“交易存在风险”，换了银行卡就好了", "app": "wechat", "ago": "11d"}
+{"id": 130, "text": "timeout 30 ./target/release/heyo --clipboard-eval cases.jsonl", "app": "org.gnome.Terminal", "ago": "15m"}

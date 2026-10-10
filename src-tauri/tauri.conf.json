@@ -1,0 +1,143 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Heyo",
+  "version": "0.1.0",
+  "identifier": "dev.heyo.app",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "create": false,
+        "title": "Heyo",
+        "width": 814,
+        "height": 534,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "center": true
+      },
+      {
+        "label": "dictation",
+        "create": false,
+        "title": "Heyo Dictation",
+        "width": 420,
+        "height": 52,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": false
+      },
+      {
+        "label": "screenshot",
+        "create": false,
+        "title": "Heyo Screenshot",
+        "transparent": true,
+        "width": 800,
+        "height": 600,
+        "decorations": false,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' asset: http://asset.localhost data: blob: https: http:",
+        "font-src": "'self' data:",
+        "media-src": "'self' asset: http://asset.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost asset: http://asset.localhost https://open.er-api.com",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "object-src": "'none'",
+        "base-uri": "'none'"
+      },
+      "devCsp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [
+          "/usr/share/**",
+          "/usr/local/share/**",
+          "$HOME/.local/share/**",
+          "$HOME/.icons/**",
+          "/var/lib/flatpak/**",
+          "/var/lib/snapd/**",
+          "/snap/**",
+          "/opt/**"
+          ],
+          "deny": [
+          "$HOME/.local/share/keyrings/**",
+          "$HOME/.local/share/heyo/support/**",
+          "$HOME/.local/share/heyo/clipboard/history.*",
+          "$HOME/.local/share/heyo/clipboard/eval/**",
+          "$HOME/.local/share/heyo/usage.json",
+          "$HOME/.local/share/heyo/quicklinks.json",
+          "$HOME/.local/share/heyo/snippets.json"
+          ]
+        }
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm", "appimage", "nsis"],
+    "category": "Utility",
+    "shortDescription": "Command palette launcher that runs Raycast extensions",
+    "longDescription": "Heyo is a keyboard-driven launcher: it opens applications, files and links,\ncalculates, keeps a clipboard history, takes dictation, and runs extensions\nwritten for Raycast.\n\nExtensions, dictation and text recognition run in Node.js 22 or newer,\nwhich Heyo finds on PATH or at the path given in its settings.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../runtime/dist/heyo-runtime.cjs": "heyo-runtime.cjs",
+      "../runtime/dist/heyo-dictation.cjs": "heyo-dictation.cjs",
+      "../runtime/dist/heyo-ocr.cjs": "heyo-ocr.cjs",
+      "../runtime/dist/heyo-dev.cjs": "heyo-dev.cjs",
+      "../runtime/dist/heyo-embed.cjs": "heyo-embed.cjs"
+    },
+    "linux": {
+      "deb": {
+        "section": "utils",
+        "priority": "optional",
+        "depends": ["xdg-utils"],
+        "recommends": ["nodejs (>= 22)", "npm", "libnotify-bin", "curl", "pulseaudio-utils"],
+        "desktopTemplate": "../packaging/linux/heyo.desktop"
+      },
+      "rpm": {
+        "depends": ["xdg-utils"],
+        "recommends": ["nodejs >= 22", "nodejs-npm", "libnotify", "curl", "pulseaudio-utils"],
+        "desktopTemplate": "../packaging/linux/heyo.desktop"
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+// How things arrive. One pace and one curve for the whole interface; where
+// less motion is asked for, base/_reset.scss cuts all of it short.
+
+@use "../abstracts" as *;
+
+// What pops up over the view: the actions, a dialog. Small things, which
+// the web view can move smoothly; whole views only fade (fade-in).
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+// Something still loading.
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loading {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}

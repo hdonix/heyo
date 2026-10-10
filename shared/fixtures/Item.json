@@ -1,0 +1,37 @@
+[
+  {
+    "alias": "s",
+    "arguments": [
+      {
+        "data": [
+          {
+            "title": "First",
+            "value": "1"
+          }
+        ],
+        "name": "query",
+        "placeholder": "Query",
+        "required": true,
+        "type": "dropdown"
+      }
+    ],
+    "favorite": true,
+    "hotkey": "<Control><Alt>f",
+    "icon": "magnifying-glass-16",
+    "id": "command:/extensions/search/index",
+    "kind": "Command",
+    "link": "https://example.com/?q={query}",
+    "section": "Favorites",
+    "subtitle": "Files",
+    "text": "A snippet's text",
+    "title": "Search 文件"
+  },
+  {
+    "favorite": false,
+    "icon": null,
+    "id": "app:firefox",
+    "kind": "Application",
+    "subtitle": null,
+    "title": "Firefox"
+  }
+]

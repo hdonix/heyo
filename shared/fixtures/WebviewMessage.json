@@ -1,0 +1,39 @@
+[
+  {
+    "args": [
+      1,
+      "two"
+    ],
+    "node": 12,
+    "prop": "onAction",
+    "session": 3,
+    "type": "dispatch"
+  },
+  {
+    "session": 3,
+    "type": "pop"
+  },
+  {
+    "session": 3,
+    "type": "close"
+  },
+  {
+    "id": 7,
+    "result": true,
+    "type": "reply"
+  },
+  {
+    "error": "no",
+    "id": 8,
+    "type": "reply"
+  },
+  {
+    "action": "primary",
+    "id": 2,
+    "type": "toast-action"
+  },
+  {
+    "target": "https://example.com",
+    "type": "open"
+  }
+]

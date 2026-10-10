@@ -1,0 +1,109 @@
+@use "../abstracts" as *;
+
+/* --- Dictation window ---------------------------------------------------- */
+
+/* The window is wider than the pill so it can grow with the text. */
+.dictation-window {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.dictation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 8px);
+  height: 36px;
+  padding: 0 8px 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-bg);
+  cursor: default;
+  user-select: none;
+}
+
+.dictation:not(.loading, .listening) {
+  padding-right: 14px;
+}
+
+.waveform {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+}
+
+.waveform span {
+  width: 2.5px;
+  min-height: 2.5px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transition: height 0.06s linear;
+}
+
+.dictation.loading .waveform span,
+.dictation.done .waveform span {
+  background: var(--color-text-muted);
+}
+
+.dictation.error .waveform span {
+  background: var(--color-danger);
+}
+
+/* While Claude polishes, the bars ripple. */
+.dictation.polishing .waveform span {
+  height: 30% !important;
+  background: var(--color-text-muted);
+  animation: ripple 0.9s ease-in-out infinite;
+}
+
+.dictation.polishing .waveform span:nth-child(3n + 1) {
+  animation-delay: 0.15s;
+}
+
+.dictation.polishing .waveform span:nth-child(3n + 2) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ripple {
+  50% {
+    transform: scaleY(2.6);
+  }
+}
+
+.dictation-text {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow: hidden;
+  @include text(md);
+  white-space: nowrap;
+}
+
+.dictation-text > span {
+  flex: none;
+}
+
+.dictation-partial {
+  color: var(--color-text-muted);
+}
+
+.dictation.error .dictation-text {
+  color: var(--color-danger);
+}
+
+.dictation .icon-button {
+  flex: none;
+  padding: 4px;
+}
+
+.st-badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+  @include text(sm);
+}

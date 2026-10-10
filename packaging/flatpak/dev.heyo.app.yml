@@ -1,0 +1,82 @@
+# A starting point, not a working package: it has never been built, and a
+# sandboxed Heyo cannot do most of what Heyo is for. packaging/README.md
+# lists what breaks and what would have to change first.
+#
+# It repackages the .deb that `pnpm tauri build --bundles deb` makes, the
+# way Tauri's own guide does, so build that first:
+#
+#   pnpm tauri build --bundles deb
+#   flatpak-builder --user --install --force-clean build-dir packaging/flatpak/dev.heyo.app.yml
+#
+# Flathub would want it built from source instead, offline, from generated
+# cargo and pnpm source lists.
+id: dev.heyo.app
+runtime: org.gnome.Platform
+# Unverified: the newest runtime known to carry WebKitGTK 4.1 when this was
+# written. Check that the one chosen still has libwebkit2gtk-4.1.
+runtime-version: '48'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node22
+command: heyo
+
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  # Extensions and the store, currency rates, Claude.
+  - --share=network
+  # Dictation.
+  - --socket=pulseaudio
+  # Search Files, and what extensions read and write.
+  - --filesystem=home
+  # The host's applications and icons, which appear under /run/host; Heyo
+  # does not look there yet.
+  - --filesystem=host-os:ro
+  # (The name that keeps Heyo to one instance, dev.heyo.app.SingleInstance,
+  # is under the application's own id and needs no permission.)
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Windows, hotkeys and pasting on GNOME go through the Shell and Heyo's
+  # extension in it.
+  - --talk-name=org.gnome.Shell
+  - --filesystem=~/.local/share/gnome-shell/extensions:create
+  # Starting the host's applications means leaving the sandbox, which this
+  # permission allows outright. Heyo does not use it yet.
+  - --talk-name=org.freedesktop.Flatpak
+
+modules:
+  # Extensions run in Node.js. Heyo uses a `node` beside its own program
+  # before any other (settings.rs), so the sandbox's copy goes there.
+  - name: node
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 /usr/lib/sdk/node22/bin/node /app/bin/node
+      - cp -a /usr/lib/sdk/node22/lib/node_modules /app/lib/node_modules
+      - ln -s ../lib/node_modules/npm/bin/npm-cli.js /app/bin/npm
+
+  - name: heyo
+    buildsystem: simple
+    sources:
+      - type: file
+        path: ../../src-tauri/target/release/bundle/deb/Heyo_0.1.0_amd64.deb
+        dest-filename: heyo.deb
+        only-arches: [x86_64]
+      - type: file
+        path: ../../src-tauri/target/release/bundle/deb/Heyo_0.1.0_arm64.deb
+        dest-filename: heyo.deb
+        only-arches: [aarch64]
+    build-commands:
+      - ar -x heyo.deb
+      - tar -xf data.tar.gz
+      - install -Dm755 usr/bin/heyo /app/bin/heyo
+      # Beside ../lib/Heyo is where the program looks for its scripts.
+      - install -Dm644 -t /app/lib/Heyo usr/lib/Heyo/heyo-runtime.cjs usr/lib/Heyo/heyo-dictation.cjs usr/lib/Heyo/heyo-ocr.cjs usr/lib/Heyo/heyo-dev.cjs usr/lib/Heyo/heyo-embed.cjs
+      # Flatpak exports only files named after the application.
+      - install -Dm644 usr/share/icons/hicolor/32x32/apps/heyo.png /app/share/icons/hicolor/32x32/apps/dev.heyo.app.png
+      - install -Dm644 usr/share/icons/hicolor/128x128/apps/heyo.png /app/share/icons/hicolor/128x128/apps/dev.heyo.app.png
+      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/heyo.png /app/share/icons/hicolor/256x256/apps/dev.heyo.app.png
+      - install -Dm644 usr/share/icons/hicolor/512x512/apps/heyo.png /app/share/icons/hicolor/512x512/apps/dev.heyo.app.png
+      - sed -e 's/^Icon=.*/Icon=dev.heyo.app/' usr/share/applications/Heyo.desktop > dev.heyo.app.desktop
+      - install -Dm644 dev.heyo.app.desktop /app/share/applications/dev.heyo.app.desktop

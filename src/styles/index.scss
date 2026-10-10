@@ -1,0 +1,23 @@
+// The stylesheet. `abstracts/` holds the scales and mixins (no output of
+// their own); `base/` the tokens and the page; `components/` a partial to a
+// part of the interface, in the order they cascade.
+
+@use "base/tokens";
+@use "base/reset";
+@use "base/motion";
+
+@use "components/palette";
+@use "components/images";
+@use "components/views";
+@use "components/grid";
+@use "components/detail";
+@use "components/form";
+@use "components/footer";
+@use "components/overlays";
+@use "components/settings-window";
+@use "components/hotkey";
+@use "components/settings";
+@use "components/root-search";
+@use "components/settings-shortcuts";
+@use "components/dictation";
+@use "components/screenshot";

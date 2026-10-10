@@ -1,0 +1,40 @@
+@use "../abstracts" as *;
+
+// The settings window draws itself: no frame of the desktop's, which looks
+// different on every desktop and like none of Heyo. Its window, like the
+// palette's, is larger by a transparent margin where its shadow falls.
+.standalone #root {
+  padding: var(--window-margin);
+  @include window-shadow("xl");
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.button {
+  gap: space(1.5);
+  padding: 0 space(3);
+  @include control(md);
+  font-weight: 500;
+  box-shadow: var(--shadow-control);
+  @include interactive(var(--color-surface-raised), color-mix(in srgb, var(--color-surface-raised), var(--tint) 5%), color-mix(in srgb, var(--color-surface-raised), var(--tint) 10%));
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.button.destructive {
+  color: var(--color-danger);
+}
+
+.button.destructive.armed {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-white);
+}

@@ -1,0 +1,499 @@
+//! The seam between Heyo and the desktop it runs on.
+//!
+//! `Desktop` is everything Heyo asks of a desktop session. Each session has
+//! one adapter (`x11`, `gnome`, `win`, and `Generic` where there is none),
+//! chosen once when first needed; tests put a fake in its place. What an
+//! adapter cannot do it leaves at the default here, which says so: nothing
+//! falls through to another desktop's tools by accident.
+//!
+//! The modules beside this one (`windows`, `input`, `capture`, …) are the
+//! interface the rest of Heyo uses; they hold what is the same on every
+//! desktop and ask the adapter for the rest.
+
+use std::sync::OnceLock;
+
+use super::capture::{Area, Shot};
+use super::clipboard_watch::Change;
+use super::keys::Hold;
+use super::windows::{Layout, Rect, Window, WindowInfo};
+use super::{unsupported, Support};
+
+/// How well a desktop supports each thing Heyo does with it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Supported {
+    /// Listing, switching and moving other applications' windows.
+    pub windows: Support,
+    /// Sending the paste keystroke to the focused application.
+    pub paste: Support,
+    /// Reading the text selected in another application.
+    pub selection: Support,
+    /// Noticing copies as they happen (limited: polled, text only).
+    pub clipboard_watch: Support,
+    /// A single key held to talk.
+    pub hold_key: Support,
+    /// Reading the screen (limited: through the desktop's screenshot tool).
+    pub capture: Support,
+    /// Covering the whole screen for a selection (limited: an ordinary
+    /// fullscreen window, which the desktop may animate).
+    pub overlay: Support,
+    /// Following what is typed in other applications, for snippets that
+    /// expand as their keyword is typed.
+    pub typing: Support,
+}
+
+impl Supported {
+    pub const NOTHING: Supported = Supported {
+        windows: Support::None,
+        paste: Support::None,
+        selection: Support::None,
+        clipboard_watch: Support::None,
+        hold_key: Support::None,
+        capture: Support::None,
+        overlay: Support::None,
+        typing: Support::None,
+    };
+}
+
+pub trait Desktop: Send + Sync {
+    fn supported(&self) -> Supported;
+
+    // --- Other applications' windows ---------------------------------------
+
+    /// Which keys are held down right now, as a 256-bit map by keycode.
+    fn keys_down(&self) -> Option<[u8; 32]> {
+        None
+    }
+
+    /// The active window, unless it is one of Heyo's own.
+    fn active_window(&self) -> Option<Window> {
+        None
+    }
+
+    /// The class of the active window, e.g. "firefox".
+    fn active_class(&self) -> Option<String> {
+        None
+    }
+
+    /// Application windows, most recently used first; `current` goes last.
+    fn windows(&self, _current: Option<Window>) -> Result<Vec<WindowInfo>, String> {
+        Err(unsupported("Listing windows"))
+    }
+
+    /// The windows that can be seen at present (not minimized, not on
+    /// another workspace), the topmost first. Where the desktop cannot tell,
+    /// all of them, most recently used first, which is nearly the same.
+    fn windows_shown(&self) -> Result<Vec<WindowInfo>, String> {
+        self.windows(None)
+    }
+
+    /// The application window used most recently before `window`.
+    fn window_before(&self, _window: Window) -> Option<Window> {
+        None
+    }
+
+    /// The windows whose class is one of `classes` (lowercase), most
+    /// recently used first.
+    fn windows_of(&self, _classes: &[String]) -> Vec<Window> {
+        Vec::new()
+    }
+
+    fn activate(&self, _window: Window) -> Result<(), String> {
+        Err(unsupported("Switching windows"))
+    }
+
+    fn close(&self, _window: Window) -> Result<(), String> {
+        Err(unsupported("Closing windows"))
+    }
+
+    fn arrange(&self, _window: Window, _layout: Layout, _monitors: &[Rect]) -> Result<(), String> {
+        Err(unsupported("Moving windows"))
+    }
+
+    // --- Input into the application in front -----------------------------------
+
+    /// Presses the paste shortcut there (a terminal's, if it is one).
+    fn paste(&self, _terminal: bool) -> Result<(), String> {
+        Err(unsupported("Pasting"))
+    }
+
+    /// The text selected there, or nothing.
+    fn selected_text(&self) -> String {
+        String::new()
+    }
+
+    // --- The clipboard ------------------------------------------------------------
+
+    /// The clipboard's text where it can be read without Heyo being in
+    /// front. `None`: read it the ordinary way.
+    fn clipboard_text(&self) -> Option<String> {
+        None
+    }
+
+    /// The clipboard's image as RGBA; see `clipboard_text`.
+    fn clipboard_image(&self) -> Option<image::RgbaImage> {
+        None
+    }
+
+    /// Sets the clipboard's text where the ordinary way needs the focus.
+    /// False: set it the ordinary way.
+    fn set_clipboard_text(&self, _text: &str) -> bool {
+        false
+    }
+
+    /// Reports every clipboard change for as long as the session lasts, or
+    /// says at once that it cannot.
+    fn watch_clipboard(&self, _on_change: &mut dyn FnMut(Change)) -> Result<(), String> {
+        Err(unsupported("Watching the clipboard"))
+    }
+
+    // --- The screen -----------------------------------------------------------------
+
+    fn grab(&self, _area: Area) -> Result<Shot, String> {
+        Err(unsupported("Capturing the screen"))
+    }
+
+    // --- A key held to talk ---------------------------------------------------------
+
+    /// The keys (of `keys::KEYS`) that can be watched.
+    fn hold_keys(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
+    fn watch_hold(&self, _key: &dyn Fn() -> String, _on: &dyn Fn(Hold)) -> Result<(), String> {
+        Err(unsupported("A hold-to-talk key"))
+    }
+
+    // --- Heyo's own windows ---------------------------------------------------------
+
+    /// Brings Heyo's window of that title to the front, where the window
+    /// cannot do so itself.
+    #[cfg(target_os = "linux")]
+    fn activate_own(&self, _title: &str) {}
+
+    /// Whether one of Heyo's windows has the focus, where the desktop knows
+    /// better than the toolkit. `None`: believe the toolkit.
+    fn own_focused(&self) -> Option<bool> {
+        None
+    }
+
+    /// Puts the screenshot overlay over a rectangle (logical pixels), above
+    /// everything, with the keyboard. The default is the best an ordinary
+    /// window can do: fullscreen on its monitor.
+    #[cfg(target_os = "linux")]
+    fn place_overlay(&self, window: &gtk::ApplicationWindow, x: i32, y: i32, _width: i32, _height: i32) {
+        use gtk::prelude::*;
+        window.move_(x, y);
+        window.fullscreen();
+        window.show_all();
+        window.present();
+    }
+
+    /// Shows the frozen capture in a window of its own under the overlay.
+    /// False: the overlay paints it itself.
+    #[cfg(target_os = "linux")]
+    fn overlay_backdrop(&self, _capture: gtk::cairo::ImageSurface, _x: i32, _y: i32, _width: i32, _height: i32) -> bool {
+        false
+    }
+
+    /// Before the overlay is hidden: gives back what `place_overlay` took.
+    #[cfg(target_os = "linux")]
+    fn release_overlay(&self, _window: &gtk::ApplicationWindow) {}
+
+    /// After the overlay is hidden.
+    #[cfg(target_os = "linux")]
+    fn close_overlay(&self) {}
+
+    /// Where the monitor the pointer is on starts, in physical pixels as the
+    /// toolkit gives monitors' positions. `None`: ask the toolkit, which on
+    /// Wayland knows the pointer only while it is over one of Heyo's windows.
+    fn pointer_monitor(&self) -> Option<(i32, i32)> {
+        None
+    }
+
+    // --- The computer ---------------------------------------------------------------
+
+    /// Does something to the computer; see [`super::system::run`].
+    fn system(&self, action: super::system::Action) -> Result<Option<String>, String> {
+        super::system::freedesktop(action)
+    }
+
+    /// Opens a file, folder or URL, with `application` when given.
+    fn open(&self, target: &str, application: Option<&str>) -> Result<(), String> {
+        super::system::freedesktop_open(target, application)
+    }
+
+    fn trash(&self, paths: &[String]) -> Result<(), String> {
+        super::system::freedesktop_trash(paths)
+    }
+
+    /// The id of the application that opens `target` by default.
+    fn default_application(&self, target: &str) -> Option<String> {
+        super::system::freedesktop_default_application(target)
+    }
+
+    /// The speakers and microphones. A desktop without a way of its own is
+    /// asked through the freedesktop tools, which only Linux has.
+    fn audio_devices(&self) -> Result<Vec<super::system::AudioDevice>, String> {
+        #[cfg(target_os = "linux")]
+        return super::system::freedesktop_audio_devices();
+        #[cfg(not(target_os = "linux"))]
+        Err(unsupported("Choosing audio devices"))
+    }
+
+    fn use_audio_device(&self, _kind: super::system::AudioKind, _name: &str) -> Result<(), String> {
+        #[cfg(target_os = "linux")]
+        return super::system::freedesktop_use_audio_device(_kind, _name);
+        #[cfg(not(target_os = "linux"))]
+        Err(unsupported("Choosing audio devices"))
+    }
+
+    /// The user's processes, the busiest first.
+    fn processes(&self) -> Result<Vec<super::system::ProcessInfo>, String> {
+        #[cfg(target_os = "linux")]
+        return super::system::freedesktop_processes();
+        #[cfg(not(target_os = "linux"))]
+        Err(unsupported("Listing processes"))
+    }
+
+    fn end_process(&self, _pid: u32, _force: bool) -> Result<(), String> {
+        #[cfg(target_os = "linux")]
+        return super::system::freedesktop_end_process(_pid, _force);
+        #[cfg(not(target_os = "linux"))]
+        Err(unsupported("Ending processes"))
+    }
+
+    // --- Global hotkeys -------------------------------------------------------------
+
+    /// What sets and keeps the global hotkeys here, if anything does.
+    fn hotkeys(&self) -> Option<&dyn Hotkeys> {
+        None
+    }
+
+    // --- What is typed --------------------------------------------------------------
+
+    /// What follows the typing in other applications here, if anything can.
+    fn typing(&self) -> Option<&dyn super::typed::Typing> {
+        None
+    }
+}
+
+/// Global hotkeys: each runs Heyo with some arguments.
+pub trait Hotkeys: Send + Sync {
+    /// The accelerator (as `<Control>space`) of what runs Heyo with these arguments.
+    fn get(&self, target: &super::hotkeys::Target) -> Option<String>;
+    /// Sets it; an empty accelerator removes the hotkey.
+    fn set(&self, target: &super::hotkeys::Target, accelerator: &str) -> Result<(), String>;
+    /// Accelerators of all `--open <id>` hotkeys, by item id.
+    fn items(&self) -> std::collections::HashMap<String, String>;
+    /// Begins acting on the hotkeys, where Heyo itself must.
+    fn start(&self, _app: &tauri::AppHandle) {}
+}
+
+/// A session Heyo has no adapter for: what generic tools can do, no more.
+pub struct Generic;
+
+impl Desktop for Generic {
+    fn supported(&self) -> Supported {
+        // On Linux: wtype or ydotool, the primary selection, polling, and
+        // the desktop's own screenshot tool. Elsewhere nothing.
+        if cfg!(target_os = "linux") {
+            Supported { paste: Support::Limited, selection: Support::Limited, clipboard_watch: Support::Limited, capture: Support::Limited, overlay: Support::Limited, ..Supported::NOTHING }
+        } else {
+            Supported::NOTHING
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn paste(&self, terminal: bool) -> Result<(), String> {
+        super::input::paste_with_tools(terminal)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn selected_text(&self) -> String {
+        super::input::primary_selection()
+    }
+
+    #[cfg(target_os = "linux")]
+    fn grab(&self, area: Area) -> Result<Shot, String> {
+        super::capture::grab_with_tool(area)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn hotkeys(&self) -> Option<&dyn Hotkeys> {
+        super::hotkeys::gsettings()
+    }
+}
+
+/// The adapter for the session Heyo was started in.
+fn choose() -> Box<dyn Desktop> {
+    #[cfg(windows)]
+    return Box::new(super::win::Windows);
+    #[cfg(target_os = "linux")]
+    match super::session() {
+        super::Session::X11 => return Box::new(super::x11::X11),
+        // An X server is usually there on Wayland too (XWayland), but it
+        // knows only the applications still using X11.
+        super::Session::Wayland if super::gnome::available() => return Box::new(super::gnome::Gnome),
+        _ => {}
+    }
+    #[allow(unreachable_code)]
+    Box::new(Generic)
+}
+
+/// The desktop Heyo is running on.
+pub fn desktop() -> &'static dyn Desktop {
+    #[cfg(test)]
+    if let Some(fake) = fake::current() {
+        return fake;
+    }
+    static CHOSEN: OnceLock<Box<dyn Desktop>> = OnceLock::new();
+    CHOSEN.get_or_init(choose).as_ref()
+}
+
+/// A desktop for tests: it has the windows it is given and remembers what
+/// was asked of it.
+#[cfg(test)]
+pub mod fake {
+    use std::cell::Cell;
+    use std::sync::Mutex;
+
+    use super::*;
+
+    thread_local!(static CURRENT: Cell<Option<&'static Fake>> = const { Cell::new(None) });
+
+    pub(super) fn current() -> Option<&'static dyn Desktop> {
+        CURRENT.with(|current| current.get()).map(|fake| fake as &dyn Desktop)
+    }
+
+    #[derive(Default)]
+    pub struct Fake {
+        /// Most recently used first; the first is in front.
+        pub windows: Mutex<Vec<WindowInfo>>,
+        /// "activate 3", "paste terminal", … in the order asked.
+        pub asked: Mutex<Vec<String>>,
+        pub selection: Mutex<String>,
+    }
+
+    impl Fake {
+        /// A desktop with these windows (id, class), the first in front.
+        pub fn with_windows(windows: &[(Window, &str)]) -> &'static Fake {
+            let fake = Fake::default();
+            *fake.windows.lock().unwrap() =
+                windows.iter().map(|(id, class)| WindowInfo { id: *id, title: format!("{class} {id}"), class: (*class).to_owned(), active: false, bounds: None }).collect();
+            Box::leak(Box::new(fake))
+        }
+
+        /// Runs `test` with this as the desktop (on this thread).
+        pub fn during<T>(&'static self, test: impl FnOnce() -> T) -> T {
+            CURRENT.with(|current| current.set(Some(self)));
+            let result = test();
+            CURRENT.with(|current| current.set(None));
+            result
+        }
+
+        pub fn asked(&self) -> Vec<String> {
+            self.asked.lock().unwrap().clone()
+        }
+
+        fn note(&self, what: String) {
+            self.asked.lock().unwrap().push(what);
+        }
+    }
+
+    impl Desktop for Fake {
+        fn supported(&self) -> Supported {
+            Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, ..Supported::NOTHING }
+        }
+
+        fn active_window(&self) -> Option<Window> {
+            self.windows.lock().unwrap().first().map(|w| w.id)
+        }
+
+        fn active_class(&self) -> Option<String> {
+            self.windows.lock().unwrap().first().map(|w| w.class.clone())
+        }
+
+        fn windows(&self, current: Option<Window>) -> Result<Vec<WindowInfo>, String> {
+            let mut windows = self.windows.lock().unwrap().clone();
+            windows.sort_by_key(|w| Some(w.id) == current);
+            Ok(windows)
+        }
+
+        fn window_before(&self, window: Window) -> Option<Window> {
+            self.windows.lock().unwrap().iter().map(|w| w.id).find(|id| *id != window)
+        }
+
+        fn windows_of(&self, classes: &[String]) -> Vec<Window> {
+            self.windows.lock().unwrap().iter().filter(|w| classes.contains(&w.class.to_lowercase())).map(|w| w.id).collect()
+        }
+
+        /// The window comes to the front, as on a real desktop.
+        fn activate(&self, window: Window) -> Result<(), String> {
+            self.note(format!("activate {window}"));
+            let mut windows = self.windows.lock().unwrap();
+            let at = windows.iter().position(|w| w.id == window).ok_or("the window is gone")?;
+            let front = windows.remove(at);
+            windows.insert(0, front);
+            Ok(())
+        }
+
+        fn close(&self, window: Window) -> Result<(), String> {
+            self.note(format!("close {window}"));
+            self.windows.lock().unwrap().retain(|w| w.id != window);
+            Ok(())
+        }
+
+        fn arrange(&self, window: Window, layout: Layout, _monitors: &[Rect]) -> Result<(), String> {
+            self.note(format!("arrange {window} {layout:?}"));
+            Ok(())
+        }
+
+        fn paste(&self, terminal: bool) -> Result<(), String> {
+            self.note(if terminal { "paste terminal".into() } else { "paste".into() });
+            Ok(())
+        }
+
+        fn selected_text(&self) -> String {
+            self.selection.lock().unwrap().clone()
+        }
+
+        fn system(&self, action: crate::platform::system::Action) -> Result<Option<String>, String> {
+            self.note(format!("system {action:?}"));
+            Ok(None)
+        }
+
+        fn open(&self, target: &str, application: Option<&str>) -> Result<(), String> {
+            self.note(format!("open {target} with {}", application.unwrap_or("the default")));
+            Ok(())
+        }
+
+        fn trash(&self, paths: &[String]) -> Result<(), String> {
+            self.note(format!("trash {}", paths.join(" ")));
+            Ok(())
+        }
+
+        fn default_application(&self, _target: &str) -> Option<String> {
+            None
+        }
+
+        fn audio_devices(&self) -> Result<Vec<crate::platform::system::AudioDevice>, String> {
+            self.note("audio devices".into());
+            Ok(Vec::new())
+        }
+
+        fn use_audio_device(&self, kind: crate::platform::system::AudioKind, name: &str) -> Result<(), String> {
+            self.note(format!("use {kind:?} {name}"));
+            Ok(())
+        }
+
+        fn processes(&self) -> Result<Vec<crate::platform::system::ProcessInfo>, String> {
+            self.note("processes".into());
+            Ok(Vec::new())
+        }
+
+        fn end_process(&self, pid: u32, _force: bool) -> Result<(), String> {
+            self.note(format!("end {pid}"));
+            Ok(())
+        }
+    }
+}

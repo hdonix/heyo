@@ -1,0 +1,158 @@
+// What pops up over a view: the action panel, alerts and prompts.
+
+@use "../abstracts" as *;
+
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  // Above the pill of actions it opens from.
+  padding: 0 space(2) 54px;
+
+  .floating-window & {
+    inset: var(--window-margin);
+  }
+
+  &.center {
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--radius-2xl);
+    background: var(--color-scrim);
+    @include enter(fade-in, fast);
+  }
+}
+
+.action-panel {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-height: 340px;
+  @include floating;
+  transform-origin: bottom right;
+  @include enter(pop-in, fast);
+}
+
+.action-panel-title {
+  padding: space(3) space(3) space(1);
+  color: var(--color-text-muted);
+  @include text(2xs, semibold);
+  @include truncate;
+}
+
+.action-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: space(1);
+}
+
+.action-section + .action-section {
+  margin-top: space(1);
+  padding-top: space(1);
+  border-top: 1px solid var(--color-divider);
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: space(2);
+  height: 32px;
+  padding: 0 space(2);
+  // Inside the panel's corner by the list's padding.
+  border-radius: var(--radius-md);
+  cursor: default;
+
+  &.selected {
+    background: var(--color-selected);
+  }
+
+  &.destructive {
+    color: var(--color-danger);
+
+    &.selected {
+      background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    }
+  }
+}
+
+.action-title {
+  flex: 1;
+  @include truncate;
+}
+
+.chevron {
+  color: var(--color-text-faint);
+}
+
+.action-search {
+  height: 40px;
+  padding: 0 space(3);
+  border: none;
+  border-top: 1px solid var(--color-divider);
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+
+  &::placeholder {
+    color: var(--color-text-faint);
+  }
+}
+
+.alert {
+  width: 320px;
+  padding: space(5);
+  @include floating;
+  border-radius: var(--radius-xl);
+  text-align: center;
+  @include enter(pop-in, fast);
+}
+
+.alert-title {
+  @include text(lg, semibold);
+}
+
+.alert-message {
+  margin-top: space(2);
+  color: var(--color-text-muted);
+  @include text(sm);
+  // A message may show lines of text as they are (what is about to be pasted).
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.alert-buttons {
+  display: flex;
+  gap: space(2);
+  margin-top: space(5);
+
+  button {
+    flex: 1;
+    justify-content: center;
+    @include control(lg);
+    font-weight: 500;
+    @include interactive(var(--fill-2), var(--fill-3), var(--fill-4));
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  // Three choices: one under the other.
+  &.stacked {
+    flex-direction: column;
+  }
+
+  // The one filled button of the dialog.
+  .primary {
+    color: var(--color-on-accent);
+    @include interactive(var(--color-accent), color-mix(in srgb, var(--color-accent), var(--tint) 10%), color-mix(in srgb, var(--color-accent), var(--tint) 18%));
+  }
+
+  .destructive {
+    color: var(--color-white);
+    @include interactive(var(--color-danger), color-mix(in srgb, var(--color-danger), #000 10%), color-mix(in srgb, var(--color-danger), #000 18%));
+  }
+}

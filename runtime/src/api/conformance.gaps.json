@@ -1,0 +1,24 @@
+{
+  "The older way in: a command that calls render() instead of exporting a component": [
+    "render"
+  ],
+  "Unstable or internal to Raycast": [
+    "unstable_AI",
+    "useUnstableAI",
+    "AI.experimental_decide",
+    "AI.refreshModels",
+    "captureMemorySnapshot",
+    "specialKeys",
+    "useActionPanel"
+  ],
+  "Newer additions not yet looked into": [
+    "environment.entryPointMode",
+    "environment.entryPointName",
+    "environment.entryPointType",
+    "environment.launchContext",
+    "OAuth.clientIdMetadataDocument",
+    "OAuth.RedirectMethod.ClientIdMetadataDocument",
+    "Cache.DEFAULT_CAPACITY",
+    "Cache.STORAGE_DIRECTORY_NAME"
+  ]
+}

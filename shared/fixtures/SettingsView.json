@@ -1,0 +1,41 @@
+{
+  "aiProvider": "claude",
+  "aliases": {
+    "app:firefox": "ff"
+  },
+  "anthropicApiKey": "",
+  "anthropicApiKeySet": true,
+  "appearance": "system",
+  "canUpdate": false,
+  "clipboardHistory": true,
+  "clipboardIgnoredApps": [],
+  "clipboardMeaning": false,
+  "clipboardPaused": false,
+  "clipboardRetentionDays": 90,
+  "compactMode": false,
+  "confirmTerminalPaste": true,
+  "dictationHoldKey": "",
+  "dictationLanguage": "auto",
+  "dictationPolish": "off",
+  "dictationSource": "",
+  "dictationVocabulary": [],
+  "disabledCommands": [],
+  "extensionsDir": "/home/ada/.local/share/heyo/extensions",
+  "favorites": [
+    "app:firefox"
+  ],
+  "hideOnBlur": true,
+  "keepCommand": false,
+  "launchAtLogin": true,
+  "localModelName": "",
+  "localModelUrl": "http://127.0.0.1:8000/v1",
+  "nodeOverridden": false,
+  "nodePath": "",
+  "nodeVersion": {
+    "Ok": "v24.0.0"
+  },
+  "settingsPath": "/home/ada/.config/heyo/settings.json",
+  "snippetExpansion": false,
+  "snippetExpansionIgnoredApps": [],
+  "version": "0.1.0"
+}

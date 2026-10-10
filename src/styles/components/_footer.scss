@@ -1,0 +1,93 @@
+// The footer's contents: what the view is, its actions, and toasts.
+
+@use "../abstracts" as *;
+
+// One pill of actions at the end, and at the start what the view is (or
+// what it has to say).
+.footer-title,
+.footer-actions,
+.toast {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 38px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-pill);
+}
+
+.footer-title {
+  gap: space(2);
+  padding: 0 space(4) 0 space(3);
+  @include truncate;
+}
+
+.footer-actions {
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0 space(1);
+}
+
+.footer-button {
+  display: inline-flex;
+  align-items: center;
+  gap: space(2);
+  height: 30px;
+  padding: 0 space(1) 0 space(3);
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 500;
+  @include interactive;
+
+  // The first is what Enter does: it reads stronger than the rest.
+  &:first-child {
+    color: var(--color-text);
+  }
+}
+
+.shortcut {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.toast {
+  gap: space(2);
+  padding: 0 space(4) 0 space(3);
+  overflow: hidden;
+  white-space: nowrap;
+  @include enter(fade-in, fast);
+}
+
+.toast-title {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.toast-message {
+  @include truncate;
+}
+
+.toast-icon {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+
+  .toast.failure & {
+    background: var(--color-danger);
+  }
+
+  .toast.animated & {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--fill-4);
+    border-top-color: var(--color-accent);
+    background: none;
+    animation: spin 0.8s linear infinite;
+  }
+}

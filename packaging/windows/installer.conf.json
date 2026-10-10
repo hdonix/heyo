@@ -1,0 +1,9 @@
+{
+  "bundle": {
+    "resources": {
+      "target/heyo-windows/node.exe": "node.exe",
+      "target/heyo-windows/libunwind.dll": "libunwind.dll",
+      "target/heyo-windows/WebView2Loader.dll": "WebView2Loader.dll"
+    }
+  }
+}

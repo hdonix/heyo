@@ -1,0 +1,46 @@
+{
+  "author": "ada",
+  "builtin": false,
+  "commands": [
+    {
+      "description": "Adds one",
+      "icon": "plus-16",
+      "id": "command:/home/ada/.local/share/heyo/extensions/todo/add",
+      "mode": "view",
+      "name": "add",
+      "preferences": [
+        {
+          "name": "list",
+          "required": false,
+          "title": "List",
+          "type": "textfield"
+        }
+      ],
+      "title": "Add Todo"
+    }
+  ],
+  "description": "Things to do",
+  "development": "/home/ada/src/todo",
+  "icon": "/home/ada/.local/share/heyo/extensions/todo/assets/icon.png",
+  "id": "/home/ada/.local/share/heyo/extensions/todo",
+  "name": "todo",
+  "preferences": [
+    {
+      "name": "token",
+      "required": true,
+      "title": "Token",
+      "type": "password"
+    }
+  ],
+  "title": "Todo",
+  "values": {
+    "commands": {
+      "add": {
+        "list": "Home"
+      }
+    },
+    "extension": {
+      "token": "abc"
+    }
+  }
+}

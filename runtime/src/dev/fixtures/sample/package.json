@@ -1,0 +1,15 @@
+{
+  "name": "sample",
+  "title": "Sample",
+  "description": "A small extension the developer tools' tests build and run.",
+  "icon": "icon.png",
+  "author": "heyo",
+  "license": "MIT",
+  "commands": [
+    { "name": "hello", "title": "Say Hello", "description": "Lists greetings", "mode": "view" },
+    { "name": "quiet", "title": "Greet Quietly", "description": "Shows a greeting and ends", "mode": "no-view" }
+  ],
+  "dependencies": {
+    "@raycast/api": "^2.7.2"
+  }
+}

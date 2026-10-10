@@ -1,0 +1,6 @@
+{
+  "uuid": "heyo-test-harness@heyo.local",
+  "name": "Heyo test harness",
+  "description": "For the test container only: lifts GNOME Shell's restrictions on its screenshot and scripting interfaces so tests can look at the screen and at the windows. Never install this on a real desktop.",
+  "shell-version": ["48", "49", "50"]
+}

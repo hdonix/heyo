@@ -1,0 +1,16 @@
+@use "../abstracts" as *;
+
+/* --- Images ------------------------------------------------------------- */
+
+.image {
+  flex: none;
+  object-fit: contain;
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  @include text(2xs);
+}
