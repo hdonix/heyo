@@ -1,5 +1,7 @@
 # Heyo
 
+[![CI](https://github.com/hdonix/heyo/actions/workflows/ci.yml/badge.svg)](https://github.com/hdonix/heyo/actions/workflows/ci.yml)
+
 A cross-platform command palette launcher. It launches desktop applications
 and runs [Raycast](https://www.raycast.com) extensions on Linux.
 

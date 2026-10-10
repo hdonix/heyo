@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev libxkbcommon-dev
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      # The oldest Node.js that Heyo runs extensions in.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # Type-checks both, and leaves the runtime's scripts where the host's
+      # build looks for them.
+      - name: Build the interface and the runtime
+        run: pnpm build
+
+      - name: Test the interface and the runtime
+        run: pnpm test
+
+      - name: Test the host
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      # The host's tests write the types the interface and the runtime share.
+      - name: Check that shared/bindings is what the host declares
+        run: git diff --exit-code -- shared/bindings
+
+  windows:
+    name: Windows (compiles)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # The host's build bundles the runtime's scripts.
+      - name: Build the runtime
+        run: pnpm build:runtime
+
+      - name: Check the host
+        working-directory: src-tauri
+        run: cargo check --locked
