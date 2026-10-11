@@ -286,7 +286,11 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
             // somewhere to go.
             let subscription = world.subscriptions.lock().unwrap().open(caller.background);
             let recording = world.running.listen(subscription, language, indicator.unwrap_or(true)).inspect_err(|_| world.subscriptions.lock().unwrap().ended(subscription))?;
-            world.subscriptions.lock().unwrap().attach(subscription, Source::Recording(recording));
+            if !world.subscriptions.lock().unwrap().attach(subscription, Source::Recording(recording)) {
+                // The process that asked ended as the recording started:
+                // nobody is left to end it.
+                effects.push(Effect::CancelListening(recording));
+            }
             return value(Subscription { subscription });
         }
         DictationStop { subscription } => {
@@ -361,9 +365,14 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
         ActivityGet { id } => return Ok(table(world).get(&caller.name, &id).is_some().into()),
         ActivityPresentation => return value(presentation()),
         ActivityOnEvent => {
-            let subscription = world.subscriptions.lock().unwrap().open(caller.background);
+            // In one step, so that a runtime process that ends meanwhile
+            // takes the listener with its subscription: a listener left
+            // behind would be sent the events in place of the extension's
+            // handler command, and hear none of them.
+            let mut subscriptions = world.subscriptions.lock().unwrap();
+            let subscription = subscriptions.open(caller.background);
+            subscriptions.attach(subscription, Source::Activities);
             table(world).listen(&caller.name, subscription);
-            world.subscriptions.lock().unwrap().attach(subscription, Source::Activities);
             return value(Subscription { subscription });
         }
     }
@@ -489,12 +498,11 @@ impl Subscriptions {
         self.last
     }
 
-    /// Says what a subscription is to, once that has started. If the
-    /// subscription is gone already, nothing is left to stop.
-    fn attach(&mut self, id: u64, source: Source) {
-        if let Some(open) = self.open.get_mut(&id) {
-            open.source = Some(source);
-        }
+    /// Says what a subscription is to, once that has started. False if the
+    /// subscription is gone already: the source is the caller's to stop.
+    fn attach(&mut self, id: u64, source: Source) -> bool {
+        let open = self.open.get_mut(&id);
+        open.map(|open| open.source = Some(source)).is_some()
     }
 
     /// The process a subscription's events go to, while it is open.
@@ -656,6 +664,8 @@ mod tests {
         monitors: RefCell<Vec<Rect>>,
         /// The recording `listen` starts, or why it does not.
         recording: RefCell<Result<u64, ExtError>>,
+        /// What happens as a recording starts, before `listen` has answered.
+        while_starting: RefCell<Option<Box<dyn Fn()>>>,
         /// "ask Restart the computer?", "hide palette", … in the order asked.
         asked: RefCell<Vec<String>>,
     }
@@ -692,6 +702,9 @@ mod tests {
 
         fn listen(&self, subscription: u64, language: Option<String>, indicator: bool) -> Result<u64, ExtError> {
             self.note(format!("listen for {subscription} in {} {}", language.as_deref().unwrap_or("the language set"), if indicator { "shown" } else { "unseen" }));
+            if let Some(happens) = self.while_starting.borrow().as_ref() {
+                happens();
+            }
             self.recording.borrow().clone()
         }
 
@@ -741,7 +754,7 @@ mod tests {
         index: RwLock<Index>,
         settings: RwLock<Settings>,
         activities: Mutex<Table>,
-        subscriptions: Mutex<Subscriptions>,
+        subscriptions: Arc<Mutex<Subscriptions>>,
         granted: Granted,
         history: ClipboardHistory,
         files: Arc<Files>,
@@ -767,12 +780,12 @@ mod tests {
                 index: RwLock::default(),
                 settings: RwLock::new(Settings::default()),
                 activities: Mutex::default(),
-                subscriptions: Mutex::new(Subscriptions::new()),
+                subscriptions: Arc::new(Mutex::new(Subscriptions::new())),
                 granted: Granted::kept(|| None),
                 history: ClipboardHistory::in_memory(),
                 files: Arc::default(),
                 last_window: LastWindow::default(),
-                app: Scripted { says: Cell::new(true), monitors: RefCell::new(vec![LEFT, RIGHT]), recording: RefCell::new(Ok(7)), asked: RefCell::default() },
+                app: Scripted { says: Cell::new(true), monitors: RefCell::new(vec![LEFT, RIGHT]), recording: RefCell::new(Ok(7)), while_starting: RefCell::default(), asked: RefCell::default() },
                 desktop: Fake::with_windows(windows),
                 dir,
             }
@@ -1330,6 +1343,19 @@ mod tests {
     }
 
     #[test]
+    fn a_recording_that_starts_as_its_process_ends_is_discarded() {
+        let bench = Bench::new(&[]);
+        if cfg!(not(target_os = "linux")) {
+            return;
+        }
+        let subscriptions = bench.subscriptions.clone();
+        *bench.app.while_starting.borrow_mut() = Some(Box::new(move || drop(subscriptions.lock().unwrap().close_all(false))));
+        // Nobody is left to end it, or to hear it.
+        assert_eq!(bench.ask(&From::heyo(), "ext.dictation.listen", json!({})).effects, [Effect::CancelListening(7)]);
+        assert_eq!(runtime_exited(&bench.world(), false), Vec::new());
+    }
+
+    #[test]
     fn the_clipboard_history_is_read_for_those_allowed() {
         let bench = Bench::new(&[]);
         bench.history.record_text("a note about lunch".into(), Some("firefox".into()), 90);
@@ -1378,11 +1404,11 @@ mod tests {
     fn a_subscription_whose_source_has_not_started_leaves_nothing_to_stop() {
         let mut subscriptions = Subscriptions::new();
         let (starting, recording, done) = (subscriptions.open(false), subscriptions.open(false), subscriptions.open(false));
-        subscriptions.attach(recording, Source::Recording(7));
+        assert!(subscriptions.attach(recording, Source::Recording(7)));
         assert_eq!((subscriptions.recording(starting, false), subscriptions.recording(recording, false)), (None, Some(7)));
         // A source that is done leaves nothing to stop, nor to attach to.
         subscriptions.ended(done);
-        subscriptions.attach(done, Source::Recording(9));
+        assert!(!subscriptions.attach(done, Source::Recording(9)));
         assert_eq!(subscriptions.listener(done), None);
         assert_eq!(subscriptions.close(starting, false), None);
         assert_eq!(subscriptions.listener(starting), None);
