@@ -317,7 +317,7 @@ fn agreed(app: &AppHandle, answer: Answer) -> bool {
 /// that gets the focus back. If the clipboard was `borrowed` for it, the
 /// loan ends with the paste.
 fn hide_and_paste(app: &AppHandle, borrowed: Option<Loan>) {
-    let _ = main_window(app).hide();
+    palette::hide(app);
     std::thread::spawn(move || {
         logged(press(HIDING, Lines::Kept));
         drop(borrowed);
@@ -331,9 +331,7 @@ fn hide_and_paste(app: &AppHandle, borrowed: Option<Loan>) {
 fn ask_over_terminal(app: &AppHandle, question: Question, borrowed: Option<Loan>) {
     // It is where the palette returns to.
     palette::remember_window(app);
-    let window = main_window(app);
-    let _ = window.show();
-    focus(&window);
+    palette::bring_back(app);
     let asking = app.clone();
     confirm::ask(app, question, move |answer| {
         if agreed(&asking, answer) {

@@ -363,7 +363,7 @@ src-tauri/src/
   permissions.rs  what an extension may have, and asking the user
   pasting.rs      putting text into another application, with the clipboard lent and given back
   activities.rs   live activities: the table, and showing what is in progress
-  palette.rs      the palette window: show, hide, toggle
+  palette.rs      the palette window, and all that is done with it
   cli.rs          command-line flags and opening an item by id
   platform/       everything that touches the desktop (see below)
   apps.rs         .desktop discovery and launching

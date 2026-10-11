@@ -4,11 +4,11 @@
 //! An id says what it names: `app:<desktop id>`, `cmd:<extension>:<command>`,
 //! `heyo:<native command>`, `quicklink:<id>`, `snippet:<id>`.
 
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::root::{Index, NATIVE};
 use crate::wire::{event, HostMessage};
-use crate::{apps, extensions, menubar, IndexState, Runtime, UsageStore};
+use crate::{apps, extensions, menubar, palette, IndexState, Runtime, UsageStore};
 
 /// What opening an item comes to.
 #[derive(Debug)]
@@ -71,7 +71,7 @@ pub(crate) fn open_with(app: &AppHandle, id: &str, fallback_text: Option<String>
     let way = way(&app.state::<IndexState>().0.read().unwrap(), id);
     let hide_palette = || {
         if origin == Origin::Palette {
-            let _ = crate::main_window(app).hide();
+            palette::hide(app);
         }
     };
     match way {
@@ -88,7 +88,7 @@ pub(crate) fn open_with(app: &AppHandle, id: &str, fallback_text: Option<String>
         }
         Way::Command(command) => {
             if origin == Origin::Outside {
-                crate::show(app);
+                palette::show(app);
             }
             let arguments = arguments.filter(|_| !command.arguments.is_empty()).map(|given| declared(&command, given));
             let arguments = arguments.map(|given| serde_json::json!(given));
@@ -108,7 +108,7 @@ pub(crate) fn open_item(app: &AppHandle, id: &str) {
     app.state::<UsageStore>().record(id);
     let result = open(app, id, None, Origin::Outside).and_then(|opened| match opened {
         true => Ok(()),
-        false => crate::main_window(app).emit(event::OPEN_ITEM, id).map_err(|e| e.to_string()),
+        false => palette::tell(app, event::OPEN_ITEM, id),
     });
     if let Err(e) = result {
         eprintln!("heyo: {e}");

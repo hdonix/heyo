@@ -42,7 +42,6 @@ use open::open_item;
 use clipboard::ClipboardHistory;
 use commands::{media::*, root::*, settings::*};
 use host::*;
-use palette::*;
 use platform::{hotkeys, windows};
 use platform::{common::*, focus::*, input::*};
 use dictation::Dictation;
@@ -160,7 +159,7 @@ pub fn run() {
         // already-running instance instead of starting a new one.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // Run again while still starting: there is nothing to show yet.
-            if app.get_webview_window("main").is_none() {
+            if !palette::exists(app) {
                 return;
             }
             // Off whatever thread the desktop called on: opening an item
@@ -168,7 +167,7 @@ pub fn run() {
             let app = app.clone();
             std::thread::spawn(move || {
                 if !handle_args(&app, &args) {
-                    toggle(&app);
+                    palette::toggle(&app);
                 }
             });
         }))
@@ -289,23 +288,27 @@ pub fn run() {
                 }
             });
             match at_start(&std::env::args().collect::<Vec<_>>()) {
-                AtStart::Palette => show(app.handle()),
-                AtStart::ClipboardHistory => open_clipboard_history(app.handle()),
+                AtStart::Palette => palette::show(app.handle()),
+                AtStart::ClipboardHistory => palette::open_clipboard_history(app.handle()),
                 AtStart::Dictation => dictation::toggle(app.handle()),
                 AtStart::Nothing => {}
             }
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == palette::WINDOW {
+                return palette::on_window_event(window, event);
+            }
             // A pinned capture is deleted with its window.
             if let (WindowEvent::Destroyed, Some(n)) = (event, window.label().strip_prefix("pin-")) {
                 screenshot::unpinned(n);
             }
-            // The palette, the dictation window and the screenshot overlay live
-            // for as long as Heyo does: closing one (Alt+F4) only hides it.
+            // The dictation window and the screenshot overlay live for as
+            // long as Heyo does, as the palette: closing one (Alt+F4) only
+            // hides it.
             if let WindowEvent::CloseRequested { api, .. } = event {
                 match window.label() {
-                    "main" | dictation::WINDOW => {
+                    dictation::WINDOW => {
                         api.prevent_close();
                         let _ = window.hide();
                     }
@@ -314,14 +317,6 @@ pub fn run() {
                         screenshot::cancel(window.app_handle());
                     }
                     _ => {}
-                }
-            }
-            // Only the palette hides itself; the settings window is a normal window.
-            if let (WindowEvent::Focused(false), "main") = (event, window.label()) {
-                if window.state::<SettingsState>().0.read().unwrap().hide_on_blur {
-                    platform::focus::when_lost(window, |window| {
-                        let _ = window.hide();
-                    });
                 }
             }
         })

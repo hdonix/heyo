@@ -1,7 +1,7 @@
 //! Commands for the palette: searching, opening items, favorites and
 //! aliases, the clipboard, and messages to the extension runtime.
 
-use tauri::{AppHandle, State, WebviewWindow};
+use tauri::{AppHandle, State};
 
 use crate::*;
 
@@ -98,7 +98,7 @@ pub(crate) fn copy_text(text: String, paste: bool, app: AppHandle) -> Result<(),
         return pasting::copy_and_paste(&app, text);
     }
     crate::platform::clipboard_watch::write_text(&text)?;
-    let _ = main_window(&app).hide();
+    palette::hide(&app);
     Ok(())
 }
 
@@ -106,7 +106,7 @@ pub(crate) fn copy_text(text: String, paste: bool, app: AppHandle) -> Result<(),
 #[tauri::command]
 pub(crate) fn open_target(target: String, app: AppHandle) -> Result<(), String> {
     crate::platform::common::open(&target)?;
-    let _ = main_window(&app).hide();
+    palette::hide(&app);
     Ok(())
 }
 
@@ -134,16 +134,10 @@ pub(crate) fn runtime_send(message: WebviewMessage, runtime: State<Runtime>, app
 
 #[tauri::command(async)]
 pub(crate) fn show_window(app: AppHandle) {
-    show(&app);
+    palette::show(&app);
 }
 
 #[tauri::command]
-pub(crate) fn hide(window: WebviewWindow) {
-    // A command that was just ending as the host put a question up must
-    // not take the palette away with it; otherwise hiding answers No.
-    if confirm::just_asked() {
-        return;
-    }
-    confirm::dismiss();
-    let _ = window.hide();
+pub(crate) fn hide(app: AppHandle) {
+    palette::dismiss(&app);
 }

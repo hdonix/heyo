@@ -154,7 +154,7 @@ fn start(app: AppHandle) {
                 let app = app.clone();
                 let _ = app.clone().run_on_main_thread(move || {
                     if !crate::handle_args(&app, &args) {
-                        crate::toggle(&app);
+                        crate::palette::toggle(&app);
                     }
                 });
             }

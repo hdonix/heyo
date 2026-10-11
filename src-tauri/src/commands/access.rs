@@ -25,7 +25,7 @@ pub(crate) enum Caller {
 impl Caller {
     fn of(label: &str) -> Option<Caller> {
         match label {
-            "main" => Some(Caller::Palette),
+            crate::palette::WINDOW => Some(Caller::Palette),
             super::settings::SETTINGS_WINDOW => Some(Caller::Settings),
             crate::dictation::WINDOW => Some(Caller::Dictation),
             crate::screenshot::WINDOW => Some(Caller::Screenshot),

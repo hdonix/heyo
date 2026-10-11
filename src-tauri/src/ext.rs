@@ -82,7 +82,7 @@ impl Running for Here<'_> {
     }
 
     fn hide_palette(&self) {
-        let _ = crate::main_window(self.0).hide();
+        palette::hide(self.0);
     }
 
     fn capture(&self, extension: &str, target: CaptureTarget) -> Result<Capture, ExtError> {

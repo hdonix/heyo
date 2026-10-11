@@ -21,14 +21,8 @@ fn value(result: impl serde::Serialize) -> Result<Value, String> {
 pub(crate) fn host_call(app: &AppHandle, request: HostRequest) -> Result<Value, String> {
     use HostRequest::*;
     match request {
-        Hide => {
-            let _ = main_window(app).hide();
-        }
-        Show => {
-            let window = main_window(app);
-            let _ = window.show();
-            focus(&window);
-        }
+        Hide => palette::hide(app),
+        Show => palette::bring_back(app),
         ClipboardWrite { text, html, concealed } => {
             if concealed.unwrap_or(false) {
                 clipboard::skip_next();

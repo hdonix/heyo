@@ -58,7 +58,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::library::Snippet;
 use crate::platform::typed::{self, Typed};
@@ -510,8 +510,8 @@ fn filled(app: &AppHandle, template: String) -> Result<String, String> {
     let (answer, answered) = channel();
     let request = REQUESTS.fetch_add(1, Ordering::SeqCst) + 1;
     *FILLING.lock().unwrap() = Some((request, answer));
-    let asked = app.emit_to("main", crate::wire::event::EXPAND_SNIPPET, ExpandSnippet { request, text: template });
-    let text = asked.map_err(|e| e.to_string()).and_then(|()| answered.recv_timeout(Duration::from_millis(1500)).map_err(|_| "the placeholders were not filled in in time".to_owned()));
+    let asked = crate::palette::tell(app, crate::wire::event::EXPAND_SNIPPET, ExpandSnippet { request, text: template });
+    let text = asked.and_then(|()| answered.recv_timeout(Duration::from_millis(1500)).map_err(|_| "the placeholders were not filled in in time".to_owned()));
     *FILLING.lock().unwrap() = None;
     text
 }

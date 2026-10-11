@@ -14,19 +14,19 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
         root::SCREENSHOT_ID => screenshot::start(app, "capture"),
         root::SCREENSHOT_TEXT_ID => screenshot::start(app, "text"),
         root::KEEP_AWAKE_ID => {
-            let _ = main_window(app).hide();
+            palette::hide(app);
             toggle_keep_awake(app);
         }
         root::PASTE_PLAIN_ID => {
-            let _ = main_window(app).hide();
+            palette::hide(app);
             pasting::paste_plain();
         }
         root::CLIPBOARD_PAUSE_ID => {
-            let _ = main_window(app).hide();
+            palette::hide(app);
             clipboard::toggle_paused(app);
         }
         root::SNIPPET_EXPANSION_ID => {
-            let _ = main_window(app).hide();
+            palette::hide(app);
             expand::toggle(app);
         }
         _ => match id.strip_prefix(root::WINDOW_PREFIX) {
@@ -80,7 +80,7 @@ pub(crate) fn apply_layout(app: &AppHandle, layout: &str) -> Result<(), String> 
     // From the palette, the target is the window that was active before it.
     let window = palette::working_window(app).ok_or("No window is focused.")?;
     let monitors = monitors(app)?;
-    let _ = main_window(app).hide();
+    palette::hide(app);
     windows::apply(window, *layout, &monitors)
 }
 
@@ -222,7 +222,7 @@ pub(crate) fn handle_args(app: &AppHandle, args: &[String]) -> bool {
         return true;
     }
     if args.iter().any(|a| a == "--clipboard") {
-        open_clipboard_history(app);
+        palette::open_clipboard_history(app);
         return true;
     }
     if let Some(i) = args.iter().position(|a| a == "--dev-reload") {

@@ -133,7 +133,7 @@ pub fn launch_command(
     match place(&found.mode, background)? {
         Place::Background => run(app, &key(&found), !background, None, Given { arguments, context }),
         Place::Palette => {
-            crate::show(app);
+            crate::palette::show(app);
             let launch = HostMessage::Launch { extension: found.extension, command: found.name, fallback_text, arguments, launch_context: context };
             app.state::<Runtime>().send(app, &launch.json())?;
         }

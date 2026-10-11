@@ -185,7 +185,7 @@ pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<Setti
 // Async: creating a window from a synchronous command can deadlock.
 #[tauri::command]
 pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
-    let _ = main_window(&app).hide();
+    palette::hide(&app);
     let window = match app.get_webview_window(SETTINGS_WINDOW) {
         Some(window) => window,
         None => WebviewWindowBuilder::new(&app, SETTINGS_WINDOW, WebviewUrl::default())
