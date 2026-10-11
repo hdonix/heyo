@@ -40,7 +40,9 @@ export function activeSession() {
 export function reportError(error: unknown) {
   console.error(error);
   const message = error instanceof Error ? error.message : String(error);
-  showToast({ style: Toast.Style.Failure, title: "Error", message });
+  // With no host to show it to, printed is all it can be: a report that
+  // fails must not be the next error reported.
+  showToast({ style: Toast.Style.Failure, title: "Error", message }).catch(() => {});
 }
 
 /// Makes `modules` what extensions get when they ask for those names: built

@@ -210,3 +210,20 @@ test("which process it is decides whether it runs what the host has run in the b
   expect(world.seen).toEqual(["worked"]);
   expect(other.sent).toEqual([{ type: "ready" }, { type: "background-done", id: 9 }]);
 });
+
+test("an error with nobody to show it to is printed, and is not another error", async () => {
+  // Before the conversation began, or after the host hung up. `main.ts`
+  // reports what nothing caught, so a report that failed would be reported.
+  vi.resetModules();
+  const { reportError } = await import("./session");
+  const printed = vi.spyOn(console, "error").mockImplementation(() => {});
+  const uncaught: unknown[] = [];
+  const note = (error: unknown) => void uncaught.push(error);
+  process.on("unhandledRejection", note);
+  reportError(new Error("lost"));
+  await sleep(20);
+  process.off("unhandledRejection", note);
+  expect(printed.mock.calls).toEqual([[new Error("lost")]]);
+  printed.mockRestore();
+  expect(uncaught).toEqual([]);
+});
