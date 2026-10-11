@@ -115,7 +115,7 @@ fn answered(world: &World, message: Value, background: bool, effects: &mut Vec<E
     }
     if let Some(need) = permissions::needed(&request) {
         let switched_off = need.permission == Permission::Activity && !activities::enabled(&world.settings.read().unwrap(), &caller.name);
-        world.granted.check(&caller, need, &method, switched_off, &|consent| world.running.ask(consent))?;
+        world.granted.check(&caller, need, switched_off, &|consent| world.running.ask(consent))?;
     }
     carry_out(world, &caller, request, effects)
 }

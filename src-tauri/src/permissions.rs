@@ -153,32 +153,52 @@ pub struct Need {
     /// hand (selecting an area of the screen), or nothing of theirs is
     /// handed over (a notification, whether the desktop is dark).
     pub unasked: bool,
+    /// The function of the API the request is made through, as an
+    /// extension's author wrote it: what a refusal names.
+    pub member: &'static str,
 }
 
-/// The permission a request needs, if any.
+/// The permission a request needs, if any, and the function it is asked
+/// through.
 pub fn needed(request: &ExtRequest) -> Option<Need> {
     use ExtRequest::*;
-    let asked = |permission| Some(Need { permission, unasked: false });
-    let unasked = |permission| Some(Need { permission, unasked: true });
+    use Permission as P;
+    let asked = |permission, member| Some(Need { permission, unasked: false, member });
+    let unasked = |permission, member| Some(Need { permission, unasked: true, member });
     match request {
         // Asking what is possible, and ending what one started, is free.
-        Unsubscribe { .. } | Supported { .. } | DictationInstalled | DictationStop { .. } => None,
-        WindowsList | WindowsActive | WindowsActivate { .. } | WindowsClose { .. } | WindowsArrange { .. } | WindowsSetBounds { .. } | WindowsMonitors | FrontmostApplication => {
-            asked(Permission::Windows)
-        }
-        ScreenCapture { target: CaptureTarget::Whole(CaptureWhole::Selection) } => unasked(Permission::ScreenCapture),
-        ScreenCapture { .. } => asked(Permission::ScreenCapture),
-        ScreenRecognizeText { .. } => asked(Permission::ScreenText),
-        DictationListen { .. } => asked(Permission::Microphone),
-        MemorySearch { .. } | MemoryGet { .. } => asked(Permission::MemoryRead),
-        ClipboardHistoryCopy { .. } => asked(Permission::ClipboardHistory),
-        FilesSearch { .. } => asked(Permission::FilesSearch),
-        SystemRun { .. } | SystemAudioDevices | SystemUseAudioDevice { .. } => asked(Permission::System),
-        SystemAppearance | SystemNotify { .. } => unasked(Permission::System),
-        ClipboardPaste { .. } => asked(Permission::InputPaste),
-        AiProvider => asked(Permission::Ai),
-        ActivityStart { .. } | ActivityUpdate { .. } | ActivityEnd { .. } | ActivityList | ActivityGet { .. } | ActivityOnEvent => unasked(Permission::Activity),
-        ActivityPresentation => None,
+        Unsubscribe { .. } | Supported { .. } | DictationInstalled | DictationStop { .. } | ActivityPresentation => None,
+        WindowsList => asked(P::Windows, "Windows.list"),
+        WindowsActive => asked(P::Windows, "Windows.active"),
+        WindowsActivate { .. } => asked(P::Windows, "Windows.activate"),
+        WindowsClose { .. } => asked(P::Windows, "Windows.close"),
+        WindowsArrange { .. } => asked(P::Windows, "Windows.arrange"),
+        WindowsSetBounds { .. } => asked(P::Windows, "Windows.setBounds"),
+        WindowsMonitors => asked(P::Windows, "Windows.monitors"),
+        // Raycast's, which has no module for it.
+        FrontmostApplication => asked(P::Windows, "getFrontmostApplication"),
+        ScreenCapture { target: CaptureTarget::Whole(CaptureWhole::Selection) } => unasked(P::ScreenCapture, "Screen.capture"),
+        ScreenCapture { .. } => asked(P::ScreenCapture, "Screen.capture"),
+        ScreenRecognizeText { .. } => asked(P::ScreenText, "Screen.recognizeText"),
+        DictationListen { .. } => asked(P::Microphone, "Dictation.listen"),
+        MemorySearch { .. } => asked(P::MemoryRead, "Memory.search"),
+        MemoryGet { .. } => asked(P::MemoryRead, "Memory.get"),
+        ClipboardHistoryCopy { .. } => asked(P::ClipboardHistory, "ClipboardHistory.copy"),
+        FilesSearch { .. } => asked(P::FilesSearch, "Files.search"),
+        SystemRun { .. } => asked(P::System, "System.run"),
+        SystemAudioDevices => asked(P::System, "System.audioDevices"),
+        SystemUseAudioDevice { .. } => asked(P::System, "System.useAudioDevice"),
+        SystemAppearance => unasked(P::System, "System.appearance"),
+        SystemNotify { .. } => unasked(P::System, "System.notify"),
+        ClipboardPaste { .. } => asked(P::InputPaste, "Clipboard.paste"),
+        AiProvider => asked(P::Ai, "AI.provider"),
+        ActivityStart { .. } => unasked(P::Activity, "LiveActivity.start"),
+        // What `start`, `list` and `get` hand over does these two.
+        ActivityUpdate { .. } => unasked(P::Activity, "LiveActivity.Handle.update"),
+        ActivityEnd { .. } => unasked(P::Activity, "LiveActivity.Handle.end"),
+        ActivityList => unasked(P::Activity, "LiveActivity.list"),
+        ActivityGet { .. } => unasked(P::Activity, "LiveActivity.get"),
+        ActivityOnEvent => unasked(P::Activity, "LiveActivity.onEvent"),
     }
 }
 
@@ -288,27 +308,12 @@ pub fn decide(heyo: Option<&Heyo>, permission: Permission, granted: &BTreeSet<Pe
     Decision::Ask
 }
 
-/// The function of `@heyo/api` behind a request, for telling its author.
-fn interface(method: &str) -> String {
-    let path = method.strip_prefix("ext.").unwrap_or(method);
-    match path.split_once('.') {
-        Some(("ai", function)) => format!("AI.{function}"),
-        Some((module, function)) => {
-            let mut letters = module.chars();
-            let first = letters.next().map(|c| c.to_ascii_uppercase()).unwrap_or_default();
-            format!("{first}{}.{function}", letters.as_str())
-        }
-        None => path.to_owned(),
-    }
-}
-
 /// What the extension is told when it is refused.
-fn refusal(reason: Reason, title: &str, permission: Permission, method: &str) -> String {
+fn refusal(reason: Reason, title: &str, need: Need) -> String {
+    let permission = need.permission;
     match reason {
         Reason::Newer => format!("{title} was written for a newer Heyo (this one provides version {API_VERSION} of the extension API)."),
-        Reason::Undeclared => {
-            format!("{} needs the \"{}\" permission; add it to \"heyo.permissions\" in package.json.", interface(method), permission.name())
-        }
+        Reason::Undeclared => format!("{} needs the \"{}\" permission; add it to \"heyo.permissions\" in package.json.", need.member, permission.name()),
         Reason::Background => format!("{title} has not been allowed to {}. Open one of its commands in Heyo to be asked.", permission.allows()),
         Reason::Refused => format!("{title} was not allowed to {}.", permission.allows()),
         Reason::Off => format!("{title} is not allowed to {}: it is turned off in Heyo Settings.", permission.allows()),
@@ -509,10 +514,10 @@ impl Granted {
     /// (`ask`) where that is theirs to say. `switched_off`: the settings
     /// have it off for this caller. Blocks while the question is up: call
     /// it off the thread that reads the runtime's messages.
-    pub(crate) fn check(&self, caller: &Caller, need: Need, method: &str, switched_off: bool, ask: &dyn Fn(Consent) -> bool) -> Result<(), ExtError> {
+    pub(crate) fn check(&self, caller: &Caller, need: Need, switched_off: bool, ask: &dyn Fn(Consent) -> bool) -> Result<(), ExtError> {
         let settle = |decision| match decision {
             Decision::Allow => Some(Ok(())),
-            Decision::Deny { code, reason } => Some(Err(ExtError::new(code, refusal(reason, &caller.title, need.permission, method)))),
+            Decision::Deny { code, reason } => Some(Err(ExtError::new(code, refusal(reason, &caller.title, need)))),
             Decision::Ask => None,
         };
         if let Some(settled) = settle(self.decision(caller, need, switched_off)) {
@@ -525,7 +530,7 @@ impl Granted {
         }
         if !ask(consent(&caller.title, need.permission)) {
             self.refused.lock().unwrap_or_else(|e| e.into_inner()).push((caller.name.clone(), need.permission, Instant::now()));
-            return Err(ExtError::new(ErrorCode::Denied, refusal(Reason::Refused, &caller.title, need.permission, method)));
+            return Err(ExtError::new(ErrorCode::Denied, refusal(Reason::Refused, &caller.title, need)));
         }
         // Allowed now whether or not it could be written down.
         if let Err(e) = self.change(|grants| grants.allow(&caller.name, need.permission)) {
@@ -599,7 +604,7 @@ pub(crate) fn revoke_extension_permission(extension: String, permission: Permiss
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::wire::WindowLayout;
+    use serde_json::{json, Value};
     use Permission::*;
 
     fn heyo(permissions: &[&str]) -> Heyo {
@@ -739,76 +744,139 @@ mod tests {
         assert_eq!(listed(&heyo(&["windows", "teleport", "ai"])), BTreeSet::from([Windows, Ai]));
     }
 
-    fn activity_attributes() -> crate::activities::Attributes {
-        crate::activities::Attributes { id: "a".into(), name: "Build".into(), icon: serde_json::json!("hammer-16"), tint: None, action: None, dismissible: None, fallback: None }
+    /// One of every request as the runtime writes it; more where what is
+    /// asked for changes what it needs.
+    fn requests() -> Vec<Value> {
+        let rect = json!({ "x": 0, "y": 0, "width": 1, "height": 1 });
+        vec![
+            json!({ "method": "ext.unsubscribe", "params": { "subscription": 1 } }),
+            json!({ "method": "ext.supported", "params": { "module": "windows" } }),
+            json!({ "method": "ext.windows.list" }),
+            json!({ "method": "ext.windows.active" }),
+            json!({ "method": "ext.windows.activate", "params": { "id": 1 } }),
+            json!({ "method": "ext.windows.close", "params": { "id": 1 } }),
+            json!({ "method": "ext.windows.arrange", "params": { "id": 1, "layout": "center" } }),
+            json!({ "method": "ext.windows.setBounds", "params": { "id": 1, "bounds": rect } }),
+            json!({ "method": "ext.windows.monitors" }),
+            json!({ "method": "ext.frontmostApplication" }),
+            json!({ "method": "ext.screen.capture", "params": { "target": "selection" } }),
+            json!({ "method": "ext.screen.capture", "params": { "target": "screen" } }),
+            json!({ "method": "ext.screen.capture", "params": { "target": { "window": 1 } } }),
+            json!({ "method": "ext.screen.capture", "params": { "target": { "rect": rect } } }),
+            json!({ "method": "ext.screen.recognizeText", "params": { "path": "a.png" } }),
+            json!({ "method": "ext.dictation.installed" }),
+            json!({ "method": "ext.dictation.listen", "params": {} }),
+            json!({ "method": "ext.dictation.stop", "params": { "subscription": 1 } }),
+            json!({ "method": "ext.memory.search", "params": { "byMeaning": true } }),
+            json!({ "method": "ext.memory.get", "params": { "id": "clipboard:1" } }),
+            json!({ "method": "ext.clipboardHistory.copy", "params": { "id": "clipboard:1" } }),
+            json!({ "method": "ext.files.search", "params": { "query": "a" } }),
+            json!({ "method": "ext.system.run", "params": { "action": "lock-screen" } }),
+            json!({ "method": "ext.system.run", "params": { "action": "restart" } }),
+            json!({ "method": "ext.system.appearance" }),
+            json!({ "method": "ext.system.notify", "params": { "title": "a" } }),
+            json!({ "method": "ext.system.audioDevices" }),
+            json!({ "method": "ext.system.useAudioDevice", "params": { "kind": "input", "name": "mic" } }),
+            json!({ "method": "ext.clipboard.paste", "params": { "text": "a" } }),
+            json!({ "method": "ext.ai.provider" }),
+            json!({ "method": "ext.activity.start", "params": { "attributes": { "id": "a", "name": "Build", "icon": "hammer-16" }, "content": { "title": "Building" }, "seq": 1 } }),
+            json!({ "method": "ext.activity.update", "params": { "id": "a", "content": {}, "seq": 2 } }),
+            json!({ "method": "ext.activity.end", "params": { "id": "a" } }),
+            json!({ "method": "ext.activity.list" }),
+            json!({ "method": "ext.activity.get", "params": { "id": "a" } }),
+            json!({ "method": "ext.activity.presentation" }),
+            json!({ "method": "ext.activity.onEvent" }),
+        ]
+    }
+
+    fn need(message: Value) -> Option<Need> {
+        needed(&ExtRequest::read(message.clone()).unwrap_or_else(|e| panic!("{message}: {e}")))
+    }
+
+    /// Every method that was sampled, with the permission a request of it
+    /// needs and the function it is asked through.
+    fn needs() -> BTreeMap<String, Option<(Permission, &'static str)>> {
+        let mut needs = BTreeMap::new();
+        for message in requests() {
+            let method = message["method"].as_str().unwrap().to_owned();
+            let need = need(message).map(|need| (need.permission, need.member));
+            // Whatever is asked for with it, a method is one function's and takes one permission.
+            assert_eq!(*needs.entry(method.clone()).or_insert(need), need, "{method}");
+        }
+        needs
     }
 
     #[test]
-    fn every_request_says_what_it_needs() {
-        use crate::platform::system::Action;
-        use crate::platform::windows::Rect;
-        use ExtRequest as R;
-        let rect = Rect { x: 0, y: 0, width: 1, height: 1 };
-        let asked = |permission| Some(Need { permission, unasked: false });
-        let unasked = |permission| Some(Need { permission, unasked: true });
-        let cases = [
-            (R::Unsubscribe { subscription: 1 }, None),
-            (R::Supported { module: crate::wire::Module::Windows }, None),
-            (R::WindowsList, asked(Windows)),
-            (R::WindowsActive, asked(Windows)),
-            (R::WindowsActivate { id: 1 }, asked(Windows)),
-            (R::WindowsClose { id: 1 }, asked(Windows)),
-            (R::WindowsArrange { id: 1, layout: WindowLayout::Named("center".into()) }, asked(Windows)),
-            (R::WindowsSetBounds { id: 1, bounds: rect }, asked(Windows)),
-            (R::WindowsMonitors, asked(Windows)),
-            (R::FrontmostApplication, asked(Windows)),
-            (R::ScreenCapture { target: CaptureTarget::Whole(CaptureWhole::Selection) }, unasked(ScreenCapture)),
-            (R::ScreenCapture { target: CaptureTarget::Whole(CaptureWhole::Screen) }, asked(ScreenCapture)),
-            (R::ScreenCapture { target: CaptureTarget::Window { window: 1 } }, asked(ScreenCapture)),
-            (R::ScreenCapture { target: CaptureTarget::Rect { rect } }, asked(ScreenCapture)),
-            (R::ScreenRecognizeText { path: "a.png".into() }, asked(ScreenText)),
-            (R::DictationInstalled, None),
-            (R::DictationListen { language: None, indicator: None }, asked(Microphone)),
-            (R::DictationStop { subscription: 1 }, None),
-            (R::MemorySearch { text: None, sources: None, kinds: None, since: None, until: None, limit: None, by_meaning: Some(true) }, asked(MemoryRead)),
-            (R::MemoryGet { id: "clipboard:1".into() }, asked(MemoryRead)),
-            (R::ClipboardHistoryCopy { id: "clipboard:1".into() }, asked(ClipboardHistory)),
-            (R::FilesSearch { query: "a".into(), limit: None }, asked(FilesSearch)),
-            (R::SystemRun { action: Action::LockScreen }, asked(System)),
-            (R::SystemRun { action: Action::Restart }, asked(System)),
-            (R::SystemAudioDevices, asked(System)),
-            (R::SystemUseAudioDevice { kind: crate::platform::system::AudioKind::Input, name: "mic".into() }, asked(System)),
-            (R::SystemAppearance, unasked(System)),
-            (R::SystemNotify { title: "a".into(), body: None }, unasked(System)),
-            (R::ClipboardPaste { text: "a".into(), html: None }, asked(InputPaste)),
-            (R::AiProvider, asked(Ai)),
-            (R::ActivityStart { attributes: activity_attributes(), content: Default::default(), announce: None, launch_type: None, seq: 1 }, unasked(Activity)),
-            (R::ActivityUpdate { id: "a".into(), content: Default::default(), alert: None, seq: 2 }, unasked(Activity)),
-            (R::ActivityEnd { id: "a".into(), final_content: None, keep: None }, unasked(Activity)),
-            (R::ActivityList, unasked(Activity)),
-            (R::ActivityGet { id: "a".into() }, unasked(Activity)),
-            (R::ActivityOnEvent, unasked(Activity)),
-            (R::ActivityPresentation, None),
-        ];
-        for (request, expected) in cases {
-            assert_eq!(needed(&request), expected, "{request:?}");
+    fn every_request_the_wire_declares_says_what_it_needs() {
+        use ts_rs::TS;
+        // The methods, out of the type as the runtime is given it.
+        let declared = ExtRequest::inline(&ts_rs::Config::default());
+        let declared: BTreeSet<&str> = declared.split("\"method\": \"").skip(1).filter_map(|rest| rest.split('"').next()).collect();
+        assert!(declared.len() > 30, "{declared:?}");
+        let needs = needs();
+        assert_eq!(needs.keys().map(String::as_str).collect::<BTreeSet<_>>(), declared);
+
+        // Asking what is possible, and ending what one started, is free.
+        let free: Vec<&str> = needs.iter().filter(|(_, need)| need.is_none()).map(|(method, _)| method.as_str()).collect();
+        assert_eq!(free, ["ext.activity.presentation", "ext.dictation.installed", "ext.dictation.stop", "ext.supported", "ext.unsubscribe"]);
+        // The rest name the function an author called, which is one of a
+        // module but for what Raycast's API reaches.
+        for (method, need) in &needs {
+            let Some((_, member)) = need else { continue };
+            assert!(member.contains('.') || method == "ext.frontmostApplication", "{method}: {member}");
+            assert!(!member.starts_with("ext."), "{method}: {member}");
         }
     }
 
     #[test]
+    fn what_the_user_does_by_hand_or_gives_nothing_away_is_not_asked_about() {
+        let rect = json!({ "x": 0, "y": 0, "width": 1, "height": 1 });
+        let of = |method: &str, params: Value| need(json!({ "method": method, "params": params })).map(|need| (need.permission, need.unasked));
+        // An area the user selects is theirs to give by selecting it.
+        assert_eq!(of("ext.screen.capture", json!({ "target": "selection" })), Some((ScreenCapture, true)));
+        for target in [json!("screen"), json!({ "window": 1 }), json!({ "rect": rect })] {
+            assert_eq!(of("ext.screen.capture", json!({ "target": target })), Some((ScreenCapture, false)));
+        }
+        // A notification, and whether the desktop is dark.
+        assert_eq!(of("ext.system.appearance", Value::Null), Some((System, true)));
+        assert_eq!(of("ext.system.notify", json!({ "title": "a" })), Some((System, true)));
+        for action in ["lock-screen", "restart"] {
+            assert_eq!(of("ext.system.run", json!({ "action": action })), Some((System, false)));
+        }
+        assert_eq!(of("ext.system.audioDevices", Value::Null), Some((System, false)));
+        // Live activities have a switch in the settings instead.
+        for message in requests() {
+            let method = message["method"].as_str().unwrap().to_owned();
+            if let Some(need) = need(message).filter(|need| need.permission == Activity) {
+                assert!(need.unasked, "{method}");
+            }
+        }
+        assert_eq!(of("ext.windows.list", Value::Null), Some((Windows, false)));
+        assert_eq!(of("ext.memory.search", json!({})), Some((MemoryRead, false)));
+        assert_eq!(of("ext.dictation.listen", json!({})), Some((Microphone, false)));
+    }
+
+    #[test]
     fn a_refusal_tells_the_author_what_to_do() {
+        let of = |method: &str, params: Value| need(json!({ "method": method, "params": params })).unwrap();
+        let list = of("ext.windows.list", Value::Null);
         assert_eq!(
-            refusal(Reason::Undeclared, "Window Sessions", Windows, "ext.windows.list"),
+            refusal(Reason::Undeclared, "Window Sessions", list),
             "Windows.list needs the \"windows\" permission; add it to \"heyo.permissions\" in package.json."
         );
-        assert_eq!(interface("ext.clipboardHistory.copy"), "ClipboardHistory.copy");
-        assert_eq!(interface("ext.ai.provider"), "AI.provider");
-        assert_eq!(interface("ext.frontmostApplication"), "frontmostApplication");
-        let background = refusal(Reason::Background, "Tiles", Windows, "ext.windows.list");
+        // By the name the author wrote, which the method's is not always.
+        let start = of("ext.activity.start", json!({ "attributes": { "id": "a", "name": "Build", "icon": "hammer-16" }, "content": { "title": "Building" }, "seq": 1 }));
+        assert_eq!(
+            refusal(Reason::Undeclared, "CI", start),
+            "LiveActivity.start needs the \"activity\" permission; add it to \"heyo.permissions\" in package.json."
+        );
+        assert_eq!(of("ext.clipboardHistory.copy", json!({ "id": "clipboard:1" })).member, "ClipboardHistory.copy");
+        assert_eq!(of("ext.ai.provider", Value::Null).member, "AI.provider");
+        assert_eq!(of("ext.frontmostApplication", Value::Null).member, "getFrontmostApplication");
+        let background = refusal(Reason::Background, "Tiles", list);
         assert!(background.starts_with("Tiles has not been allowed to see, switch, move and close the windows"));
-        assert!(refusal(Reason::Newer, "Tiles", Windows, "ext.windows.list").contains("newer Heyo"));
-        assert!(refusal(Reason::Off, "Tiles", Activity, "ext.activity.start").contains("turned off in Heyo Settings"));
-        assert_eq!(interface("ext.activity.start"), "Activity.start");
+        assert!(refusal(Reason::Newer, "Tiles", list).contains("newer Heyo"));
+        assert!(refusal(Reason::Off, "Tiles", start).contains("turned off in Heyo Settings"));
     }
 
     #[test]
