@@ -350,10 +350,9 @@ async function openQuicklink(item: Item, palette: Palette, argument?: string): P
   if (needsArgument(link) && argument === undefined) {
     // Opened by a hotkey while hidden: show the window to ask.
     await palette.invoke("show_window");
-    void palette.ask({ title: item.title, placeholder: "Query" }).then((value) => {
-      if (value !== null) void openQuicklink(item, palette, value);
-    });
-    return;
+    const asked = await palette.ask({ title: item.title, placeholder: "Query" });
+    if (asked === null) return;
+    argument = asked;
   }
   const isUrl = /^[a-z][\w+.-]*:/i.test(link);
   const target = await expand(link, { query: argument, encode: isUrl, readClipboard: readClipboard(palette) });
@@ -363,10 +362,9 @@ async function openQuicklink(item: Item, palette: Palette, argument?: string): P
 async function pasteSnippet(item: Item, palette: Palette, paste: boolean, argument?: string): Promise<void> {
   if (needsArgument(item.text ?? "") && argument === undefined) {
     await palette.invoke("show_window");
-    void palette.ask({ title: item.title, placeholder: "Text for {argument}" }).then((value) => {
-      if (value !== null) void pasteSnippet(item, palette, paste, value);
-    });
-    return;
+    const asked = await palette.ask({ title: item.title, placeholder: "Text for {argument}" });
+    if (asked === null) return;
+    argument = asked;
   }
   const text = await expand(item.text ?? "", { query: argument, readClipboard: readClipboard(palette) });
   await palette.invoke("copy_text", { text, paste });

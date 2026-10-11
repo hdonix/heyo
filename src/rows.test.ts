@@ -389,3 +389,11 @@ test("an item opened from outside the list is not counted again, and asks for wh
   ]);
   expect((await opening(docs, { failing: ["open_target"] })).pop()).toEqual(["showError", "Could not open Docs", "open_target failed"]);
 });
+
+test("what could not be opened is said so, also when its argument came from the prompt", async () => {
+  for (const [found, command] of [[github, "open_target"], [greeting, "copy_text"]] as const) {
+    const { fake, asked } = palette({ replies: ["heyo"], failing: [command] });
+    await open(found, fake);
+    expect((await settled(asked)).pop()).toEqual(["showError", `Could not open ${found.title}`, `${command} failed`]);
+  }
+});
