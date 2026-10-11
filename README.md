@@ -331,7 +331,8 @@ Raycast's `ray` tool. In the extension's directory (after `npm install`):
 ```
 src/              UI (React)
   App.tsx         hosts the root search or a running command
-  RootSearch.tsx  root search: results, calculator, favorites, aliases
+  RootSearch.tsx  root search: the list as drawn, its keys and clicks
+  rows.ts         what a row of the root search is and does
   calculator.ts   arithmetic, units, currency and time zones
   hotkey.tsx      hotkey recorder
   host.ts         the host as a window calls it: typed commands and events
@@ -352,11 +353,16 @@ runtime/src/      extension runtime (Node), bundled to runtime/dist/
   renderer.ts     React reconciler whose tree is streamed to the UI
   session.ts      runs one command at a time, sends incremental renders
   api/            the @raycast/api implementation
+  heyo/           the @heyo/api implementation; members.ts declares each function once
   builtins/       Heyo's own commands (store, clipboard, emoji, system, …)
 src-tauri/src/
   lib.rs          startup, shared state, the application index
   commands/       what the webview can invoke: palette, settings, media
   host.rs         what the runtime asks of the host (`host.*`)
+  ext.rs, ext/    what extensions ask (`ext.*`): answered in ext/answer.rs, without the application
+  permissions.rs  what an extension may have, and asking the user
+  pasting.rs      putting text into another application, with the clipboard lent and given back
+  activities.rs   live activities: the table, and showing what is in progress
   palette.rs      the palette window: show, hide, toggle
   cli.rs          command-line flags and opening an item by id
   platform/       everything that touches the desktop (see below)
