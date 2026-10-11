@@ -10,8 +10,10 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
 
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tauri::{AppHandle, Manager};
+use ts_rs::TS;
 
 /// A path as programs expect it. Windows hands out paths in a long form
 /// (`\\?\C:\…`) that Node.js, for one, cannot open.
@@ -169,16 +171,39 @@ pub fn run(mut command: Command) -> std::io::Result<Vec<Value>> {
     Ok(String::from_utf8_lossy(&output.stdout).lines().filter_map(|line| serde_json::from_str(line).ok()).collect())
 }
 
-/// Whether a message ends an installation: `installed` or `error`.
-pub fn concludes(message: &Value) -> bool {
-    matches!(message["type"].as_str(), Some("installed" | "error"))
+/// How an installation is going: what an installer script writes, a line
+/// each, and what the settings window is told of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "lowercase")]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub enum InstallProgress {
+    /// `step` names what is being fetched; `received` of `total` bytes,
+    /// where the installer can tell.
+    Progress {
+        step: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        received: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        total: Option<f64>,
+    },
+    Installed,
+    Error { message: String },
+}
+
+impl InstallProgress {
+    /// Whether it ends the installation: `installed` or `error`.
+    pub fn concludes(&self) -> bool {
+        !matches!(self, InstallProgress::Progress { .. })
+    }
 }
 
 /// Runs an installer in the background, passing its progress to `report`.
 /// Whatever happens, the last thing reported is `installed` or `error`.
-pub fn install(command: Result<Command, String>, report: impl Fn(Value) + Send + Sync + 'static) {
+pub fn install(command: Result<Command, String>, report: impl Fn(InstallProgress) + Send + Sync + 'static) {
     let report = std::sync::Arc::new(report);
-    let failed = |message: String| json!({ "type": "error", "message": message });
+    let failed = |message: String| InstallProgress::Error { message };
     let concluded = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let started = command.and_then(|command| {
         let (report, concluded) = (report.clone(), concluded.clone());
@@ -186,14 +211,18 @@ pub fn install(command: Result<Command, String>, report: impl Fn(Value) + Send +
         Helper::start(
             command,
             move |message| {
+                let progress = match serde_json::from_value::<InstallProgress>(message) {
+                    Ok(progress) => progress,
+                    Err(e) => return eprintln!("heyo: an installer wrote something that is not its progress: {e}"),
+                };
                 // Nothing follows the conclusion, whatever the installer says.
-                if !concluded.fetch_or(concludes(&message), std::sync::atomic::Ordering::Relaxed) {
-                    report(message);
+                if !concluded.fetch_or(progress.concludes(), std::sync::atomic::Ordering::Relaxed) {
+                    report(progress);
                 }
             },
             move || {
                 if !done.load(std::sync::atomic::Ordering::Relaxed) {
-                    at_exit(json!({ "type": "error", "message": "The download stopped unexpectedly" }));
+                    at_exit(failed("The download stopped unexpectedly".into()));
                 }
             },
         )
@@ -207,6 +236,7 @@ pub fn install(command: Result<Command, String>, report: impl Fn(Value) + Send +
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::sync::mpsc;
     use std::time::Duration;
 
@@ -290,13 +320,13 @@ mod tests {
         }
     }
 
-    fn installing(script: &str) -> Vec<Value> {
+    fn installing(script: &str) -> Vec<InstallProgress> {
         let (tx, rx) = mpsc::channel();
-        install(Ok(sh(script)), move |message| tx.send(message).unwrap());
+        install(Ok(sh(script)), move |progress| tx.send(progress).unwrap());
         let mut seen = Vec::new();
-        while let Ok(message) = rx.recv_timeout(WAIT) {
-            let last = concludes(&message);
-            seen.push(message);
+        while let Ok(progress) = rx.recv_timeout(WAIT) {
+            let last = progress.concludes();
+            seen.push(progress);
             if last {
                 break;
             }
@@ -306,20 +336,35 @@ mod tests {
         seen
     }
 
+    fn step(name: &str) -> InstallProgress {
+        InstallProgress::Progress { step: name.into(), received: None, total: None }
+    }
+
     #[test]
     fn an_installation_always_concludes() {
         let done = installing(r#"echo '{"type":"progress","step":"a"}'; echo '{"type":"installed"}'"#);
-        assert_eq!(done.len(), 2);
-        assert_eq!(done[1]["type"], "installed");
+        assert_eq!(done, [step("a"), InstallProgress::Installed]);
 
         let died = installing(r#"echo '{"type":"progress","step":"a"}'; exit 3"#);
-        assert_eq!(died.last().unwrap()["type"], "error");
+        assert_eq!(died, [step("a"), InstallProgress::Error { message: "The download stopped unexpectedly".into() }]);
 
-        let chatty = installing(r#"echo '{"type":"error","message":"no disk"}'; echo '{"type":"progress"}'"#);
-        assert_eq!(chatty, vec![json!({ "type": "error", "message": "no disk" })]);
+        let chatty = installing(r#"echo '{"type":"error","message":"no disk"}'; echo '{"type":"progress","step":"b"}'"#);
+        assert_eq!(chatty, [InstallProgress::Error { message: "no disk".into() }]);
 
         let (tx, rx) = mpsc::channel();
-        install(Err("no Node.js".into()), move |message| tx.send(message).unwrap());
-        assert_eq!(rx.recv_timeout(WAIT).unwrap(), json!({ "type": "error", "message": "no Node.js" }));
+        install(Err("no Node.js".into()), move |progress| tx.send(progress).unwrap());
+        assert_eq!(rx.recv_timeout(WAIT).unwrap(), InstallProgress::Error { message: "no Node.js".into() });
+    }
+
+    #[test]
+    fn progress_is_what_the_installers_write() {
+        let counted = installing(r#"echo '{"type":"progress","step":"Speech model","received":512,"total":2048}'; echo '{"type":"installed"}'"#);
+        assert_eq!(counted[0], InstallProgress::Progress { step: "Speech model".into(), received: Some(512.0), total: Some(2048.0) });
+        assert_eq!(serde_json::to_value(&counted[0]).unwrap(), json!({ "type": "progress", "step": "Speech model", "received": 512.0, "total": 2048.0 }));
+        assert_eq!(serde_json::to_value(step("Engine")).unwrap(), json!({ "type": "progress", "step": "Engine" }));
+        assert_eq!(serde_json::to_value(InstallProgress::Installed).unwrap(), json!({ "type": "installed" }));
+        // What is something else is passed over, and the installation still concludes.
+        let odd = installing(r#"echo '{"text":"hi"}'; echo '{"type":"installed"}'"#);
+        assert_eq!(odd, [InstallProgress::Installed]);
     }
 }

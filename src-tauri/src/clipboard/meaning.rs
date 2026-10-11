@@ -17,7 +17,6 @@ use std::time::{Duration, Instant};
 
 use chrono::Local;
 use serde::Serialize;
-use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::embed::{self, Embed, Role};
@@ -25,6 +24,7 @@ use super::fusion::{self, Tuning};
 use super::store::{Found, Store};
 use super::vectors::{self, Index};
 use super::{ClipboardHistory, Kind};
+use crate::helper::InstallProgress;
 use crate::wire::event;
 use crate::SettingsState;
 
@@ -306,19 +306,19 @@ pub fn install(app: &AppHandle) -> Result<(), String> {
     if meaning.installing.swap(true, Ordering::Relaxed) {
         return Ok(());
     }
-    let _ = app.emit(event::CLIPBOARD_MEANING_INSTALL, json!({ "type": "progress", "step": "Language model" }));
+    let _ = app.emit(event::CLIPBOARD_MEANING_INSTALL, InstallProgress::Progress { step: "Language model".into(), received: None, total: None });
     let window = app.clone();
     let command = embed::command(app).map(|mut command| {
         command.arg("install");
         command
     });
-    crate::helper::install(command, move |message| {
-        if crate::helper::concludes(&message) {
+    crate::helper::install(command, move |progress| {
+        if progress.concludes() {
             let meaning = &window.state::<ClipboardHistory>().meaning;
             meaning.installing.store(false, Ordering::Relaxed);
             meaning.wake();
         }
-        let _ = window.emit(event::CLIPBOARD_MEANING_INSTALL, message);
+        let _ = window.emit(event::CLIPBOARD_MEANING_INSTALL, progress);
     });
     Ok(())
 }

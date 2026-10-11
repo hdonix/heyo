@@ -552,13 +552,16 @@ impl Granted {
 // --- For the settings ---------------------------------------------------------
 
 /// A permission of an extension, as its page in the settings shows it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[ts(export, export_to = "../../shared/bindings/", rename = "PermissionRow")]
 pub struct Row {
     pub permission: Permission,
     /// What it lets the extension do, after "allow it to".
+    #[ts(type = "string")]
     pub allows: &'static str,
     /// `allowed` by the user (and theirs to take back), `asks` when first
     /// used, or `free`: listing it is enough.
+    #[ts(type = "\"allowed\" | \"asks\" | \"free\"")]
     pub state: &'static str,
 }
 

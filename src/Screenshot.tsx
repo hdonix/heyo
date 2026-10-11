@@ -287,8 +287,8 @@ export function ScreenshotOverlay() {
           action,
           png,
           ...(rect ?? {}),
-          origin_x: capture.x,
-          origin_y: capture.y,
+          originX: capture.x,
+          originY: capture.y,
           scale: capture.scale,
         },
       });

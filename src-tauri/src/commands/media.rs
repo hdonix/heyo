@@ -10,7 +10,9 @@ pub(crate) async fn screenshot_finish(request: screenshot::Finish, app: AppHandl
     screenshot::finish(app, request).await
 }
 
-#[derive(Serialize)]
+/// Whether text recognition can be used, for the settings page.
+#[derive(Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) struct OcrStatus {
     installed: bool,
     installing: bool,

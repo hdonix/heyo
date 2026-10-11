@@ -145,10 +145,15 @@ pub(crate) fn current_monitor(app: &AppHandle) -> Result<Area, String> {
     Ok(Area { x: position.x, y: position.y, width: size.width, height: size.height, scale: monitor.scale_factor() })
 }
 
-#[derive(Clone, Serialize)]
-struct Capture {
+/// The frozen screen, as the overlay is given it (`SCREENSHOT`).
+#[derive(Clone, Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/", rename = "ScreenshotCapture")]
+pub(crate) struct Capture {
     path: String,
-    /// `capture` shows the toolbar; `text` extracts text as soon as a region is selected.
+    /// `capture` shows the toolbar; `text` extracts text as soon as a region
+    /// is selected; `pick` is an extension asking for the area, and selecting
+    /// it is all there is to do.
+    #[ts(type = "\"capture\" | \"text\" | \"pick\"")]
     mode: String,
     /// Screen position of the overlay, in physical pixels.
     x: i32,
@@ -308,30 +313,41 @@ fn timestamp() -> String {
         .unwrap_or_else(|| COUNTER.fetch_add(1, Ordering::Relaxed).to_string())
 }
 
-/// What the user chose to do with the selected region.
-#[derive(Deserialize)]
+/// What the user chose to do with the selected region. Cancelling needs
+/// nothing but the action.
+#[derive(Deserialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../shared/bindings/", rename = "ScreenshotFinish")]
 pub struct Finish {
-    /// `copy`, `save`, `pin`, `text`, `cancel`, or `pick` (for the extension
-    /// that asked for the selection).
+    /// `pick` is for the extension that asked for the selection.
+    #[ts(type = "\"copy\" | \"save\" | \"pin\" | \"text\" | \"pick\" | \"cancel\"")]
     action: String,
     /// The cropped, annotated region as base64 PNG.
     #[serde(default)]
+    #[ts(optional, as = "Option<String>")]
     png: String,
     /// Selection in logical pixels, relative to the overlay.
     #[serde(default)]
+    #[ts(optional, as = "Option<f64>")]
     x: f64,
     #[serde(default)]
+    #[ts(optional, as = "Option<f64>")]
     y: f64,
     #[serde(default)]
+    #[ts(optional, as = "Option<f64>")]
     width: f64,
     #[serde(default)]
+    #[ts(optional, as = "Option<f64>")]
     height: f64,
     /// Screen position of the overlay in physical pixels, and its scale.
     #[serde(default)]
+    #[ts(optional, as = "Option<i32>")]
     origin_x: i32,
     #[serde(default)]
+    #[ts(optional, as = "Option<i32>")]
     origin_y: i32,
     #[serde(default = "one")]
+    #[ts(optional, as = "Option<f64>")]
     scale: f64,
 }
 

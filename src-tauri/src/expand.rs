@@ -493,6 +493,16 @@ fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), S
     }
 }
 
+/// What `EXPAND_SNIPPET` carries: a snippet's text for the palette to fill
+/// in, and the number its answer (`snippet_expanded`) is known by.
+#[derive(Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub(crate) struct ExpandSnippet {
+    #[ts(type = "number")]
+    request: u64,
+    text: String,
+}
+
 /// The snippet's text with its placeholders filled in. The palette's
 /// webview does that for snippets chosen there (`shared/placeholders.ts`),
 /// so it is asked: one piece of code decides what `{date}` means.
@@ -500,7 +510,7 @@ fn filled(app: &AppHandle, template: String) -> Result<String, String> {
     let (answer, answered) = channel();
     let request = REQUESTS.fetch_add(1, Ordering::SeqCst) + 1;
     *FILLING.lock().unwrap() = Some((request, answer));
-    let asked = app.emit_to("main", crate::wire::event::EXPAND_SNIPPET, serde_json::json!({ "request": request, "text": template }));
+    let asked = app.emit_to("main", crate::wire::event::EXPAND_SNIPPET, ExpandSnippet { request, text: template });
     let text = asked.map_err(|e| e.to_string()).and_then(|()| answered.recv_timeout(Duration::from_millis(1500)).map_err(|_| "the placeholders were not filled in in time".to_owned()));
     *FILLING.lock().unwrap() = None;
     text

@@ -68,15 +68,6 @@ impl Target {
         }
     }
 
-    pub fn parse(name: &str) -> Option<Self> {
-        match name {
-            "toggle" => Some(Self::toggle()),
-            "clipboard" => Some(Self::clipboard_history()),
-            "dictation" => Some(Self::dictation()),
-            _ => None,
-        }
-    }
-
     #[cfg(any(target_os = "linux", test))]
     fn command(&self) -> String {
         let exe = env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| "heyo".into());

@@ -228,9 +228,23 @@ pub(crate) async fn get_hotkeys() -> Hotkeys {
     }
 }
 
+/// The hotkeys that open Heyo itself, named as in `Hotkeys`.
+#[derive(Clone, Copy, serde::Deserialize, ts_rs::TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub(crate) enum HotkeyName {
+    Toggle,
+    Clipboard,
+    Dictation,
+}
+
 #[tauri::command]
-pub(crate) async fn set_hotkey(name: String, accelerator: String) -> Result<Hotkeys, String> {
-    let target = hotkeys::Target::parse(&name).ok_or_else(|| format!("unknown hotkey {name}"))?;
+pub(crate) async fn set_hotkey(name: HotkeyName, accelerator: String) -> Result<Hotkeys, String> {
+    let target = match name {
+        HotkeyName::Toggle => hotkeys::Target::toggle(),
+        HotkeyName::Clipboard => hotkeys::Target::clipboard_history(),
+        HotkeyName::Dictation => hotkeys::Target::dictation(),
+    };
     hotkeys::set(&target, &accelerator)?;
     Ok(get_hotkeys().await)
 }
@@ -265,7 +279,7 @@ pub(crate) fn list_extensions() -> Vec<extensions::ExtensionInfo> {
 }
 
 #[tauri::command(async)]
-pub(crate) fn set_extension_preferences(extension: String, values: Value) -> Result<(), String> {
+pub(crate) fn set_extension_preferences(extension: String, values: extensions::PreferenceValues) -> Result<(), String> {
     extensions::save_preferences(&extension, &values)
 }
 

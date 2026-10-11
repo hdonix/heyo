@@ -540,8 +540,9 @@ fn stop_developing(entry: &Development) -> Result<(), String> {
 
 /// An extension as the settings window shows it: the manifest's metadata,
 /// preference definitions and the saved preference values.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../shared/bindings/")]
 pub struct ExtensionInfo {
     /// `@heyo`, or the extension's directory.
     pub id: String,
@@ -553,16 +554,17 @@ pub struct ExtensionInfo {
     pub builtin: bool,
     /// The source directory, for an extension being developed (`heyo dev`).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub development: Option<String>,
     pub commands: Vec<CommandInfo>,
     /// Extension-level preference definitions from the manifest.
-    pub preferences: serde_json::Value,
-    /// `{ extension: {...}, commands: { name: {...} } }`, as the runtime stores them.
-    pub values: serde_json::Value,
+    pub preferences: Vec<Preference>,
+    pub values: PreferenceValues,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../shared/bindings/")]
 pub struct CommandInfo {
     pub id: String,
     pub name: String,
@@ -570,18 +572,69 @@ pub struct CommandInfo {
     pub description: Option<String>,
     pub mode: String,
     pub icon: Option<String>,
-    pub preferences: serde_json::Value,
+    pub preferences: Vec<Preference>,
+}
+
+/// A preference a manifest declares, as much of it as the settings window
+/// shows.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct Preference {
+    pub name: String,
+    /// `textfield`, `password`, `checkbox`, `dropdown`, `appPicker`, `file`
+    /// or `directory`.
+    #[serde(rename = "type", default)]
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    /// What stands beside a checkbox.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub placeholder: Option<String>,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "unknown")]
+    pub default: Option<serde_json::Value>,
+    /// The choices of a `dropdown`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<Choice>>")]
+    pub data: Vec<Choice>,
+}
+
+/// The preferences a manifest, or one of its commands, declares. One that
+/// is not well formed is left out.
+fn preferences(declaring: &serde_json::Value) -> Vec<Preference> {
+    declaring["preferences"].as_array().into_iter().flatten().filter_map(|preference| serde_json::from_value(preference.clone()).ok()).collect()
+}
+
+/// The preferences the user has set, as the runtime stores them
+/// (`runtime/src/context.ts`): the extension's own, and each command's
+/// under its name.
+#[derive(Debug, Default, Clone, PartialEq, serde::Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct PreferenceValues {
+    #[serde(default)]
+    #[ts(type = "Record<string, unknown>")]
+    pub extension: serde_json::Map<String, serde_json::Value>,
+    #[serde(default)]
+    #[ts(type = "Record<string, Record<string, unknown>>")]
+    pub commands: std::collections::BTreeMap<String, serde_json::Map<String, serde_json::Value>>,
 }
 
 pub fn preferences_path(extension: &str) -> PathBuf {
     crate::paths::preferences(extension)
 }
 
-fn stored_values(extension: &str) -> serde_json::Value {
-    fs::read_to_string(preferences_path(extension))
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_else(|| serde_json::json!({}))
+fn stored_values(extension: &str) -> PreferenceValues {
+    fs::read_to_string(preferences_path(extension)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
 
 /// Every extension with all of its commands, including Heyo's own.
@@ -604,11 +657,11 @@ pub fn list() -> Vec<ExtensionInfo> {
                 name: c.name,
                 title: c.title,
                 icon: c.icon,
-                preferences: serde_json::json!([]),
+                preferences: Vec::new(),
             })
             .collect(),
-        preferences: serde_json::json!([]),
-        values: serde_json::json!({}),
+        preferences: Vec::new(),
+        values: PreferenceValues::default(),
     };
     let mut builtin = builtin;
     // Heyo's native commands, so they get aliases, hotkeys and a switch too.
@@ -619,7 +672,7 @@ pub fn list() -> Vec<ExtensionInfo> {
         description: Some(n.description.clone()),
         mode: "native".into(),
         icon: Some(n.icon.into()),
-        preferences: serde_json::json!([]),
+        preferences: Vec::new(),
     }));
     let mut out = vec![builtin];
     let developed = development().into_iter().map(|entry| (PathBuf::from(entry.dir), Some(entry.source)));
@@ -647,7 +700,7 @@ pub fn list() -> Vec<ExtensionInfo> {
                     description: str_of(c, "description"),
                     mode: str_of(c, "mode").unwrap_or_default(),
                     icon: str_of(c, "icon").and_then(|i| asset(&dir, &i)).or_else(|| extension_icon.clone()),
-                    preferences: c.get("preferences").cloned().unwrap_or_else(|| serde_json::json!([])),
+                    preferences: preferences(c),
                 }
             })
             .collect();
@@ -659,7 +712,7 @@ pub fn list() -> Vec<ExtensionInfo> {
             builtin: false,
             development: source,
             commands,
-            preferences: manifest.get("preferences").cloned().unwrap_or_else(|| serde_json::json!([])),
+            preferences: preferences(&manifest),
             values: stored_values(&name),
             name,
             id,
@@ -668,7 +721,7 @@ pub fn list() -> Vec<ExtensionInfo> {
     out
 }
 
-pub fn save_preferences(extension: &str, values: &serde_json::Value) -> Result<(), String> {
+pub fn save_preferences(extension: &str, values: &PreferenceValues) -> Result<(), String> {
     if extension.contains(['/', '\\']) || extension.starts_with('.') {
         return Err(format!("invalid extension name {extension}"));
     }

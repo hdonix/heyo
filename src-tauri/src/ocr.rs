@@ -5,10 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use serde_json::json;
 use tauri::{AppHandle, Emitter};
 
-use crate::helper;
+use crate::helper::{self, InstallProgress};
 use crate::wire::event;
 
 static INSTALLING: AtomicBool = AtomicBool::new(false);
@@ -50,13 +49,13 @@ pub fn install(app: &AppHandle) -> Result<(), String> {
     if INSTALLING.swap(true, Ordering::Relaxed) {
         return Ok(());
     }
-    let _ = app.emit(event::OCR_INSTALL, json!({ "type": "progress", "step": "Text recognition engine" }));
+    let _ = app.emit(event::OCR_INSTALL, InstallProgress::Progress { step: "Text recognition engine".into(), received: None, total: None });
     let window = app.clone();
-    helper::install(command(app, "install"), move |message| {
-        if helper::concludes(&message) {
+    helper::install(command(app, "install"), move |progress| {
+        if progress.concludes() {
             INSTALLING.store(false, Ordering::Relaxed);
         }
-        let _ = window.emit(event::OCR_INSTALL, message);
+        let _ = window.emit(event::OCR_INSTALL, progress);
     });
     Ok(())
 }

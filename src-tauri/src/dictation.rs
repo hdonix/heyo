@@ -105,9 +105,46 @@ fn node_command(app: &AppHandle, args: &[&str]) -> Result<Command, String> {
     Ok(command)
 }
 
+/// What the dictation window is told of a recording: the helper's account
+/// of it, and the host's own of one starting or failing.
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, ts_rs::TS)]
+#[serde(tag = "type", rename_all = "lowercase")]
+#[ts(export, export_to = "../../shared/bindings/", rename = "DictationEvent")]
+pub(crate) enum Told {
+    /// A recording begins; `polish` is the mode it will be polished in.
+    Start { polish: String },
+    /// The microphone is open.
+    Ready,
+    /// How loud it is, from 0 to 1; null when that could not be measured.
+    Level { value: Option<f64> },
+    /// The sentence in progress, as far as it is recognized.
+    Partial { text: String },
+    /// A finished sentence.
+    Segment { text: String },
+    Polishing,
+    /// The recording is over: `text` is what is pasted, `raw` what was heard.
+    Result {
+        text: String,
+        raw: String,
+        /// Why the text was not polished.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        warning: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        cancelled: Option<bool>,
+    },
+    Error { message: String },
+}
+
 fn emit(app: &AppHandle, event: Value) {
+    // The window is told what `Told` declares and nothing else.
+    let told = match serde_json::from_value::<Told>(event) {
+        Ok(told) => told,
+        Err(e) => return eprintln!("heyo: dictation: not something its window is told: {e}"),
+    };
     if let Some(window) = app.get_webview_window(WINDOW) {
-        let _ = window.emit(EVENT, event);
+        let _ = window.emit(EVENT, told);
     }
 }
 
@@ -476,7 +513,8 @@ pub fn cancel(app: &AppHandle) {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
 pub struct Microphone {
     name: String,
     description: String,
@@ -499,7 +537,9 @@ pub fn microphones() -> Vec<Microphone> {
         .collect()
 }
 
-#[derive(Serialize)]
+/// Whether dictation can be used, for the settings page.
+#[derive(Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/", rename = "DictationStatus")]
 pub struct Status {
     installed: bool,
     installing: bool,
@@ -521,11 +561,11 @@ pub fn install(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
     let window = app.clone();
-    helper::install(node_command(app, &["install"]), move |message| {
-        if helper::concludes(&message) {
+    helper::install(node_command(app, &["install"]), move |progress| {
+        if progress.concludes() {
             window.state::<Dictation>().0.lock().unwrap().installing = false;
         }
-        let _ = window.emit(crate::wire::event::DICTATION_INSTALL, message);
+        let _ = window.emit(crate::wire::event::DICTATION_INSTALL, progress);
     });
     Ok(())
 }
@@ -598,5 +638,33 @@ mod tests {
     fn progress_changes_nothing() {
         assert_eq!(effects(false, &json!({ "type": "partial", "text": "Hel" })), []);
         assert_eq!(effects(true, &json!({ "type": "level", "value": 0.4 })), []);
+    }
+
+    /// Everything `runtime/src/dictation.ts` writes while recording, and what
+    /// the host says itself, is something the window is told.
+    #[test]
+    fn the_window_is_told_what_the_helper_and_the_host_say() {
+        let told = |event: Value| serde_json::from_value::<Told>(event);
+        for event in [
+            json!({ "type": "start", "polish": "off" }),
+            json!({ "type": "ready" }),
+            json!({ "type": "level", "value": 0.4 }),
+            json!({ "type": "partial", "text": "Hel" }),
+            json!({ "type": "segment", "text": "Hello." }),
+            json!({ "type": "polishing" }),
+            json!({ "type": "result", "text": "um hello", "raw": "um hello", "warning": "no API key" }),
+            json!({ "type": "result", "text": "", "raw": "", "cancelled": true }),
+            json!({ "type": "error", "message": "no microphone" }),
+        ] {
+            // As it was said, nothing added and nothing lost.
+            assert_eq!(serde_json::to_value(told(event.clone()).unwrap_or_else(|e| panic!("{event}: {e}"))).unwrap(), event);
+        }
+        // What the window does not read stays behind; a level that could not be measured is none.
+        let result = told(json!({ "type": "result", "text": "Hello.", "raw": "um hello", "polished": true })).unwrap();
+        assert_eq!(result, Told::Result { text: "Hello.".into(), raw: "um hello".into(), warning: None, cancelled: None });
+        assert_eq!(told(json!({ "type": "level", "value": null })).unwrap(), Told::Level { value: None });
+        // An installer's progress, or anything else, is not for this window.
+        assert!(told(json!({ "type": "progress", "step": "Speech engine" })).is_err());
+        assert!(told(json!({ "text": "hi" })).is_err());
     }
 }
