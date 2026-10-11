@@ -1,6 +1,6 @@
 # Heyo's documents
 
-What each document is for. They are in English unless marked.
+What each document is for.
 
 ## Using Heyo
 
@@ -16,8 +16,8 @@ What each document is for. They are in English unless marked.
 |---|---|
 | [developing-extensions.md](developing-extensions.md) | `heyo dev`, `heyo build`, `heyo ext check` and `heyo migrate`: writing an extension, or bringing one over from Raycast. |
 | [../packages/api/README.md](../packages/api/README.md) | `@heyo/api` for its users: what it adds to `@raycast/api`, and its permissions. |
-| [extension-api.md](extension-api.md) | The specification of `@heyo/api`: packaging, versions, permissions, the wire protocol, every interface. **In Chinese.** |
-| [live-activities.md](live-activities.md) | The design of live activities: what each desktop offers for showing something in progress, the interface, the implementation. **In Chinese.** |
+| [extension-api.md](extension-api.md) | The specification of `@heyo/api`: packaging, versions, permissions, the wire protocol, every interface. |
+| [live-activities.md](live-activities.md) | The design of live activities: what each desktop offers for showing something in progress, the interface, the implementation. |
 
 ## Working on Heyo
 
@@ -31,8 +31,8 @@ What each document is for. They are in English unless marked.
 | [../packaging/README.md](../packaging/README.md) | How each package is built, what has been verified, updates, and the release checklist. |
 | [../scripts/wayland-test/README.md](../scripts/wayland-test/README.md) | The GNOME-on-Wayland container: how to drive it, and what a test in it does and does not show. |
 | [../scripts/windows-test/CHECKLIST.md](../scripts/windows-test/CHECKLIST.md) | What remains to be tried by hand on Windows. |
-| [flutter-evaluation.md](flutter-evaluation.md) | A record of trying Flutter for the interface, what was measured, and why the web view stayed. **In Chinese.** |
-| [../TODO.md](../TODO.md) | The to-do list: what is done and what is not, with priorities. **In Chinese.** |
+| [flutter-evaluation.md](flutter-evaluation.md) | A record of trying Flutter for the interface, what was measured, and why the web view stayed. |
+| [../TODO.md](../TODO.md) | The to-do list: what is done and what is not, with priorities. |
 
 `images/` holds the README's pictures, which
 `scripts/gui-test/readme-shots.sh` takes

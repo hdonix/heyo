@@ -207,7 +207,7 @@ The interface is light or dark, following the system unless you choose.
 | [docs/usage.md](docs/usage.md) | every feature, its keys, and where Heyo keeps things |
 | [docs/compatibility.md](docs/compatibility.md) | which Raycast extensions run, measured |
 | [docs/developing-extensions.md](docs/developing-extensions.md) | writing extensions with `heyo dev`, `build`, `ext check`, `migrate` |
-| [docs/extension-api.md](docs/extension-api.md) | the specification of `@heyo/api` (in Chinese); [packages/api/README.md](packages/api/README.md) is the short English introduction |
+| [docs/extension-api.md](docs/extension-api.md) | the specification of `@heyo/api`; [packages/api/README.md](packages/api/README.md) is the short introduction |
 | [docs/architecture.md](docs/architecture.md) | how Heyo is built: the host, the web view, the runtime, and how they talk |
 | [docs/development.md](docs/development.md) | building, running, testing and debugging Heyo |
 | [packaging/README.md](packaging/README.md) | how the packages are built, and what a release still needs |
