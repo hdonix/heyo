@@ -9,18 +9,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Item } from "../shared/bindings/Item";
 
 const host = vi.hoisted(() => ({ results: [] as unknown[], activities: [] as unknown[], calc: null as unknown, calls: [] as [string, any][] }));
-vi.mock("@tauri-apps/api/core", () => ({
-  convertFileSrc: (path: string) => path,
-  invoke: async (command: string, args: unknown) => {
-    host.calls.push([command, args]);
-    if (command === "get_item") return (host.results as { id: string }[]).find((item) => item.id === (args as { id: string }).id) ?? null;
-    return command === "search" ? host.results : command === "list_quicklinks" ? [] : command === "activities" ? host.activities : undefined;
-  },
-}));
-vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 vi.mock("./calculator", () => ({ calculate: () => host.calc, loadRates: async () => null }));
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
+import { fakeHost } from "./host.fake";
 import { RootSearch } from "./RootSearch";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -92,7 +84,16 @@ async function show(results: Item[], activities: ActivityView[] = []) {
   inputRef.current!.focus();
 }
 
-beforeEach(() => vi.spyOn(console, "error").mockImplementation(() => {}));
+beforeEach(() => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const found = () => host.results as Item[];
+  host.calls = fakeHost({
+    search: found,
+    list_quicklinks: [],
+    activities: () => host.activities as ActivityView[],
+    get_item: ({ id }) => found().find((item) => item.id === id) ?? null,
+  }).calls as [string, any][];
+});
 afterEach(() => {
   act(() => root.unmount());
   container.remove();

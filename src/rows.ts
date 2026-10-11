@@ -8,22 +8,22 @@
 //! does: its actions in groups, the first of the first group being what
 //! Enter, a click on the row and the footer's button do.
 //!
-//! Nothing here draws or keeps anything. What an action does, it does through
-//! the `Palette` it is handed: the host, and the palette around the list.
+//! Nothing here draws or keeps anything. What an action does, it does by
+//! calling the host, and through the `Palette` it is handed: the palette
+//! around the list.
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
 import type { Item } from "../shared/bindings/Item";
 import { expand, needsArgument } from "../shared/placeholders";
 import { afterAlias, argumentsOf, filled, missing, type Argument } from "./arguments";
 import type { Calculation } from "./calculator";
+import { call } from "./host";
 import type { ActionSection, PanelAction } from "./raycast/actions";
 
 const SETTINGS_ID = "heyo:settings";
 
-/// What a row's actions act through.
+/// What of the palette a row's actions act through.
 export interface Palette {
-  /// Calls the host.
-  invoke<T = unknown>(command: string, args?: Record<string, unknown>): Promise<T>;
   showError(title: string, message?: string): void;
   showSuccess(title: string): void;
   openSettings(): void;
@@ -141,7 +141,7 @@ function ofKind(row: Row, context: Context, palette: Palette): Own {
     case "activity":
       return ofActivity(row.activity, palette);
     case "calc":
-      return ofCalculation(row.calc, palette);
+      return ofCalculation(row.calc);
     case "item":
       return ofItem(row.item, context, palette);
     case "fallback":
@@ -151,7 +151,7 @@ function ofKind(row: Row, context: Context, palette: Palette): Own {
 
 function ofActivity(activity: ActivityView, palette: Palette): Own {
   const failed = (e: unknown) => palette.showError(`Could not act on ${activity.name}`, String(e));
-  const act = (button: number | null) => void palette.invoke("activity_action", { key: activity.key, button }).catch(failed);
+  const act = (button: number | null) => void call("activity_action", { key: activity.key, button }).catch(failed);
   return {
     title: activity.title,
     groups: [
@@ -161,14 +161,14 @@ function ofActivity(activity: ActivityView, palette: Palette): Own {
         ...activity.buttons.map((button, index) => ({ title: button.title, icon: button.icon ?? "circle-16", run: () => act(index) })),
       ],
       activity.dismissible
-        ? [{ title: "End Activity", icon: "x-mark-circle-16", run: () => void palette.invoke("activity_dismiss", { key: activity.key }).catch(failed) }]
+        ? [{ title: "End Activity", icon: "x-mark-circle-16", run: () => void call("activity_dismiss", { key: activity.key }).catch(failed) }]
         : [],
     ],
   };
 }
 
-function ofCalculation(calc: Calculation, palette: Palette): Own {
-  const copy = (text: string, paste: boolean) => void palette.invoke("copy_text", { text, paste });
+function ofCalculation(calc: Calculation): Own {
+  const copy = (text: string, paste: boolean) => void call("copy_text", { text, paste });
   return {
     title: "Calculator",
     groups: [
@@ -192,7 +192,7 @@ function ofFallback(fallback: Fallback, context: Context, palette: Palette): Own
 
 /// Hands a question to the AI model.
 export function askAi(question: string, palette: Palette) {
-  void palette.invoke("launch", { id: "cmd:@heyo:ask-ai", fallbackText: question }).catch((e) => palette.showError("Could not ask AI", String(e)));
+  void call("launch", { id: "cmd:@heyo:ask-ai", fallbackText: question }).catch((e) => palette.showError("Could not ask AI", String(e)));
 }
 
 function fallbacks(quicklinks: Item[]): Fallback[] {
@@ -202,14 +202,14 @@ function fallbacks(quicklinks: Item[]): Fallback[] {
       id: "google",
       title: "Search Google",
       icon: "magnifying-glass-16",
-      run: (q, palette) => void palette.invoke("open_target", { target: `https://www.google.com/search?q=${encodeURIComponent(q)}` }).catch(failed(palette)),
+      run: (q, palette) => void call("open_target", { target: `https://www.google.com/search?q=${encodeURIComponent(q)}` }).catch(failed(palette)),
     },
     { id: "ask-ai", title: "Ask AI", icon: "stars-16", run: askAi },
     {
       id: "files",
       title: "Search Files",
       icon: "blank-document-16",
-      run: (q, palette) => void palette.invoke("launch", { id: "cmd:@heyo:search-files", fallbackText: q }).catch(failed(palette)),
+      run: (q, palette) => void call("launch", { id: "cmd:@heyo:search-files", fallbackText: q }).catch(failed(palette)),
     },
     ...quicklinks
       .filter((link) => needsArgument(link.link ?? ""))
@@ -232,7 +232,6 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
   const fields = context.folded ? [] : argumentsOf(item);
   const values = valuesOf(item, context);
   const { id } = item;
-  const invoke = (command: string, args: Record<string, unknown>) => void palette.invoke(command, args);
 
   /// Opens the item with what its fields hold. A required field left empty
   /// keeps it from opening, and is asked for instead.
@@ -240,7 +239,7 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
     const empty = missing(fields, values);
     if (empty.length) return palette.fillIn(id, fields.findIndex((field) => field.name === empty[0]));
     if (fields.length) palette.argumentsSent();
-    invoke("record_usage", { id });
+    void call("record_usage", { id });
     void open(item, palette, fields.length ? values : undefined);
   };
 
@@ -265,7 +264,7 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
       title: "Copy Link",
       icon: "copy-clipboard-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "c" },
-      run: () => invoke("copy_text", { text: item.link ?? "", paste: false }),
+      run: () => void call("copy_text", { text: item.link ?? "", paste: false }),
     });
   }
 
@@ -274,7 +273,7 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
       title: item.favorite ? "Remove from Favorites" : "Add to Favorites",
       icon: item.favorite ? "star-disabled-16" : "star-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "f" },
-      run: () => invoke("set_favorite", { id, favorite: !item.favorite }),
+      run: () => void call("set_favorite", { id, favorite: !item.favorite }),
     },
   ];
   if (item.favorite && item.section === "Favorites") {
@@ -283,13 +282,13 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
         title: "Move Up in Favorites",
         icon: "arrow-up-16",
         shortcut: { modifiers: ["ctrl", "alt"], key: "arrowUp" },
-        run: () => invoke("move_favorite", { id, offset: -1 }),
+        run: () => void call("move_favorite", { id, offset: -1 }),
       },
       {
         title: "Move Down in Favorites",
         icon: "arrow-down-16",
         shortcut: { modifiers: ["ctrl", "alt"], key: "arrowDown" },
-        run: () => invoke("move_favorite", { id, offset: 1 }),
+        run: () => void call("move_favorite", { id, offset: 1 }),
       },
     );
   }
@@ -312,14 +311,14 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
       title: "Remove Hotkey",
       icon: "x-mark-circle-16",
       run: () =>
-        void palette.invoke("set_item_hotkey", { id, title: item.title, accelerator: "" }).catch((e) => palette.showError("Could not remove hotkey", String(e))),
+        void call("set_item_hotkey", { id, title: item.title, accelerator: "" }).catch((e) => palette.showError("Could not remove hotkey", String(e))),
     });
   }
   manage.push({
     title: "Reset Ranking",
     icon: "arrow-counter-clockwise-16",
     run: () => {
-      invoke("reset_ranking", { id });
+      void call("reset_ranking", { id });
       palette.showSuccess(`Reset ranking of ${item.title}`);
     },
   });
@@ -337,40 +336,40 @@ export async function open(item: Item, palette: Palette, given?: Record<string, 
     if (item.kind === "Quicklink") return await openQuicklink(item, palette, given?.query);
     if (item.kind === "Snippet") return await pasteSnippet(item, palette, true, given?.query);
     // Applications, extensions' commands, and Heyo's own (screenshots, …), which run in the host.
-    await palette.invoke("launch", { id: item.id, arguments: given });
+    await call("launch", { id: item.id, arguments: given });
   } catch (e) {
     palette.showError(`Could not open ${item.title}`, String(e));
   }
 }
 
-const readClipboard = (palette: Palette) => () => palette.invoke<string>("read_clipboard");
+const readClipboard = () => call("read_clipboard");
 
 async function openQuicklink(item: Item, palette: Palette, argument?: string): Promise<void> {
   const link = item.link ?? "";
   if (needsArgument(link) && argument === undefined) {
     // Opened by a hotkey while hidden: show the window to ask.
-    await palette.invoke("show_window");
+    await call("show_window");
     const asked = await palette.ask({ title: item.title, placeholder: "Query" });
     if (asked === null) return;
     argument = asked;
   }
   const isUrl = /^[a-z][\w+.-]*:/i.test(link);
-  const target = await expand(link, { query: argument, encode: isUrl, readClipboard: readClipboard(palette) });
-  await palette.invoke("open_target", { target });
+  const target = await expand(link, { query: argument, encode: isUrl, readClipboard });
+  await call("open_target", { target });
 }
 
 async function pasteSnippet(item: Item, palette: Palette, paste: boolean, argument?: string): Promise<void> {
   if (needsArgument(item.text ?? "") && argument === undefined) {
-    await palette.invoke("show_window");
+    await call("show_window");
     const asked = await palette.ask({ title: item.title, placeholder: "Text for {argument}" });
     if (asked === null) return;
     argument = asked;
   }
-  const text = await expand(item.text ?? "", { query: argument, readClipboard: readClipboard(palette) });
-  await palette.invoke("copy_text", { text, paste });
+  const text = await expand(item.text ?? "", { query: argument, readClipboard });
+  await call("copy_text", { text, paste });
 }
 
 async function editAlias(item: Item, palette: Palette) {
   const alias = await palette.ask({ title: `Alias for ${item.title}`, placeholder: "e.g. cb — leave empty to remove", initial: item.alias ?? "" });
-  if (alias !== null) void palette.invoke("set_alias", { id: item.id, alias }).catch((e) => palette.showError("Could not set alias", String(e)));
+  if (alias !== null) void call("set_alias", { id: item.id, alias }).catch((e) => palette.showError("Could not set alias", String(e)));
 }

@@ -5,6 +5,8 @@ import { expect, test } from "vitest";
 import type { ActivityView } from "../shared/bindings/ActivityView";
 import type { Item } from "../shared/bindings/Item";
 import type { Calculation } from "./calculator";
+import type { Command } from "./host";
+import { fakeHost } from "./host.fake";
 import { askAi, describe, open, rowsFor, type Context, type Description, type Found, type Palette, type Row } from "./rows";
 
 const item = (id: string, rest: Partial<Item> = {}): Item => ({ id, title: id, subtitle: null, icon: "box-16", kind: "Command", favorite: false, ...rest });
@@ -52,19 +54,17 @@ const rows = (query: string, found: Partial<Found>) => rowsFor(query, { ...nothi
 const rowOf = (found: Item) => rows("", { items: [found] })[0];
 const laidOut = (list: Row[]) => list.map((row) => [row.key, row.heading]);
 
-/// A palette that writes down what is asked of it. The host answers with
-/// `answers` and fails the commands in `failing`; a prompt is answered with
-/// the next of `replies`, and cancelled when there is none.
-function palette(play: { answers?: Record<string, unknown>; failing?: string[]; replies?: string[] } = {}) {
-  const asked: unknown[][] = [];
+/// A palette that writes down what is asked of it, in one list with what
+/// is asked of the host. The host answers with `answers` and fails the
+/// commands in `failing`; a prompt is answered with the next of `replies`,
+/// and cancelled when there is none.
+function palette(play: { answers?: Parameters<typeof fakeHost>[0]; failing?: Command[]; replies?: string[] } = {}) {
+  const host = fakeHost(play.answers);
+  for (const command of play.failing ?? []) host.refuse(command, `${command} failed`);
+  const asked = host.calls as unknown[][];
   const replies = [...(play.replies ?? [])];
   const note = (what: string) => (...with_: unknown[]) => void asked.push([what, ...with_.filter((w) => w !== undefined)]);
   const fake: Palette = {
-    invoke: async <T>(command: string, args?: Record<string, unknown>) => {
-      asked.push(args ? [command, args] : [command]);
-      if (play.failing?.includes(command)) throw `${command} failed`;
-      return play.answers?.[command] as T;
-    },
     showError: note("showError"),
     showSuccess: note("showSuccess"),
     openSettings: note("openSettings"),

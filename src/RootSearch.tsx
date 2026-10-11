@@ -7,14 +7,12 @@
 
 import { composing } from "./ime";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { ArrowRight, Star } from "lucide-react";
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
 import type { Item } from "../shared/bindings/Item";
-import { event } from "../shared/wire";
 import { calculate, loadRates, type Calculation, type Rates } from "./calculator";
+import { call, listen } from "./host";
 import { HotkeyHint, HotkeyRecorder } from "./hotkey";
 import { ItemIcon } from "./ItemIcon";
 import { ArgumentFields } from "./ArgumentFields";
@@ -82,7 +80,7 @@ function Prompt(props: {
 function HotkeyPrompt(props: { item: Item; onDone(): void }) {
   const [error, setError] = useState<string | null>(null);
   const save = (accelerator: string) =>
-    invoke("set_item_hotkey", { id: props.item.id, title: props.item.title, accelerator })
+    call("set_item_hotkey", { id: props.item.id, title: props.item.title, accelerator })
       .then(props.onDone)
       .catch((e) => setError(String(e)));
   return (
@@ -177,7 +175,7 @@ export function RootSearch(props: {
 
   useEffect(() => {
     const id = ++requestId.current;
-    invoke<Item[]>("search", { query }).then((results) => {
+    call("search", { query }).then((results) => {
       if (id !== requestId.current) return;
       setItems(results);
       if (answered.current?.query !== query || answered.current.shown !== props.shown) setHeld(FIRST);
@@ -194,18 +192,17 @@ export function RootSearch(props: {
   // asked, so while one is running and in view it is asked once a second.
   const [activities, setActivities] = useState<ActivityView[]>([]);
   const fetchActivities = () =>
-    invoke<ActivityView[]>("activities")
+    call("activities")
       .then((all) => Array.isArray(all) && setActivities(all))
       .catch(() => {});
   useEffect(() => {
     fetchActivities();
-    const heard = listen<ActivityView[]>(event.activities, ({ payload }) => setActivities(payload));
-    return () => void heard.then((stop) => stop());
+    return listen("activities", setActivities);
   }, [props.shown]);
 
   const [quicklinks, setQuicklinks] = useState<Item[]>([]);
   useEffect(() => {
-    invoke<Item[]>("list_quicklinks").then(setQuicklinks);
+    call("list_quicklinks").then(setQuicklinks);
   }, [props.version]);
 
   const calc = useMemo(() => calculate(query, rates), [query, rates]);
@@ -240,7 +237,6 @@ export function RootSearch(props: {
   const focusStop = (stop: number) => (stop === 0 ? props.inputRef.current : fieldRefs.current[stop - 1])?.focus();
 
   const palette: Palette = {
-    invoke,
     showError: props.showError,
     showSuccess: props.showSuccess,
     openSettings: props.openSettings,
@@ -286,7 +282,7 @@ export function RootSearch(props: {
     if (!props.pendingOpen) return;
     const id = props.pendingOpen;
     props.onPendingHandled();
-    invoke<Item | null>("get_item", { id }).then((item) => item && open(item, palette));
+    call("get_item", { id }).then((item) => item && open(item, palette));
   }, [props.pendingOpen]);
 
   const groups = about?.actions ?? [];
@@ -339,7 +335,7 @@ export function RootSearch(props: {
       askAi(query.trim(), palette);
     } else if (e.key === "Escape") {
       if (query) props.setQuery("");
-      else invoke("hide");
+      else void call("hide");
     } else if (e.ctrlKey || e.altKey) {
       const action = actionForShortcut(groups, e);
       if (action) {

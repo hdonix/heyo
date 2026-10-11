@@ -331,13 +331,13 @@ test("the panel lists an extension's actions in their sections, and a submenu op
   press(filter(), "Escape");
   expect(titles()).toEqual(["Colour", "Open", "Delete"]);
   act(() => rows()[0].click());
-  invoke.mockClear();
+  heyo.forget();
   act(() => rows()[1].click());
   expect(dispatched()).toEqual([[blue.id, "onAction"]]);
   expect(host.querySelector(".action-panel")).toBeNull();
 
   // An action in a submenu is reached by its shortcut without opening anything.
-  invoke.mockClear();
+  heyo.forget();
   press(search(), "r", { ctrlKey: true, code: "KeyR" });
   expect(dispatched()).toEqual([[red.id, "onAction"]]);
 });
