@@ -334,6 +334,7 @@ src/              UI (React)
   RootSearch.tsx  root search: results, calculator, favorites, aliases
   calculator.ts   arithmetic, units, currency and time zones
   hotkey.tsx      hotkey recorder
+  host.ts         the host as a window calls it: typed commands and events
   Dictation.tsx   dictation progress window
   Screenshot.tsx  screenshot overlay and pinned captures
   Settings.tsx    settings window
@@ -386,6 +387,22 @@ it writes). A window changes settings by sending only the fields that
 change (`change_settings`); the host merges them into the rest, saves, does
 what the change calls for and tells every window. So adding a setting is
 adding the field, its default and its control.
+
+### Commands
+
+What a window asks of the host is a command: a `#[tauri::command]`
+function, registered in `lib.rs`. Each is said twice more, and `cargo test`
+fails until both are there: which windows may call it
+(`commands/access.rs`), and what it takes and answers as a window sees it
+(`commands/bindings.rs`, which also says what every event carries). That
+last table is written to `shared/bindings/commands.ts`, and the web view
+calls through it: `call("copy_text", { text, paste })` and
+`listen("settingsChanged", …)` from `src/host.ts` do not compile with a
+name, an argument or a payload the host does not have. A call that fails
+is handled where it matters and otherwise ends in `.catch(reported(…))`,
+which shows it in the window's toast or error line. Tests of the web view
+play the host with `fakeHost` (`src/host.fake.ts`), typed by the same
+table.
 
 ### Styles and themes
 
