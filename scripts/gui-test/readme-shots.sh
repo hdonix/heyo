@@ -147,11 +147,12 @@ for THEME in ${*:-light dark}; do
   shot live-activity
 
   # The settings window: 924 by 704 is what Heyo asks for
-  # (commands/settings.rs), here at twice that. Under GNOME Shell it now
-  # and then comes up taller, by the height of the title bar it does not
-  # have; it is then closed and opened again, so that the two themes match.
+  # (commands/settings.rs), here at twice that. Under GNOME Shell it comes
+  # up taller more often than not, by the height of the title bar it does
+  # not have; it is then closed and opened again, so that the two themes
+  # match.
   away
-  for _ in 1 2 3 4; do
+  for _ in $(seq 12); do
     heyo --open heyo:settings; w 5
     [ "$(size 'Heyo Settings')" = "1848 1408" ] && break
     xdotool key Escape; w 0.5; xdotool key Escape; w 1.5
