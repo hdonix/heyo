@@ -261,15 +261,6 @@ impl Loan {
         }
         of.give_back(puts)
     }
-
-    /// Ends the loan with the text left where it is: it is the user's now.
-    pub(crate) fn keep(self) {
-        let mut lent = self.of.lent();
-        lent.owed = None;
-        lent.puts += 1;
-        drop(lent);
-        std::mem::forget(self);
-    }
 }
 
 impl Drop for Loan {
@@ -323,15 +314,21 @@ fn agreed(app: &AppHandle, answer: Answer) -> bool {
 }
 
 /// Hides the palette and pastes what is on the clipboard into the window
-/// that gets the focus back.
-fn hide_and_paste(app: &AppHandle) {
+/// that gets the focus back. If the clipboard was `borrowed` for it, the
+/// loan ends with the paste.
+fn hide_and_paste(app: &AppHandle, borrowed: Option<Loan>) {
     let _ = main_window(app).hide();
-    std::thread::spawn(|| logged(press(HIDING, Lines::Kept)));
+    std::thread::spawn(move || {
+        logged(press(HIDING, Lines::Kept));
+        drop(borrowed);
+    });
 }
 
 /// Brings the palette back over the terminal that is in front to ask, and
-/// pastes what is on the clipboard if the answer is yes.
-fn ask_over_terminal(app: &AppHandle, question: Question) {
+/// pastes what is on the clipboard if the answer is yes. If the clipboard
+/// was `borrowed` for it, the loan ends with the answer: after the paste,
+/// or at once when there is to be none.
+fn ask_over_terminal(app: &AppHandle, question: Question, borrowed: Option<Loan>) {
     // It is where the palette returns to.
     if let Some(terminal) = windows::active_external() {
         *app.state::<windows::LastWindow>().0.lock().unwrap() = Some(terminal);
@@ -342,7 +339,7 @@ fn ask_over_terminal(app: &AppHandle, question: Question) {
     let asking = app.clone();
     confirm::ask(app, question, move |answer| {
         if agreed(&asking, answer) {
-            hide_and_paste(&asking);
+            hide_and_paste(&asking, borrowed);
         }
     });
 }
@@ -355,7 +352,7 @@ pub(crate) fn copy_and_paste(app: &AppHandle, text: String) -> Result<(), String
         confirm::ask(app, question, move |answer| {
             if agreed(&asking, answer) {
                 match write_text(&text) {
-                    Ok(()) => hide_and_paste(&asking),
+                    Ok(()) => hide_and_paste(&asking, None),
                     Err(e) => notify("Could not paste", &e),
                 }
             }
@@ -363,7 +360,7 @@ pub(crate) fn copy_and_paste(app: &AppHandle, text: String) -> Result<(), String
         return Ok(());
     }
     write_text(&text)?;
-    hide_and_paste(app);
+    hide_and_paste(app, None);
     Ok(())
 }
 
@@ -374,22 +371,21 @@ pub(crate) fn paste_clipboard(app: &AppHandle) {
     PASTING.world.wait(FOCUS);
     let text = terminal_focused().then(read_text).flatten().unwrap_or_default();
     match question_before(&text, asks(app), || true) {
-        Some(question) => ask_over_terminal(app, question),
+        Some(question) => ask_over_terminal(app, question, None),
         None => logged(press(Duration::ZERO, Lines::Kept)),
     }
 }
 
 /// Pastes text for an extension into the window in front (the palette has
 /// hidden) and returns when the clipboard has its old text back. Where the
-/// paste has to be asked about first the clipboard is left as it is: the
-/// paste happens when the user answers.
+/// paste has to be asked about first it returns with the question up: the
+/// paste, and the clipboard's return after it, wait for the answer.
 pub(crate) fn paste_and_give_back(app: &AppHandle, text: &str, html: Option<&str>) -> Result<(), String> {
     let loan = borrow();
     loan.put(text, html)?;
     PASTING.world.wait(FOCUS);
     if let Some(question) = question_before(text, asks(app), terminal_focused) {
-        loan.keep();
-        ask_over_terminal(app, question);
+        ask_over_terminal(app, question, Some(loan));
         return Ok(());
     }
     logged(press(Duration::ZERO, Lines::Kept));
@@ -607,18 +603,12 @@ mod tests {
             pasting.press(HIDING, Lines::Kept).unwrap();
             world.pass(READ * 4);
             assert_eq!(happened(desktop), ["copy an answer", "wait 200", "paste"]);
-            // A loan that was kept leaves its text too.
-            let loan = pasting.borrow();
-            loan.put("asked about", None).unwrap();
-            loan.keep();
-            world.pass(READ * 4);
-            assert_eq!(clipboard(desktop).as_deref(), Some("asked about"));
-            // As does one that put nothing there,
+            // A loan that put nothing there has nothing to give back,
             drop(pasting.borrow());
             pasting.borrow().returned().unwrap();
             world.pass(READ * 4);
-            happened(desktop);
-            // or that found no text to give back.
+            assert_eq!(happened(desktop), NOTHING);
+            // nor has one that found no text there.
             *desktop.clipboard.lock().unwrap() = None;
             let loan = pasting.borrow();
             loan.put("over a picture", None).unwrap();
