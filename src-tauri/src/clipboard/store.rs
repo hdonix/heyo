@@ -91,7 +91,6 @@ impl Store {
         for suffix in ["", "-wal", "-shm"] {
             super::private(&dir.join(format!("history.db{suffix}")), 0o600);
         }
-        store.adopt(&dir.join("history.json"));
         Ok(store)
     }
 
@@ -130,30 +129,6 @@ impl Store {
              CREATE TABLE IF NOT EXISTS vectors (entry INTEGER PRIMARY KEY, model TEXT NOT NULL, vector BLOB NOT NULL);",
         )?;
         Ok(Store { db })
-    }
-
-    /// Moves the entries of the old `history.json` in, once.
-    fn adopt(&self, json: &Path) {
-        #[derive(serde::Deserialize)]
-        struct Old {
-            entries: Vec<Entry>,
-        }
-        let Ok(text) = std::fs::read_to_string(json) else { return };
-        let adopted = serde_json::from_str::<Old>(&text).map_err(|e| e.to_string()).and_then(|old| {
-            let count = old.entries.len();
-            self.db.execute_batch("BEGIN").map_err(|e| e.to_string())?;
-            let inserted = old.entries.iter().try_for_each(|entry| self.insert(entry));
-            self.db.execute_batch(if inserted.is_ok() { "COMMIT" } else { "ROLLBACK" }).map_err(|e| e.to_string())?;
-            inserted.map(|()| count).map_err(|e| e.to_string())
-        });
-        match adopted {
-            // Not kept beside the database: an entry deleted later would live on in it.
-            Ok(count) => {
-                eprintln!("heyo: moved {count} clipboard entries into history.db");
-                let _ = std::fs::remove_file(json);
-            }
-            Err(e) => eprintln!("heyo: could not read the old clipboard history ({e}); it stays in {}", json.display()),
-        }
     }
 
     pub(super) fn insert(&self, entry: &Entry) -> rusqlite::Result<()> {
@@ -508,29 +483,6 @@ mod tests {
         assert!(store.search("发票", None, 10).unwrap().entries.is_empty());
     }
 
-    #[test]
-    fn takes_over_the_old_file() {
-        let dir = std::env::temp_dir().join(format!("heyo-clipboard-test-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let old = r#"{"next_id":7,"entries":[
-            {"id":7,"kind":"text","text":"最新的一条","app":"Code","copiedAt":3000,"firstCopiedAt":2000,"timesCopied":2,"pinned":true,"hash":18446744073709551615},
-            {"id":3,"kind":"link","text":"https://example.com","copiedAt":1000,"firstCopiedAt":1000,"timesCopied":1,"pinned":false,"hash":5}]}"#;
-        std::fs::write(dir.join("history.json"), old).unwrap();
-        let store = Store::open(&dir).unwrap();
-        assert!(!dir.join("history.json").exists());
-        let entries = store.recent(None, 10).unwrap();
-        assert_eq!(entries.iter().map(|e| (e.id, e.pinned, e.times_copied, e.hash)).collect::<Vec<_>>(), [(7, true, 2, u64::MAX), (3, false, 1, 5)]);
-        assert_eq!(texts(&store.search("最新", None, 10).unwrap()), ["最新的一条"]);
-        // New entries continue after the old ids.
-        assert_eq!(add(&store, "next", "Code", 4000), 8);
-        drop(store);
-        // Opening again changes nothing.
-        assert_eq!(Store::open(&dir).unwrap().count().unwrap(), 3);
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    /// `cargo test --release clipboard::store::tests::speed -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn speed() {
