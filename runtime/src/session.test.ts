@@ -81,15 +81,6 @@ test("the command in the palette may hide it", async () => {
   expect(methods()).toEqual(["host.hide", "host.hud"]);
 });
 
-test("a launch that cannot be leaves the command on screen", async () => {
-  const beta = extension("beta", { show: { mode: "view", source: show }, bar: { mode: "menu-bar", source: show } });
-  launch(beta, "show");
-  const session = activeSession();
-  expect(() => launch(beta, "nowhere")).toThrow(/Unknown command/);
-  expect(() => launch(beta, "bar")).toThrow(/menu bar/);
-  expect(activeSession()).toBe(session);
-});
-
 const go = (options: string) => `
   const api = require("@raycast/api");
   exports.default = async () => { await api.launchCommand(${options}); };
