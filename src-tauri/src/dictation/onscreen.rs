@@ -165,6 +165,22 @@ fn common(a: &str, b: &str) -> usize {
     a.char_indices().zip(b.chars()).find(|((_, x), y)| x != y).map_or(a.len().min(b.len()), |((at, _), _)| at)
 }
 
+/// How much of `owed` (bytes) the application can be taken to hold, where
+/// `there` stands in its place and nothing may be erased: what the two
+/// begin with in common. Where they part in the middle of a word, the word
+/// is owed whole: after "watch" that should have been "walk", "walk" reads
+/// better than "lk". (In writing without spaces between words they part
+/// where they part.)
+fn held(there: &str, owed: &str) -> usize {
+    let same = common(there, owed);
+    let of_a_word = |c: char| c.is_alphanumeric() && u32::from(c) < 0x2e80;
+    let parted_in_a_word = same < there.len() && owed[same..].starts_with(of_a_word) && owed[..same].ends_with(of_a_word);
+    match parted_in_a_word {
+        true => owed[..same].char_indices().rev().take_while(|(_, c)| of_a_word(*c)).last().map_or(same, |(at, _)| at),
+        false => same,
+    }
+}
+
 impl OnScreen {
     /// `live`: the words go in as they are spoken. `polishing`: the text is
     /// to be polished when the recording ends.
@@ -315,7 +331,7 @@ impl OnScreen {
     /// stays, and what was said and is not there yet is pasted.
     fn fall_back(&mut self) -> Vec<Step> {
         self.how = How::Appending;
-        self.put = common(&self.screen, &self.said);
+        self.put = held(&self.screen, &self.said);
         self.stale = self.screen[self.put..].to_owned();
         self.append()
     }
@@ -327,7 +343,7 @@ impl OnScreen {
         if owed.is_empty() {
             return Vec::new();
         }
-        let text = owed[common(&self.stale, owed)..].to_owned();
+        let text = owed[held(&self.stale, owed)..].to_owned();
         self.put = self.said.len();
         self.stale.clear();
         if text.is_empty() {
@@ -810,6 +826,29 @@ mod tests {
         assert!(field.screen.live());
         field.partial("Hello");
         assert_eq!(field.text, "Hello");
+    }
+
+    #[test]
+    fn after_a_word_that_stands_there_wrongly_the_word_is_written_whole() {
+        let owed = |there: &str, owed: &'static str| &owed[held(there, owed)..];
+        // Where the two part in the middle of a word, the word is owed whole.
+        assert_eq!(owed("let us watch", "let us walk to"), "walk to");
+        assert_eq!(owed("bring 40", "bring 42 of them"), "42 of them");
+        assert_eq!(owed("eine größere", "eine Größe und"), "Größe und");
+        // Between words, and where what stands there is how the text goes
+        // on, nothing is written twice.
+        assert_eq!(owed("See who had", "See you at three."), "you at three.");
+        assert_eq!(owed("we walked", "we walk to"), " to");
+        assert_eq!(owed("Hello wor", "Hello world."), "ld.");
+        assert_eq!(owed("Hello world", "Hello"), "");
+        assert_eq!(owed("", "Hello"), "Hello");
+        // Writing without spaces has no words to keep whole.
+        assert_eq!(owed("今天天汽", "今天天气很好"), "气很好");
+
+        // The user typed after a word the recognizer then changed its mind about.
+        let mut field = Field::new(true, false);
+        field.partial("let us watch").types("!").sentence("let us walk to the park.");
+        assert_eq!(field.text, "let us watch!walk to the park.");
     }
 
     #[test]
