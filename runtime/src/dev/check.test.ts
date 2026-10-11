@@ -34,6 +34,7 @@ describe("macOS-only code", () => {
     expect(rules('spawn(\n  "mdfind",\n  [query],\n);')).toEqual(["mac-program"]);
     expect(rules('const say = "/usr/bin/say";')).toEqual(["mac-program"]);
     expect(rules("await $`pmset -g batt`")).toEqual(["mac-program"]);
+    expect(rules('const { stdout } = await exec("ioreg -rc AppleSmartBattery"); spawn("xcrun", ["simctl", "list"]);')).toEqual(["mac-program", "mac-program"]);
     // The same words where nothing is run.
     expect(rules('const title = "say something"; const mode = "security";')).toEqual([]);
     expect(rules('exec("git status"); exec("ls -la");')).toEqual([]);

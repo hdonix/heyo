@@ -21,9 +21,9 @@ const { MAC_PROGRAMS: ONLY_MAC } = createRequire(import.meta.url)("../../runtime
 // Not macOS's alone, though an extension that calls them was written for it.
 const SHARED_PROGRAMS = new Set(["brew", "killall", "sysctl"]);
 /// What an error names that an extension written for macOS starts: beside
-/// those, `open` (which the checker reads apart, by its flags) and more
-/// that the checker does not look for.
-const MAC_PROGRAMS = new Set([...ONLY_MAC, "open", "ioreg", "vm_stat", "mas", "swift", "xcrun", "xcodebuild", ...SHARED_PROGRAMS]);
+/// those, `open` (which the checker reads apart, by its flags) and `swift`
+/// (which other systems can have, and no extension starts for them).
+const MAC_PROGRAMS = new Set([...ONLY_MAC, "open", "swift", ...SHARED_PROGRAMS]);
 
 export const STATUSES = {
   works: "Launches cleanly",

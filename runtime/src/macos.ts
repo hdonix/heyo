@@ -12,7 +12,7 @@ export const MAC_PROGRAMS: ReadonlySet<string> = new Set([
   "osascript", "pbcopy", "pbpaste", "defaults", "mdfind", "mdls", "say", "pmset", "networksetup", "launchctl", "screencapture",
   "sips", "caffeinate", "diskutil", "system_profiler", "scutil", "plutil", "afplay", "security", "ditto", "hdiutil", "sw_vers",
   "softwareupdate", "shortcuts", "qlmanage", "tmutil", "airport", "automator", "dscl", "spctl", "codesign", "xattr", "osacompile",
-  "PlistBuddy", "lsregister", "mdutil",
+  "PlistBuddy", "lsregister", "mdutil", "ioreg", "vm_stat", "mas", "xcrun", "xcodebuild",
 ]);
 
 /// Whether a file is a macOS (Mach-O) executable.
