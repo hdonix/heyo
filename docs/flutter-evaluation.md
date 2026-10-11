@@ -1,61 +1,106 @@
-# 用 Flutter 做界面：试过，搁置（2026-10-10 至 10-11）
+# Flutter for the interface: tried, and shelved (2026-10-10 to 10-11)
 
-结论：**不迁移。界面继续用 Tauri 的网页视图。** 试验的代码不在主干上，保留在分支 `flutter-ui`。
+Conclusion: **no migration. The interface stays on Tauri's web view.** The
+code of the trial is not on the main branch; it is kept on the branch
+`flutter-ui`.
 
-这份文档记下试了什么、量到了什么、为什么停，以及以后要重新考虑时该从哪里接着做。
+This document records what was tried, what was measured, why it stopped,
+and where to pick it up if it is ever reconsidered.
 
-## 为什么试
+## Why it was tried
 
-在开发用的机器上（NVIDIA 专有驱动，X11），WebKitGTK 用不上显卡，界面是 CPU 画的。
-滚动卡顿、阴影重算都源于此（见 `TODO.md` 的"性能"一节）。Flutter 自带渲染引擎，想看它能否绕开这个问题。
+On the development machine (NVIDIA's proprietary driver, X11) WebKitGTK
+cannot use the GPU, and the interface is drawn on the CPU.
+Stuttering scrolling and shadows being recomputed both come from this (see
+the "Performance" section of `TODO.md`). Flutter brings its own rendering
+engine, and the question was whether it could get around the problem.
 
-## 量到了什么
+## What was measured
 
-| 项 | 结果 | 怎么量的 |
+| Item | Result | How it was measured |
 |---|---|---|
-| 显卡 | Flutter 在这台机器上用上了显卡（进程出现在 `nvidia-smi` 里） | 真实桌面，不抢焦点的测试窗口 |
-| 按住方向键，2000 行，整帧耗时（中位数 / 95 分位） | 真实桌面 3.2 / 4.6 ms；无显卡的沙箱 7.3 / 10.3 ms | Flutter 的 `FrameTiming` |
-| 同一场景下的网页视图 | 沙箱里每步 11–13 ms | `scripts/gui-test/scroll.sh`。口径不同（从帧回调到页面空闲），只能比量级 |
-| 岛的展开收起（连续的形状变化） | 真实桌面 2.8 / 3.9 ms | 同上 |
-| 中文输入法 | X11 会话下正常 | 用户亲手试 |
-| 中文字体 | 需要显式列出后备字体，否则是空方框 | 沙箱截图 |
-| 内存（常驻 / 按比例分摊），面板隐藏时 | 网页视图 838 / 294 MB；Flutter 319 / 194 MB | 沙箱，发布构建 |
-| 内存，面板加设置窗口都打开 | 网页视图 1102 / 399 MB；Flutter 616 / 363 MB | 同上。每多一个 Flutter 窗口约 170 MB，窗口全开时会超过网页视图 |
-| 从唤出到画出 | 13–56 ms，多数在 20 ms 左右 | 沙箱，软件渲染 |
-| 打包体积 | Flutter 界面约 50 MB（deb 里 27 MiB） | 构建产物 |
+| GPU | Flutter did use the GPU on this machine (the process appears in `nvidia-smi`) | The real desktop, with a test window that does not take focus |
+| Holding an arrow key, 2000 rows, time of a whole frame (median / 95th percentile) | The real desktop 3.2 / 4.6 ms; the sandbox without a GPU 7.3 / 10.3 ms | Flutter's `FrameTiming` |
+| The web view in the same scenario | 11–13 ms a step in the sandbox | `scripts/gui-test/scroll.sh`. The measure differs (from the frame callback to the page being idle), so only the order of magnitude can be compared |
+| The island expanding and collapsing (a continuous change of shape) | The real desktop 2.8 / 3.9 ms | As above |
+| Chinese input method | Works in an X11 session | Tried by the user's own hand |
+| Chinese fonts | Fallback fonts have to be listed explicitly, otherwise there are empty boxes | Sandbox screenshots |
+| Memory (resident / proportional), with the palette hidden | The web view 838 / 294 MB; Flutter 319 / 194 MB | The sandbox, release builds |
+| Memory, with the palette and the settings window both open | The web view 1102 / 399 MB; Flutter 616 / 363 MB | As above. Every further Flutter window is about 170 MB, and with all windows open it would exceed the web view |
+| From being called up to being drawn | 13–56 ms, mostly around 20 ms | The sandbox, software rendering |
+| Package size | The Flutter interface is about 50 MB (27 MiB in the deb) | The build output |
 
-没有量的：Wayland、Windows、200% 缩放、真实桌面上的内存。
+Not measured: Wayland, Windows, 200% scaling, memory on the real desktop.
 
-## 为什么停
+## Why it stopped
 
-渲染性能的收益是真的，但代价和缺口加起来超过了它：
+The gain in rendering performance is real, but the costs and the gaps
+together outweigh it:
 
-1. **要重写整个界面层。** 约 7000 行 TypeScript 和 2900 行 SCSS，其中最重的是扩展视图的渲染器。地基做完时，Flutter 一侧只有一个最小的面板。
-2. **没有网页引擎就画不了扩展里的 HTML 和 SVG。** Raycast 扩展的详情页是 Markdown，可以夹 HTML；很多扩展把一张代码生成的 SVG 当画布用
-   （Speedtest 的整个仪表盘就是一张 SVG 图片）。这些现在由 WebKit 完整支持，换 Flutter 后要靠子集实现来补，是一个持续的兼容差距。
-   在 Flutter 里嵌回网页视图不解决问题：Linux 上嵌入的网页视图盖在 Flutter 画面之上，浮层（动作面板、Toast）画不到它上面。
-3. **多窗口。** Flutter 稳定版没有多窗口接口（`enable-windowing` 只在开发主干上可用），只能每个窗口一个进程，每个约 170 MB。
-4. **Windows 不能交叉编译。** 现在的 Windows 版是从 Linux 交叉编译的；Flutter 必须在 Windows 机器上构建。
-5. **Raycast 自己走的是相反的方向。** Raycast 2.0 为了跨平台，从原生渲染改成了"原生外壳加系统网页视图"。
-   我们换引擎的全部理由都在 Linux 的一种驱动上。
+1. **The whole interface layer would have to be rewritten.** About 7000
+   lines of TypeScript and 2900 lines of SCSS, the heaviest of which is the
+   renderer of extension views. When the groundwork was done, the Flutter
+   side had only a minimal palette.
+2. **Without a web engine, the HTML and SVG in extensions cannot be
+   drawn.** The detail pages of Raycast extensions are Markdown, which may
+   have HTML mixed in; many extensions use an SVG generated in code as a
+   canvas (the whole dashboard of Speedtest is one SVG image). WebKit
+   supports all of this fully today; after a move to Flutter it would have
+   to be made up for by implementing a subset, which is a lasting gap in
+   compatibility.
+   Embedding a web view back into Flutter does not solve it: on Linux an
+   embedded web view sits on top of what Flutter draws, and overlays (the
+   action panel, toasts) cannot be drawn over it.
+3. **Several windows.** Stable Flutter has no multi-window interface
+   (`enable-windowing` is only available on the development branch), so it
+   could only be one process per window, each about 170 MB.
+4. **Windows cannot be cross-compiled.** Today's Windows build is
+   cross-compiled from Linux; Flutter has to be built on a Windows machine.
+5. **Raycast itself went the opposite way.** For the sake of being
+   cross-platform, Raycast 2.0 changed from native rendering to "a native
+   shell plus the system web view".
+   Our whole reason for changing engines lies in one driver on Linux.
 
-## 留下了什么
+## What is left
 
-- **这份文档**和上面的数据。
-- **分支 `flutter-ui`**：完整的地基。包括 `ui/`（Flutter 项目：主机客户端、设计规范、图标映射、共用组件、一个走通全程的面板，87 个测试）、
-  `src-tauri/src/shell/`（界面抽象：网页视图窗口或 Flutter 进程；命令分发表；事件转发）、`docs/flutter-ui.md`（架构和约定）、`scripts/gui-test/flutter-shell.sh`。
-  做这个地基的子代理在自己的沙箱里跑通了它的 26 项检查；合并到主干后没有再验证过就撤回了。
-- **沙箱脚本的两处改进**（已留在主干）：`HEYO_TEST_DISPLAY` 可以指定显示器编号，多个沙箱可以并行；`down.py` 只结束自己那个显示器上的进程，并在 `SIGTERM` 无效时强制结束。
-- **对灵动岛方案的影响**：展开界面用网页画。实验确认了网页视图的渲染成本只和变化的面积有关、空闲为零，够用。
+- **This document** and the figures above.
+- **The branch `flutter-ui`**: the complete groundwork. It includes `ui/`
+  (the Flutter project: a host client, the design specification, the icon
+  mapping, shared components, and one palette that goes the whole way,
+  with 87 tests), `src-tauri/src/shell/` (the abstraction of the interface:
+  a web view window or a Flutter process; the command dispatch table;
+  event forwarding), `docs/flutter-ui.md` (architecture and conventions)
+  and `scripts/gui-test/flutter-shell.sh`.
+  The subagent that built this groundwork passed its 26 checks in its own
+  sandbox; after being merged into the main branch it was withdrawn without
+  being verified again.
+- **Two improvements to the sandbox scripts** (kept on the main branch):
+  `HEYO_TEST_DISPLAY` can give the display number, so that several
+  sandboxes can run in parallel; `down.py` only ends the processes on its
+  own display, and kills them when `SIGTERM` has no effect.
+- **The effect on the Dynamic Island design**: the expanded interface is
+  drawn as a web page. The experiments confirmed that the rendering cost of
+  the web view depends only on the area that changes and is zero when idle,
+  which is enough.
 
-## 渲染性能的问题还在
+## The rendering performance problem is still there
 
-搁置 Flutter 不等于问题解决了。还没认真试过的两条路，成本都低得多：
+Shelving Flutter does not mean the problem is solved. Two roads have not
+been seriously tried yet, both far cheaper:
 
-1. **让 WebKitGTK 用上显卡。** 只试过两种配置（默认、指定 NVIDIA 的 GBM 后端），都因为 GBM 缓冲区创建失败而不行。没有系统地研究过。
-2. **换成 Chromium 内核。** 它在 NVIDIA 上的显卡加速是成熟的，前端代码不用改，HTML 和 SVG 也都在。代价是体积和内存。Tauri 的 CEF 运行时成熟度没有核实过。
+1. **Getting WebKitGTK to use the GPU.** Only two configurations were tried
+   (the default, and naming NVIDIA's GBM backend), and both failed because
+   creating GBM buffers failed. It has not been studied systematically.
+2. **Changing to a Chromium engine.** Its GPU acceleration on NVIDIA is
+   mature, the front-end code needs no change, and HTML and SVG are all
+   there. The price is size and memory. How mature Tauri's CEF runtime is
+   has not been verified.
 
-## 如果以后重新考虑
+## If it is reconsidered later
 
-先确认这三件事有没有变：Flutter 的多窗口接口是否进了稳定版；有没有办法在 Flutter 里完整渲染 SVG 和常见的 HTML（比如在 Rust 主机里把 SVG 渲染成位图）；
-Linux 上网页视图的显卡问题是否已经用别的办法解决（那样换引擎的理由就没有了）。然后从 `flutter-ui` 分支接着做。
+First confirm whether these three things have changed: whether Flutter's
+multi-window interface has reached the stable channel; whether there is a
+way to render SVG and common HTML fully in Flutter (for example, rendering
+SVG to a bitmap in the Rust host); whether the GPU problem of the web view
+on Linux has been solved some other way (in which case the reason for
+changing engines is gone). Then pick it up from the `flutter-ui` branch.
