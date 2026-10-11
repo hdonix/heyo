@@ -344,7 +344,10 @@ runtime/src/      extension runtime (Node), bundled to runtime/dist/
   ocr.ts          text-recognition helper (PaddleOCR)
   ai.ts           Claude or a local model, for Heyo's own commands
   background.ts   menu bar and background commands (a process of their own)
-  main.ts         entry: provides @raycast/api and React to extensions
+  main.ts         entry: the process and its pipes
+  runtime.ts      provides @raycast/api and React to extensions, takes the host's messages
+  protocol.ts     the conversation with the host: requests, replies, events
+  transport.ts    what carries it: stdin and stdout, or a pair in memory for tests
   renderer.ts     React reconciler whose tree is streamed to the UI
   session.ts      runs one command at a time, sends incremental renders
   api/            the @raycast/api implementation
