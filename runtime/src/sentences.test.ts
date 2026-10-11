@@ -5,9 +5,12 @@ import { between, type Engine, PARTIAL_INTERVAL_MS, SAMPLE_RATE, type Said, Sess
 /// A recognizer and a detector for tests. Audio is words: a word is a
 /// stretch of samples of one loudness, which names it. The recognizer
 /// writes the words it is given and ends with a mark, as SenseVoice does;
-/// the detector finishes a sentence after a pause.
+/// the detector finishes a sentence after a pause, and like the real one
+/// it notices speech late: what it calls a sentence has lost most of its
+/// first word.
 const WORD = SAMPLE_RATE / 4;
 const PAUSE = Math.ceil((0.6 * SAMPLE_RATE) / VAD_WINDOW);
+const LATE = 5 * VAD_WINDOW;
 
 function engine(words: string[], mark = "."): Engine {
   let fed = 0;
@@ -39,8 +42,8 @@ function engine(words: string[], mark = "."): Engine {
     vad: {
       acceptWaveform(window) {
         const loud = window.some((sample) => sample !== 0);
-        if (loud && start < 0) start = fed;
-        if (start >= 0) speech.push(window.slice());
+        if (loud && start < 0) start = fed + LATE;
+        if (start >= 0 && fed >= start) speech.push(window.slice());
         quiet = loud ? 0 : quiet + 1;
         fed += window.length;
         if (start >= 0 && quiet >= PAUSE) end();
@@ -50,6 +53,12 @@ function engine(words: string[], mark = "."): Engine {
       front: () => done[0],
       pop: () => void done.shift(),
       flush: end,
+      reset() {
+        end();
+        done.length = 0;
+        fed = 0;
+        quiet = 0;
+      },
     },
   };
 }
@@ -117,6 +126,20 @@ describe("a recording", () => {
     const { texts, text } = record(engine(WORDS), [audio([1, 2, 3, 4], 0)]);
     expect(texts("segment")).toEqual(["the weather is nice."]);
     expect(text).toBe("the weather is nice.");
+  });
+
+  it("keeps the first word of a sentence, which the detector is late for", () => {
+    const { texts } = record(engine(WORDS), [audio([8, 3, 4])]);
+    expect(texts("segment")).toEqual(["park is nice."]);
+  });
+
+  it("hears a second recording as it heard the first", () => {
+    // The helper keeps its recognizer and detector from one to the next.
+    const kept = engine(WORDS);
+    const first = record(kept, [audio([1, 2, 3, 4]), audio([6, 7, 1, 8])]);
+    const second = record(kept, [audio([1, 2, 3, 4]), audio([6, 7, 1, 8])]);
+    expect(second.texts("segment")).toEqual(first.texts("segment"));
+    expect(second.text).toBe("the weather is nice. walk to the park.");
   });
 
   it("writes the user's words their way, in progress and finished", () => {

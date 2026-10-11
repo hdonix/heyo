@@ -21,7 +21,8 @@ export interface Engine {
     front(): { start: number; samples: Float32Array };
     pop(): void;
     flush(): void;
-    clear?(): void;
+    /// Forgets all it has heard, and counts its samples from nothing again.
+    reset(): void;
   };
 }
 
@@ -94,7 +95,10 @@ export class Session {
     private say: (said: Said) => void,
     private now: () => number = Date.now,
   ) {
-    engine.vad.clear?.();
+    // The detector outlives a recording. Left as it was, it would go on
+    // counting samples where the last one stopped, and no sentence of this
+    // one would be found in what was kept of it (`withPreroll`).
+    engine.vad.reset();
   }
 
   feed(samples: Float32Array) {
