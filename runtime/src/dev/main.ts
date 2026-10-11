@@ -1,7 +1,9 @@
 //! The developer tools behind `heyo build`, `heyo dev`, `heyo migrate` and
 //! `heyo ext check`. The `heyo` program starts this with Node.js
 //! (`src-tauri/src/cli.rs`); it also runs on its own: `node heyo-dev.cjs
-//! build .`. Required as a module it does nothing and exports the checker.
+//! build .`. Required as a module it does nothing and exports the checker,
+//! with what the compatibility run (`scripts/compat`) must have the same
+//! as the checker has it.
 
 import path from "node:path";
 
@@ -13,6 +15,7 @@ import { registered, unregister } from "./registry";
 
 export { checkExtension, checkManifest, checkSource, formatReport, RULES, type Finding, type Report, type Rule, type Severity } from "./check";
 export { validateManifest } from "./manifest";
+export { MAC_PROGRAMS } from "../macos";
 export { rewriteImports } from "./migrate";
 
 export const USAGE = `Usage:

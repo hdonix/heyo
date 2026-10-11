@@ -8,20 +8,22 @@
 //! code is known not to work here. It does not mean every action in it
 //! was tried.
 
+import { createRequire } from "node:module";
+
 /// The checker's rules (`runtime/src/dev/check.ts`) that mean "written for
 /// macOS".
 export const MAC_RULES = new Set(["applescript", "open-flags", "mac-program", "mac-path", "darwin-only", "swift", "mac-binary"]);
 const API_RULES = new Set(["api-missing", "api-unsupported"]);
 
-/// Programs only macOS has (the checker's list, which is not exported).
-const MAC_PROGRAMS = new Set([
-  "osascript", "pbcopy", "pbpaste", "defaults", "mdfind", "mdls", "say", "pmset", "networksetup", "launchctl", "screencapture",
-  "sips", "caffeinate", "diskutil", "system_profiler", "scutil", "plutil", "afplay", "security", "ditto", "hdiutil", "sw_vers",
-  "softwareupdate", "shortcuts", "qlmanage", "tmutil", "airport", "automator", "dscl", "spctl", "codesign", "xattr", "osacompile",
-  "PlistBuddy", "lsregister", "mdutil", "open", "ioreg", "sysctl", "vm_stat", "brew", "mas", "swift", "xcrun", "xcodebuild", "killall",
-]);
+/// Programs only macOS has: the checker's list, out of the developer
+/// tools as they were built (`pnpm build:runtime`).
+const { MAC_PROGRAMS: ONLY_MAC } = createRequire(import.meta.url)("../../runtime/dist/heyo-dev.cjs");
 // Not macOS's alone, though an extension that calls them was written for it.
 const SHARED_PROGRAMS = new Set(["brew", "killall", "sysctl"]);
+/// What an error names that an extension written for macOS starts: beside
+/// those, `open` (which the checker reads apart, by its flags) and more
+/// that the checker does not look for.
+const MAC_PROGRAMS = new Set([...ONLY_MAC, "open", "ioreg", "vm_stat", "mas", "swift", "xcrun", "xcodebuild", ...SHARED_PROGRAMS]);
 
 export const STATUSES = {
   works: "Launches cleanly",

@@ -18,6 +18,7 @@ import path from "node:path";
 import apiGaps from "../api/conformance.gaps.json";
 import propGaps from "../api/props.gaps.json";
 import { gained, members, modules, permissionsOf, type ModuleName } from "../heyo/members";
+import { isMacProgram, MAC_PROGRAMS } from "../macos";
 import { existsIn, readPackage, sourceFiles } from "./files";
 import { lex, withoutComments, type Token } from "./lex";
 import { API_MODULES, validateManifest } from "./manifest";
@@ -67,15 +68,6 @@ export const RULES = {
 } as const;
 
 export type Rule = keyof typeof RULES;
-
-/// Programs that come with macOS and that nothing else has under that name.
-/// (`open` is handled apart: with a plain file or address it has equivalents.)
-const MAC_PROGRAMS = new Set([
-  "osascript", "pbcopy", "pbpaste", "defaults", "mdfind", "mdls", "say", "pmset", "networksetup", "launchctl", "screencapture",
-  "sips", "caffeinate", "diskutil", "system_profiler", "scutil", "plutil", "afplay", "security", "ditto", "hdiutil", "sw_vers",
-  "softwareupdate", "shortcuts", "qlmanage", "tmutil", "airport", "automator", "dscl", "spctl", "codesign", "xattr", "osacompile",
-  "PlistBuddy", "lsregister", "mdutil",
-]);
 
 /// What on a line says a string on it is a command being run.
 const RUNS = /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync|execa|execaSync|execaCommand|runCommand|shell|useExec)\b|\$`/;
@@ -376,21 +368,6 @@ export function checkManifest(manifest: unknown, exists: (file: string) => boole
     findings.push({ rule: "ai-tools", severity: "info", file: "package.json", message: "declares AI tools; Heyo runs the extension's commands and not its tools" });
   }
   return findings;
-}
-
-function isMacProgram(file: string) {
-  try {
-    const head = Buffer.alloc(4);
-    const fd = fs.openSync(file, "r");
-    try {
-      fs.readSync(fd, head, 0, 4, 0);
-    } finally {
-      fs.closeSync(fd);
-    }
-    return ["cafebabe", "bebafeca", "feedface", "cefaedfe", "feedfacf", "cffaedfe"].includes(head.toString("hex"));
-  } catch {
-    return false;
-  }
 }
 
 /// Files under `dir` (relative to `base`), to a depth, not following links.

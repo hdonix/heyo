@@ -15,25 +15,9 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { supportPath, type Extension } from "./context";
+import { isMacProgram } from "./macos";
 
 const run = promisify(execFile);
-
-/// Whether a file is a macOS (Mach-O) executable.
-function isMacProgram(file: string) {
-  try {
-    const head = Buffer.alloc(4);
-    const fd = fs.openSync(file, "r");
-    try {
-      fs.readSync(fd, head, 0, 4, 0);
-    } finally {
-      fs.closeSync(fd);
-    }
-    // Universal binaries and 32/64-bit ones, in either byte order.
-    return ["cafebabe", "bebafeca", "feedface", "cefaedfe", "feedfacf", "cffaedfe"].includes(head.toString("hex"));
-  } catch {
-    return false;
-  }
-}
 
 interface Fixup {
   /// What is being set up, for the progress message.
