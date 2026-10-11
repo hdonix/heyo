@@ -24,6 +24,11 @@ export SCREEN=3840x2160 GDK_SCALE=2
 MARGIN=16
 RADIUS=28
 
+# The speech engine installed for the Heyo of whoever runs this, which the
+# picture of dictation reads (and writes nothing to). In the environment,
+# for the script that another of these runs when it is done: by then the
+# home directory is no longer theirs.
+export HEYO_TEST_SPEECH="${HEYO_TEST_SPEECH:-$HOME/.local/share/heyo/dictation}"
 # A home with nothing in it: no path of whoever runs this can show.
 export HOME="$T/home/user"
 rm -rf "$HOME"; mkdir -p "$HOME"

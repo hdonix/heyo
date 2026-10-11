@@ -1,12 +1,16 @@
 #!/usr/bin/python3
-"""say.py OUT.wav SENTENCE...: speech for the dictation tests.
+"""say.py [--open] OUT.wav SENTENCE...: speech for the dictation tests.
 
 Speaks the sentences with Flite (libflite and its cmu_us_slt voice, which
 Debian and Ubuntu package as libflite1), each followed by a pause long
 enough for the sentence to count as finished, and writes 16 kHz mono 16-bit
 PCM: what Heyo's dictation helper reads in place of a microphone
 (HEYO_DICTATION_WAV). Nothing is recorded and nothing is kept in the
-repository; the same sentences give the same audio every time."""
+repository; the same sentences give the same audio every time.
+
+With --open no pause follows the last sentence: the recording ends with
+the speaker in the middle of it, and whoever listens goes on waiting for
+the rest."""
 import array
 import ctypes
 import sys
@@ -50,13 +54,16 @@ def at_rate(samples, rate):
 
 
 def main():
-    out, sentences = sys.argv[1], sys.argv[2:]
+    arguments = sys.argv[1:]
+    unfinished = arguments[:1] == ["--open"]
+    out, sentences = arguments[unfinished], arguments[unfinished + 1 :]
     flite, spoken = voice()
     pcm = array.array("h", [0] * (RATE // 2))
-    for sentence in sentences:
+    for place, sentence in enumerate(sentences):
         made = flite.flite_text_to_wave(sentence.encode(), spoken).contents
         pcm.extend(at_rate(array.array("h", made.samples[: made.num_samples]), made.sample_rate))
-        pcm.extend([0] * int(RATE * PAUSE))
+        if not (unfinished and place == len(sentences) - 1):
+            pcm.extend([0] * int(RATE * PAUSE))
     with wave.open(out, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)

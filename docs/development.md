@@ -168,15 +168,24 @@ again, in both themes, so that they can follow the interface:
 
 ```sh
 scripts/gui-test/readme-shots.sh           # or: readme-shots.sh dark
+scripts/gui-test/readme-dictation.sh       # the picture of dictation by itself
 ```
 
-It starts a sandbox from nothing for each theme: an empty home directory,
-a short list of applications, a backdrop drawn by `readme-backdrop.py`,
-and a little sample data (favourites, a few things copied). The session
-runs at twice the size, so the pictures are 2× and the README shows them
-at half their width. It needs GNOME Shell, the network (it installs one
-extension from the Raycast Store and converts a currency) and a few
-minutes.
+It starts a sandbox from nothing for each theme (`readme-env.sh`, which
+both scripts share): an empty home directory, a short list of
+applications, a backdrop drawn by `readme-backdrop.py`, and a little
+sample data (favourites, a few things copied). The session runs at twice
+the size, so the pictures are 2× and the README shows them at half their
+width. It needs GNOME Shell, the network (it installs one extension from
+the Raycast Store and converts a currency) and a few minutes.
+
+The picture of dictation is taken last, by `readme-dictation.sh`, in a
+session of its own: a note is open in gedit, which takes the input method,
+and two sentences spoken by `say.py` are dictated into it. The recording
+ends in the middle of the second sentence and Heyo goes on listening, so
+the screen holds still with that sentence being composed. It needs gedit,
+Flite and the speech engine installed for your own Heyo (as
+`dictate-live.sh` does), and not the network.
 
 ## GNOME on Wayland, in a container
 

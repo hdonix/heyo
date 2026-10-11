@@ -10,6 +10,9 @@
 # It needs the network (the Raycast Store, from which one extension is
 # installed, and the exchange rates) and takes about three minutes a theme.
 # KEEP=1 leaves the last sandbox running, to look around in.
+#
+# The picture of dictation is readme-dictation.sh's, which this runs when
+# it is done (unless a sandbox is kept), and which can be run by itself.
 . "$(dirname "$0")/readme-env.sh"
 
 # Heyo's settings and what it has learnt: the favourites, and what has been
@@ -162,3 +165,4 @@ for THEME in ${*:-light dark}; do
   grep -v "EGL\|dbind\|heyo: started\|heyo: renderer" "$T/app.log" | tail -n 5 | cut -c1-200
   [ -n "$KEEP" ] || python3 "$HERE/down.py" > /dev/null
 done
+[ -n "$KEEP" ] || exec "$HERE/readme-dictation.sh" "$@"
