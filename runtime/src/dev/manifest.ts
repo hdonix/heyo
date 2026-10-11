@@ -5,7 +5,7 @@ import { permissions as PERMISSIONS } from "../../../shared/bindings/needs";
 
 /// The names both of which the runtime answers with its own API object.
 export const API_MODULES = ["@raycast/api", "@heyo/api"];
-/// What a built command leaves for the runtime to provide (`main.ts`).
+/// What a built command leaves for the runtime to provide (`runtime.ts`).
 export const PROVIDED = [...API_MODULES, "react", "react/jsx-runtime", "react/jsx-dev-runtime"];
 
 export const MODES = ["view", "no-view", "menu-bar"];

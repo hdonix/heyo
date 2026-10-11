@@ -74,7 +74,7 @@ v0.3 相对 v0.2 的变化：阶段 A–E 做完之后（第 11 节），把规�
 - 它导出两部分：
   1. **Raycast 部分**：`@raycast/api` 的全部导出，名字、签名、类型都相同（清单见第 8 节）。
   2. **Heyo 部分**：第 7 节定义的新增模块，以及对若干 Raycast 模块的扩展。
-- 在 Heyo 里，运行时拦截模块加载（`runtime/src/main.ts` 的 `provided` 表），
+- 在 Heyo 里，运行时拦截模块加载（`runtime/src/runtime.ts` 的 `provided` 表），
   `@raycast/api` 和 `@heyo/api` 都换成**同一个对象**。这一点是必须的：扩展常常同时依赖
   `@raycast/utils`，后者内部引用 `@raycast/api`；两个名字指向同一份实现，导航栈、
   Toast、缓存才不会各有一份。
@@ -955,7 +955,7 @@ Raycast 部分的接口不要求 `heyo` 清单字段，否则商店里的扩展�
 |---|---|---|---|
 | A | 完成 | `ExtRequest` 枚举、`{ code, message }` 错误、请求带扩展名和目录 | `wire.rs`、`ext.rs`、`runtime.rs`、`runtime/src/protocol.ts` |
 | B | 完成 | 权限：清单读取、判定函数 `decide`、询问框、存储、设置页；拒绝记 60 秒（5.2） | `permissions.rs`、`extensions.rs`、`src/Settings.tsx`、`src/App.tsx` |
-| C | 完成 | `@heyo/api` 垫片与类型包；`provided` 表里两个包名指向同一对象；类型测试 `types.check.ts` 把 `index.d.ts` 和运行时扣在一起 | `runtime/src/heyo/`、`runtime/src/main.ts`、`packages/api/` |
+| C | 完成 | `@heyo/api` 垫片与类型包；`provided` 表里两个包名指向同一对象；类型测试 `types.check.ts` 把 `index.d.ts` 和运行时扣在一起 | `runtime/src/heyo/`、`runtime/src/runtime.ts`、`packages/api/` |
 | C2 | 完成 | Raycast 一致性测试（8.3），并按它补齐 8.1 的缺口 | `runtime/src/api/conformance.test.ts`、`props.test.ts` |
 | C3 | 完成 | `heyo build`、`heyo migrate`、`heyo ext check` | `packages/cli/` |
 | D | 完成 | v1 模块：Windows、Screen、Dictation、Memory、Files、System、Input、AI | `ext.rs` 调用现有 `platform::*`、`clipboard`、`files`、`ocr`、`dictation` |
