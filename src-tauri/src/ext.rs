@@ -21,7 +21,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
@@ -30,6 +29,7 @@ use crate::activities;
 use crate::clipboard::{self, ClipboardHistory, Kind};
 use crate::confirm::Consent;
 use crate::dictation::{self, Heard, NotListening};
+use crate::palette;
 use crate::permissions;
 use crate::platform::capture::{Area, Shot};
 use crate::platform::windows::{self, Rect};
@@ -64,7 +64,7 @@ fn world<'a>(app: &'a AppHandle, running: &'a Here<'a>) -> World<'a> {
         granted: &permissions::GRANTED,
         history: app.state::<ClipboardHistory>().inner(),
         files: app.state::<std::sync::Arc<crate::files::Files>>().inner(),
-        last_window: crate::palette::came_from(app),
+        last_window: palette::came_from(app),
         running,
     }
 }
@@ -165,30 +165,12 @@ fn private(path: &Path) {
     }
 }
 
-/// Runs `f` with the palette out of the picture, and brings it back as it
-/// was: the command that asked is still in it.
-fn without_the_palette<T>(app: &AppHandle, f: impl FnOnce() -> T) -> T {
-    let window = crate::main_window(app);
-    let shown = window.is_visible().unwrap_or(false);
-    if shown {
-        let _ = window.hide();
-        // Let it disappear from the screen first.
-        std::thread::sleep(Duration::from_millis(180));
-    }
-    let result = f();
-    if shown {
-        let _ = window.show();
-        crate::focus(&window);
-    }
-    result
-}
-
 fn capture(app: &AppHandle, extension: &str, target: CaptureTarget) -> Result<Capture, ExtError> {
     let path = capture_path(extension);
     let shown = path.to_string_lossy().into_owned();
     let rect = match target {
         CaptureTarget::Whole(CaptureWhole::Selection) => {
-            return match without_the_palette(app, || screenshot::pick(app, path.clone())) {
+            return match palette::away_during(app, || screenshot::pick(app, path.clone())) {
                 Picked::Saved { width, height } => {
                     private(&path);
                     Ok(Capture { path: shown, width, height })
@@ -211,7 +193,7 @@ fn capture(app: &AppHandle, extension: &str, target: CaptureTarget) -> Result<Ca
             Area { x: rect.x, y: rect.y, width: rect.width as u32, height: rect.height as u32, scale: 1.0 }
         }
     };
-    let shot = without_the_palette(app, || platform::capture::grab(area))?;
+    let shot = palette::away_during(app, || platform::capture::grab(area))?;
     save_png(&shot, &path)?;
     Ok(Capture { path: shown, width: shot.width, height: shot.height })
 }

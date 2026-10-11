@@ -1,5 +1,7 @@
 //! The palette window: showing, hiding and toggling it.
 
+use std::time::Duration;
+
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use crate::*;
@@ -33,6 +35,35 @@ pub(crate) fn show(app: &AppHandle) {
     let _ = window.show();
     focus(&window);
     let _ = window.emit(event::SHOWN, ());
+}
+
+/// How long the palette takes to be gone from the screen once it is hidden.
+const GONE: Duration = Duration::from_millis(180);
+
+/// Puts the palette away and returns when it is off the screen, for what
+/// is about to look at the screen. Says whether it was up. (It waits: not
+/// for the main thread.)
+pub(crate) fn hide_until_gone(app: &AppHandle) -> bool {
+    let window = main_window(app);
+    let up = window.is_visible().unwrap_or(false);
+    if up {
+        let _ = window.hide();
+        std::thread::sleep(GONE);
+    }
+    up
+}
+
+/// Runs `f` with the palette off the screen, and brings it back as it was:
+/// the command that asked is still in it.
+pub(crate) fn away_during<T>(app: &AppHandle, f: impl FnOnce() -> T) -> T {
+    let up = hide_until_gone(app);
+    let result = f();
+    if up {
+        let window = main_window(app);
+        let _ = window.show();
+        focus(&window);
+    }
+    result
 }
 
 /// `heyo --clipboard`: shows the palette with Clipboard History open.

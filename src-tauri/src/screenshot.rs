@@ -215,14 +215,8 @@ pub fn start(app: &AppHandle, mode: &str) {
         end_pick(Picked::Cancelled);
     }
     std::thread::spawn(move || {
-        // Let the palette disappear from the screen first.
-        if let Some(main) = app.get_webview_window("main") {
-            if main.is_visible().unwrap_or(false) {
-                let _ = main.hide();
-                std::thread::sleep(Duration::from_millis(180));
-            }
-        }
-        // A previous overlay must not end up in the capture.
+        // Neither the palette nor a previous overlay may end up in the capture.
+        crate::palette::hide_until_gone(&app);
         if app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false)) {
             close_overlay(&app);
             std::thread::sleep(Duration::from_millis(180));
