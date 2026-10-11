@@ -1,0 +1,191 @@
+name: Package
+
+# The packages people install, for each system and processor Heyo is built
+# for. Run by hand they are left on the run to download; for a tag v1.2.3
+# they also become a draft release, to be read through and published.
+#
+# One machine compiles for all four targets, into one target directory and
+# one cache; the packages are then made apart, each where it can be made,
+# from what was compiled, in seconds. A push to master that changes what is
+# compiled against only compiles: a tag's run starts from the cache of the
+# branch it was cut from, and from no other tag's.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    branches: [master]
+    paths:
+      - src-tauri/Cargo.lock
+      - scripts/package/**
+      - .github/workflows/package.yml
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TARGETS: x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-pc-windows-gnullvm aarch64-pc-windows-gnullvm
+
+jobs:
+  build:
+    name: Compile
+    # The oldest Ubuntu with WebKitGTK 4.1: a program runs where the C
+    # library is as new as the one it was built with, or newer.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # The program and its scripts say the version in tauri.conf.json,
+      # whatever the tag says: a release whose name and contents disagree
+      # is stopped here.
+      - name: Check that the tag is the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' src-tauri/tauri.conf.json)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::the tag is $GITHUB_REF_NAME but src-tauri/tauri.conf.json says $version"
+            exit 1
+          fi
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev libxkbcommon-dev
+
+      # The compiler for Windows, which also compiles Linux for the other
+      # processor, and that processor's libraries: both are large and
+      # change only when the scripts that fetch them do.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.local/share/llvm-mingw
+            ~/.cache/heyo-build/sysroots
+          key: cross-${{ hashFiles('scripts/package/toolchain.sh', 'scripts/package/sysroot.sh') }}
+      - name: Fetch the cross compiler
+        run: scripts/package/toolchain.sh
+      - name: Lay out the libraries for arm64
+        run: scripts/package/sysroot.sh arm64
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,x86_64-pc-windows-gnullvm,aarch64-pc-windows-gnullvm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: package
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Compile for every target
+        run: scripts/package/build.sh $TARGETS
+
+      # The programs, what the Windows ones need beside them, and the
+      # runtime's scripts: all a package is made of.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: programs
+          if-no-files-found: error
+          path: |
+            src-tauri/target/*/release/heyo
+            src-tauri/target/*/release/heyo.exe
+            src-tauri/target/*/release/WebView2Loader.dll
+            src-tauri/target/*/release/libunwind.dll
+            runtime/dist/heyo-*.cjs
+
+  package:
+    name: ${{ matrix.name }}
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux x86_64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          # An AppImage is made of the libraries of the machine that makes it.
+          - { name: Linux arm64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          # Tauri's installer script needs NSIS 3.09, which Ubuntu 22.04 does not have.
+          - { name: Windows x86_64, os: ubuntu-24.04, target: x86_64-pc-windows-gnullvm }
+          - { name: Windows arm64, os: ubuntu-24.04, target: aarch64-pc-windows-gnullvm }
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install what the AppImage is made of
+        if: contains(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libxkbcommon-dev patchelf file xdg-utils
+
+      # Tauri's packager, run on Linux, looks for the tray library whatever
+      # it packages for.
+      - name: Install NSIS
+        if: contains(matrix.target, 'windows')
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nsis libayatana-appindicator3-dev
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      # Nothing is compiled here: the packager asks cargo where things are.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: programs
+      # An artifact does not keep that a file may be run.
+      - run: chmod +x src-tauri/target/*/release/heyo
+
+      - name: Make the packages
+        run: scripts/package/bundle.sh ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-${{ matrix.target }}
+          path: src-tauri/target/packages/*
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    name: Draft release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: packages
+          merge-multiple: true
+          pattern: packages-*
+      - name: Say what each package hashes to
+        working-directory: packages
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      # A draft: nothing is announced until someone has read it and
+      # published it.
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes --title "Heyo ${GITHUB_REF_NAME#v}" packages/*
