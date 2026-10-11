@@ -57,10 +57,11 @@ dictationPolish: string,
  */
 dictationHoldKey: string, 
 /**
- * Type as you speak: dictated words go into the application as they
- * are recognized and are corrected where they stand, where the session
- * can do that (`platform::typed::rewriting`). Off, or elsewhere, each
- * sentence is pasted when it is finished.
+ * Type as you speak: the sentence being spoken is on screen in the
+ * application while it is recognized, where the session can do that:
+ * composed there through the input method, or else pasted and
+ * corrected where it stands (`platform::Words`). Off, or elsewhere,
+ * nothing goes in before a sentence is finished.
  */
 dictationLive: boolean, 
 /**

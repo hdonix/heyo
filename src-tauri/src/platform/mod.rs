@@ -84,6 +84,21 @@ pub struct HoldKey {
     title: &'static str,
 }
 
+/// A way for dictated words to reach the application.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, ts_rs::TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export, export_to = "../../shared/bindings/", rename = "DictationWords")]
+pub enum Words {
+    /// As they are spoken, composed there through the session's input
+    /// method: where the window in front takes one.
+    Composed,
+    /// As they are spoken, pasted and corrected where they stand: where
+    /// that is safe (`dictation`).
+    Rewritten,
+    /// Each sentence pasted when it is finished.
+    Pasted,
+}
+
 /// What the running session can do, so features that cannot work are
 /// hidden or explained instead of failing when used.
 #[derive(serde::Serialize, ts_rs::TS)]
@@ -111,9 +126,9 @@ pub struct Capabilities {
     pub overlay: Support,
     /// Expanding snippets as their keyword is typed in other applications.
     pub snippet_expansion: Support,
-    /// Writing dictated words into the application as they are spoken, and
-    /// correcting them where they stand.
-    pub live_dictation: Support,
+    /// The ways dictated words reach the application here, in the order
+    /// they are tried for a recording. The last is always there.
+    pub dictation_words: Vec<Words>,
     /// The keys offered for hold-to-talk.
     pub hold_keys: Vec<HoldKey>,
     /// Heyo's GNOME Shell extension: "none" where it has no use, else
@@ -152,7 +167,7 @@ pub fn capabilities() -> Capabilities {
         capture: supported.capture,
         overlay: supported.overlay,
         snippet_expansion: if typed::supported() { supported.typing } else { Support::None },
-        live_dictation: if typed::rewriting() { supported.rewriting } else { Support::None },
+        dictation_words: [(composing::supported(), Words::Composed), (typed::rewriting(), Words::Rewritten), (true, Words::Pasted)].into_iter().filter_map(|(here, way)| here.then_some(way)).collect(),
         hold_keys: offered.into_iter().map(|(value, title)| HoldKey { value, title }).collect(),
         #[cfg(target_os = "linux")]
         extension: gnome::extension::state().name(),
@@ -224,6 +239,18 @@ mod tests {
         // Composing through the input method has been tried on X11 only.
         assert_eq!(x11.composing, Support::Full);
         assert_eq!((gnome.composing, generic.composing), (Support::None, Support::None));
+    }
+
+    #[test]
+    fn dictated_words_go_the_best_way_the_session_has() {
+        use desktop::fake::Fake;
+        let fake = Fake::with_windows(&[(1, "firefox")]);
+        fake.during(|| assert_eq!(capabilities().dictation_words, [Words::Rewritten, Words::Pasted]));
+        *fake.input_method.lock().unwrap() = true;
+        fake.during(|| assert_eq!(capabilities().dictation_words, [Words::Composed, Words::Rewritten, Words::Pasted]));
+        // A session that can only paste.
+        *fake.supported.lock().unwrap() = Some(desktop::Supported { paste: Support::Full, ..desktop::Supported::NOTHING });
+        fake.during(|| assert_eq!(capabilities().dictation_words, [Words::Pasted]));
     }
 
     /// What an adapter does not do says so, and reaches for nothing else.

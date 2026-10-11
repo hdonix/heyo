@@ -66,7 +66,7 @@ const capabilities: Capabilities = {
   capture: "full",
   overlay: "full",
   snippetExpansion: "full",
-  liveDictation: "full",
+  dictationWords: ["rewritten", "pasted"],
   holdKeys: [],
   extension: "none",
 };
@@ -204,7 +204,7 @@ test("typing as you speak has a switch where the session can do it", async () =>
 
 test("where the session cannot type as you speak, the page says so and offers no switch", async () => {
   act(() => root.unmount());
-  host.answer("get_capabilities", { ...capabilities, session: "wayland", liveDictation: "none" });
+  host.answer("get_capabilities", { ...capabilities, session: "wayland", dictationWords: ["pasted"] });
   root = createRoot(page);
   act(() => root.render(<SettingsWindow />));
   await settle();
@@ -213,4 +213,28 @@ test("where the session cannot type as you speak, the page says so and offers no
   expect(row.querySelector("input.st-switch")).toBeNull();
   expect(row.querySelector(".st-row-description")?.textContent).toContain("Not available on Wayland");
   expect(row.querySelector(".st-row-description")?.textContent).toContain("Each sentence is pasted when it is finished.");
+});
+
+test("the page says which way the words reach the window, and where they go another way", async () => {
+  const described = async (dictationWords: (typeof capabilities)["dictationWords"]) => {
+    act(() => root.unmount());
+    host.answer("get_capabilities", { ...capabilities, dictationWords });
+    root = createRoot(page);
+    act(() => root.render(<SettingsWindow />));
+    await settle();
+    await dictation();
+    const row = [...page.querySelectorAll(".st-row")].find((row) => row.querySelector(".st-row-label")?.textContent === "Type as You Speak")!;
+    expect(row.querySelector("input.st-switch")).not.toBeNull();
+    return row.querySelector(".st-row-description")?.textContent ?? "";
+  };
+  // Through the input method, which sets the user's own aside meanwhile.
+  const composed = await described(["composed", "rewritten", "pasted"]);
+  expect(composed).toContain("through the input method");
+  expect(composed).toContain("Your own input method (Pinyin, say) is set aside while you dictate");
+  expect(composed).toContain("gets the words by pasting, corrected where they stand");
+  expect(await described(["composed", "pasted"])).toContain("gets each sentence pasted when it is finished");
+  // By pasting and correcting, where there is no input method to go through.
+  const rewritten = await described(["rewritten", "pasted"]);
+  expect(rewritten).toContain("are corrected there when a later word changes an earlier one");
+  expect(rewritten).not.toContain("input method");
 });
