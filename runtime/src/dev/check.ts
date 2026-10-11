@@ -17,6 +17,7 @@ import path from "node:path";
 
 import apiGaps from "../api/conformance.gaps.json";
 import propGaps from "../api/props.gaps.json";
+import { IDLE, REFUSING } from "../api/shortfalls";
 import { gained, members, modules, permissionsOf, type ModuleName } from "../heyo/members";
 import { isMacProgram, MAC_PROGRAMS } from "../macos";
 import { existsIn, readPackage, sourceFiles } from "./files";
@@ -81,14 +82,15 @@ const MAC_PATHS: [RegExp, string][] = [
   [/(?:^|["'`\s])\/Volumes\//, "/Volumes"],
 ];
 
-/// What Heyo has of these and how it falls short. Kept by hand from
-/// `runtime/src/api/index.ts`: the first two are answered with an error
-/// (`system.unsupported`), the rest are accepted and do less than in Raycast.
-const UNSUPPORTED: Record<string, { severity: Severity; message: string }> = {
-  "BrowserExtension.getContent": { severity: "error", message: "BrowserExtension.getContent throws on Heyo: there is no browser extension to ask" },
-  "BrowserExtension.getTabs": { severity: "error", message: "BrowserExtension.getTabs throws on Heyo: there is no browser extension to ask" },
-  updateCommandMetadata: { severity: "info", message: "updateCommandMetadata does nothing on Heyo: the root search shows the subtitle from the manifest" },
-};
+/// What Heyo has of Raycast's API and how it falls short
+/// (`api/shortfalls.ts`): to use what refuses is an error, and what does
+/// nothing is worth knowing of.
+const UNSUPPORTED: Record<string, { severity: Severity; message: string }> = Object.fromEntries([
+  ...Object.entries(REFUSING).flatMap(([module, { why, functions }]) =>
+    functions.map((name) => [`${module}.${name}`, { severity: "error", message: `${module}.${name} throws on Heyo: ${why}` }] as const),
+  ),
+  ...Object.entries(IDLE).map(([name, instead]) => [name, { severity: "info", message: `${name} does nothing on Heyo: ${instead}` }] as const),
+]);
 
 const flat = (lists: Record<string, string[]>) => Object.values(lists).flat();
 

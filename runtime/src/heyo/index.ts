@@ -10,6 +10,7 @@
 
 import type { Support } from "../../../shared/bindings/Support";
 import raycast from "../api";
+import { REFUSING } from "../api/shortfalls";
 import { LiveActivity } from "./activity";
 import { AI } from "./ai";
 import { Clipboard } from "./clipboard";
@@ -41,7 +42,7 @@ const environment = Object.defineProperties(
 ) as typeof raycast.environment & typeof heyoEnvironment;
 
 /// What is there by name but only ever refuses.
-const absent = ["BrowserExtension"];
+const absent = Object.keys(REFUSING);
 
 /// Whether a part of the API is there and does something, by its name as
 /// imported: `has("Screen.recognizeText")`.

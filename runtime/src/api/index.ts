@@ -13,6 +13,7 @@ import { Action, ActionPanel, Detail, Form, Grid, List, MenuBarExtra } from "./c
 import { Icon } from "./icon";
 import { useNavigation } from "./navigation";
 import { OAuth } from "./oauth";
+import { REFUSING } from "./shortfalls";
 import * as system from "./system";
 import { getFrontmostApplication, WindowManagement } from "./windows";
 
@@ -204,16 +205,20 @@ export async function launchCommand(options: LaunchCommandOptions) {
   );
 }
 
+/// Does nothing, which `shortfalls.ts` has for telling whoever uses it.
 export async function updateCommandMetadata(_metadata: { subtitle?: string | null }) {}
 
 // Raycast's `AI`, answered by the model set up in Heyo, is one object with
 // what Heyo adds to it: the two package names give the same module.
 export { AI };
 
-export const BrowserExtension = {
-  getContent: system.unsupported("The browser extension API"),
-  getTabs: system.unsupported("The browser extension API"),
-};
+/// A module that is there by name and only refuses (`shortfalls.ts`).
+function refusing<M extends keyof typeof REFUSING>(module: M) {
+  const { called, functions } = REFUSING[module];
+  return Object.fromEntries(functions.map((name) => [name, system.unsupported(called)])) as Record<(typeof REFUSING)[M]["functions"][number], () => never>;
+}
+
+export const BrowserExtension = refusing("BrowserExtension");
 
 export { OAuth };
 
