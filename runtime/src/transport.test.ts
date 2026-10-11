@@ -44,6 +44,18 @@ test("a line is written with its end, and read without it", async () => {
   expect(closed()).toBe(true);
 });
 
+test("only a line feed ends a line", async () => {
+  const { input, lines, listen, settled } = piped();
+  listen();
+  // JSON leaves these two as they are inside a string; they are text the
+  // user copied, not the end of a message.
+  const message = JSON.stringify({ type: "reply", id: 1, result: "one two three" });
+  input.write(message + "\n");
+  await settled();
+  expect(lines).toEqual([message]);
+  expect(JSON.parse(lines[0]).result).toBe("one two three");
+});
+
 test("a pair in memory hands each end what the other sent, in order", () => {
   const [a, b] = pair();
   const [atA, atB]: string[][] = [[], []];
