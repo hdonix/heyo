@@ -947,10 +947,7 @@ pub fn now() -> Millis {
 }
 
 /// Whether activities are on at all, and for this extension.
-pub(crate) fn enabled_for(app: &tauri::AppHandle, extension: &str) -> bool {
-    use tauri::Manager;
-    let settings = app.state::<crate::SettingsState>();
-    let settings = settings.0.read().unwrap();
+pub(crate) fn enabled(settings: &crate::settings::Settings, extension: &str) -> bool {
     settings.live_activities && !settings.activities_off.iter().any(|off| off == extension)
 }
 
@@ -1074,7 +1071,8 @@ fn deliver(app: &tauri::AppHandle, source: &Source, event: Json, user: bool) {
 /// commands, being runtime code, would go through `LiveActivity` instead.
 #[allow(dead_code)]
 pub(crate) fn start_builtin(app: &tauri::AppHandle, attributes: Attributes, content: Content, microphone: bool) -> Result<(), ExtError> {
-    if !enabled_for(app, crate::extensions::BUILTIN) {
+    use tauri::Manager;
+    if !enabled(&app.state::<crate::SettingsState>().0.read().unwrap(), crate::extensions::BUILTIN) {
         return Ok(());
     }
     let source = Source { extension: crate::extensions::BUILTIN.into(), title: "Heyo".into(), location: crate::extensions::BUILTIN.into() };

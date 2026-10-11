@@ -27,7 +27,7 @@ use crate::clipboard::sources::Shown;
 use crate::clipboard::{self, ClipboardHistory, Kind};
 use crate::dictation::{self, Heard, NotListening};
 use crate::extensions::{self, Declared};
-use crate::permissions::{self, Caller, Identity};
+use crate::permissions::{self, Caller, Identity, Permission};
 use crate::platform::capture::{Area, Shot};
 use crate::platform::desktop::Supported as Abilities;
 use crate::platform::system::Action;
@@ -60,7 +60,8 @@ fn answer(app: &AppHandle, message: Value, background: bool) -> Answer {
     let declared = extensions::declared(Path::new(&given.dir));
     let caller = caller(given, declared, background)?;
     if let Some(need) = permissions::needed(&request) {
-        permissions::check(app, &caller, need, &method)?;
+        let switched_off = need.permission == Permission::Activity && !activities::enabled(&app.state::<crate::SettingsState>().0.read().unwrap(), &caller.name);
+        permissions::GRANTED.check(&caller, need, &method, switched_off, &|consent| permissions::ask(app, consent))?;
     }
     run(app, &caller, request)
 }
@@ -195,7 +196,7 @@ fn run(app: &AppHandle, caller: &Caller, request: ExtRequest) -> Answer {
         SystemRun { action } => {
             // A command of Heyo's has asked already, in its own words.
             if let Some((question, yes)) = confirmed(action).filter(|_| !caller.builtin) {
-                permissions::confirm_each_time(app, caller, question.into(), yes)?;
+                permissions::GRANTED.confirm_each_time(caller, question.into(), yes, &|consent| permissions::ask(app, consent))?;
             }
             return value(platform::system::run(action)?);
         }

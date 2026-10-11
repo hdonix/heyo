@@ -16,7 +16,7 @@
 //! nothing the user is shown, may say otherwise.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -396,29 +396,26 @@ fn save(path: &Path, grants: &Grants) -> Result<(), String> {
     std::fs::rename(&tmp, path).map_err(failed)
 }
 
-/// The grants as last read or written; the file is this process's alone.
-static GRANTS: Mutex<Option<Grants>> = Mutex::new(None);
-
-fn with_grants<T>(f: impl FnOnce(&mut Grants) -> T) -> T {
-    let mut grants = GRANTS.lock().unwrap_or_else(|e| e.into_inner());
-    f(grants.get_or_insert_with(|| load(&crate::paths::permissions())))
+/// What asking goes by, beside the manifest: what the user has allowed, what
+/// they refused a moment ago, and the one question at a time.
+pub(crate) struct Granted {
+    /// Where the grants are kept. A test's are kept nowhere.
+    file: fn() -> Option<PathBuf>,
+    /// The grants as last read or written; the file is this process's alone.
+    grants: Mutex<Option<Grants>>,
+    /// One question at a time: the palette has one dialog, and the second of
+    /// two requests for the same thing is answered by the first's answer.
+    asking: Mutex<()>,
+    refused: Mutex<Vec<(String, Permission, Instant)>>,
 }
 
-fn change(f: impl FnOnce(&mut Grants)) -> Result<(), String> {
-    with_grants(|grants| {
-        let before = grants.clone();
-        f(grants);
-        if *grants == before {
-            return Ok(());
-        }
-        save(&crate::paths::permissions(), grants).inspect_err(|_| *grants = before)
-    })
-}
+/// The user's own, kept with the configuration.
+pub(crate) static GRANTED: Granted = Granted::kept(|| Some(crate::paths::permissions()));
 
 /// Takes back all that an extension was allowed: it is being uninstalled,
 /// and another of its name is not it.
 pub(crate) fn forget(extension: &str) {
-    if let Err(e) = change(|grants| grants.forget(extension)) {
+    if let Err(e) = GRANTED.change(|grants| grants.forget(extension)) {
         eprintln!("heyo: {e}");
     }
 }
@@ -439,39 +436,16 @@ pub(crate) struct Caller {
     pub location: String,
 }
 
-/// One question at a time: the palette has one dialog, and the second of
-/// two requests for the same thing is answered by the first's answer.
-static ASKING: Mutex<()> = Mutex::new(());
-
 /// For how long a No holds. An extension that asks again at once (on every
 /// render, say) must not put the question back up as fast as it is refused.
 const REFUSAL: Duration = Duration::from_secs(60);
-static REFUSED: Mutex<Vec<(String, Permission, Instant)>> = Mutex::new(Vec::new());
 
 /// How long an answer is waited for before the question counts as left.
 const PATIENCE: Duration = Duration::from_secs(300);
 
-fn refused_lately(extension: &str, permission: Permission) -> bool {
-    let mut refused = REFUSED.lock().unwrap_or_else(|e| e.into_inner());
-    refused.retain(|(_, _, at)| at.elapsed() < REFUSAL);
-    refused.iter().any(|(name, which, _)| name == extension && *which == permission)
-}
-
-fn decision(caller: &Caller, need: Need, switched_off: bool) -> Decision {
-    let context = Context {
-        builtin: caller.builtin,
-        background: caller.background,
-        route: caller.route,
-        unasked: need.unasked,
-        refused: refused_lately(&caller.name, need.permission),
-        switched_off,
-    };
-    decide(caller.heyo.as_ref(), need.permission, &with_grants(|grants| grants.of(&caller.name)), context)
-}
-
 /// Puts a question up in the palette, bringing it forward for as long as
 /// the question takes if it was away, and waits for the answer.
-fn ask(app: &AppHandle, consent: Consent) -> bool {
+pub(crate) fn ask(app: &AppHandle, consent: Consent) -> bool {
     let window = crate::main_window(app);
     let away = !window.is_visible().unwrap_or(true);
     if away {
@@ -489,46 +463,89 @@ fn ask(app: &AppHandle, consent: Consent) -> bool {
     yes
 }
 
-/// Makes sure the caller may have what `need` names, asking the user where
-/// that is theirs to say. Blocks while the question is up: call it off the
-/// thread that reads the runtime's messages.
-pub(crate) fn check(app: &AppHandle, caller: &Caller, need: Need, method: &str) -> Result<(), ExtError> {
-    let settle = |decision| match decision {
-        Decision::Allow => Some(Ok(())),
-        Decision::Deny { code, reason } => Some(Err(ExtError::new(code, refusal(reason, &caller.title, need.permission, method)))),
-        Decision::Ask => None,
-    };
-    let switched_off = need.permission == Permission::Activity && !crate::activities::enabled_for(app, &caller.name);
-    if let Some(settled) = settle(decision(caller, need, switched_off)) {
-        return settled;
+impl Granted {
+    pub(crate) const fn kept(file: fn() -> Option<PathBuf>) -> Granted {
+        Granted { file, grants: Mutex::new(None), asking: Mutex::new(()), refused: Mutex::new(Vec::new()) }
     }
-    let _one = ASKING.lock().unwrap_or_else(|e| e.into_inner());
-    // It may have been answered while this request waited its turn.
-    if let Some(settled) = settle(decision(caller, need, switched_off)) {
-        return settled;
-    }
-    if !ask(app, consent(&caller.title, need.permission)) {
-        REFUSED.lock().unwrap_or_else(|e| e.into_inner()).push((caller.name.clone(), need.permission, Instant::now()));
-        return Err(ExtError::new(ErrorCode::Denied, refusal(Reason::Refused, &caller.title, need.permission, method)));
-    }
-    // Allowed now whether or not it could be written down.
-    if let Err(e) = change(|grants| grants.allow(&caller.name, need.permission)) {
-        eprintln!("heyo: {e}");
-    }
-    Ok(())
-}
 
-/// Has the user confirm something that is asked every time (restarting the
-/// computer), whoever asks and whatever they were allowed.
-pub(crate) fn confirm_each_time(app: &AppHandle, caller: &Caller, title: String, yes: &'static str) -> Result<(), ExtError> {
-    if caller.background {
-        return Err(ExtError::new(ErrorCode::Denied, format!("{title} Nobody can be asked from the menu bar or the background.")));
+    fn with_grants<T>(&self, f: impl FnOnce(&mut Grants) -> T) -> T {
+        let mut grants = self.grants.lock().unwrap_or_else(|e| e.into_inner());
+        f(grants.get_or_insert_with(|| (self.file)().map(|path| load(&path)).unwrap_or_default()))
     }
-    let _one = ASKING.lock().unwrap_or_else(|e| e.into_inner());
-    let message = if caller.builtin { String::new() } else { format!("{} asks for it.", caller.title) };
-    match ask(app, Consent { title, message, yes, no: "Cancel" }) {
-        true => Ok(()),
-        false => Err(ExtError::new(ErrorCode::Cancelled, "It was called off.")),
+
+    fn change(&self, f: impl FnOnce(&mut Grants)) -> Result<(), String> {
+        self.with_grants(|grants| {
+            let before = grants.clone();
+            f(grants);
+            if *grants == before {
+                return Ok(());
+            }
+            match (self.file)() {
+                Some(path) => save(&path, grants).inspect_err(|_| *grants = before),
+                None => Ok(()),
+            }
+        })
+    }
+
+    fn refused_lately(&self, extension: &str, permission: Permission) -> bool {
+        let mut refused = self.refused.lock().unwrap_or_else(|e| e.into_inner());
+        refused.retain(|(_, _, at)| at.elapsed() < REFUSAL);
+        refused.iter().any(|(name, which, _)| name == extension && *which == permission)
+    }
+
+    fn decision(&self, caller: &Caller, need: Need, switched_off: bool) -> Decision {
+        let context = Context {
+            builtin: caller.builtin,
+            background: caller.background,
+            route: caller.route,
+            unasked: need.unasked,
+            refused: self.refused_lately(&caller.name, need.permission),
+            switched_off,
+        };
+        decide(caller.heyo.as_ref(), need.permission, &self.with_grants(|grants| grants.of(&caller.name)), context)
+    }
+
+    /// Makes sure the caller may have what `need` names, asking the user
+    /// (`ask`) where that is theirs to say. `switched_off`: the settings
+    /// have it off for this caller. Blocks while the question is up: call
+    /// it off the thread that reads the runtime's messages.
+    pub(crate) fn check(&self, caller: &Caller, need: Need, method: &str, switched_off: bool, ask: &dyn Fn(Consent) -> bool) -> Result<(), ExtError> {
+        let settle = |decision| match decision {
+            Decision::Allow => Some(Ok(())),
+            Decision::Deny { code, reason } => Some(Err(ExtError::new(code, refusal(reason, &caller.title, need.permission, method)))),
+            Decision::Ask => None,
+        };
+        if let Some(settled) = settle(self.decision(caller, need, switched_off)) {
+            return settled;
+        }
+        let _one = self.asking.lock().unwrap_or_else(|e| e.into_inner());
+        // It may have been answered while this request waited its turn.
+        if let Some(settled) = settle(self.decision(caller, need, switched_off)) {
+            return settled;
+        }
+        if !ask(consent(&caller.title, need.permission)) {
+            self.refused.lock().unwrap_or_else(|e| e.into_inner()).push((caller.name.clone(), need.permission, Instant::now()));
+            return Err(ExtError::new(ErrorCode::Denied, refusal(Reason::Refused, &caller.title, need.permission, method)));
+        }
+        // Allowed now whether or not it could be written down.
+        if let Err(e) = self.change(|grants| grants.allow(&caller.name, need.permission)) {
+            eprintln!("heyo: {e}");
+        }
+        Ok(())
+    }
+
+    /// Has the user confirm something that is asked every time (restarting
+    /// the computer), whoever asks and whatever they were allowed.
+    pub(crate) fn confirm_each_time(&self, caller: &Caller, title: String, yes: &'static str, ask: &dyn Fn(Consent) -> bool) -> Result<(), ExtError> {
+        if caller.background {
+            return Err(ExtError::new(ErrorCode::Denied, format!("{title} Nobody can be asked from the menu bar or the background.")));
+        }
+        let _one = self.asking.lock().unwrap_or_else(|e| e.into_inner());
+        let message = if caller.builtin { String::new() } else { format!("{} asks for it.", caller.title) };
+        match ask(Consent { title, message, yes, no: "Cancel" }) {
+            true => Ok(()),
+            false => Err(ExtError::new(ErrorCode::Cancelled, "It was called off.")),
+        }
     }
 }
 
@@ -567,13 +584,13 @@ fn rows(heyo: Option<&Heyo>, granted: &BTreeSet<Permission>) -> Vec<Row> {
 #[tauri::command(async)]
 pub(crate) fn extension_permissions(id: String) -> Vec<Row> {
     let Some(declared) = crate::extensions::declared(Path::new(&id)) else { return Vec::new() };
-    rows(declared.heyo.as_ref(), &with_grants(|grants| grants.of(&declared.name)))
+    rows(declared.heyo.as_ref(), &GRANTED.with_grants(|grants| grants.of(&declared.name)))
 }
 
 /// Takes back what an extension was allowed; it asks again when it next needs it.
 #[tauri::command(async)]
 pub(crate) fn revoke_extension_permission(extension: String, permission: Permission) -> Result<(), String> {
-    change(|grants| grants.revoke(&extension, permission))
+    GRANTED.change(|grants| grants.revoke(&extension, permission))
 }
 
 #[cfg(test)]
