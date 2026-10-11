@@ -45,7 +45,7 @@ pub(crate) struct World<'a> {
     pub granted: &'a Granted,
     pub history: &'a ClipboardHistory,
     pub files: &'a Arc<Files>,
-    /// The window that was in front before the palette came up.
+    /// The window the user came from when the palette came up.
     pub last_window: &'a LastWindow,
     pub running: &'a dyn Running,
 }
@@ -240,9 +240,9 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
         }
         Supported { module } => return value(support(module, supported())),
 
-        WindowsList => return value(described(windows::list(None)?, working_window(world), &world.running.monitors()?)),
+        WindowsList => return value(described(windows::list(None)?, world.last_window.working(), &world.running.monitors()?)),
         WindowsActive => {
-            let current = working_window(world);
+            let current = world.last_window.working();
             let all = described(windows::list(None)?, current, &world.running.monitors()?);
             return value(all.into_iter().find(|window| Some(window.id) == current));
         }
@@ -402,12 +402,6 @@ fn presentation() -> Presentation {
 
 // --- Windows ---------------------------------------------------------------------
 
-/// The window the user is working in: the one in front, or the one that
-/// was before the palette came up.
-fn working_window(world: &World) -> Option<windows::Window> {
-    windows::active_external().or(*world.last_window.0.lock().unwrap())
-}
-
 /// Which monitor a rectangle is on: the one that holds its centre, else the first.
 fn monitor_of(bounds: Rect, monitors: &[Rect]) -> Option<u32> {
     let (x, y) = (bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
@@ -435,7 +429,7 @@ fn described(windows: Vec<WindowInfo>, current: Option<windows::Window>, monitor
 /// The application of the window the user is working in, as Raycast's API
 /// tells of one; null when there is no such window.
 fn frontmost_application(world: &World) -> Value {
-    let current = working_window(world);
+    let current = world.last_window.working();
     let Some(window) = current.and_then(|id| windows::list(Some(id)).ok()?.into_iter().find(|w| w.id == id)) else {
         return Value::Null;
     };
@@ -806,6 +800,16 @@ mod tests {
             }
         }
 
+        /// The palette comes up over this window.
+        fn palette_over(&self, window: windows::Window) {
+            *self.desktop.heyo_in_front.lock().unwrap() = false;
+            self.desktop.during(|| {
+                windows::activate(window).unwrap();
+                self.last_window.remember();
+            });
+            *self.desktop.heyo_in_front.lock().unwrap() = true;
+        }
+
         /// Installs an extension whose manifest is this.
         fn install_manifest(&self, folder: &str, manifest: Value) -> From {
             let dir = self.dir.join(folder);
@@ -1007,15 +1011,16 @@ mod tests {
         *bench.desktop.heyo_in_front.lock().unwrap() = true;
         assert_eq!(bench.result(&heyo, "ext.windows.active", Value::Null), Value::Null);
         assert_eq!(bench.result(&heyo, "ext.frontmostApplication", Value::Null), Value::Null);
-        *bench.last_window.0.lock().unwrap() = Some(2);
+        bench.palette_over(2);
         assert_eq!(bench.result(&heyo, "ext.windows.active", Value::Null)["id"], 2);
         let active: Vec<bool> = bench.result(&heyo, "ext.windows.list", Value::Null).as_array().unwrap().iter().map(|window| window["active"] == true).collect();
-        assert_eq!(active, [false, true]);
+        assert_eq!(active, [true, false]);
         // A window of a program nothing installed describes still has a name.
         assert_eq!(bench.result(&heyo, "ext.frontmostApplication", Value::Null), json!({ "name": "Code", "localizedName": "Code", "path": "" }));
 
         // Otherwise it is the one in front.
         *bench.desktop.heyo_in_front.lock().unwrap() = false;
+        bench.desktop.during(|| windows::activate(1)).unwrap();
         let firefox = crate::apps::App {
             id: "org.mozilla.firefox.desktop".into(),
             name: "Firefox".into(),

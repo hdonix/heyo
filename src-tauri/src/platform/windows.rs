@@ -16,7 +16,24 @@ pub type Window = u32;
 /// The window that was active before the palette took focus, so commands
 /// run from the palette act on the application the user came from.
 #[derive(Default)]
-pub struct LastWindow(pub Mutex<Option<Window>>);
+pub struct LastWindow(Mutex<Option<Window>>);
+
+impl LastWindow {
+    /// Notes the window in front as the one the user comes from. With one
+    /// of Heyo's own in front there is none to note, and the one noted
+    /// before stays.
+    pub fn remember(&self) {
+        if let Some(active) = active_external() {
+            *self.0.lock().unwrap() = Some(active);
+        }
+    }
+
+    /// The window the user is working in: the one in front, or, with one of
+    /// Heyo's own in front, the one they came from.
+    pub fn working(&self) -> Option<Window> {
+        active_external().or(*self.0.lock().unwrap())
+    }
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct WindowInfo {
@@ -186,8 +203,33 @@ pub fn apply(window: Window, layout: Layout, monitors: &[Rect]) -> Result<(), St
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::platform::desktop::fake::Fake;
 
     const AREA: Rect = Rect { x: 0, y: 32, width: 1920, height: 1048 };
+
+    #[test]
+    fn the_window_worked_in_is_the_one_in_front_or_the_one_the_palette_came_up_over() {
+        let desktop = Fake::with_windows(&[(1, "firefox"), (2, "Code")]);
+        let came_from = LastWindow::default();
+        desktop.during(|| {
+            // Nothing remembered yet: only what is in front.
+            assert_eq!(came_from.working(), Some(1));
+            *desktop.heyo_in_front.lock().unwrap() = true;
+            assert_eq!(came_from.working(), None);
+            // The palette comes up over Firefox.
+            *desktop.heyo_in_front.lock().unwrap() = false;
+            came_from.remember();
+            *desktop.heyo_in_front.lock().unwrap() = true;
+            assert_eq!(came_from.working(), Some(1));
+            // Shown again while it is up, it has no other window to come from.
+            came_from.remember();
+            assert_eq!(came_from.working(), Some(1));
+            // With the palette away, the window in front is the one, whichever was remembered.
+            *desktop.heyo_in_front.lock().unwrap() = false;
+            activate(2).unwrap();
+            assert_eq!(came_from.working(), Some(2));
+        });
+    }
 
     #[test]
     fn fractions_tile_the_work_area() {

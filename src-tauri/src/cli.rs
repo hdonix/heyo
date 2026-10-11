@@ -1,7 +1,7 @@
 //! What a `heyo …` invocation or a hotkey asks for: opening an item by
 //! id, native commands, and the command-line flags.
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::*;
 
@@ -51,7 +51,7 @@ pub(crate) fn open_app(app: &AppHandle, entry: &apps::App) -> Result<(), String>
         return apps::launch(entry);
     };
     // From the palette, "in front" is the window the user came from.
-    let current = windows::active_external().or(*app.state::<windows::LastWindow>().0.lock().unwrap());
+    let current = palette::working_window(app);
     let target = if current != Some(front) {
         front
     } else if open.len() > 1 {
@@ -75,7 +75,7 @@ pub(crate) fn open_app(app: &AppHandle, entry: &apps::App) -> Result<(), String>
 pub(crate) fn apply_layout(app: &AppHandle, layout: &str) -> Result<(), String> {
     let (_, _, layout) = windows::LAYOUTS.iter().find(|(id, ..)| *id == layout).ok_or("unknown layout")?;
     // From the palette, the target is the window that was active before it.
-    let window = working_window(app).ok_or("No window is focused.")?;
+    let window = palette::working_window(app).ok_or("No window is focused.")?;
     let monitors = monitors(app)?;
     let _ = main_window(app).hide();
     windows::apply(window, *layout, &monitors)
@@ -88,12 +88,6 @@ pub(crate) fn monitors(app: &AppHandle) -> Result<Vec<windows::Rect>, String> {
         .iter()
         .map(|m| windows::Rect { x: m.position().x, y: m.position().y, width: m.size().width as i32, height: m.size().height as i32 })
         .collect())
-}
-
-/// The window the user is working in: the one in front, or the one that
-/// was before the palette came up.
-pub(crate) fn working_window(app: &AppHandle) -> Option<windows::Window> {
-    windows::active_external().or(*app.state::<windows::LastWindow>().0.lock().unwrap())
 }
 
 /// Whether the arguments (the program's name first) ask for a developer

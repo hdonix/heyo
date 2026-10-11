@@ -330,9 +330,7 @@ fn hide_and_paste(app: &AppHandle, borrowed: Option<Loan>) {
 /// or at once when there is to be none.
 fn ask_over_terminal(app: &AppHandle, question: Question, borrowed: Option<Loan>) {
     // It is where the palette returns to.
-    if let Some(terminal) = windows::active_external() {
-        *app.state::<windows::LastWindow>().0.lock().unwrap() = Some(terminal);
-    }
+    palette::remember_window(app);
     let window = main_window(app);
     let _ = window.show();
     focus(&window);
@@ -347,7 +345,7 @@ fn ask_over_terminal(app: &AppHandle, question: Question, borrowed: Option<Loan>
 /// Copies text, hides the palette and pastes into the window the user came
 /// from; asks first where the text would run as commands.
 pub(crate) fn copy_and_paste(app: &AppHandle, text: String) -> Result<(), String> {
-    if let Some(question) = question_before(&text, asks(app), || into_terminal(working_window(app))) {
+    if let Some(question) = question_before(&text, asks(app), || into_terminal(palette::working_window(app))) {
         let asking = app.clone();
         confirm::ask(app, question, move |answer| {
             if agreed(&asking, answer) {

@@ -64,7 +64,7 @@ fn world<'a>(app: &'a AppHandle, running: &'a Here<'a>) -> World<'a> {
         granted: &permissions::GRANTED,
         history: app.state::<ClipboardHistory>().inner(),
         files: app.state::<std::sync::Arc<crate::files::Files>>().inner(),
-        last_window: app.state::<windows::LastWindow>().inner(),
+        last_window: crate::palette::came_from(app),
         running,
     }
 }
