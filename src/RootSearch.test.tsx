@@ -12,6 +12,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => path,
   invoke: async (command: string, args: unknown) => {
     host.calls.push([command, args]);
+    if (command === "get_item") return (host.results as { id: string }[]).find((item) => item.id === (args as { id: string }).id) ?? null;
     return command === "search" ? host.results : command === "list_quicklinks" ? [] : command === "activities" ? host.activities : undefined;
   },
 }));
@@ -46,6 +47,8 @@ const github = item("quicklink:gh", { title: "GitHub", kind: "Quicklink", link: 
 let root: Root;
 let container: HTMLElement;
 let refresh: () => void;
+/// What the palette is shown with, where a test wants other than the usual.
+let given: Partial<React.ComponentProps<typeof RootSearch>> = {};
 const inputRef = createRef<HTMLInputElement>();
 
 function Harness() {
@@ -70,6 +73,7 @@ function Harness() {
       pendingOpen={null}
       onPendingHandled={() => {}}
       dialog={null}
+      {...given}
     />
   );
 }
@@ -92,6 +96,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   host.calc = null;
+  given = {};
   vi.restoreAllMocks();
 });
 
@@ -191,6 +196,19 @@ test("a quicklink's query is such a field, filled by what follows its alias", as
   await press("Enter");
   await settle();
   expect(host.calls.find(([command]) => command === "open_target")?.[1]).toEqual({ target: "https://github.com/search?q=heyo%20launcher" });
+});
+
+test("a quicklink opened from outside asks for its query, and the search field has the keyboard after", async () => {
+  given = { pendingOpen: github.id };
+  await show([github]);
+  const asked = container.querySelector<HTMLInputElement>(".prompt input")!;
+  asked.focus();
+  await type(asked, "heyo");
+  await press("Enter");
+  await settle();
+  expect(host.calls.find(([command]) => command === "open_target")?.[1]).toEqual({ target: "https://github.com/search?q=heyo" });
+  expect(container.querySelector(".prompt")).toBeNull();
+  expect(document.activeElement).toBe(inputRef.current);
 });
 
 test("the selected row stays selected when the results are fetched again", async () => {

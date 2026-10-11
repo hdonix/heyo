@@ -331,6 +331,7 @@ export function RootSearch(props: {
         onSubmit: (value) => {
           setPrompt(null);
           openQuicklink(item, value);
+          refocus();
         },
         onCancel: () => {
           setPrompt(null);
@@ -353,6 +354,7 @@ export function RootSearch(props: {
         onSubmit: (value) => {
           setPrompt(null);
           pasteSnippet(item, paste, value);
+          refocus();
         },
         onCancel: () => {
           setPrompt(null);
