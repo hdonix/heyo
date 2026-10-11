@@ -11,9 +11,13 @@ import { setAppearance } from "./api";
 import { builtinExtension } from "./builtins";
 import { readManifest, runAs, scopedReact } from "./context";
 import { refresh as refreshDevelopment, teeConsole } from "./dev/console";
-import { on, send, start } from "./protocol";
+import { connect, on, send } from "./protocol";
 import { dispatch, nodeById, publicInstanceHooks, type HostNode } from "./renderer";
 import { activeSession, close, launch, provide, relaunch, reportError } from "./session";
+import { pipes } from "./transport";
+
+// Captured before extensions can replace it.
+const exit = process.exit.bind(process);
 
 // Sharing our React instance is required for hooks to work. The two API
 // names are one object: an extension written for Heyo and the libraries it
@@ -95,5 +99,6 @@ teeConsole();
 // The process for menu bar and background commands takes only those.
 if (process.env.HEYO_BACKGROUND) startBackground();
 
-start();
+// The host closing our stdin is Heyo exiting.
+connect(pipes()).then(() => exit(0));
 send({ type: "ready" });

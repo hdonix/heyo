@@ -50,7 +50,6 @@ export const protocol = {
     hearing.set(subscription, listener);
     return () => void hearing.delete(subscription);
   },
-  start() {},
 };
 
 /// An event from the host, for whoever subscribed. False if nobody hears it.
