@@ -191,10 +191,7 @@ pub(crate) fn handle_args(app: &AppHandle, args: &[String]) -> bool {
             Some(link) => {
                 // Either runtime may have asked: a menu bar command signs in
                 // too. The state in the link tells each whether it is its own.
-                let message = HostMessage::OauthCallback { url: link.clone() }.json();
-                let palette = app.state::<Runtime>().send_if_running(&message);
-                let background = app.state::<crate::runtime::Background>().0.send_if_running(&message);
-                if let (Err(e), Err(_)) = (palette, background) {
+                if let Err(e) = crate::runtime::tell_running(app, &HostMessage::OauthCallback { url: link.clone() }.json()) {
                     eprintln!("heyo: {e}");
                 }
             }
@@ -211,9 +208,7 @@ pub(crate) fn handle_args(app: &AppHandle, args: &[String]) -> bool {
         reload_commands(app);
         if let Some(dir) = args.get(i + 1) {
             // Whichever runtime has a command of it running starts it again.
-            let message = HostMessage::DevReload { extension: dir.clone() }.json();
-            let _ = app.state::<Runtime>().send_if_running(&message);
-            let _ = app.state::<crate::runtime::Background>().0.send_if_running(&message);
+            let _ = crate::runtime::tell_running(app, &HostMessage::DevReload { extension: dir.clone() }.json());
         }
         return true;
     }

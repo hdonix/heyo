@@ -42,6 +42,17 @@ fn runtime_of(app: &AppHandle, background: bool, f: impl FnOnce(&Runtime)) {
     }
 }
 
+/// Tells both runtime processes, each if it is running: what either may
+/// be waiting to hear. An error when neither is running.
+pub(crate) fn tell_running(app: &AppHandle, message: &Value) -> Result<(), String> {
+    let palette = app.state::<Runtime>().send_if_running(message);
+    let background = app.state::<Background>().0.send_if_running(message);
+    match (palette, background) {
+        (Err(e), Err(_)) => Err(e),
+        _ => Ok(()),
+    }
+}
+
 struct Process {
     generation: u64,
     helper: Helper,

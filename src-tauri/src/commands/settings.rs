@@ -30,37 +30,39 @@ pub(crate) async fn local_models(url: String) -> Result<Vec<String>, String> {
     Ok(body["data"].as_array().into_iter().flatten().filter_map(|m| m["id"].as_str().map(str::to_owned)).collect())
 }
 
-/// Makes `next` the settings: saves them, does what the change calls for,
-/// and tells every window. The one way settings change.
+/// Makes `next` the settings: saves them, does what the change calls for
+/// (`settings::consequences`), and tells every window. The one way settings
+/// change.
 fn commit(app: &AppHandle, next: Settings) -> Result<SettingsView, String> {
     let state = app.state::<SettingsState>();
     let previous = state.0.read().unwrap().clone();
     next.save()?;
     *state.0.write().unwrap() = next.clone();
-    // The runtime was started with the old Node.
-    if previous.node() != next.node() {
-        app.state::<Runtime>().stop();
-    }
-    if previous.disabled_commands != next.disabled_commands {
-        reload_commands(app);
-    } else {
-        // Favourites and aliases show in the root search.
-        let _ = app.emit(crate::wire::event::INDEX_READY, ());
-    }
-    if previous.appearance != next.appearance {
-        // Extensions read `environment.appearance`; both runtimes hear of it.
-        let message = crate::wire::HostMessage::Appearance { dark: next.dark() }.json();
-        let _ = app.state::<Runtime>().send_if_running(&message);
-        let _ = app.state::<crate::runtime::Background>().0.send_if_running(&message);
-    }
-    if previous.clipboard_retention_days != next.clipboard_retention_days {
-        app.state::<ClipboardHistory>().prune(next.clipboard_retention_days);
+    for consequence in settings::consequences(&previous, &next, settings::node_given().is_some()) {
+        carry_out(app, &next, consequence);
     }
     let view = view(app);
     // Every window hears this, so it carries what every window may know;
     // the settings window asks for the rest (`get_settings`).
     let _ = app.emit(crate::wire::event::SETTINGS_CHANGED, view.clone().for_window("*"));
     Ok(view)
+}
+
+fn carry_out(app: &AppHandle, next: &Settings, consequence: settings::Consequence) {
+    use settings::Consequence::*;
+    match consequence {
+        RestartRuntime => app.state::<Runtime>().stop(),
+        ReloadCommands => reload_commands(app),
+        RefreshIndex => {
+            let _ = app.emit(crate::wire::event::INDEX_READY, ());
+        }
+        TellAppearance => {
+            // Neither running: nobody to tell.
+            let _ = crate::runtime::tell_running(app, &HostMessage::Appearance { dark: next.dark() }.json());
+        }
+        PruneClipboard { days } => app.state::<ClipboardHistory>().prune(days),
+        AtNextStart => eprintln!("heyo: the renderer changes when Heyo is next started"),
+    }
 }
 
 /// Held from reading the settings to committing the change made to them:

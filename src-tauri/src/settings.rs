@@ -5,6 +5,10 @@
 //! `cargo test`), and a change arrives as the fields that changed
 //! (`Settings::changed`), so a field need be named nowhere else to be saved.
 //!
+//! Most settings are read by whoever uses them at the moment of use. What
+//! a change has to set in motion beyond that is [`consequences`], carried
+//! out by the one place settings change (`commands::settings`).
+//!
 //! "Launch at login" is not stored: it is whether the autostart entry exists.
 
 use std::collections::BTreeMap;
@@ -156,6 +160,51 @@ impl Default for Settings {
     }
 }
 
+/// Something a change of the settings sets in motion, beyond their being
+/// saved and every window hearing of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Consequence {
+    /// The palette's extension runtime was started with the Node.js named
+    /// before: it stops, and what is next asked of it starts it with the new.
+    RestartRuntime,
+    /// Commands were disabled or enabled: the root search is built again.
+    ReloadCommands,
+    /// The root search may show something else (favourites, aliases): the
+    /// palette asks again.
+    RefreshIndex,
+    /// Extensions read `environment.appearance`: both runtimes are told.
+    TellAppearance,
+    /// Clipboard entries older than this many days go now.
+    PruneClipboard { days: u32 },
+    /// The renderer is chosen before the web view exists: it changes when
+    /// Heyo is next started.
+    AtNextStart,
+}
+
+/// What must happen when the settings change from `previous` to `next`.
+/// `node_given`: the environment names Node.js (`HEYO_NODE`), whatever the
+/// setting says.
+pub fn consequences(previous: &Settings, next: &Settings, node_given: bool) -> Vec<Consequence> {
+    let mut all = Vec::new();
+    if previous == next {
+        return all;
+    }
+    if !node_given && previous.node_path.trim() != next.node_path.trim() {
+        all.push(Consequence::RestartRuntime);
+    }
+    all.push(if previous.disabled_commands != next.disabled_commands { Consequence::ReloadCommands } else { Consequence::RefreshIndex });
+    if previous.appearance != next.appearance {
+        all.push(Consequence::TellAppearance);
+    }
+    if previous.clipboard_retention_days != next.clipboard_retention_days {
+        all.push(Consequence::PruneClipboard { days: next.clipboard_retention_days });
+    }
+    if previous.renderer != next.renderer {
+        all.push(Consequence::AtNextStart);
+    }
+    all
+}
+
 pub fn settings_path() -> PathBuf {
     crate::paths::settings()
 }
@@ -237,15 +286,17 @@ impl Settings {
 
     /// The Node.js executable; `HEYO_NODE` overrides the setting.
     pub fn node(&self) -> String {
-        env::var("HEYO_NODE")
-            .ok()
-            .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| match self.node_path.trim() {
-                // The one that came with Heyo, if one did; else whichever is installed.
-                "" => bundled_node().unwrap_or_else(|| "node".into()),
-                path => path.into(),
-            })
+        node_given().unwrap_or_else(|| match self.node_path.trim() {
+            // The one that came with Heyo, if one did; else whichever is installed.
+            "" => bundled_node().unwrap_or_else(|| "node".into()),
+            path => path.into(),
+        })
     }
+}
+
+/// The Node.js the environment names (`HEYO_NODE`), if it names one.
+pub fn node_given() -> Option<String> {
+    env::var("HEYO_NODE").ok().filter(|node| !node.is_empty())
 }
 
 /// What Windows runs at sign-in to start Heyo without showing it. The path
@@ -334,6 +385,20 @@ mod tests {
         value.as_object().unwrap().clone()
     }
 
+    /// Another value a setting could have than the one given.
+    fn different(name: &str, value: &serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Bool(b) => json!(!b),
+            serde_json::Value::Number(n) => json!(n.as_u64().unwrap() + 1),
+            serde_json::Value::String(s) if name == "appearance" => json!(if s == "dark" { "light" } else { "dark" }),
+            serde_json::Value::String(s) if name == "renderer" => json!(if s == "cpu" { "auto" } else { "cpu" }),
+            serde_json::Value::String(s) => json!(format!("{s}x")),
+            serde_json::Value::Array(_) => json!(["x"]),
+            serde_json::Value::Object(_) => json!({ "x": "y" }),
+            serde_json::Value::Null => panic!("{name} has no value"),
+        }
+    }
+
     #[test]
     fn a_change_leaves_every_other_setting_alone() {
         let before = Settings { compact_mode: true, favorites: vec!["app:a".into()], anthropic_api_key: "sk-secret".into(), ..Settings::default() };
@@ -358,18 +423,56 @@ mod tests {
     fn every_setting_can_be_changed() {
         let defaults = serde_json::to_value(Settings::default()).unwrap();
         for (name, value) in defaults.as_object().unwrap() {
-            let different = match value {
-                serde_json::Value::Bool(b) => json!(!b),
-                serde_json::Value::Number(n) => json!(n.as_u64().unwrap() + 1),
-                serde_json::Value::String(s) if name == "appearance" => json!(if s == "dark" { "light" } else { "dark" }),
-                serde_json::Value::String(s) if name == "renderer" => json!(if s == "cpu" { "auto" } else { "cpu" }),
-                serde_json::Value::String(s) => json!(format!("{s}x")),
-                serde_json::Value::Array(_) => json!(["x"]),
-                serde_json::Value::Object(_) => json!({ "x": "y" }),
-                serde_json::Value::Null => continue,
-            };
+            let different = different(name, value);
             let changed = Settings::default().changed(&changes(json!({ name: different.clone() }))).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert_eq!(serde_json::to_value(&changed).unwrap()[name], different, "{name}");
+        }
+    }
+
+    /// Which settings set what in motion.
+    #[test]
+    fn a_change_sets_in_motion_what_it_calls_for_and_no_more() {
+        use Consequence::*;
+        let was = Settings::default();
+        let table: Vec<(Settings, Vec<Consequence>)> = vec![
+            // Saved again as it was (a toggle set to what it already is).
+            (was.clone(), vec![]),
+            (Settings { node_path: "/opt/node/bin/node".into(), ..was.clone() }, vec![RestartRuntime, RefreshIndex]),
+            // The same Node.js, written with spaces.
+            (Settings { node_path: "  ".into(), ..was.clone() }, vec![RefreshIndex]),
+            (Settings { disabled_commands: vec!["cmd:x:y".into()], ..was.clone() }, vec![ReloadCommands]),
+            (Settings { favorites: vec!["app:a".into()], ..was.clone() }, vec![RefreshIndex]),
+            (Settings { aliases: BTreeMap::from([("app:a".into(), "a".into())]), ..was.clone() }, vec![RefreshIndex]),
+            (Settings { appearance: Appearance::Dark, ..was.clone() }, vec![RefreshIndex, TellAppearance]),
+            (Settings { clipboard_retention_days: 7, ..was.clone() }, vec![RefreshIndex, PruneClipboard { days: 7 }]),
+            (Settings { renderer: crate::renderer::Renderer::Cpu, ..was.clone() }, vec![RefreshIndex, AtNextStart]),
+            // Several at once, each with its own.
+            (
+                Settings { node_path: "node24".into(), disabled_commands: vec!["cmd:x:y".into()], appearance: Appearance::Light, clipboard_retention_days: 30, ..was.clone() },
+                vec![RestartRuntime, ReloadCommands, TellAppearance, PruneClipboard { days: 30 }],
+            ),
+        ];
+        for (next, expected) in table {
+            assert_eq!(consequences(&was, &next, false), expected, "{next:?}");
+        }
+        // Where the environment names Node.js, the setting names nothing that runs.
+        let other_node = Settings { node_path: "/opt/node/bin/node".into(), ..was.clone() };
+        assert_eq!(consequences(&was, &other_node, true), [RefreshIndex]);
+    }
+
+    /// Every other setting is read where it is used: a change of it makes
+    /// the palette ask for the root search again and nothing else, whichever
+    /// setting it is.
+    #[test]
+    fn a_setting_read_where_it_is_used_sets_nothing_else_in_motion() {
+        let with_their_own = ["nodePath", "disabledCommands", "appearance", "clipboardRetentionDays", "renderer"];
+        let defaults = serde_json::to_value(Settings::default()).unwrap();
+        for (name, value) in defaults.as_object().unwrap() {
+            if with_their_own.contains(&name.as_str()) {
+                continue;
+            }
+            let next = Settings::default().changed(&changes(json!({ name: different(name, value) }))).unwrap();
+            assert_eq!(consequences(&Settings::default(), &next, false), [Consequence::RefreshIndex], "{name}");
         }
     }
 
