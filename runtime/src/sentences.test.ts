@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type Engine, PARTIAL_INTERVAL_MS, SAMPLE_RATE, type Said, Session, VAD_WINDOW } from "./sentences";
+import { between, type Engine, PARTIAL_INTERVAL_MS, SAMPLE_RATE, type Said, Session, VAD_WINDOW } from "./sentences";
 
 /// A recognizer and a detector for tests. Audio is words: a word is a
 /// stretch of samples of one loudness, which names it. The recognizer
@@ -99,12 +99,15 @@ describe("a recording", () => {
 
   it("finishes each sentence at the pause after it", () => {
     const { said, texts, text } = record(engine(WORDS), [audio([1, 2, 3, 4]), audio([6, 7, 1, 8])]);
-    expect(texts("segment")).toEqual(["the weather is nice.", "walk to the park."]);
-    expect(text).toBe("the weather is nice.walk to the park.");
+    // The second begins with the space that sets it off from the first.
+    expect(texts("segment")).toEqual(["the weather is nice.", " walk to the park."]);
+    expect(text).toBe("the weather is nice. walk to the park.");
+    expect(texts("partial").filter((partial) => partial.includes("walk")).every((partial) => partial.startsWith(" walk"))).toBe(true);
     // A sentence is said after the last that was heard of it in progress,
     // and nothing more is heard of it then.
     const order = said.filter((line) => line.type !== "level").map((line) => `${line.type} ${"text" in line ? line.text : ""}`);
     const first = order.indexOf("segment the weather is nice.");
+    expect(first).toBeGreaterThan(0);
     expect(order.slice(0, first).every((line) => line.startsWith("partial the"))).toBe(true);
     expect(order.slice(first + 1).every((line) => line.includes("walk"))).toBe(true);
   });
@@ -119,6 +122,13 @@ describe("a recording", () => {
     const { texts } = record(engine(WORDS), [audio([1, 2, 3, 4])], (text) => text.replace("weather", "Wetter"));
     expect(texts("partial")[0]).toBe("the Wetter is.");
     expect(texts("segment")).toEqual(["the Wetter is nice."]);
+  });
+
+  it("joins sentences as their writing does", () => {
+    const chinese = ["今天", "天气", "很好", "我们", "去", "公园"];
+    const { texts, text } = record(engine(chinese, "。"), [audio([1, 2, 3]), audio([4, 5, 6])]);
+    expect(texts("segment")).toEqual(["今天 天气 很好。", "我们 去 公园。"]);
+    expect(text).toBe("今天 天气 很好。我们 去 公园。");
   });
 
   it("says nothing of noise", () => {
@@ -137,5 +147,31 @@ describe("a recording", () => {
     // Speech first, silence after.
     expect(levels[1]).toBeGreaterThan(0);
     expect(levels[levels.length - 1]).toBe(0);
+  });
+});
+
+describe("between two sentences", () => {
+  it("is a space where sentences are set apart by one", () => {
+    expect(between("See you at three.", "Bring coffee.")).toBe(" ");
+    expect(between("Really?", "Yes!")).toBe(" ");
+    expect(between("안녕하세요.", "반갑습니다.")).toBe(" ");
+    expect(between("no mark at the end", "Next.")).toBe(" ");
+    // English after Chinese needs none; Chinese after English does.
+    expect(between("I use Python.", "我也是。")).toBe(" ");
+  });
+
+  it("is nothing in Chinese and Japanese", () => {
+    expect(between("今天天气很好。", "我们去公园。")).toBe("");
+    expect(between("今日はいい天気", "散歩しましょう。")).toBe("");
+    expect(between("真的吗？", "Yes.")).toBe("");
+    expect(between("我用的是Python。", "It works.")).toBe("");
+  });
+
+  it("is nothing where there is nothing to set apart", () => {
+    expect(between("", "First.")).toBe("");
+    expect(between("One. ", "Two.")).toBe("");
+    expect(between("One.\n", "Two.")).toBe("");
+    expect(between("One.", " Two.")).toBe("");
+    expect(between("One.", "")).toBe("");
   });
 });

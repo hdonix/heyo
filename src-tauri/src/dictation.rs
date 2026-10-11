@@ -49,7 +49,7 @@ struct State {
 /// What an extension hears of the recording it started.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Heard {
-    /// A sentence, as soon as it is recognized.
+    /// A sentence by itself, as soon as it is recognized.
     Segment(String),
     /// All of it; the recording is over.
     Result(String),
@@ -79,7 +79,8 @@ pub(crate) enum NotListening {
 fn heard(event: &Value) -> Option<Heard> {
     let text = || event["text"].as_str().unwrap_or_default().to_owned();
     match event["type"].as_str().unwrap_or_default() {
-        "segment" => Some(Heard::Segment(text())),
+        // Without the space that sets it apart from the sentence before.
+        "segment" => Some(Heard::Segment(text().trim_start().to_owned())),
         "result" if event["cancelled"] == true => Some(Heard::Cancelled),
         "result" => Some(Heard::Result(text())),
         "error" => Some(Heard::Failed(event["message"].as_str().unwrap_or("Dictation failed").to_owned())),
@@ -117,9 +118,11 @@ pub(crate) enum Told {
     Ready,
     /// How loud it is, from 0 to 1; null when that could not be measured.
     Level { value: Option<f64> },
-    /// The sentence in progress, as far as it is recognized.
+    /// The sentence in progress, as far as it is recognized. Like a
+    /// finished one it begins with what sets it apart from the sentence
+    /// before (a space, where the language writes one).
     Partial { text: String },
-    /// A finished sentence.
+    /// A finished sentence: the text so far is these, one after the other.
     Segment { text: String },
     Polishing,
     /// The recording is over: `text` is what is pasted, `raw` what was heard.
@@ -608,6 +611,8 @@ mod tests {
     #[test]
     fn an_extension_listening_hears_sentences_and_then_all_of_it() {
         assert_eq!(heard(&json!({ "type": "segment", "text": "Hello." })), Some(Heard::Segment("Hello.".into())));
+        // A later sentence comes with the space before it, which is not part of it.
+        assert_eq!(heard(&json!({ "type": "segment", "text": " World." })), Some(Heard::Segment("World.".into())));
         assert_eq!(heard(&json!({ "type": "result", "text": "Hello. World.", "raw": "Hello. World.", "polished": false })), Some(Heard::Result("Hello. World.".into())));
         // Nothing heard is still an answer; a discarded recording is not text.
         assert_eq!(heard(&json!({ "type": "result", "text": "", "raw": "" })), Some(Heard::Result(String::new())));

@@ -5,6 +5,10 @@
 //! The recognizer is not a streaming one: it is given the whole sentence so
 //! far, again and again, and may write its beginning differently each time.
 //! Whoever shows the partial text must be ready to correct it.
+//!
+//! What is said here is text as it is to be written one piece after the
+//! other: a sentence begins with the space that separates it from the one
+//! before, where the language has one, so that the pieces only need joining.
 
 /// The recognizer and the voice-activity detector, as much of them as a
 /// recording uses (`sherpa-onnx-node`, or a test's own).
@@ -46,6 +50,19 @@ function concat(chunks: Float32Array[]) {
 /// SenseVoice returns a lone punctuation mark for noise.
 const meaningful = (text: string) => /[\p{L}\p{N}]/u.test(text);
 
+/// Chinese and Japanese writing, and the full-width marks that go with it:
+/// nothing stands between two sentences there.
+const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3000-\u303f\uff00-\uffef]/u;
+
+/// What goes between what was said so far and the next sentence: a space,
+/// unless the text before ends in writing that has none between sentences
+/// (or in a space already, or there is no text before).
+export function between(before: string, sentence: string): string {
+  const last = [...before].pop();
+  if (last === undefined || !sentence || /\s/u.test(last) || UNSPACED.test(last) || /^\s/u.test(sentence)) return "";
+  return " ";
+}
+
 /// One recording: feeds audio to the detector and says partial and final text.
 export class Session {
   private pending = new Float32Array(0);
@@ -59,6 +76,7 @@ export class Session {
   private levelEnergy = 0;
   private levelCount = 0;
   private levelAt = 0;
+  /// The finished sentences, each as it joins those before it.
   readonly segments: string[] = [];
 
   constructor(
@@ -102,8 +120,13 @@ export class Session {
     if (this.speaking && seconds >= MIN_PARTIAL_SECONDS && this.now() - this.lastPartial >= PARTIAL_INTERVAL_MS) {
       this.lastPartial = this.now();
       const text = this.correct(this.engine.decode(concat(this.speech)));
-      if (meaningful(text)) this.say({ type: "partial", text });
+      if (meaningful(text)) this.say({ type: "partial", text: this.joined(text) });
     }
+  }
+
+  /// The sentence as it is written after the ones before it.
+  private joined(text: string) {
+    return between(this.segments.join(""), text) + text;
   }
 
   private trimPreroll() {
@@ -124,8 +147,9 @@ export class Session {
       this.speechSamples = 0;
       this.speaking = false;
       if (!meaningful(text)) continue;
-      this.segments.push(text);
-      this.say({ type: "segment", text });
+      const sentence = this.joined(text);
+      this.segments.push(sentence);
+      this.say({ type: "segment", text: sentence });
     }
   }
 
