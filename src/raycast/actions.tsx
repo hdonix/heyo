@@ -1,4 +1,9 @@
 // Action panels: collecting actions, keyboard shortcuts, and the ⌃K overlay.
+//
+// The overlay shows actions in sections, whoever they are from: an
+// extension's `ActionPanel` (read from its tree by `sections`) or the root
+// search's own. It hands back the action that was chosen; what running it
+// means is the caller's.
 
 import { composing } from "../ime";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,30 +13,59 @@ import { dateChoices, fromDateInput, inRange, toDateInput } from "./dates";
 import { Image } from "./Image";
 import { content, matchesQuery, type Node } from "./model";
 
-export interface ActionSection {
-  title?: string;
-  actions: Node[];
+/// What the panel shows of an action, and how the action takes part in it.
+export interface PanelAction {
+  title: string;
+  /// An `Image.ImageLike`.
+  icon?: unknown;
+  /// A `Keyboard.Shortcut`.
+  shortcut?: unknown;
+  destructive?: boolean;
+  /// Of a submenu, what is in it: chosen, it opens in place.
+  submenu?: ActionSection<this>[];
+  /// Of `Action.PickDate`, the dates it takes: chosen, it asks for one.
+  pickDate?: { type?: string; min?: unknown; max?: unknown };
 }
+
+export interface ActionSection<A extends PanelAction = PanelAction> {
+  title?: string;
+  actions: A[];
+}
+
+/// An action of an extension, and the node to tell the extension of.
+export interface NodeAction extends PanelAction {
+  node: Node;
+}
+
+const ofNode = (node: Node): NodeAction => ({
+  node,
+  title: node.props.title ?? "",
+  icon: node.props.icon,
+  shortcut: node.props.shortcut,
+  destructive: node.props.style === "destructive",
+  submenu: node.type === "ActionPanel.Submenu" ? sections(node) : undefined,
+  pickDate: node.props.pickDate || undefined,
+});
 
 /// Groups an `ActionPanel`'s children into sections; bare actions form an
 /// untitled leading section. Submenus are kept as entries.
-export function sections(panel: Node | undefined): ActionSection[] {
+export function sections(panel: Node | undefined): ActionSection<NodeAction>[] {
   if (!panel) return [];
-  const out: ActionSection[] = [];
-  let loose: ActionSection | undefined;
+  const out: ActionSection<NodeAction>[] = [];
+  let loose: ActionSection<NodeAction> | undefined;
   for (const child of content(panel)) {
     if (child.type === "ActionPanel.Section") {
       loose = undefined;
-      out.push({ title: child.props.title, actions: content(child) });
+      out.push({ title: child.props.title, actions: content(child).map(ofNode) });
     } else if (child.type === "Action" || child.type === "ActionPanel.Submenu") {
       if (!loose) out.push((loose = { actions: [] }));
-      loose.actions.push(child);
+      loose.actions.push(ofNode(child));
     }
   }
   return out.filter((s) => s.actions.length);
 }
 
-export const flatten = (secs: ActionSection[]) => secs.flatMap((s) => s.actions);
+export const flatten = <A extends PanelAction>(secs: ActionSection<A>[]) => secs.flatMap((s) => s.actions);
 
 type Shortcut = { modifiers: string[]; key: string };
 
@@ -114,27 +148,24 @@ export function ShortcutHint({ shortcut }: { shortcut: unknown }) {
 }
 
 /// Finds the action whose shortcut matches a key press, searching submenus.
-export function actionForShortcut(secs: ActionSection[], e: React.KeyboardEvent) {
-  const search = (actions: Node[]): Node | undefined => {
+export function actionForShortcut<A extends PanelAction>(secs: ActionSection<A>[], e: React.KeyboardEvent) {
+  const search = (actions: A[]): A | undefined => {
     for (const action of actions) {
-      if (action.type === "ActionPanel.Submenu") {
-        if (matchesShortcut(e, action.props.shortcut)) return undefined;
-        const found = search(flatten(sections(action)));
+      if (action.submenu) {
+        if (matchesShortcut(e, action.shortcut)) return undefined;
+        const found = search(flatten(action.submenu));
         if (found) return found;
-      } else if (matchesShortcut(e, action.props.shortcut)) return action;
+      } else if (matchesShortcut(e, action.shortcut)) return action;
     }
     return undefined;
   };
   return search(flatten(secs));
 }
 
-/// Whether an action asks for a date before it runs (`Action.PickDate`).
-export const picksDate = (action: Node) => !!action.props.pickDate;
-
 /// What `Action.PickDate` shows in the panel: a date field, and the dates
 /// asked for most as buttons. Enter in the field takes its date.
-function DatePanel(props: { action: Node; onPick(date: Date | null): void }) {
-  const { type, min, max } = props.action.props.pickDate ?? {};
+function DatePanel(props: { dates: NonNullable<PanelAction["pickDate"]>; onPick(date: Date | null): void }) {
+  const { type, min, max } = props.dates;
   const withTime = type !== "date";
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -172,52 +203,53 @@ function DatePanel(props: { action: Node; onPick(date: Date | null): void }) {
   );
 }
 
-interface Level {
+interface Level<A extends PanelAction> {
   title?: string;
-  sections: ActionSection[];
+  sections: ActionSection<A>[];
   /// The action whose date is being asked for, instead of a list of actions.
-  picker?: Node;
+  picker?: A;
 }
 
 /// The ⌃K overlay. Submenus open in place; Esc goes back up. With `picker`
 /// it opens asking for that action's date (the action was run by its
 /// shortcut, or as the primary action).
-export function ActionOverlay(props: {
+export function ActionOverlay<A extends PanelAction>(props: {
   title?: string;
-  sections: ActionSection[];
-  picker?: Node;
-  onRun(action: Node): void;
-  onPickDate?(action: Node, date: Date | null): void;
+  sections: ActionSection<A>[];
+  picker?: A;
+  onRun(action: A): void;
+  onPickDate?(action: A, date: Date | null): void;
   onClose(): void;
 }) {
-  const [stack, setStack] = useState<Level[]>([
-    props.picker ? { title: props.picker.props.title, sections: [], picker: props.picker } : { title: props.title, sections: props.sections },
+  const [stack, setStack] = useState<Level<A>[]>([
+    props.picker ? { title: props.picker.title, sections: [], picker: props.picker } : { title: props.title, sections: props.sections },
   ]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const top = stack[stack.length - 1];
 
-  const visible = useMemo(
-    () =>
-      top.sections
-        .map((s) => ({ ...s, actions: s.actions.filter((a) => matchesQuery(query, a.props.title ?? "")) }))
-        .filter((s) => s.actions.length),
-    [top, query],
-  );
-  const flat = flatten(visible);
+  // Each action with its place among all of them, which is what its row is
+  // told apart by while the query hides others.
+  const visible = useMemo(() => {
+    let place = 0;
+    return top.sections
+      .map((s) => ({ title: s.title, rows: s.actions.map((action) => ({ action, place: place++ })).filter((row) => matchesQuery(query, row.action.title)) }))
+      .filter((s) => s.rows.length);
+  }, [top, query]);
+  const flat = visible.flatMap((s) => s.rows.map((row) => row.action));
 
   useEffect(() => inputRef.current?.focus(), [stack]);
   useEffect(() => setSelected(0), [query, stack]);
   const listRef = useReveal<HTMLDivElement>([selected]);
 
-  const activate = (action: Node | undefined) => {
+  const activate = (action: A | undefined) => {
     if (!action) return;
-    if (action.type === "ActionPanel.Submenu") {
-      setStack([...stack, { title: action.props.title, sections: sections(action) }]);
+    if (action.submenu) {
+      setStack([...stack, { title: action.title, sections: action.submenu }]);
       setQuery("");
-    } else if (picksDate(action)) {
-      setStack([...stack, { title: action.props.title, sections: [], picker: action }]);
+    } else if (action.pickDate) {
+      setStack([...stack, { title: action.title, sections: [], picker: action }]);
       setQuery("");
     } else props.onRun(action);
   };
@@ -269,25 +301,24 @@ export function ActionOverlay(props: {
     <div className="overlay-backdrop" onMouseDown={props.onClose}>
       <div className="action-panel" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
         {top.title && <div className="action-panel-title">{top.title}</div>}
-        {top.picker && <DatePanel key={top.picker.id} action={top.picker} onPick={(date) => props.onPickDate?.(top.picker!, date)} />}
+        {top.picker?.pickDate && <DatePanel dates={top.picker.pickDate} onPick={(date) => props.onPickDate?.(top.picker!, date)} />}
         <div className="action-list" ref={listRef} hidden={!!top.picker}>
           {visible.map((section, si) => (
             <div key={si} className="action-section">
               {section.title && <div className="section-title">{section.title}</div>}
-              {section.actions.map((action) => {
+              {section.rows.map(({ action, place }) => {
                 const i = ++index;
-                const destructive = action.props.style === "destructive";
                 return (
                   <div
-                    key={action.id}
-                    className={`action-row${i === selected ? " selected" : ""}${destructive ? " destructive" : ""}`}
+                    key={place}
+                    className={`action-row${i === selected ? " selected" : ""}${action.destructive ? " destructive" : ""}`}
                     {...underPointer(() => setSelected(i))}
                     onClick={() => activate(action)}
                   >
-                    <Image image={action.props.icon} size={16} />
-                    <span className="action-title">{action.props.title}</span>
-                    {action.type === "ActionPanel.Submenu" ? <span className="chevron">›</span> : null}
-                    <ShortcutHint shortcut={action.props.shortcut} />
+                    <Image image={action.icon} size={16} />
+                    <span className="action-title">{action.title}</span>
+                    {action.submenu ? <span className="chevron">›</span> : null}
+                    <ShortcutHint shortcut={action.shortcut} />
                   </div>
                 );
               })}

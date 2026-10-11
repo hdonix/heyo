@@ -20,9 +20,9 @@ import { afterAlias, argumentsOf, filled, missing, tabStop } from "./arguments";
 import { FIRST, hold, locate } from "./reselect";
 import { step, underPointer, useReveal } from "./selection";
 import { SelectionIndicator } from "./SelectionIndicator";
-import { actionForShortcut, ActionOverlay, type ActionSection, ShortcutHint } from "./raycast/actions";
+import { actionForShortcut, ActionOverlay, ShortcutHint } from "./raycast/actions";
 import { ToastView } from "./raycast/CommandView";
-import type { Node, Toast } from "./raycast/model";
+import type { Toast } from "./raycast/model";
 
 const SETTINGS_ID = "heyo:settings";
 const SEARCH_PLACEHOLDER = "Search apps, commands, or calculate…";
@@ -564,20 +564,12 @@ export function RootSearch(props: {
       return [primary, manage];
   };
 
-  // The action panel works on runtime-style nodes; these stand in for them.
   const groups = actionsFor(current);
-  const handlers = new Map<number, () => void>();
-  const panelSections: ActionSection[] = groups.map((group, g) => ({
-    actions: group.map((action, a) => {
-      const id = -(g * 100 + a + 1);
-      handlers.set(id, action.run);
-      const node: Node = { id, type: "Action", props: { title: action.title, icon: action.icon, shortcut: action.shortcut }, children: [] };
-      return node;
-    }),
-  }));
-  const runNode = (node: Node) => {
+  const panelSections = groups.map((actions) => ({ actions }));
+  /// Runs an action chosen in the panel, or by its shortcut.
+  const runAction = (action: RootAction) => {
     setPanelOpen(false);
-    handlers.get(node.id)?.();
+    action.run();
     refocus();
   };
 
@@ -625,10 +617,10 @@ export function RootSearch(props: {
       if (query) props.setQuery("");
       else invoke("hide");
     } else if (e.ctrlKey || e.altKey) {
-      const node = actionForShortcut(panelSections, e);
-      if (node) {
+      const action = actionForShortcut(panelSections, e);
+      if (action) {
         e.preventDefault();
-        runNode(node);
+        runAction(action);
       } else if (e.ctrlKey && e.key === "n") move(1);
       else if (e.ctrlKey && e.key === "p") move(-1);
     }
@@ -776,7 +768,7 @@ export function RootSearch(props: {
                   : current && "Calculator"
           }
           sections={panelSections}
-          onRun={runNode}
+          onRun={runAction}
           onClose={() => {
             setPanelOpen(false);
             refocus();

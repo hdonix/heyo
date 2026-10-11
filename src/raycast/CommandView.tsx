@@ -4,7 +4,7 @@ import { composing } from "../ime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
-import { actionForShortcut, ActionOverlay, flatten, picksDate, sections, ShortcutHint } from "./actions";
+import { actionForShortcut, ActionOverlay, flatten, sections, ShortcutHint, type NodeAction } from "./actions";
 import { DetailView } from "./Detail";
 import { FormView, type FormValues } from "./FormView";
 import { ExtensionDir, Image } from "./Image";
@@ -105,7 +105,7 @@ export function CommandView(props: {
   const [actions, setActions] = useState<Node | undefined>();
   const [panelOpen, setPanelOpen] = useState(false);
   /// The `Action.PickDate` the panel is open for, when it was run directly.
-  const [picker, setPicker] = useState<Node | undefined>();
+  const [picker, setPicker] = useState<NodeAction | undefined>();
   const memories = useRef(new Memories()).current;
   const memory = view ? memories.of(view.key) : undefined;
   const keys = useRef<Keys>({}).current;
@@ -181,7 +181,7 @@ export function CommandView(props: {
   // List, Grid and Form report their actions (they depend on the selection).
   const viewActions = root?.type === "Detail" ? slot(root, "actions") : root ? actions : undefined;
   const panelSections = useMemo(() => sections(viewActions), [viewActions]);
-  const runnable = flatten(panelSections).filter((a) => a.type === "Action");
+  const runnable = flatten(panelSections).filter((a) => a.node.type === "Action");
 
   /// Puts the keyboard back in the view. Whatever had the focus (the action
   /// panel's search field, a form that was replaced) may be gone, and with
@@ -197,27 +197,28 @@ export function CommandView(props: {
     setPicker(undefined);
   };
 
-  const run = (action: Node) => {
+  const run = (action: NodeAction) => {
     // The date is asked for first, in the panel.
-    if (picksDate(action)) {
+    if (action.pickDate) {
       setPicker(action);
       setPanelOpen(true);
       return;
     }
     closePanel();
-    if (action.props.submit) dispatch(action, "onSubmit", formValues.current);
+    const { node } = action;
+    if (node.props.submit) dispatch(node, "onSubmit", formValues.current);
     // Quick Look is of the selected item, which only the list here knows.
-    else if (action.props.preview) dispatch(action, "onAction", searchable ? keys.quickLook : undefined);
-    else dispatch(action, "onAction");
+    else if (node.props.preview) dispatch(node, "onAction", searchable ? keys.quickLook : undefined);
+    else dispatch(node, "onAction");
     refocus();
   };
-  const pickDate = (action: Node, date: Date | null) => {
+  const pickDate = ({ node }: NodeAction, date: Date | null) => {
     closePanel();
-    if (isFn(action.props.onChange)) dispatch(action, "onChange", date);
+    if (isFn(node.props.onChange)) dispatch(node, "onChange", date);
     refocus();
   };
   keys.runPrimary = (panel) => {
-    const action = flatten(sections(panel ?? viewActions)).find((a) => a.type === "Action");
+    const action = flatten(sections(panel ?? viewActions)).find((a) => a.node.type === "Action");
     if (action) run(action);
   };
 
@@ -248,7 +249,7 @@ export function CommandView(props: {
       const action = (e.ctrlKey || e.altKey || e.metaKey) && actionForShortcut(panelSections, e);
       if (action) {
         e.preventDefault();
-        if (action.type === "Action") run(action);
+        if (action.node.type === "Action") run(action);
       } else if (keys.current?.(e)) e.preventDefault();
     }
   };
@@ -315,7 +316,7 @@ export function CommandView(props: {
           <span className="footer-actions">
             {primary && (
               <button className="footer-button" onClick={() => run(primary)}>
-                {primary.props.title} <kbd>↵</kbd>
+                {primary.title} <kbd>↵</kbd>
               </button>
             )}
             {runnable.length > 0 && (
