@@ -215,6 +215,16 @@ pub fn start(app: &AppHandle) {
     });
 }
 
+/// Stops the background runtime, which starts again when something is next
+/// asked of it (with another Node.js, say). What was mounted in it is gone,
+/// so the menu bar's commands start afresh at the schedule's next look; the
+/// others keep to their intervals.
+pub fn restart(app: &AppHandle) {
+    app.state::<Background>().0.stop();
+    let in_menu_bar: Vec<String> = active(app).iter().filter(|command| handles(command)).map(key).collect();
+    app.state::<MenuBar>().0.lock().unwrap().started.retain(|key, _| !in_menu_bar.contains(key));
+}
+
 /// Takes a command's icon out of the menu bar.
 fn remove_tray(app: &AppHandle, key: String) {
     let handle = app.clone();

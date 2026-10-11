@@ -167,6 +167,9 @@ pub enum Consequence {
     /// The palette's extension runtime was started with the Node.js named
     /// before: it stops, and what is next asked of it starts it with the new.
     RestartRuntime,
+    /// So was the runtime of the menu bar and background commands: it stops
+    /// too, and the menu bar's commands are started again.
+    RestartBackground,
     /// Commands were disabled or enabled: the root search is built again.
     ReloadCommands,
     /// The root search may show something else (favourites, aliases): the
@@ -190,7 +193,7 @@ pub fn consequences(previous: &Settings, next: &Settings, node_given: bool) -> V
         return all;
     }
     if !node_given && previous.node_path.trim() != next.node_path.trim() {
-        all.push(Consequence::RestartRuntime);
+        all.extend([Consequence::RestartRuntime, Consequence::RestartBackground]);
     }
     all.push(if previous.disabled_commands != next.disabled_commands { Consequence::ReloadCommands } else { Consequence::RefreshIndex });
     if previous.appearance != next.appearance {
@@ -437,7 +440,7 @@ mod tests {
         let table: Vec<(Settings, Vec<Consequence>)> = vec![
             // Saved again as it was (a toggle set to what it already is).
             (was.clone(), vec![]),
-            (Settings { node_path: "/opt/node/bin/node".into(), ..was.clone() }, vec![RestartRuntime, RefreshIndex]),
+            (Settings { node_path: "/opt/node/bin/node".into(), ..was.clone() }, vec![RestartRuntime, RestartBackground, RefreshIndex]),
             // The same Node.js, written with spaces.
             (Settings { node_path: "  ".into(), ..was.clone() }, vec![RefreshIndex]),
             (Settings { disabled_commands: vec!["cmd:x:y".into()], ..was.clone() }, vec![ReloadCommands]),
@@ -449,7 +452,7 @@ mod tests {
             // Several at once, each with its own.
             (
                 Settings { node_path: "node24".into(), disabled_commands: vec!["cmd:x:y".into()], appearance: Appearance::Light, clipboard_retention_days: 30, ..was.clone() },
-                vec![RestartRuntime, ReloadCommands, TellAppearance, PruneClipboard { days: 30 }],
+                vec![RestartRuntime, RestartBackground, ReloadCommands, TellAppearance, PruneClipboard { days: 30 }],
             ),
         ];
         for (next, expected) in table {
@@ -458,6 +461,20 @@ mod tests {
         // Where the environment names Node.js, the setting names nothing that runs.
         let other_node = Settings { node_path: "/opt/node/bin/node".into(), ..was.clone() };
         assert_eq!(consequences(&was, &other_node, true), [RefreshIndex]);
+    }
+
+    /// Menu bar and background commands run in a process of their own, and
+    /// it was started with the same Node.js as the palette's.
+    #[test]
+    fn another_node_restarts_the_background_runtime_as_well_as_the_palettes() {
+        let was = Settings { node_path: "/usr/bin/node".into(), ..Settings::default() };
+        for path in ["/opt/node/bin/node", ""] {
+            let caused = consequences(&was, &Settings { node_path: path.into(), ..was.clone() }, false);
+            assert!(caused.contains(&Consequence::RestartRuntime) && caused.contains(&Consequence::RestartBackground), "{path:?}: {caused:?}");
+        }
+        // Neither without the other, and neither for anything else.
+        let caused = consequences(&was, &Settings { appearance: Appearance::Dark, ..was.clone() }, false);
+        assert!(!caused.contains(&Consequence::RestartRuntime) && !caused.contains(&Consequence::RestartBackground));
     }
 
     /// Every other setting is read where it is used: a change of it makes

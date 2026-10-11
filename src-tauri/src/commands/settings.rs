@@ -52,6 +52,7 @@ fn carry_out(app: &AppHandle, next: &Settings, consequence: settings::Consequenc
     use settings::Consequence::*;
     match consequence {
         RestartRuntime => app.state::<Runtime>().stop(),
+        RestartBackground => menubar::restart(app),
         ReloadCommands => reload_commands(app),
         RefreshIndex => {
             let _ = app.emit(crate::wire::event::INDEX_READY, ());
