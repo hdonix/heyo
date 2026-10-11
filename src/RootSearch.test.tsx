@@ -279,6 +279,53 @@ test("a click on the calculator does what the calculator does, whichever row is 
   expect(host.calls.filter(([command]) => command === "copy_text").map(([, args]) => args)).toEqual([{ text: "42", paste: false }]);
 });
 
+test("a click on a row is for that row, and the footer's button for the selected one", async () => {
+  await show([item("a"), item("b")]);
+  await type(inputRef.current!, "cats");
+  await settle();
+  expect([...container.querySelectorAll(".section-title")].map((e) => e.textContent)).toEqual(["Use “cats” with…"]);
+  const titled = (title: string) => [...container.querySelectorAll<HTMLElement>(".item")].find((row) => row.querySelector(".title")?.textContent === title)!;
+  await act(async () => titled("Search Google").click());
+  await act(async () => titled("b").click());
+  await settle();
+  expect(host.calls.filter(([command]) => command === "open_target").map(([, args]) => args)).toEqual([{ target: "https://www.google.com/search?q=cats" }]);
+  expect(launches()).toEqual([{ id: "b", arguments: undefined }]);
+
+  expect(selectedTitle()).toBe("a");
+  const primary = container.querySelector<HTMLElement>(".footer-button")!;
+  expect(primary.textContent).toContain("Open Command");
+  await act(async () => primary.click());
+  await settle();
+  expect(launches().pop()).toEqual({ id: "a", arguments: undefined });
+});
+
+test("an action's shortcut runs it for the selected row, without the panel", async () => {
+  await show([item("a"), item("b")]);
+  await press("ArrowDown");
+  await press("f", { ctrlKey: true, shiftKey: true, code: "KeyF" });
+  await settle();
+  expect(host.calls.filter(([command]) => command === "set_favorite").map(([, args]) => args)).toEqual([{ id: "b", favorite: true }]);
+  expect(container.querySelector(".action-panel")).toBeNull();
+});
+
+test("folded away, the palette is the search field alone until something is typed", async () => {
+  given = { compact: true };
+  await show([github]);
+  expect(container.querySelector(".panel.compact")).not.toBeNull();
+  expect(container.querySelector(".list")).toBeNull();
+  // The first result is still what Enter opens, with no field to fill in: it asks.
+  expect(fields()).toEqual([]);
+  await press("Enter");
+  await settle();
+  expect(container.querySelector(".prompt .alert-title")?.textContent).toBe("GitHub");
+  await press("Escape");
+
+  await type(inputRef.current!, "g");
+  await settle();
+  expect(container.querySelector(".panel.compact")).toBeNull();
+  expect(selectedTitle()).toBe("GitHub");
+});
+
 const activity = (key: string, rest: Partial<ActivityView> = {}): ActivityView => ({
   key,
   extension: "@heyo",
