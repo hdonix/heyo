@@ -1,218 +1,218 @@
-# 待办：对标 Raycast 常用功能
+# To do: matching the commonly used features of Raycast
 
-按 Raycast 的功能分区整理。`[x]` 已完成，`[ ]` 待做。
-优先级：**P0** 高频且 Linux 上可行，**P1** 常用，**P2** 锦上添花或受平台限制。
+Arranged by Raycast's feature areas. `[x]` is done, `[ ]` is to do.
+Priorities: **P0** used often and feasible on Linux, **P1** commonly used, **P2** nice to have, or limited by the platform.
 
-## 根搜索与启动
+## Root search and launching
 
-- [x] 模糊搜索应用（`.desktop`）和命令
-- [x] 单实例 + 全局热键（GNOME 自定义快捷键，设置里可录制）
-- [x] 失焦隐藏、重新打开时保留当前命令
-- [x] 按使用频率排序（frecency）：常用的应用和命令排在前面，空查询时显示「Suggestions」
-- [x] 收藏（Favorites）：`Ctrl+Shift+F` 固定到根搜索顶部，可调整顺序
-- [x] 别名（Alias）：`Ctrl+K → Set Alias`，如 `cb` → Clipboard History
-- [x] 每个应用 / 命令 / 快捷链接 / 片段单独的全局热键（根搜索 `Ctrl+Shift+H`，或设置 → Extensions 的 Hotkey 列）
-- [x] 打开已在运行的应用时切到它的窗口而不是再开一个；再按一次在该应用的多个窗口间轮换
-- [ ] **P2** 根搜索里给应用加「新建窗口」操作
-- [x] 回退命令：结果下方提供「用 Google 搜索」「搜索文件」和带 `{query}` 的快捷链接
-- [ ] **P2** 回退命令可在设置里排序和开关
-- [x] **P1** 命令参数直接在根搜索栏输入（Raycast 的内联参数），而不是弹出表单
-- [ ] **P2** 搜索文件夹/最近文档
+- [x] Fuzzy search of applications (`.desktop`) and commands
+- [x] Single instance + a global hotkey (a GNOME custom shortcut, which can be recorded in the settings)
+- [x] Hides on losing focus, and keeps the current command when opened again
+- [x] Ordering by how often things are used (frecency): the applications and commands used most come first, and an empty query shows "Suggestions"
+- [x] Favorites: `Ctrl+Shift+F` pins to the top of the root search, and the order can be changed
+- [x] Aliases: `Ctrl+K → Set Alias`, such as `cb` → Clipboard History
+- [x] A global hotkey of its own for every application / command / quicklink / snippet (`Ctrl+Shift+H` in the root search, or the Hotkey column of Settings → Extensions)
+- [x] Opening an application that is already running switches to its window instead of opening another; pressing again cycles through that application's windows
+- [ ] **P2** A "New Window" action for applications in the root search
+- [x] Fallback commands: below the results, "Search Google", "Search Files" and the quicklinks that have `{query}`
+- [ ] **P2** Fallback commands can be ordered and switched on and off in the settings
+- [x] **P1** Command arguments are typed straight into the root search bar (Raycast's inline arguments), not in a form that pops up
+- [ ] **P2** Searching folders/recent documents
 
-## 内置工具
+## Built-in tools
 
-- [x] 剪贴板历史（文本/链接/颜色/文件/图片、固定、搜索、按类型筛选、跳过密码）
-- [x] 计算器：`2^10`、`15% of 80`、单位换算 `5 km in mi`、货币 `100 usd in cny`、时区 `3pm pst in beijing`
-- [x] 快捷链接（Quicklinks）：带 `{query}` 的模板；设别名后输入 `gh heyo` 直接打开
-- [x] 文本片段（Snippets）：`{clipboard}`、`{date}`、`{argument}` 等占位符，关键词在根搜索直接粘贴
-- [x] 系统命令：锁屏、睡眠、重启、关机、注销、清空回收站、切换深色模式、调节音量、防休眠
-- [x] 窗口切换（Switch Windows）：搜索并切换到已打开的窗口，可关闭窗口
-- [x] 窗口管理：半屏、四角、三分屏、最大化、居中、移到下一个显示器（X11、GNOME Wayland、Windows；Windows 上不能移到下一个显示器）
-- [x] 表情与符号选择器：中英文搜索、最近使用
-- [x] 文件搜索：打开时把主目录的文件名读进内存（约 0.3 秒），按键即模糊匹配；跳过隐藏目录和 node_modules 等
-- [x] 结束进程：按名称、命令或监听端口搜索
-- [x] 切换音频输入/输出设备
-- [x] 浏览器书签与历史搜索（Firefox、Chrome、Chromium、Brave、Edge）
-- [ ] **P2** 文件内容搜索（ripgrep）
-- [ ] **P2** 浏览器已打开标签页搜索（需要浏览器扩展配合）
-- [ ] **P2** 浮动笔记（Floating Notes）
-- [ ] **P2** 日程（读取本地日历 / CalDAV）
-- [ ] **P2** 取色器、翻译、词典
-- [ ] **P2** 专注模式（Focus）
+- [x] Clipboard history (text/links/colors/files/images, pinning, search, filtering by kind, skipping passwords)
+- [x] Calculator: `2^10`, `15% of 80`, unit conversion `5 km in mi`, currencies `100 usd in cny`, time zones `3pm pst in beijing`
+- [x] Quicklinks: templates with `{query}`; with an alias set, typing `gh heyo` opens it directly
+- [x] Snippets: placeholders such as `{clipboard}`, `{date}` and `{argument}`; the keyword pastes directly from the root search
+- [x] System commands: lock screen, sleep, restart, shut down, log out, empty the trash, toggle dark mode, adjust the volume, keep awake
+- [x] Switch Windows: search for an open window and switch to it; windows can be closed
+- [x] Window management: halves, quarters, thirds, maximize, center, move to the next display (X11, GNOME Wayland, Windows; on Windows a window cannot be moved to the next display)
+- [x] Emoji and symbol picker: search in Chinese and English, recently used
+- [x] File search: on opening, the file names of the home directory are read into memory (about 0.3 seconds), and every keystroke is a fuzzy match; hidden directories, node_modules and the like are skipped
+- [x] Kill Process: search by name, command or listening port
+- [x] Switching the audio input/output device
+- [x] Searching browser bookmarks and history (Firefox, Chrome, Chromium, Brave, Edge)
+- [ ] **P2** Searching file contents (ripgrep)
+- [ ] **P2** Searching the tabs open in the browser (needs a browser extension to go with it)
+- [ ] **P2** Floating Notes
+- [ ] **P2** Calendar (reading local calendars / CalDAV)
+- [ ] **P2** Color picker, translation, dictionary
+- [ ] **P2** Focus mode (Focus)
 
-## 快捷链接与片段（后续）
+## Quicklinks and snippets (later)
 
-- [x] **P1** 文本片段的关键词自动展开（在任意应用里输入关键词即替换，需要键盘监听）
-- [ ] **P2** 快捷链接指定打开方式（Open With）、自定义图标
+- [x] **P1** Snippet keywords expand automatically (typing the keyword in any application replaces it; needs listening to the keyboard)
+- [ ] **P2** Choosing what a quicklink opens with (Open With), custom icons
 
-## 剪贴板历史（后续）
+## Clipboard history (later)
 
-「本地记忆搜索」的调研和分期见 `reports/Heyo 本地记忆搜索调研规划.md`。
+The research and the phases of "local memory search" are in `reports/Heyo 本地记忆搜索调研规划.md`.
 
-- [x] **记忆搜索阶段 0** 历史迁到 SQLite（`history.db`，旧 `history.json` 自动迁移后删除）；中文单字索引 + 三字子串索引；规则解析时间/来源/类型，读不出结果时退回纯文字；上限从 1000 条放宽到 5 万条（主要靠保留期限）；记录「搜了什么、选了哪条」；`heyo --clipboard-eval` 评测
-- [x] **记忆搜索：评测工具** `heyo --clipboard-eval --export/--generate`（生成只发给本机模型）、合成的 130 条语料和 168 个用例
-- [x] **记忆搜索阶段 1 的实现** 按语义查找（multilingual-e5-small，默认关闭，设置里下载）；合成集上前 5 命中 42% → 93%，查询 p95 约 7 毫秒
-- [ ] **P1 记忆搜索：真实评测** 真实历史只有 33 条、没有选择记录，判定标准（四周真实使用里有 ≥10% 的选择只靠语义进前五）还答不了；跨语言需要每种语言约 16 条以上才起作用。原条目： 用真实历史攒到 100 条以上（日常使用的选择记录 + 本地模型按类型合成的查询），这是进入阶段 1 的前提
-- [x] **P1 记忆搜索阶段 1** 剪贴板语义检索：multilingual-e5-small（int8）跑在 OCR 用的 onnxruntime-node 里，后台向量队列，暴力检索，与关键词结果融合；是否继续按报告里的四条标准判断
-- [ ] **P2 记忆搜索阶段 2–4** 浏览器历史、主动截图的 OCR、文件名进同一个搜索
-- [ ] **P2** 拼音/首字母搜索；数据库加密（密钥放 Secret Service）
+- [x] **Memory search, phase 0** The history moved to SQLite (`history.db`; the old `history.json` is migrated automatically and then deleted); an index of single Chinese characters + an index of three-character substrings; rules parse the time/source/kind, falling back to plain text when nothing is found that way; the limit relaxed from 1000 entries to 50,000 (mainly relying on the retention period); recording "what was searched for, which entry was chosen"; evaluation with `heyo --clipboard-eval`
+- [x] **Memory search: evaluation tools** `heyo --clipboard-eval --export/--generate` (generation is only sent to a model on this machine), a synthetic corpus of 130 entries and 168 cases
+- [x] **The implementation of memory search phase 1** Finding by meaning (multilingual-e5-small, off by default, downloaded in the settings); on the synthetic set hits in the top 5 went from 42% to 93%, with a query p95 of about 7 milliseconds
+- [ ] **P1 Memory search: real evaluation** The real history has only 33 entries and no record of choices, so the criterion (in four weeks of real use, ≥10% of choices reach the top five only by meaning) cannot be answered yet; across languages it takes about 16 or more entries per language to have an effect. The original item: build the real history up to more than 100 entries (the choices recorded in daily use + queries synthesized by kind by a local model), which is the precondition for entering phase 1
+- [x] **P1 Memory search, phase 1** Semantic retrieval of the clipboard: multilingual-e5-small (int8) runs in the onnxruntime-node that OCR uses, with a background vector queue and brute-force retrieval, fused with the keyword results; whether to go on is judged by the four criteria in the report
+- [ ] **P2 Memory search, phases 2–4** Browser history, OCR of screenshots taken on purpose, and file names go into the same search
+- [ ] **P2** Search by pinyin/initials; encrypting the database (with the key in the Secret Service)
 
-- [x] 以纯文本粘贴（Paste as Plain Text 命令，可绑快捷键；历史记录本身只存纯文本）
-- [ ] **P2** 粘贴后保持窗口
-- [x] **P1** 忽略指定应用（如密码管理器以外的敏感应用）
-- [x] **P1** 显示来源应用图标
-- [ ] **P2** 图片 OCR、编辑条目后再粘贴
-- [ ] **P2** Wayland 下的变更监听（目前回退为每秒轮询文本）
+- [x] Pasting as plain text (the Paste as Plain Text command, which can be given a shortcut; the history itself only stores plain text)
+- [ ] **P2** Keeping the window after pasting
+- [x] **P1** Ignoring given applications (such as sensitive applications other than password managers)
+- [x] **P1** Showing the icon of the source application
+- [ ] **P2** OCR of images, editing an entry before pasting it
+- [ ] **P2** Listening for changes under Wayland (for now it falls back to polling the text every second)
 
-## 选中文字与截图
+## Selected text and screenshots
 
-- [x] 选中文字操作：翻译、润色、纠错、缩短、解释、总结（Claude，流式），搜索；结果可替换原文
-- [x] 截图：框选、矩形/箭头/画笔标注、复制、保存、贴图、取字（本地 PaddleOCR）
-- [x] AI 操作支持本地模型（OpenAI 兼容接口：vLLM、LM Studio、Ollama；与语音润色共用）；`scripts/local-model.sh` 用 Docker 启动 vLLM + Qwen
-- [x] 截图：文字标注、打码、移动和调整选区；标注可拖动
-- [ ] **P2** 截图：双击文字标注重新编辑；标注改颜色、删除单个
-- [x] 自定义选中文字操作（自己写提示词）
-- [x] **P1** 截图：窗口自动吸附
-- [ ] **P2** 长截图、录屏 / GIF、多显示器同时框选
+- [x] Selected-text actions: translate, polish, correct, shorten, explain, summarize (Claude, streamed), search; the result can replace the original text
+- [x] Screenshots: selecting an area, rectangle/arrow/pen annotations, copy, save, pin on screen, take the text (PaddleOCR, locally)
+- [x] AI actions support a local model (an OpenAI-compatible interface: vLLM, LM Studio, Ollama; shared with the polishing of speech); `scripts/local-model.sh` starts vLLM + Qwen with Docker
+- [x] Screenshots: text annotations, blurring, moving and resizing the selection; annotations can be dragged
+- [ ] **P2** Screenshots: double-clicking a text annotation to edit it again; changing the color of an annotation, deleting a single one
+- [x] Custom selected-text actions (with a prompt you write yourself)
+- [x] **P1** Screenshots: snapping to windows automatically
+- [ ] **P2** Scrolling screenshots, screen recording / GIF, selecting across several displays at once
 
-## 语音输入
+## Voice input
 
-- [x] 快捷键开始/结束录音，本地识别（SenseVoice），边说边在浮窗出字，停顿后逐句粘贴
-- [x] 可选的 Claude 润色（整理 / 翻译成英文）
-- [x] 按住说话、松开结束（短按则是按一下开始、再按一下结束；仅 X11）
-- [x] 单键按住说话（右 Alt、左 Alt、右 Ctrl 等）：监听原始按键，不占用该键，短按和组合键不触发
-- [x] **P1** 自定义词汇表（人名、术语），提高专有名词准确率
-- [ ] **P2** 更多润色模式和自定义提示词；按当前应用自动选择风格
-- [ ] **P2** 可选的更高精度模型或云端识别
+- [x] A shortcut starts/ends recording, recognition is local (SenseVoice), the words appear in the floating indicator as you speak, and each sentence is pasted after a pause
+- [x] Optional polishing by Claude (tidy up / translate into English)
+- [x] Hold to talk, release to end (a short press is instead press once to start and press again to end; X11 only)
+- [x] Hold-to-talk on a single key (right Alt, left Alt, right Ctrl and so on): listens to the raw keys and does not take the key over; short presses and key combinations do not trigger it
+- [x] **P1** A custom vocabulary (names, terms), to improve the accuracy of proper nouns
+- [ ] **P2** More polishing modes and custom prompts; choosing the style automatically by the current application
+- [ ] **P2** An optional higher-accuracy model, or recognition in the cloud
 
 ## AI
 
-- [x] Quick AI：在根搜索输入问题，按 Tab 交给 AI 回答（Claude 或本地模型），可追问
-- [x] **P1** AI Chat 窗口
-- [ ] **P2** AI Commands：对选中文本执行「改写、翻译、总结」等提示词
-- [ ] **P2** 扩展的 `useAI`（`AI.ask` 已可用）；`AI.ask` 的 `creativity` 映射到温度
+- [x] Quick AI: type a question in the root search and press Tab to hand it to the AI to answer (Claude or a local model); follow-up questions are possible
+- [x] **P1** The AI Chat window
+- [ ] **P2** AI Commands: running prompts such as "rewrite, translate, summarize" on the selected text
+- [ ] **P2** `useAI` for extensions (`AI.ask` already works); mapping the `creativity` of `AI.ask` to temperature
 
-## 扩展与 Raycast API
+## Extensions and the Raycast API
 
-- [x] 从 Raycast Store 搜索、安装、卸载扩展
-- [x] List / Grid / Detail / Form / ActionPanel / 导航 / Toast / Alert
-- [x] Clipboard、LocalStorage、Cache、偏好设置、命令参数、`@raycast/utils`
-- [x] 设置里启用/停用命令、编辑扩展偏好
-- [x] 扩展更新：Manage Extensions 检测商店新版本，单个或全部更新
-- [x] 后台/定时命令（`interval`，`LaunchType.Background`）：运行过一次后按间隔自动执行
-- [x] 菜单栏命令（MenuBarExtra）→ 系统托盘：标题、图标、分组、子菜单、点击动作
-- [x] **P1** 菜单栏点击提速：菜单渲染完不卸载命令，点击时直接调用已有的动作函数（现在要重新加载并重新取数据，延迟等于一次网络请求）。前提：后台进程里「当前命令」的全局状态改成每个命令各带自己的上下文（如 AsyncLocalStorage），否则常驻的多个命令会串偏好和存储目录
-- [ ] **P2** 菜单栏：菜单项图标、Raycast 内置图标作托盘图标、`alternate` 项、从托盘移除的入口
-- [x] 扩展的 `AI.ask` 可用（走设置里选的模型）
-- [x] OAuth（`OAuth.PKCEClient`）：注册为 `raycast://` 链接的处理程序接住授权码；令牌按扩展保存（权限 600）
-- [ ] **P1** 用真实服务（GitHub、Linear 等）逐个验证 OAuth 扩展
-- [ ] **P2** 其它 `raycast://` 深链接（打开扩展命令）
-- [x] **P1** 开发者模式：导入本地扩展、`ray develop` 热重载、显示日志
-- [x] **P1** 跨扩展 `launchCommand`
-- [x] `WindowManagement`、`getFrontmostApplication`（主机报告窗口位置并可精确摆放；X11 实测，GNOME Wayland 和 Windows 只过了编译）
-- [x] 旧版 API 的别名（`CopyToClipboardAction`、`FormTextField`、`getLocalStorageItem` 等 37 个）、`AI.Model`、`Color.Brown`；旧属性名 `enableFiltering`、`accessoryTitle`、`accessoryIcon`
-- [x] 一致性测试：对照真实的 `@raycast/api` 类型，缺的名字和从未读取的组件属性必须登记（`runtime/src/api/conformance.gaps.json`、`props.gaps.json`）
-- [x] **P1** 表单的 `storeValue`（9 个组件：记住上次的值）
-- [x] **P1** `Form.FilePicker` 的选项（多选、选目录、选文件、显示隐藏文件）
-- [x] **P1** `Action.CreateSnippet` / `CreateQuicklink` 接到 Heyo 自己的片段和快捷链接；`Action.PickDate`；`Action.ToggleQuickLook` 和 `quickLook`
-- [ ] **P2** `environment.appearance` 跟随真实主题（现在写死为深色）；`environment.launchContext`；`updateCommandMetadata`；`getSelectedFinderItems`；`Form.enableDrafts`、`TextArea.enableMarkdown`；窗口的 `application` 字段
-- [ ] **P2** 一致性测试加深到函数签名；名字级缺口里剩下的 16 个（`render()`、不稳定接口、较新的 OAuth 和 `Cache` 常量）
-- [ ] **P2** `BrowserExtension`（需要自己发布浏览器扩展）；Raycast 的 AI 扩展（`Tool`）
-- [ ] **P2** 脚本命令（Script Commands）：带元数据注释的 shell 脚本作为命令
-- [ ] **P2** Deeplink：`heyo://extensions/<author>/<ext>/<command>`
-- [ ] **P2** 过滤掉明确只支持 macOS 的扩展，或在商店标注
+- [x] Searching, installing and uninstalling extensions from the Raycast Store
+- [x] List / Grid / Detail / Form / ActionPanel / navigation / Toast / Alert
+- [x] Clipboard, LocalStorage, Cache, preferences, command arguments, `@raycast/utils`
+- [x] Enabling/disabling commands and editing extension preferences in the settings
+- [x] Extension updates: Manage Extensions detects new versions in the store, and updates one or all
+- [x] Background/scheduled commands (`interval`, `LaunchType.Background`): after being run once they run automatically at the interval
+- [x] Menu bar commands (MenuBarExtra) → the system tray: title, icon, sections, submenus, click actions
+- [x] **P1** Faster menu bar clicks: the command is not unloaded once the menu is rendered, and a click calls the action function that is already there (today it has to load again and fetch its data again, and the delay equals one network request). Precondition: the global state of "the current command" in the background process becomes a context each command carries for itself (such as AsyncLocalStorage), otherwise several resident commands would mix up preferences and storage directories
+- [ ] **P2** Menu bar: icons of menu items, Raycast's built-in icons as tray icons, `alternate` items, a way to remove an item from the tray
+- [x] `AI.ask` works for extensions (through the model chosen in the settings)
+- [x] OAuth (`OAuth.PKCEClient`): registered as the handler of `raycast://` links to catch the authorization code; tokens are stored per extension (mode 600)
+- [ ] **P1** Verifying OAuth extensions one by one against real services (GitHub, Linear and so on)
+- [ ] **P2** Other `raycast://` deep links (opening an extension's command)
+- [x] **P1** Developer mode: importing a local extension, `ray develop` hot reload, showing logs
+- [x] **P1** `launchCommand` across extensions
+- [x] `WindowManagement`, `getFrontmostApplication` (the host reports window positions and can place windows exactly; measured on X11, only compiled on GNOME Wayland and Windows)
+- [x] Aliases of the old API (`CopyToClipboardAction`, `FormTextField`, `getLocalStorageItem` and others, 37 in all), `AI.Model`, `Color.Brown`; the old property names `enableFiltering`, `accessoryTitle`, `accessoryIcon`
+- [x] Conformance tests: against the types of the real `@raycast/api`, missing names and component properties that are never read have to be registered (`runtime/src/api/conformance.gaps.json`, `props.gaps.json`)
+- [x] **P1** `storeValue` of forms (9 components: remembering the last value)
+- [x] **P1** The options of `Form.FilePicker` (multiple selection, choosing directories, choosing files, showing hidden files)
+- [x] **P1** `Action.CreateSnippet` / `CreateQuicklink` connected to Heyo's own snippets and quicklinks; `Action.PickDate`; `Action.ToggleQuickLook` and `quickLook`
+- [ ] **P2** `environment.appearance` following the real theme (hard-coded to dark for now); `environment.launchContext`; `updateCommandMetadata`; `getSelectedFinderItems`; `Form.enableDrafts`, `TextArea.enableMarkdown`; the `application` field of windows
+- [ ] **P2** Deepening the conformance tests to function signatures; the 16 left among the gaps at the level of names (`render()`, unstable interfaces, the newer OAuth and the `Cache` constants)
+- [ ] **P2** `BrowserExtension` (needs publishing a browser extension of our own); Raycast's AI extensions (`Tool`)
+- [ ] **P2** Script Commands: shell scripts with metadata comments as commands
+- [ ] **P2** Deeplink: `heyo://extensions/<author>/<ext>/<command>`
+- [ ] **P2** Filtering out extensions that clearly support only macOS, or marking them in the store
 
-## 外观与设置
+## Appearance and settings
 
-- [x] Raycast 风格的设置窗口（General / Extensions / Advanced / About）
-- [x] 开机启动、Node.js 路径
-- [x] 浅色主题 / 跟随系统：`src/styles/` 按模块拆分，`tokens.css` 用 `light-dark()` 一处定义明暗两套配色，设置里可选 System/Light/Dark
-- [x] 视觉打磨：样式改为 SCSS（scales 映射表 + mixin），4px 间距网格、带行高和字距的字号阶梯、统一的图标块、滑动的选中高亮、骨架屏和空状态、面板投影（窗口留透明边距）、出现/切换/弹出的动效、五态交互
-- [ ] **P2** 毛玻璃背景（依赖各平台合成器）；设置页的快捷键表格、听写和截图部分的样式还没用 mixin 重写；Windows 上的字体渲染没看过
-- [x] 紧凑模式（只显示搜索栏，输入后展开）；设置窗口自绘边框
-- [ ] **P2** 紧凑模式下的收藏栏；设置窗口的缩放和最小化
-- [ ] **P2** 字体大小、窗口位置记忆、多显示器在当前屏幕显示
-- [ ] **P2** 设置导入/导出
+- [x] A settings window in the style of Raycast (General / Extensions / Advanced / About)
+- [x] Opening at login, the path of Node.js
+- [x] Light theme / following the system: `src/styles/` is split by module, `tokens.css` defines the light and dark color schemes in one place with `light-dark()`, and the settings offer System/Light/Dark
+- [x] Visual polish: the styles moved to SCSS (scales maps + mixins), a 4px spacing grid, a type scale with line heights and letter spacing, uniform icon tiles, a sliding selection highlight, skeleton screens and empty states, a drop shadow for the palette (the window leaves a transparent margin), motion for appearing/switching/popping up, five interaction states
+- [ ] **P2** A frosted glass background (depends on each platform's compositor); the styles of the shortcut table and of the dictation and screenshot parts of the settings have not been rewritten with mixins yet; font rendering on Windows has not been looked at
+- [x] Compact mode (only the search bar is shown, expanding once something is typed); the settings window draws its own border
+- [ ] **P2** A favorites bar in compact mode; scaling and minimizing of the settings window
+- [ ] **P2** Font size, remembering the window position, showing on the current screen with several displays
+- [ ] **P2** Importing/exporting settings
 
-## 代码审查（2026-10-07，五个角度）
+## Code review (2026-10-07, from five angles)
 
-第一批已修：Alt+F4 后崩溃、商店安装接受 `..` 作扩展名、设置窗口覆盖面板里改的收藏和别名、设置文件损坏时静默重置、无视图命令结束时误关别的命令、托盘图标删不掉、输入法组字时回车/Esc/Tab 被当成命令、Ctrl+K 执行后键盘失灵、弹层在隐藏后残留。
+Fixed in the first batch: a crash after Alt+F4, the store install accepting `..` as an extension name, the settings window overwriting favorites and aliases changed in the palette, a silent reset when the settings file is corrupt, a no-view command closing another command by mistake when it ends, tray icons that could not be removed, Enter/Esc/Tab being taken as commands while an input method is composing, the keyboard going dead after Ctrl+K carried something out, popovers left behind after hiding.
 
-- [x] **安全** CSP；Markdown 白名单（无 `<style>`、表单、媒体）且最后一步才净化；链接只放行 http/https/mailto；`runtime_send` 只转发白名单消息；API key 不再回传给任何窗口；资源协议屏蔽密钥环、令牌和剪贴板历史
-- [x] **隐私** 剪贴板历史跳过 Heyo 自己的管道式写入（语音输入的粘贴与恢复）、扩展标记为 `concealed` 的复制、密码管理器窗口里的复制；目录 0700 / 文件 0600；AI 结果按原文显示（不渲染 HTML、不加载图片），粘贴前去掉控制字符；浏览器数据库的副本放进私有缓存目录；截图残留文件用完即删
-- [x] **P1 安全** 按窗口限制可调用的命令（现在所有窗口都能调全部命令）；本地模型地址非本机时提示；按需下载固定版本并校验；粘贴到终端的多行文本先确认
-- [ ] **P2 隐私** 剪贴板忽略列表做成设置项、「暂停记录」命令；快捷链接图标不再向 Google 请求
-- [x] **P0 后台运行时** 每个命令独立上下文或独立 worker；后台无视图命令加超时；菜单项动作执行完再卸载；后台命令不能隐藏/显示面板；`launchCommand` 先校验再关闭、支持后台类型；OAuth 回调也发给后台进程；模块重复加载的泄漏
-- [x] **P1 输入** 扩展控制的搜索框和表单值改成本地优先（现在每个字都等运行时回传，会丢字、打断输入法）；从子视图返回时恢复搜索词和选中项；根搜索刷新时保持选中项
-- [x] **地基** 拆 `lib.rs`（1082 → 260 行）；桌面相关代码收进 `platform/`，X11 实现在 `platform/x11/`，带会话检测和能力表
-- [x] **地基（2026-10-10 架构评审的 8 项）** 设置只声明一次；平台后端只选一次（`Desktop` 特征）；三层消息只定义一次（`wire.rs` → `shared/bindings/`）；路径集中（`paths.rs`）；子进程行协议（`helper.rs`）；系统命令归主机；列表选中逻辑（`selection.ts`）；内置命令目录一份、按 id 打开一条路径（`open.rs`）、排序测试。Rust 测试 84 个，前端与运行时测试 11 个（vitest）
-- [x] **第二轮架构评审（2026-10-11）的 8 项** 扩展请求的应答不需要运行中的应用（`ext/answer.rs`，28 个测试穿过入口）；`@heyo/api` 的成员只声明一次（`runtime/src/heyo/members.ts`，名单和表都由它派生）；界面调主机的命令有一张带类型的表（`commands/bindings.rs` → `shared/bindings/commands.ts`，`src/host.ts`，测试用同一个假主机）；借用剪贴板粘贴只有一处（`pasting.rs`，剪贴板读写进了 `Desktop`）；根搜索的一行在一处说清（`src/rows.ts`）；设置变更的后果是一张可测的清单（`settings::consequences`）；运行时与主机之间的测试接缝移到传输层（`transport.ts`、`testhost.ts`）；面板窗口只在 `palette.rs` 里被操作（第 8 项，不引入接缝）。Rust 测试 372 个，前端与运行时 544 个
-- [ ] **第二轮评审没有列成候选的** `Settings.tsx` 里"带进度的安装"写了三遍、页面逻辑只有 4 个测试；`App.tsx` 的会话与确认框不变量只在监听闭包里；`Screenshot.tsx` 的几何与拖拽状态机没有测试；`builtins/store.tsx` 的安装会删除并替换扩展目录，没有测试；`dictation.rs` 的录音状态机；`lib.rs` 的启动顺序约束；扩展清单被解析三种方式
-- [ ] **P2 拍 README 截图时看到的（2026-10-11，未查）** 剪贴板历史里图片条目的详情预览是空的（行缩略图正常，可能是沙箱里数据目录走了符号链接）；面板隐藏时用 `heyo --open` 打开一个视图命令后，第一个按键丢失（三次都复现）；2 倍缩放下设置窗口偶尔比设定高 74 像素；2 倍缩放的 GNOME 下第一次唤出面板位置偏了约 250 像素，之后居中
-- [ ] **P2 这一轮看到没改的** 归还剪贴板是盲的（长时间听写期间用户复制的内容会被旧内容覆盖），而且只归还文字；`settingsChanged` 事件的载荷类型没有区分缺省的两个路径；没有动作、没有按钮但可结束的活动，回车会直接结束它；`ExtReplies` 是运行时一侧手写的，主机的回复还不是生成的类型；`host.*` 的 7 处回复类型仍是手写断言
-- [x] 崩溃钩子、Heyo 自己的日志文件、「复制诊断信息」
-- [ ] **P1 地基** `scripts/install.sh` 和二进制/辅助脚本的版本校验；计算器和占位符的测试；切换音频设备、结束进程仍在运行时里直接调 `pactl`/`ps`/`ss`
-- [x] **Wayland（GNOME）第一步** `gnome-extension/heyo@heyo.app` + `platform/gnome/`：窗口列表/切换/关闭/布局、粘贴、选中文字、剪贴板监听与读写、抓屏、把自己的窗口带到前台；只应答 Heyo 进程；在 Docker 的 GNOME 50 会话里验证
-- [x] **Wayland（GNOME）第二步** 按住说话（扩展把单个修饰键注册为快捷键报告按下，轮询修饰键状态得知松开，用空闲时间判断中途是否按了别的键）；设置里检测并一键安装扩展（扩展文件内嵌在二进制里）
-- [x] **Windows 能启动** 用条件编译隔开 Linux 专用代码，应用列表来自开始菜单快捷方式；从 Linux 交叉编译（llvm-mingw），在 Docker 里的 Windows 11 ARM 虚拟机上启动并能打开应用（`scripts/windows-test/`）
-- [x] **Windows 后端第一批**（`platform/win/`）全局快捷键（默认 Alt+Space，存 `hotkeys.json`）、窗口列表/切换/布局、粘贴、剪贴板监听；`heyo.exe` 旁的 `node.exe` 直接用；数据在 `%APPDATA%\heyo`、缓存和日志在 `%LOCALAPPDATA%\heyo`；在虚拟机里实测：快捷键唤出、左半屏布局、表情粘贴到终端、剪贴板历史记到来源应用
-- [x] **Windows 后端第二批（只编译过，没运行）** 截屏、选中文字（UI Automation，回退 Ctrl+C）、按住说话（低级键盘钩子）、.lnk 解析与应用图标、商店应用、跨显示器布局、开机自启、安装器；核对清单在 `scripts/windows-test/CHECKLIST.md`
-- [ ] **P1 Windows 余下**（上一条全部需要在虚拟机里实测）听写的录音（建议 `heyo.exe --record` 走 WASAPI）、语音和识别引擎是否有 win-arm64 版本、截图浮层的原生底图、片段展开、音频设备和进程列表。原列表： 系统命令、打开文件、回收站的 Windows 实现已写但没在虚拟机里跑过；截图和 OCR、选中文字、按住说话和听写（模型下载、麦克风）、应用图标（从 .lnk 取）、按应用切换窗口（.lnk 指向的程序名）、UWP/商店应用、安装包和开机自启、多显示器、Heyo 自己粘贴的内容不该记进历史；Windows 上的编译警告
-- [x] **Wayland（GNOME）第三步** 扩展有了协议版本，设置里区分"缺失/过期/待生效/已生效"；按阅读核对了 GNOME 45–50 的接口；缩放和多显示器下的截取与布局（容器里四种布局 110 项检查）；Heyo 的窗口不进 Dash/切换器/概览；锁屏后按住说话不丢；`docs/wayland.md` 写了 KDE、wlroots、门户的方案
-- [ ] **P1 Wayland 余下** 还没做的：GNOME 46 真机实测；提交到 extensions.gnome.org（缺 `metadata.json` 的 url，需要人来传）；Heyo 先于 Shell 启用扩展时会退回通用适配器直到重启；KDE/其他桌面未实现。原列表： 扩展升级后的提示（现在版本不匹配会显示为未安装，重新安装即可）；GNOME 46（Ubuntu 24.04）的 Wayland 会话实测；高分屏/多显示器下的截图坐标；让 Heyo 的窗口不出现在 Dock 和概览里；提交到 extensions.gnome.org；KDE/其他桌面
-- [x] 主线程上的阻塞调用改异步；`Cache` 多实例互相覆盖；59 个长序列表情显示成破图
-- [ ] **P2** `appPicker` 偏好；列表虚拟化；快捷键设置的原子性
+- [x] **Security** CSP; a Markdown allowlist (no `<style>`, forms or media), sanitized only at the last step; links only let through http/https/mailto; `runtime_send` only forwards allowlisted messages; the API key is no longer sent back to any window; the asset protocol blocks the keyring, tokens and the clipboard history
+- [x] **Privacy** The clipboard history skips Heyo's own pipeline writes (the pasting and restoring of voice input), copies that extensions mark as `concealed`, and copies made in password manager windows; directories 0700 / files 0600; AI results are shown as the original text (no HTML rendered, no images loaded), and control characters are removed before pasting; copies of browser databases go into a private cache directory; leftover screenshot files are deleted as soon as they have been used
+- [x] **P1 Security** Restricting the commands that can be called per window (today every window can call every command); a warning when the local model's address is not this machine; downloading pinned versions on demand and verifying them; confirming multi-line text before it is pasted into a terminal
+- [ ] **P2 Privacy** Making the clipboard ignore list a setting, a "Pause Recording" command; quicklink icons no longer requested from Google
+- [x] **P0 The background runtime** A separate context or a separate worker for each command; a timeout for background no-view commands; unloading only after a menu item's action has finished; background commands cannot hide/show the palette; `launchCommand` validates before closing and supports the background type; the OAuth callback is also sent to the background process; the leak from modules being loaded repeatedly
+- [x] **P1 Input** Search fields and form values controlled by extensions become local-first (today every character waits for the runtime to send it back, which drops characters and interrupts input methods); the search text and the selected item are restored on returning from a child view; the selected item is kept when the root search refreshes
+- [x] **Groundwork** Splitting `lib.rs` (1082 → 260 lines); desktop-related code gathered into `platform/`, with the X11 implementation in `platform/x11/`, with session detection and a table of abilities
+- [x] **Groundwork (the 8 items of the architecture review of 2026-10-10)** Settings are declared only once; the platform backend is chosen only once (the `Desktop` trait); the messages of the three layers are defined only once (`wire.rs` → `shared/bindings/`); paths in one place (`paths.rs`); the line protocol of child processes (`helper.rs`); system commands belong to the host; the selection logic of lists (`selection.ts`); one catalog of built-in commands, one path that opens by id (`open.rs`), tests of the ordering. 84 Rust tests, 11 tests of the front end and the runtime (vitest)
+- [x] **The 8 items of the second architecture review (2026-10-11)** Answering extension requests does not need a running application (`ext/answer.rs`, 28 tests go through the entry point); the members of `@heyo/api` are declared only once (`runtime/src/heyo/members.ts`, from which the lists and tables are all derived); the commands the interface calls on the host have one typed table (`commands/bindings.rs` → `shared/bindings/commands.ts`, `src/host.ts`, with the tests using the same fake host); pasting by borrowing the clipboard is in only one place (`pasting.rs`; reading and writing the clipboard went into `Desktop`); a row of the root search is spelled out in one place (`src/rows.ts`); the consequences of a settings change are one testable list (`settings::consequences`); the test seam between the runtime and the host moved to the transport layer (`transport.ts`, `testhost.ts`); the palette window is only operated on in `palette.rs` (item 8, which introduces no seam). 372 Rust tests, 544 of the front end and the runtime
+- [ ] **What the second review did not list as candidates** "Installing with progress" is written three times in `Settings.tsx`, and the page logic has only 4 tests; the invariants of sessions and confirmations in `App.tsx` are only in the listener closures; the geometry and the drag state machine of `Screenshot.tsx` have no tests; installing in `builtins/store.tsx` deletes and replaces the extension's directory, and has no tests; the recording state machine of `dictation.rs`; the constraints on the startup order in `lib.rs`; the extension manifest is parsed in three ways
+- [ ] **P2 Seen while taking the README's screenshots (2026-10-11, not looked into)** The detail preview of image entries in the clipboard history is empty (the row thumbnails are fine; possibly the data directory went through a symbolic link in the sandbox); after opening a view command with `heyo --open` while the palette is hidden, the first keystroke is lost (reproduced all three times); at 2x scaling the settings window is occasionally 74 pixels taller than set; under GNOME at 2x scaling the palette is about 250 pixels off the first time it is called up, and centered after that
+- [ ] **P2 Seen in this round and not changed** Giving the clipboard back is blind (what the user copied during a long dictation is overwritten by the old content), and only text is given back; the payload type of the `settingsChanged` event does not distinguish the two paths it leaves out; an activity with no action and no buttons that can be ended is ended directly by Enter; `ExtReplies` is written by hand on the runtime's side, and the host's replies are not generated types yet; 7 reply types of `host.*` are still hand-written assertions
+- [x] Crash hook, Heyo's own log file, "Copy Diagnostics"
+- [ ] **P1 Groundwork** Version checks of `scripts/install.sh` and of the binary/helper scripts; tests of the calculator and of placeholders; switching the audio device and ending processes still call `pactl`/`ps`/`ss` directly in the runtime
+- [x] **Wayland (GNOME), step one** `gnome-extension/heyo@heyo.app` + `platform/gnome/`: listing/switching/closing/arranging windows, pasting, the selected text, watching and reading and writing the clipboard, capturing the screen, bringing its own window to the front; it answers only the Heyo process; verified in a GNOME 50 session in Docker
+- [x] **Wayland (GNOME), step two** Hold-to-talk (the extension registers a single modifier key as a shortcut to report the press, learns of the release by polling the modifier state, and uses the idle time to judge whether another key was pressed in between); the settings detect the extension and install it with one click (the extension's files are embedded in the binary)
+- [x] **Windows can start** Linux-only code is set apart with conditional compilation, and the list of applications comes from the Start menu's shortcuts; cross-compiled from Linux (llvm-mingw), it starts in a Windows 11 ARM virtual machine in Docker and can open applications (`scripts/windows-test/`)
+- [x] **The Windows backend, first batch** (`platform/win/`) A global shortcut (Alt+Space by default, stored in `hotkeys.json`), listing/switching/arranging windows, pasting, watching the clipboard; the `node.exe` beside `heyo.exe` is used directly; data in `%APPDATA%\heyo`, cache and logs in `%LOCALAPPDATA%\heyo`; measured in the virtual machine: called up by the shortcut, the left-half layout, pasting an emoji into a terminal, the clipboard history recording the source application
+- [x] **The Windows backend, second batch (only compiled, not run)** Screen capture, the selected text (UI Automation, falling back to Ctrl+C), hold-to-talk (a low-level keyboard hook), parsing .lnk and application icons, Store applications, layouts across displays, starting at login, the installer; the checklist is in `scripts/windows-test/CHECKLIST.md`
+- [ ] **P1 What is left for Windows** (everything in the previous item needs measuring in the virtual machine) Recording for dictation (`heyo.exe --record` through WASAPI is suggested), whether the speech and recognition engines have win-arm64 versions, a native backdrop for the screenshot overlay, snippet expansion, audio devices and the process list. The original list: the Windows implementations of the system commands, opening files and the trash are written but have not been run in the virtual machine; screenshots and OCR, the selected text, hold-to-talk and dictation (model download, microphone), application icons (taken from .lnk), switching windows by application (the program name a .lnk points to), UWP/Store applications, the installer package and starting at login, several displays, what Heyo itself pastes should not be recorded in the history; compiler warnings on Windows
+- [x] **Wayland (GNOME), step three** The extension has a protocol version, and the settings distinguish "missing/outdated/pending/active"; the interfaces of GNOME 45–50 were checked by reading; capture and layouts under scaling and several displays (110 checks of four layouts in the container); Heyo's windows stay out of the Dash/switcher/overview; hold-to-talk is not lost after the screen locks; `docs/wayland.md` describes the approaches for KDE, wlroots and portals
+- [ ] **P1 What is left for Wayland** Not done yet: measuring on a real machine with GNOME 46; submitting to extensions.gnome.org (the url in `metadata.json` is missing, and a person has to upload it); when Heyo starts before the Shell enables the extension it falls back to the generic adapter until restarted; KDE/other desktops are not implemented. The original list: a notice after the extension is upgraded (today a version mismatch shows as not installed, and installing again fixes it); measuring in a Wayland session of GNOME 46 (Ubuntu 24.04); screenshot coordinates on high-DPI screens/several displays; keeping Heyo's windows out of the Dock and the overview; submitting to extensions.gnome.org; KDE/other desktops
+- [x] Blocking calls on the main thread made asynchronous; several instances of `Cache` overwriting each other; 59 long-sequence emoji shown as broken images
+- [ ] **P2** The `appPicker` preference; list virtualization; atomicity of the shortcut settings
 
-## 扩展 API（`@heyo/api`）
+## Extension API (`@heyo/api`)
 
-规格在 `docs/extension-api.md`（草案 v0.2）：`@raycast/api` 的超集，换一个 import 即可迁移，另加 Heyo 自有能力。
+The specification is in `docs/extension-api.md` (draft v0.2): a superset of `@raycast/api`, migrating by changing one import, plus Heyo's own abilities.
 
-- [ ] **待定** 规格第 12 节的 9 个问题：进程隔离是否进 v1、无清单扩展的窗口权限、根搜索提供者的同意方式、包名、`Memory.add`、「仅这一次」、类型转导出还是自有、是否支持 `Tool`、`BrowserExtension`
-- [x] **P1 阶段 A** `ext.*` 请求、带类型码的错误、请求带扩展名
-- [x] **P1 阶段 B** 权限：清单、判定、询问框、存储、设置页
-- [x] **P1 阶段 C** `@heyo/api` 包（两个包名指向同一实现）；`heyo build` / `migrate` / `ext check`
-- [x] **P1 阶段 D** v1 模块：Windows、Screen、Dictation、Memory、Files、System、AI
-- [x] **P1 阶段 E** 内置命令改用同一套接口，删掉对应的 `host.*`
-- [ ] **P2 阶段 F–G** 事件通道和窗口事件；根搜索结果提供者
-- [ ] **P2 阶段 H** 每个扩展一个进程
-- [ ] **搁置** 在 macOS 的 Raycast 里验证迁移后的扩展（这台 ARM 机器跑不了 macOS；需要真 Mac 或云端 Mac）
+- [ ] **Undecided** The 9 questions of section 12 of the specification: whether process isolation goes into v1, window permission for extensions without a manifest, how consent is given for root search providers, the package name, `Memory.add`, "Only This Once", re-exported types or our own, whether to support `Tool`, `BrowserExtension`
+- [x] **P1 Phase A** `ext.*` requests, errors with a typed code, requests carrying the extension's name
+- [x] **P1 Phase B** Permissions: the manifest, deciding, the prompt, storage, the settings page
+- [x] **P1 Phase C** The `@heyo/api` package (both package names point to the same implementation); `heyo build` / `migrate` / `ext check`
+- [x] **P1 Phase D** The v1 modules: Windows, Screen, Dictation, Memory, Files, System, AI
+- [x] **P1 Phase E** The built-in commands move to the same API, and the corresponding `host.*` requests are deleted
+- [ ] **P2 Phases F–G** The event channel and window events; root search result providers
+- [ ] **P2 Phase H** One process per extension
+- [ ] **Shelved** Verifying migrated extensions in Raycast on macOS (this ARM machine cannot run macOS; it takes a real Mac or a Mac in the cloud)
 
-## 发行
+## Distribution
 
-- [x] 安装包能构建：deb、rpm、AppImage、Windows NSIS 安装器；`scripts/install.sh`；程序与辅助脚本的版本校验；更新器已接入但默认不编译（`packaging/README.md`）
-- [ ] **P0 发行余下（需要人来做）** 许可证（仓库没有，包里也就没有）；安装并运行每种包；x86_64 构建；更新用的签名密钥和发布地址；Windows 代码签名；AUR 和 Flatpak 清单没有构建过（Flatpak 的结论是按现状不可行）
-- [x] **P1** Raycast 扩展兼容度看板：自动跑热门扩展，公开哪些能用
-- [ ] **P2** 从 Raycast、Ulauncher、Albert 导入；首次引导
-- [ ] **P2** 「Heyo」的商标查重
+- [x] The packages can be built: deb, rpm, AppImage, the Windows NSIS installer; `scripts/install.sh`; version checks of the program and the helper scripts; the updater is wired in but not compiled by default (`packaging/README.md`)
+- [ ] **P0 What is left for distribution (a person has to do it)** The licence (the repository has none, so neither do the packages); installing and running every kind of package; x86_64 builds; the signing key and the release address for updates; Windows code signing; the AUR and Flatpak manifests have never been built (the conclusion for Flatpak is that it is not feasible as things stand)
+- [x] **P1** A compatibility dashboard for Raycast extensions: runs the popular extensions automatically and publishes which ones work
+- [ ] **P2** Importing from Raycast, Ulauncher, Albert; first-run onboarding
+- [ ] **P2** A trademark search for "Heyo"
 
-## 性能
+## Performance
 
-- [x] 窗口阴影改为图片（软件渲染下每次重绘都在重算模糊）；选中高亮在列表边缘不再回跳；`scripts/gui-test/scroll.sh` 测量
-- [ ] **P2** 真机上的按键导航帧数没有实测（沙箱里每步绘制 11–13 毫秒）
+- [x] The window shadow became an image (under software rendering the blur was recomputed on every redraw); the selection highlight no longer jumps back at the edges of a list; measured by `scripts/gui-test/scroll.sh`
+- [ ] **P2** The frame rate of key navigation on a real machine has not been measured (in the sandbox each step takes 11–13 milliseconds to draw)
 
-## 界面引擎
+## The interface engine
 
-- [x] **试过 Flutter，搁置**（2026-10-11）：渲染快三到四倍、输入法可用，但要重写整个界面层、画不了扩展里的 HTML 和 SVG、稳定版没有多窗口、Windows 不能交叉编译。数据和理由在 `docs/flutter-evaluation.md`，代码在分支 `flutter-ui`
-- [x] **渲染性能：查清了原因**（2026-10-11，`research_notes/gpu/webkitgtk.md`）：NVIDIA 的 GBM 后端需要 `nvidia-drm modeset=1`，而 DGX Spark 的镜像用 `nvidia-drm-options-modeset0` 包把它关掉了（`/etc/modprobe.d/zz-nvidia-drm-override.conf`），WebKit 因此退到 Mesa 的软件路径并失败。现在的 CPU 路径关掉了全部加速合成（没有 `backdrop-filter` 和 3D）。新增设置 Advanced → Rendering：Automatic / CPU / GPU 共享内存 / GPU DMA-BUF
-- [ ] **P1 渲染性能：两条出路** (a) 去掉那个包或覆盖文件，启用 `nvidia-drm.modeset=1`，重启并冷启动一次（论坛上同型号机器可行；需要用户决定）；(b) 过渡期用"GPU 共享内存"：显卡绘制但每帧固定约 36 ms（UI 的 FrameDone 握手串行化加同步回读，2.52 没有开关能改），2× 缩放下比 CPU 的 65 ms 好、1× 下比 16 ms 差。替代内核（Verso 已归档、CEF 运行时是 400 MB 的 alpha、Electron 124 MB）都不值得
-- [ ] **P1 显示缩放**：开发机的桌面在 2026-10-11 变成了 2×（`Xft.dpi` 192），CPU 路径下每帧 65 ms；待确认是否有意为之
-- [x] `environment.appearance` 跟随设置（启动时经环境变量，改变时经消息；选"跟随系统"时在启动和改设置时读一次系统主题，系统主题中途变化不跟随）
+- [x] **Flutter tried, and shelved** (2026-10-11): rendering is three to four times faster and input methods work, but the whole interface layer would have to be rewritten, the HTML and SVG in extensions cannot be drawn, the stable channel has no multi-window, and Windows cannot be cross-compiled. The figures and the reasons are in `docs/flutter-evaluation.md`, the code on the branch `flutter-ui`
+- [x] **Rendering performance: the cause found** (2026-10-11, `research_notes/gpu/webkitgtk.md`): NVIDIA's GBM backend needs `nvidia-drm modeset=1`, and the DGX Spark's image turns it off with the `nvidia-drm-options-modeset0` package (`/etc/modprobe.d/zz-nvidia-drm-override.conf`), so WebKit falls back to Mesa's software path and fails. The present CPU path turns off all accelerated compositing (no `backdrop-filter` and no 3D). A new setting, Advanced → Rendering: Automatic / CPU / GPU shared memory / GPU DMA-BUF
+- [ ] **P1 Rendering performance: two ways out** (a) remove that package or the override file, enable `nvidia-drm.modeset=1`, restart and cold boot once (it works on machines of the same model according to the forum; the user has to decide); (b) in the meantime use "GPU shared memory": the GPU draws, but every frame is a fixed 36 ms or so (the UI's FrameDone handshake is serialized, plus a synchronous readback; 2.52 has no switch to change it), better than the CPU's 65 ms at 2× scaling and worse than its 16 ms at 1×. The alternative engines (Verso is archived, the CEF runtime is a 400 MB alpha, Electron is 124 MB) are none of them worth it
+- [ ] **P1 Display scaling**: the development machine's desktop became 2× on 2026-10-11 (`Xft.dpi` 192), and on the CPU path every frame is 65 ms; to be confirmed whether that was intended
+- [x] `environment.appearance` follows the setting (through an environment variable at startup, through a message when it changes; with "follow the system" chosen the system theme is read once at startup and when the setting is changed, and a change of the system theme in between is not followed)
 
-## 这一轮留下的（2026-10-10 并行实现 P0/P1 之后）
+## Left over from this round (after implementing P0/P1 in parallel on 2026-10-10)
 
-- [ ] **P1 实测** 大量功能只有单元测试、没在界面里看过：后台常驻的菜单栏命令、输入本地优先、返回恢复、`storeValue`、文件选择器、日期选择、Quick Look、AI 对话（没调过真实模型）、剪贴板忽略列表和暂停、听写词汇、终端粘贴确认、诊断信息、按语义查找的界面、扩展 API 的听写和带图提问、设置里的权限列表
-- [ ] **P1 片段展开的手工检查** 真实键盘、Electron/Qt/Firefox、终端、输入法、死键；GNOME Wayland 和 Windows 不支持
-- [x] **扩展 API 阶段 E** 切换窗口、系统命令、音频设备、文件搜索、剪贴板历史的读取和复制改走 `@heyo/api`，删掉 15 个 `host.*`；Ask AI 和 AI Chat 没转（`AI.ask` 不支持对话历史）
-- [x] **规格修订（阶段 E 的结论）** 已做成 v0.3；`AI.ask` 支持 `messages`、`system`、`images`、`material`，Ask AI / AI Chat / 选中文字动作都改走它。原条目： `MemoryItem` 的字段、`Memory.search` 的按语义查找、去掉 `ClipboardHistory.search`、`AI.ask` 支持历史消息、`Windows.list()` 的顺序约定、上限 200 还是 300、`System` 是否包含音频和进程
-- [x] **P2 扩展 API 与规格的偏差** 拒绝只记 60 秒；`offline` 恒为假；`apiVersion` 不拦安装；从 Manage Extensions 卸载不清权限；安装时不显示权限
-- [ ] **P1 决定** 表单密码框的 `storeValue` 现在会明文存（仅本人可读）；AI 回答在面板关闭后继续生成
-- [ ] **P2** 后台进程里类组件生命周期、ref 回调读到的"当前命令"可能是别的命令；`Cache` 跨进程读改写没有锁；只有菜单栏命令的扩展无法被询问跨扩展启动
-- [ ] **P2** `heyo dev` 重建后菜单栏和后台命令不重启；AI 工具（`tools/*.ts`）不构建
-- [ ] **P2** 从 Heyo 自己的命令粘贴时，剪贴板条目的来源应用有时记成 Heyo、有时记成目标窗口（取决于监听器处理时谁在前台）
-- [ ] **P2** 听写辅助进程用音频文件测试时丢了开头第一个词（"Front center" → "Center."），原因未查
-- [x] **P2** Node 的 `readline` 会在 U+2028/U+2029 处断行：运行时的管道、听写辅助进程、兼容性运行都改为只在换行处断行（`runtime/src/transport.ts` 的 `streams`）
-- [x] **实时活动第一步**（2026-10-11）：主机里的活动表（序号保护、上限、两步降级、排序）、`ext.activity.*` 与权限 `activity`、`@heyo/api` 的 `LiveActivity`、面板里的"进行中"区域、内置 Timer 命令、通知作为唯一呈现器。偏差：新增 `elapsed` 事件；`handles` 写在命令项上；每个扩展的开关存在设置里
-- [ ] **实时活动（灵动岛）** 方案 `docs/live-activities.md` v0.3（调研 + 讨论结论：状态栏为主阵地并承载菜单栏扩展、折叠态收数据而展开态可自定义界面、面板里的"进行中"区域、默认安静）。待你定第 12 节的问题后做阶段 0 原型；"进行中"区域不依赖任何决定，可以先做
-- [ ] 听写窗口在沙箱里有过三次「出现和消失都滞后」，之后 16 次未复现，原因未查实
+- [ ] **P1 Measuring** A great many features have only unit tests and have not been seen in the interface: resident menu bar commands in the background, local-first input, restoring on return, `storeValue`, the file picker, the date picker, Quick Look, the AI conversation (never tried with a real model), the clipboard ignore list and pausing, the dictation vocabulary, the confirmation for pasting into a terminal, diagnostics, the interface of finding by meaning, dictation and asking with images through the extension API, the list of permissions in the settings
+- [ ] **P1 Manual checks of snippet expansion** A real keyboard, Electron/Qt/Firefox, terminals, input methods, dead keys; not supported on GNOME Wayland and Windows
+- [x] **Extension API, phase E** Switching windows, the system commands, audio devices, file search, and reading and copying from the clipboard history moved to `@heyo/api`, with 15 `host.*` requests deleted; Ask AI and AI Chat were not moved (`AI.ask` does not support a conversation history)
+- [x] **Revising the specification (the conclusions of phase E)** Done as v0.3; `AI.ask` supports `messages`, `system`, `images` and `material`, and Ask AI / AI Chat / the selected-text actions all moved to it. The original item: the fields of `MemoryItem`, finding by meaning in `Memory.search`, removing `ClipboardHistory.search`, `AI.ask` supporting earlier messages, the order of `Windows.list()`, a limit of 200 or of 300, whether `System` includes audio and processes
+- [x] **P2 Deviations between the extension API and the specification** A refusal is only remembered for 60 seconds; `offline` is always false; `apiVersion` does not block installing; uninstalling from Manage Extensions does not clear permissions; permissions are not shown at install time
+- [ ] **P1 To decide** `storeValue` of a form's password field is stored in plain text now (readable only by the user); the AI's answer goes on being generated after the palette closes
+- [ ] **P2** In the background process, the "current command" that class component lifecycles and ref callbacks read may be another command; read-modify-write of `Cache` across processes has no lock; an extension with only menu bar commands cannot be asked about launching across extensions
+- [ ] **P2** After `heyo dev` rebuilds, menu bar and background commands are not restarted; AI tools (`tools/*.ts`) are not built
+- [ ] **P2** When pasting from Heyo's own commands, the source application of the clipboard entry is sometimes recorded as Heyo and sometimes as the target window (depending on which is in front when the watcher handles it)
+- [ ] **P2** Tested with an audio file, the dictation helper process lost the first word at the start ("Front center" → "Center."); the cause has not been looked into
+- [x] **P2** Node's `readline` breaks lines at U+2028/U+2029: the runtime's pipes, the dictation helper process and the compatibility run all changed to breaking only at newlines (`streams` in `runtime/src/transport.ts`)
+- [x] **Live activities, step one** (2026-10-11): the table of activities in the host (sequence protection, limits, two-step degradation, ordering), `ext.activity.*` and the permission `activity`, `LiveActivity` in `@heyo/api`, the "In Progress" section in the palette, the built-in Timer command, notifications as the only presenter. Deviations: a new `elapsed` event; `handles` is written on the command entry; the switch for each extension is stored in the settings
+- [ ] **Live activities (a Dynamic Island)** The design `docs/live-activities.md` v0.3 (research + the conclusions of discussion: the status bar as the main ground, also carrying menu bar extensions; the collapsed state takes data while the expanded state can have a custom interface; the "In Progress" section in the palette; quiet by default). The phase 0 prototype is to be done once you have settled the questions of section 12; the "In Progress" section depends on no decision and can be done first
+- [ ] The dictation window was "late both to appear and to disappear" three times in the sandbox, and did not reproduce in 16 tries after that; the cause has not been established
 
-- [ ] 大列表首次渲染较大（约 1900 个带动作的条目 ≈ 4.5 MB），可按需加载动作面板
+- [ ] The first render of a large list is big (about 1900 entries with actions ≈ 4.5 MB); the action panel could be loaded on demand
