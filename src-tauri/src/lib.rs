@@ -288,13 +288,11 @@ pub fn run() {
                     let _ = handle.emit(crate::wire::event::INDEX_READY, ());
                 }
             });
-            let args: Vec<String> = std::env::args().collect();
-            if args.iter().any(|a| a == "--clipboard") {
-                open_clipboard_history(app.handle());
-            } else if args.iter().any(|a| a == "--dictate") {
-                dictation::toggle(app.handle());
-            } else if !args.iter().any(|a| a == "--hidden" || a == "--open") {
-                show(app.handle());
+            match at_start(&std::env::args().collect::<Vec<_>>()) {
+                AtStart::Palette => show(app.handle()),
+                AtStart::ClipboardHistory => open_clipboard_history(app.handle()),
+                AtStart::Dictation => dictation::toggle(app.handle()),
+                AtStart::Nothing => {}
             }
             Ok(())
         })

@@ -172,6 +172,31 @@ fn use_parent_console(command: &mut std::process::Command) {
     }
 }
 
+/// What Heyo opens with when it starts.
+#[derive(Debug, PartialEq)]
+pub(crate) enum AtStart {
+    Palette,
+    ClipboardHistory,
+    Dictation,
+    /// Started with the session, or for an item that is opened once the
+    /// index knows it: no window comes up by itself.
+    Nothing,
+}
+
+/// What the arguments Heyo was started with have it open with.
+pub(crate) fn at_start(args: &[String]) -> AtStart {
+    let given = |flag: &str| args.iter().any(|a| a == flag);
+    if given("--clipboard") {
+        AtStart::ClipboardHistory
+    } else if given("--dictate") {
+        AtStart::Dictation
+    } else if given("--hidden") || given("--open") {
+        AtStart::Nothing
+    } else {
+        AtStart::Palette
+    }
+}
+
 /// Handles command-line arguments, from this process or a second instance.
 /// Returns whether they asked for something other than toggling the window.
 pub(crate) fn handle_args(app: &AppHandle, args: &[String]) -> bool {
@@ -219,6 +244,22 @@ pub(crate) fn handle_args(app: &AppHandle, args: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn heyo_starts_with_the_palette_unless_told_otherwise() {
+        let at = |line: &str| at_start(&line.split(' ').map(str::to_owned).collect::<Vec<_>>());
+        assert_eq!(at("heyo"), AtStart::Palette);
+        // As the session's autostart runs it, and with an item to open.
+        assert_eq!(at("heyo --hidden"), AtStart::Nothing);
+        assert_eq!(at("heyo --open app:firefox"), AtStart::Nothing);
+        assert_eq!(at("heyo --clipboard"), AtStart::ClipboardHistory);
+        assert_eq!(at("heyo --dictate"), AtStart::Dictation);
+        // What is asked for comes up, hidden or not.
+        assert_eq!(at("heyo --hidden --clipboard"), AtStart::ClipboardHistory);
+        assert_eq!(at("heyo --hidden --dictate"), AtStart::Dictation);
+        // An item's id is not a flag.
+        assert_eq!(at("heyo --open cmd:@heyo:clipboard-history"), AtStart::Nothing);
+    }
 
     #[test]
     fn the_developer_tools_are_asked_for_by_the_first_word() {
