@@ -211,7 +211,7 @@ export function ClipboardHistory() {
       })
       .catch((e) => {
         setFound((last) => ({ items: [], understood: { terms: [] }, relaxed: false, recording: last?.recording, paused: last?.paused }));
-        showToast({ style: Toast.Style.Failure, title: "Could not load clipboard history", message: String(e) });
+        showToast({ style: Toast.Style.Failure, title: "Could not load clipboard history", message: e instanceof Error ? e.message : String(e) });
       });
   };
   // The host searches: the history is too long to hand over whole.
@@ -249,7 +249,7 @@ export function ClipboardHistory() {
       await request("host.clipboardHistory.pause", { paused: value });
       await showToast({ style: Toast.Style.Success, title: value ? "Clipboard history is paused" : "Clipboard history resumed" });
     } catch (e) {
-      await showToast({ style: Toast.Style.Failure, title: "Could not change clipboard history", message: String(e) });
+      await showToast({ style: Toast.Style.Failure, title: "Could not change clipboard history", message: e instanceof Error ? e.message : String(e) });
     }
     reload();
   };

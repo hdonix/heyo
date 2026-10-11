@@ -417,7 +417,7 @@ test("Clipboard History says so when the history cannot be read, or is not kept"
   const failed = await show("clipboard-history", createElement(ClipboardHistory));
   expect(failed.titles()).toEqual([]);
   expect(failed.top().props.isLoading).toBe(false);
-  expect(sent.find((m) => m.type === "toast")).toMatchObject({ toast: { title: "Could not load clipboard history", message: "HeyoError: the history is locked" } });
+  expect(sent.find((m) => m.type === "toast")).toMatchObject({ toast: { title: "Could not load clipboard history", message: "the history is locked" } });
 });
 
 test("Selection Actions reads the selection the way Raycast's API does", async () => {
