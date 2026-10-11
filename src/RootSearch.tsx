@@ -695,7 +695,7 @@ export function RootSearch(props: {
           }
           if (row.type === "calc") {
             return (
-              <li key="calc" className="calc-row" {...underPointer(() => pointAt(i))} onClick={() => groups[0]?.[0]?.run()}>
+              <li key="calc" className="calc-row" {...underPointer(() => pointAt(i))} onClick={() => actionsFor(row)[0]?.[0]?.run()}>
                 <div className="section-title">Calculator</div>
                 <CalculatorCard calc={row.calc} selected={isSelected} />
               </li>

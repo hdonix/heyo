@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import type { Item } from "../shared/bindings/Item";
 
-const host = vi.hoisted(() => ({ results: [] as unknown[], activities: [] as unknown[], calls: [] as [string, any][] }));
+const host = vi.hoisted(() => ({ results: [] as unknown[], activities: [] as unknown[], calc: null as unknown, calls: [] as [string, any][] }));
 vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => path,
   invoke: async (command: string, args: unknown) => {
@@ -16,7 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   },
 }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
-vi.mock("./calculator", () => ({ calculate: () => null, loadRates: async () => null }));
+vi.mock("./calculator", () => ({ calculate: () => host.calc, loadRates: async () => null }));
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
 import { activityMatches, RootSearch } from "./RootSearch";
@@ -91,6 +91,7 @@ beforeEach(() => vi.spyOn(console, "error").mockImplementation(() => {}));
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  host.calc = null;
   vi.restoreAllMocks();
 });
 
@@ -245,6 +246,17 @@ test("what is typed in a field, and the focus in it, survive a refresh", async (
   expect(selectedTitle()).toBe("Weather");
   expect((fields()[0] as HTMLInputElement).value).toBe("Oslo");
   expect(document.activeElement).toBe(fields()[0]);
+});
+
+test("a click on the calculator does what the calculator does, whichever row is selected", async () => {
+  host.calc = { question: "6 × 7", answer: "42", value: "42", label: "Result" };
+  await show([item("a")]);
+  await press("ArrowDown");
+  expect(selectedTitle()).toBe("a");
+  await act(async () => container.querySelector<HTMLElement>(".calc-row")!.click());
+  await settle();
+  expect(launches()).toEqual([]);
+  expect(host.calls.filter(([command]) => command === "copy_text").map(([, args]) => args)).toEqual([{ text: "42", paste: false }]);
 });
 
 const activity = (key: string, rest: Partial<ActivityView> = {}): ActivityView => ({
