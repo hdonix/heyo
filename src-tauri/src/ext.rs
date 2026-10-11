@@ -32,9 +32,8 @@ use crate::confirm::Consent;
 use crate::dictation::{self, Heard, NotListening};
 use crate::permissions;
 use crate::platform::capture::{Area, Shot};
-use crate::platform::desktop::Supported as Abilities;
 use crate::platform::windows::{self, Rect};
-use crate::platform::{self, Support};
+use crate::platform;
 use crate::screenshot::{self, Picked};
 use crate::wire::{Capture, CaptureTarget, CaptureWhole, ErrorCode, ExtError, HostMessage};
 
@@ -121,10 +120,6 @@ fn perform(app: &AppHandle, effects: Vec<Effect>) {
             Effect::CancelListening(recording) => dictation::cancel_listening(app, recording),
         }
     }
-}
-
-fn supported() -> Abilities {
-    platform::desktop::desktop().supported()
 }
 
 // --- The screen ------------------------------------------------------------------
@@ -276,9 +271,6 @@ pub(crate) fn runtime_exited(app: &AppHandle, background: bool) {
 /// Pastes text into the window in front (the palette has hidden) and puts
 /// back the text that was on the clipboard (`pasting`).
 fn paste_and_restore(app: &AppHandle, text: String, html: Option<String>) -> Result<(), ExtError> {
-    if supported().paste == Support::None {
-        return Err(ExtError::unsupported(platform::unsupported("Pasting")));
-    }
     Ok(crate::pasting::paste_and_give_back(app, &text, html.as_deref())?)
 }
 
