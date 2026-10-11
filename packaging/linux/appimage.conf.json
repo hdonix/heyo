@@ -1,0 +1,11 @@
+{
+  "bundle": {
+    "linux": {
+      "appimage": {
+        "files": {
+          "/usr/bin/node": "target/bundled-node/node"
+        }
+      }
+    }
+  }
+}
