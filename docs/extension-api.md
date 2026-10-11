@@ -1,100 +1,150 @@
-# Heyo 扩展 API 规格（草案 v0.3）
+# The Heyo extension API: specification (draft v0.3)
 
-状态：草案，已按阶段 A–E 的实现修订。日期：2026-10-11。
+Status: draft, revised to match what phases A–E implemented. Date: 2026-10-11.
 
-本文定义 `@heyo/api`。它是 `@raycast/api` 的**超集**：Raycast 接口的每一个导出都以
-同样的名字和签名存在，所以迁移一个扩展只需要把 `import … from "@raycast/api"` 换成
-`import … from "@heyo/api"`。在此之上，它增加 Heyo 自有的能力（窗口、屏幕与文字识别、
-听写、本地记忆、文件索引、系统操作、进行中的活动、根搜索结果）。
+This document defines `@heyo/api`. It is a **superset** of `@raycast/api`:
+every export of Raycast's API is there under the same name and with the same
+signature, so migrating an extension only takes changing
+`import … from "@raycast/api"` to `import … from "@heyo/api"`. On top of
+that it adds what Heyo itself can do (windows, the screen and text
+recognition, dictation, local memory, the file index, system actions,
+activities in progress, results in the root search).
 
-不改 import 的 Raycast 扩展照常运行；两个包名在 Heyo 里指向同一份实现。
+A Raycast extension that does not change its imports runs as before; in Heyo
+both package names point to the same implementation.
 
-v0.2 相对 v0.1 的变化：`@heyo/api` 从"只含新增能力"改为"Raycast 接口的超集"；
-因此重写了第 1、3、8 节，第 7 节里与 Raycast 重名的模块改为在原接口上扩展。
+What changed from v0.1 to v0.2: `@heyo/api` went from "only what is added" to
+"a superset of Raycast's API"; sections 1, 3 and 8 were rewritten for that,
+and the modules in section 7 that share a name with one of Raycast's now
+extend the original.
 
-v0.3 相对 v0.2 的变化：阶段 A–E 做完之后（第 11 节），把规格改到与实现一致，改过的地方标"改"。
-内置命令改用这套接口时暴露出的缺口都补进了接口：`MemoryItem` 多了图像尺寸、来源应用的名称和图标、
-首次复制时间与次数、"按语义找到"的标记，其中只有剪贴板来源才有的字段改为可选；`Memory.search`
-可按语义查找，上限改为 300；`ClipboardHistory.search` 去掉，读取一律走 `Memory.search`；
-`Files.search` 返回 `total`；`System` 加音频设备；写明 `Windows.list()` 的顺序约定；`AI.ask`
-带对话历史（`messages`）、文本材料（`material`）和整段回调（`onText`），Heyo 自己的 Ask AI、AI Chat
-和选中文字操作改走它，失败一律是 `HeyoError`。与实现对齐的还有：权限的拒绝只记 60 秒、没有
-"仅这一次"；`offline` 恒为假；`apiVersion` 不拦安装。第 12 节的问题 5 和 7 已由实现回答。
-此前漏写的 `LiveActivity` 模块（7.9）和 `activity` 权限（5.1）也补上了；它的设计在 `docs/live-activities.md`。
+What changed from v0.2 to v0.3: once phases A–E were done (section 11), the
+specification was brought in line with the implementation, and each place
+that changed is marked "Changed". The gaps that showed when the built-in
+commands moved to this API were all filled in the API: `MemoryItem` gained
+the size of an image, the name and icon of the application it came from, the
+time of the first copy and the number of copies, and a mark for "found by
+meaning", and the fields that only the clipboard source has became optional;
+`Memory.search` can find by meaning, and its upper limit is now 300;
+`ClipboardHistory.search` is gone, and all reading goes through
+`Memory.search`; `Files.search` returns `total`; `System` gained audio
+devices; the order of `Windows.list()` is written down; `AI.ask` takes the
+conversation so far (`messages`), text to work on (`material`) and a
+callback with the whole answer (`onText`), Heyo's own Ask AI, AI Chat and
+selected-text actions now go through it, and every failure is a `HeyoError`.
+Also brought in line with the implementation: a refused permission is only
+remembered for 60 seconds, and there is no "Only This Once"; `offline` is
+always false; `apiVersion` does not block installing. Questions 5 and 7 of
+section 12 have been answered by the implementation.
+The `LiveActivity` module (7.9) and the `activity` permission (5.1), which
+had been left out, are now here too; its design is in
+`docs/live-activities.md`.
 
-文末第 12 节列出需要你拍板的问题；它们会影响实现，但不影响整体结构。
-
----
-
-## 1. 目标与非目标
-
-**目标**
-
-1. **换一个 import 就能迁移**。`@raycast/api` 的每个导出在 `@heyo/api` 里同名、同签名、同行为。
-   做不到同行为的地方（macOS 专有的概念）有明确的、有文档的降级，而不是缺失或崩溃。
-2. 第三方扩展能做到今天只有内置命令能做的事。内置命令改为使用同一套接口，不再有私有通道。
-3. 迁移后的扩展仍然可以在 Raycast 里运行：在 Heyo 上多出能力，在 Raycast 上正常降级。
-4. 每项能力在当前会话（X11、GNOME Wayland、Windows、其他）是否可用，扩展能在调用前查到。
-5. 扩展读取 Heyo 保管的用户数据（剪贴板历史、记忆、屏幕内容、麦克风）之前，用户明确同意过。
-6. 接口可以演进而不破坏已发布的扩展。
-
-**非目标**
-
-- 不承诺"换 import 之后任何扩展都能用"。接口兼容解决的是接口；自己去调 macOS 程序、
-  AppleScript、`/Applications` 路径的扩展仍然需要移植。`heyo ext check` 负责把这类问题找出来（第 9 节）。
-- 不提供 D-Bus、systemd、注册表的封装。扩展在 Node.js 里可以直接用现成的库或命令行。
-- v1 不做沙箱（见 5.4）。
-- 不让扩展注册全局热键。热键由用户在设置里绑定到命令。
+Section 12, at the end, lists the questions that need your decision; they
+affect the implementation but not the overall structure.
 
 ---
 
-## 2. 设计原则
+## 1. Goals and non-goals
 
-- **按能力分模块，不按平台分**。扩展写 `Windows.list()`，不写 `X11.listWindows()`。
-- **先问再做**。每个模块有 `supported()`，返回 `"full" | "limited" | "none"`，与主机的
-  `Supported`（`src-tauri/src/platform/desktop.rs`）一一对应。
-- **失败有类型**。所有错误是带 `code` 的 `HeyoError`，扩展不需要解析文案。
-- **主机是唯一执行者**。扩展运行时只转发请求；窗口、截屏、索引都在主机里做，
-  所以 Windows 与 Wayland 的差异不会泄漏到扩展里。
-- **一处声明**。请求与返回类型在 `src-tauri/src/wire.rs` 声明，由 `cargo test`
-  生成到 `shared/bindings/`，`@heyo/api` 的类型从那里来。
-  改：Heyo 加的每个函数（所在模块、名字、它发的请求）在 `runtime/src/heyo/members.ts` 声明一次。
-  它需要的权限由主机说了算（`permissions.rs` 的 `needed`，`cargo test` 写到 `shared/bindings/needs.ts`），
-  回复的类型按请求记在 `shared/wire.ts` 的 `ExtReplies` 里。只是转发请求的函数直接由声明生成；
-  类型包、Heyo 之外的桩、`heyo ext check` 认得的模块和权限、测试里的调用表，都拿这份声明对照，
-  少一处多一处都过不了编译或测试。
+**Goals**
+
+1. **Migrating takes changing one import.** Every export of `@raycast/api`
+   is in `@heyo/api` with the same name, the same signature and the same
+   behavior. Where the same behavior is not possible (concepts only macOS
+   has) there is a definite, documented degradation, not a missing export or
+   a crash.
+2. Third-party extensions can do what only built-in commands can do today.
+   The built-in commands move to the same API, and no private channel is
+   left.
+3. A migrated extension can still run in Raycast: it gains abilities on
+   Heyo and degrades normally on Raycast.
+4. Whether each ability is available in the current session (X11, GNOME
+   Wayland, Windows, others) is something an extension can find out before
+   it calls.
+5. Before an extension reads user data that Heyo keeps (the clipboard
+   history, memory, what is on the screen, the microphone), the user has
+   explicitly agreed.
+6. The API can evolve without breaking extensions that are already
+   published.
+
+**Non-goals**
+
+- No promise that "any extension works once its imports are changed". API
+  compatibility solves the API; an extension that itself calls macOS
+  programs, AppleScript or paths under `/Applications` still has to be
+  ported. `heyo ext check` is there to find such problems (section 9).
+- No wrappers for D-Bus, systemd or the registry. In Node.js an extension
+  can use existing libraries or command-line tools directly.
+- No sandbox in v1 (see 5.4).
+- Extensions do not register global hotkeys. The user binds hotkeys to
+  commands in the settings.
 
 ---
 
-## 3. 包、加载与共存
+## 2. Design principles
 
-### 3.1 包
+- **Modules by ability, not by platform.** An extension writes
+  `Windows.list()`, not `X11.listWindows()`.
+- **Ask first, then act.** Every module has `supported()`, which returns
+  `"full" | "limited" | "none"`, one to one with the host's `Supported`
+  (`src-tauri/src/platform/desktop.rs`).
+- **Failures have types.** Every error is a `HeyoError` with a `code`; an
+  extension never has to parse the wording.
+- **The host is the only one that acts.** The extension runtime only
+  forwards requests; windows, screen capture and indexing are all done in
+  the host, so the differences between Windows and Wayland do not leak into
+  extensions.
+- **Declared in one place.** Request and reply types are declared in
+  `src-tauri/src/wire.rs` and generated into `shared/bindings/` by
+  `cargo test`; the types of `@heyo/api` come from there.
+  Changed: every function Heyo adds (its module, its name, the request it
+  sends) is declared once, in `runtime/src/heyo/members.ts`. The permission
+  it needs is the host's to say (`needed` in `permissions.rs`, written to
+  `shared/bindings/needs.ts` by `cargo test`), and the type of the reply is
+  recorded per request in `ExtReplies` in `shared/wire.ts`. Functions that
+  only forward a request are generated straight from the declaration; the
+  types package, the stubs for outside Heyo, the modules and permissions
+  `heyo ext check` knows, and the table of calls in the tests are all
+  checked against this declaration, and one too few or one too many fails
+  to compile or fails a test.
 
-- 包名 `@heyo/api`，发布到 npm。
-- 它导出两部分：
-  1. **Raycast 部分**：`@raycast/api` 的全部导出，名字、签名、类型都相同（清单见第 8 节）。
-  2. **Heyo 部分**：第 7 节定义的新增模块，以及对若干 Raycast 模块的扩展。
-- 在 Heyo 里，运行时拦截模块加载（`runtime/src/runtime.ts` 的 `provided` 表），
-  `@raycast/api` 和 `@heyo/api` 都换成**同一个对象**。这一点是必须的：扩展常常同时依赖
-  `@raycast/utils`，后者内部引用 `@raycast/api`；两个名字指向同一份实现，导航栈、
-  Toast、缓存才不会各有一份。
+---
 
-三种情况下的行为：
+## 3. Package, loading and coexistence
 
-| 扩展怎么写 | 在 Heyo 里 | 在 Raycast 里 |
+### 3.1 The package
+
+- The package is named `@heyo/api` and is published to npm.
+- It exports two parts:
+  1. **The Raycast part**: every export of `@raycast/api`, with the same
+     names, signatures and types (the list is in section 8).
+  2. **The Heyo part**: the new modules defined in section 7, and the
+     extensions to some of Raycast's modules.
+- In Heyo the runtime intercepts module loading (the `provided` table in
+  `runtime/src/runtime.ts`), and `@raycast/api` and `@heyo/api` are both
+  replaced by **the same object**. This is required: extensions often
+  depend on `@raycast/utils` as well, which imports `@raycast/api`
+  internally; only when both names point to the same implementation is
+  there one navigation stack, one set of toasts and one cache, not two.
+
+The behavior in the three cases:
+
+| How the extension is written | In Heyo | In Raycast |
 |---|---|---|
-| 只用 `@raycast/api`（商店里的现状） | 照常运行，用不到新增能力 | 照常运行 |
-| 改用 `@heyo/api`，只用 Raycast 部分 | 照常运行 | 照常运行（见下） |
-| 改用 `@heyo/api`，用到 Heyo 部分 | 全部可用 | Raycast 部分正常；Heyo 部分降级 |
+| Uses only `@raycast/api` (how the store is today) | Runs as before, without the added abilities | Runs as before |
+| Moves to `@heyo/api`, uses only the Raycast part | Runs as before | Runs as before (see below) |
+| Moves to `@heyo/api`, uses the Heyo part | Everything is available | The Raycast part works; the Heyo part degrades |
 
-为了让第二、三种情况在 Raycast 里也能运行，npm 上的 `@heyo/api` 是这样构成的：
+So that the second and third cases also run in Raycast, `@heyo/api` on npm
+is put together like this:
 
 ```ts
-// npm 上的 @heyo/api（Heyo 之外才会真正加载到）
-export * from "@raycast/api";          // peerDependency，由 Raycast 提供
+// @heyo/api on npm (only really loaded outside Heyo)
+export * from "@raycast/api";          // a peerDependency, provided by Raycast
 export const isHeyo = false;
-export const Windows = { supported: async () => "none", /* 其余抛 HeyoError("unsupported") */ };
-// …其余 Heyo 模块同理
+export const Windows = { supported: async () => "none", /* the rest throw HeyoError("unsupported") */ };
+// …the other Heyo modules likewise
 ```
 
 ```ts
@@ -105,31 +155,42 @@ if (isHeyo && (await Windows.supported()) !== "none") {
 }
 ```
 
-### 3.1.1 迁移一个扩展
+### 3.1.1 Migrating an extension
 
-1. `npm install @heyo/api`。
-2. 把源码里的 `"@raycast/api"` 替换为 `"@heyo/api"`。`heyo migrate <目录>` 做这一步，
-   并在 `package.json` 里加上 `heyo` 字段。
-3. `@raycast/utils` 不需要改：它继续引用 `@raycast/api`，在 Heyo 里拿到的是同一份实现。
-4. `heyo ext check` 报告接口之外的问题：调用了 macOS 程序、AppleScript、写死的 macOS 路径。
-5. 用 `heyo build` 构建（它把 `@heyo/api`、`@raycast/api`、`react` 标为 external，产物与 `ray build` 相同）。
+1. `npm install @heyo/api`.
+2. Replace `"@raycast/api"` in the sources with `"@heyo/api"`.
+   `heyo migrate <dir>` does this step, and adds the `heyo` field to
+   `package.json`.
+3. `@raycast/utils` needs no change: it goes on importing `@raycast/api`,
+   and in Heyo it gets the same implementation.
+4. `heyo ext check` reports the problems outside the API: calls to macOS
+   programs, AppleScript, hard-coded macOS paths.
+5. Build with `heyo build` (it marks `@heyo/api`, `@raycast/api` and `react`
+   as external, and what it produces is the same as `ray build`).
 
-不做第 2 步的扩展不受影响；第 2 步的意义是拿到 Heyo 部分的类型，并声明权限。
+An extension that skips step 2 is not affected; the point of step 2 is to
+get the types of the Heyo part, and to declare permissions.
 
-### 3.1.2 类型从哪里来
+### 3.1.2 Where the types come from
 
-Raycast 部分的类型有两种做法，需要你决定（第 12 节问题 7）：
+There are two ways to do the types of the Raycast part, and you need to
+decide (question 7 of section 12):
 
-- **转导出**：`@heyo/api` 把 `@raycast/api` 列为 peerDependency，类型直接 `export *`。
-  开发者仍需安装 `@raycast/api`，但类型永远与 Raycast 一致，我们不需要维护。
-- **自有类型**：我们独立写一份等价的类型声明。开发者只装一个包，但我们要跟着 Raycast 的版本更新，
-  它的 `package.json` 标注的许可是 MIT；类型声明是否另有条款我没有查。
+- **Re-export**: `@heyo/api` lists `@raycast/api` as a peerDependency and
+  the types are a plain `export *`. Developers still have to install
+  `@raycast/api`, but the types always agree with Raycast's and we do not
+  have to maintain them.
+- **Our own types**: we write an equivalent set of type declarations
+  independently. Developers install only one package, but we have to follow
+  Raycast's releases; the licence its `package.json` states is MIT, and I
+  have not checked whether the type declarations come under other terms.
 
-规格以"转导出"为默认。
+The specification takes "re-export" as the default.
 
-### 3.2 清单
+### 3.2 The manifest
 
-扩展在 `package.json` 里加一个 `heyo` 字段。没有这个字段的扩展不能使用需要权限的接口。
+An extension adds a `heyo` field to its `package.json`. An extension without
+this field cannot use the parts of the API that need a permission.
 
 ```json
 {
@@ -143,149 +204,188 @@ Raycast 部分的类型有两种做法，需要你决定（第 12 节问题 7）
 }
 ```
 
-| 字段 | 含义 |
+| Field | Meaning |
 |---|---|
-| `apiVersion` | 扩展编写时所依据的主版本。改：Heyo 支持的主版本低于它时**不拦安装**（安装走的是 Raycast 商店的流程，不读这个字段）；需要权限的调用以 `unsupported` 失败，说明"为更新的 Heyo 编写"。 |
-| `permissions` | 扩展可能用到的权限（见第 5 节）。未列出的权限在调用时直接拒绝，不询问。改：安装时不显示这份清单，用到时才询问。 |
-| `platforms` | 可选。不含当前平台时，扩展的命令不进入根搜索。 |
+| `apiVersion` | The major version the extension was written against. Changed: when the major version Heyo supports is lower, installing is **not blocked** (installing follows the Raycast Store's flow, which does not read this field); calls that need a permission fail with `unsupported`, saying "written for a newer Heyo". |
+| `permissions` | The permissions the extension may come to use (see section 5). A permission that is not listed is refused at the call, without asking. Changed: this list is not shown at install time; the user is asked when a permission is first used. |
+| `platforms` | Optional. When it does not include the current platform, the extension's commands do not enter the root search. |
 
-### 3.3 命令模式
+### 3.3 Command modes
 
-沿用 `view`、`no-view`、`menu-bar`，新增一种：
+`view`, `no-view` and `menu-bar` stay as they are, and one is added:
 
-- `provider`：向根搜索贡献结果（见 7.10）。
+- `provider`: contributes results to the root search (see 7.10).
 
 ---
 
-## 4. 版本与兼容
+## 4. Versions and compatibility
 
-- `apiVersion` 是整数主版本。同一主版本内只增不改：新增函数、新增可选参数、新增返回字段。
-- 删除或改变语义需要新主版本。Heyo 同时支持当前主版本和上一个主版本。
-- 细粒度探测用 `has()`，不靠版本号比较：
+- `apiVersion` is an integer major version. Within one major version things
+  are only added, never changed: new functions, new optional parameters,
+  new fields in what is returned.
+- Removing something or changing what it means takes a new major version.
+  Heyo supports the current major version and the one before it at the same
+  time.
+- Fine-grained detection uses `has()`, not comparing version numbers:
 
 ```ts
 import { has } from "@heyo/api";
 if (has("Screen.recognizeText")) { /* … */ }
 ```
 
-- `environment.heyoVersion` 给出 Heyo 的版本字符串，仅用于日志和问题报告。
+- `environment.heyoVersion` gives Heyo's version string, for logs and
+  problem reports only.
 
 ---
 
-## 5. 权限
+## 5. Permissions
 
-### 5.1 权限表
+### 5.1 The table of permissions
 
-| 权限 | 允许 | 默认 |
+| Permission | Allows | Default |
 |---|---|---|
-| `windows` | 列出、激活、关闭、移动其他应用的窗口 | 首次使用时询问 |
-| `screen.capture` | 截取屏幕或窗口的图像 | 每次由用户框选时无需询问；整屏或指定窗口首次询问 |
-| `screen.text` | 对图像做文字识别 | 不询问（只处理扩展自己给的图像） |
-| `microphone` | 录音并转写 | 首次使用时询问 |
-| `clipboard.history` | 读取剪贴板历史 | 首次使用时询问 |
-| `memory.read` | 搜索本地记忆（跨来源） | 首次使用时询问 |
-| `memory.write` | 向本地记忆写入扩展自己的条目 | 首次使用时询问 |
-| `files.search` | 查询文件索引（只返回路径） | 不询问 |
-| `system` | 锁屏、休眠、音量、外观、清空回收站 | 首次使用时询问；重启、关机、注销每次确认 |
-| `input.paste` | 向前台应用粘贴文本 | 不询问（与 Raycast 的 `Clipboard.paste` 等同） |
-| `ai` | 使用用户配置的模型 | 不询问（与 Raycast 的 `AI.ask` 等同）。改：Raycast 原有的调用方式不需要清单；用到 Heyo 加的选项（`system`、`messages`、`images`、`material`）或 `AI.provider()` 时，清单里必须列出 `ai`，否则以 `denied` 失败 |
-| `search.provider` | 向根搜索贡献结果，因而能看到用户输入的每个查询 | 安装时询问 |
-| `activity` | 改，新增：在面板的"进行中"区域显示扩展正在做的事，做完时告诉用户（7.9） | 不询问；设置里每个扩展有一个开关，另有总开关，关掉后以 `denied` 失败。只有用户运行的命令能发起新活动 |
+| `windows` | Listing, activating, closing and moving other applications' windows | Asked on first use |
+| `screen.capture` | Capturing an image of the screen or of a window | Never asked when the user selects the area each time; asked the first time for the whole screen or a given window |
+| `screen.text` | Recognizing the text in an image | Not asked (it only processes images the extension itself supplies) |
+| `microphone` | Recording and transcribing | Asked on first use |
+| `clipboard.history` | Reading the clipboard history | Asked on first use |
+| `memory.read` | Searching local memory (across sources) | Asked on first use |
+| `memory.write` | Writing the extension's own entries to local memory | Asked on first use |
+| `files.search` | Querying the file index (only paths are returned) | Not asked |
+| `system` | Lock screen, sleep, volume, appearance, emptying the trash | Asked on first use; restart, shut down and log out are confirmed every time |
+| `input.paste` | Pasting text into the frontmost application | Not asked (the same as Raycast's `Clipboard.paste`) |
+| `ai` | Using the model the user has configured | Not asked (the same as Raycast's `AI.ask`). Changed: the ways of calling it that Raycast already has need no manifest; to use the options Heyo adds (`system`, `messages`, `images`, `material`) or `AI.provider()`, the manifest must list `ai`, otherwise the call fails with `denied` |
+| `search.provider` | Contributing results to the root search, and so seeing every query the user types | Asked at install time |
+| `activity` | Changed, new: showing what the extension is doing in the palette's "In Progress" section, and telling the user when it is done (7.9) | Not asked; the settings have a switch for each extension and one for all, and when it is off the call fails with `denied`. Only a command the user ran can start a new activity |
 
-### 5.2 询问与存储
+### 5.2 Asking and storing
 
-- 询问是面板里的一个确认框，写明扩展名和权限的白话说明。改：选项只有"允许""拒绝"，没有"仅这一次"（第 12 节问题 5）。
-- 改：只有"允许"写入 `$XDG_CONFIG_HOME/heyo/permissions.json`（按扩展名记录，文件 0600）。"拒绝"不落盘，
-  只在内存里记 60 秒：这段时间内同一扩展再问同一权限直接以 `denied` 失败而不弹窗（否则每次渲染都问一次的扩展会把确认框刷屏），
-  之后再用再问。设置窗口的扩展页列出已允许的权限并可撤销。
-- 同一时间只有一个确认框；两个请求同时要同一权限时，第二个等第一个的答案。五分钟没人回答算作离开，以 `denied` 失败。
-- 后台运行（菜单栏、定时命令）时没有人可以回答：未获许可的调用直接以 `denied` 失败，不弹窗。
-- 已知偏差（待修）：从 Manage Extensions 卸载扩展时没有清掉它的权限记录；装回同名扩展会沿用。
+- Asking is a confirmation in the palette that names the extension and says
+  in plain words what the permission is. Changed: the only choices are
+  "Allow" and "Deny"; there is no "Only This Once" (question 5 of
+  section 12).
+- Changed: only "Allow" is written to
+  `$XDG_CONFIG_HOME/heyo/permissions.json` (recorded per extension name,
+  file mode 0600). "Deny" is not written to disk and is only remembered in
+  memory for 60 seconds: within that time, the same extension asking for the
+  same permission again fails with `denied` straight away, without a prompt
+  (otherwise an extension that asks on every render would flood the screen
+  with confirmations), and after that it is asked again when it is used
+  again. The extension's page in the settings window lists the permissions
+  that have been allowed and can revoke them.
+- There is only one confirmation at a time; when two requests want the same
+  permission at once, the second waits for the answer to the first. Five
+  minutes without an answer counts as the user having left, and fails with
+  `denied`.
+- When running in the background (menu bar and scheduled commands) there is
+  nobody to answer: a call that has not been allowed fails with `denied`
+  straight away, without a prompt.
+- Known deviation (to be fixed): uninstalling an extension from Manage
+  Extensions does not clear its permission records; installing an extension
+  of the same name again carries them over.
 
-### 5.3 在哪里检查
+### 5.3 Where it is checked
 
-- 运行时为每个请求附上发起扩展的名称；主机在执行前查权限表。
-- 主机是检查点，因为数据在主机手里。
+- The runtime attaches the name of the extension that asked to every
+  request; the host looks up the table of permissions before it acts.
+- The host is the checkpoint, because the host is the one holding the data.
 
-### 5.4 诚实的边界
+### 5.4 The honest boundary
 
-今天所有扩展与运行时在同一个 Node.js 进程里，扩展可以读写文件、起子进程。因此：
+Today every extension and the runtime are in the same Node.js process, and
+an extension can read and write files and start child processes. So:
 
-- 权限系统约束的是 **Heyo 保管的数据和 Heyo 代为执行的动作**，不是扩展在本机能做的一切。
-- 一个恶意扩展理论上可以伪造请求来源。v1 的权限是"知情同意和可审计"，不是安全隔离。
-- 真正的隔离需要每个扩展一个进程，并由主机按进程识别来源。这列为 v2（见第 11 节），
-  规格里的请求格式已为此留出位置：来源由通道决定，而不是由消息里的字段决定。
+- What the permission system constrains is **the data Heyo keeps and the
+  actions Heyo carries out on an extension's behalf**, not everything an
+  extension can do on this computer.
+- A malicious extension could in theory forge where a request comes from.
+  The permissions of v1 are "informed consent and auditability", not
+  security isolation.
+- Real isolation takes one process per extension, with the host telling the
+  origin by process. This is listed as v2 (see section 11), and the request
+  format in this specification already leaves room for it: the origin is
+  decided by the channel, not by a field in the message.
 
-设置里和安装时的文案必须与此一致，不能把权限描述成沙箱。
+The wording in the settings and at install time must agree with this, and
+must not describe permissions as a sandbox.
 
 ---
 
-## 6. 线上协议
+## 6. Wire protocol
 
-### 6.1 请求
+### 6.1 Requests
 
-扩展请求与内置的 `host.*` 请求分开命名，前缀 `ext.`，这样内部接口可以自由变动。
+Extension requests are named apart from the built-in `host.*` requests,
+with the prefix `ext.`, so that the internal interface is free to change.
 
 ```jsonc
-// 运行时 → 主机
+// runtime → host
 { "type": "request", "id": 41, "method": "ext.windows.list", "extension": "window-sessions", "params": {} }
-// 主机 → 运行时
+// host → runtime
 { "type": "reply", "id": 41, "result": [ /* … */ ] }
 { "type": "reply", "id": 41, "error": { "code": "denied", "message": "Window access was not allowed." } }
 ```
 
-- 在 Rust 里是一个新枚举 `ExtRequest`（`#[serde(tag = "method", content = "params")]`），
-  与现有 `HostRequest` 并列，同样导出 TypeScript 类型。
-- 现有回复里的 `error` 是字符串；`ext.*` 的回复改为 `{ code, message }`。`host.*` 保持不变。
+- In Rust this is a new enum, `ExtRequest`
+  (`#[serde(tag = "method", content = "params")]`), beside the existing
+  `HostRequest`, and its TypeScript types are exported the same way.
+- The `error` in existing replies is a string; replies to `ext.*` change it
+  to `{ code, message }`. `host.*` stays as it is.
 
-### 6.2 事件
+### 6.2 Events
 
-订阅类接口需要主机主动发消息，这是协议里新增的方向：
+Interfaces that subscribe need the host to send messages of its own accord,
+which is a new direction in the protocol:
 
 ```jsonc
-// 运行时 → 主机：开始订阅
+// runtime → host: start subscribing
 { "type": "request", "id": 42, "method": "ext.windows.watch", "extension": "…", "params": {} }
-// 主机 → 运行时：回复给出订阅号
+// host → runtime: the reply gives the subscription number
 { "type": "reply", "id": 42, "result": { "subscription": 7 } }
-// 主机 → 运行时：之后的事件
+// host → runtime: the events after that
 { "type": "event", "subscription": 7, "data": { "kind": "focused", "window": { /* … */ } } }
-// 运行时 → 主机：结束
+// runtime → host: end
 { "type": "request", "id": 43, "method": "ext.unsubscribe", "params": { "subscription": 7 } }
 ```
 
-- 订阅属于发起它的命令会话；会话结束时运行时统一取消，主机在运行时退出时清理。
-- 流式结果（听写的中间结果）用同一机制。
+- A subscription belongs to the command session that started it; when the
+  session ends the runtime cancels them all, and the host cleans up when the
+  runtime exits.
+- Streamed results (the interim results of dictation) use the same
+  mechanism.
 
-### 6.3 错误码
+### 6.3 Error codes
 
-| `code` | 含义 | 扩展该怎么办 |
+| `code` | Meaning | What the extension should do |
 |---|---|---|
-| `unsupported` | 当前会话做不到 | 隐藏功能或说明原因 |
-| `denied` | 用户没有许可 | 说明需要什么权限 |
-| `cancelled` | 用户中途取消（如退出框选） | 安静结束 |
-| `unavailable` | 需要的组件没装（语音引擎、识别引擎） | 引导到设置 |
-| `invalid` | 参数不对 | 修正调用 |
-| `failed` | 其他失败，`message` 给出原因 | 展示给用户 |
+| `unsupported` | The current session cannot do it | Hide the feature or say why |
+| `denied` | The user has not allowed it | Say which permission is needed |
+| `cancelled` | The user cancelled part way (for example, left the area selection) | End quietly |
+| `unavailable` | A component it needs is not installed (the speech engine, the recognition engine) | Lead the user to the settings |
+| `invalid` | The parameters are wrong | Fix the call |
+| `failed` | Any other failure; `message` gives the reason | Show it to the user |
 
 ---
 
-## 7. 接口
+## 7. The interface
 
-以下是 `@heyo/api` 在 Raycast 部分之外新增或扩展的内容，签名为 TypeScript。标注"v1"的进入第一版，其余为后续。
+What follows is what `@heyo/api` adds or extends beyond the Raycast part,
+with signatures in TypeScript. What is marked "v1" goes into the first
+version; the rest comes later.
 
-### 7.1 环境与能力（v1）
+### 7.1 Environment and abilities (v1)
 
 ```ts
 export const isHeyo: boolean;
 export function has(feature: string): boolean;
 
-/** Raycast 的 environment 的全部字段，再加上以下这些。 */
+/** Every field of Raycast's environment, plus the following. */
 export const environment: RaycastEnvironment & {
   heyoVersion: string;
   apiVersion: number;
   platform: "linux" | "windows";
   session: "x11" | "wayland" | "windows" | "unknown";
-  offline: boolean; // 用户开启了"不出本机"
+  offline: boolean; // the user has turned on "nothing leaves this computer"
 };
 
 export type Support = "full" | "limited" | "none";
@@ -295,29 +395,35 @@ export class HeyoError extends Error {
 }
 ```
 
-`offline` 为真时，扩展应避免联网；Heyo 自己的 `AI` 会只用本地模型。改：Heyo 还没有这个开关，
-`offline` 恒为 `false`；要知道模型是否在本机，问 `AI.provider()`（7.8）。
+When `offline` is true, an extension should avoid the network; Heyo's own
+`AI` will only use the local model. Changed: Heyo does not have this switch
+yet, and `offline` is always `false`; to know whether the model is on this
+computer, ask `AI.provider()` (7.8).
 
-改：第 7 节的每个 Heyo 模块（`Windows`、`Screen`、`Dictation`、`Memory`、`ClipboardHistory`、`Files`、`System`、`LiveActivity`）
-都有 `supported(): Promise<Support>`，下文不再逐个写出。`Memory` 和 `ClipboardHistory` 在没有剪贴板监听的会话里答 `"limited"`
-（历史仍可读，只是不再增长）；`Files`、`System` 总是 `"full"`；`LiveActivity` 目前总是 `"limited"`（7.9）。
-问 `supported()` 不需要权限。
+Changed: every Heyo module of section 7 (`Windows`, `Screen`, `Dictation`,
+`Memory`, `ClipboardHistory`, `Files`, `System`, `LiveActivity`) has
+`supported(): Promise<Support>`, which is not written out for each one
+below. `Memory` and `ClipboardHistory` answer `"limited"` in a session with
+no clipboard watching (the history can still be read, it just no longer
+grows); `Files` and `System` are always `"full"`; `LiveActivity` is always
+`"limited"` for now (7.9). Asking `supported()` needs no permission.
 
-### 7.2 Windows（v1，权限 `windows`）
+### 7.2 Windows (v1, permission `windows`)
 
-对应 `platform::windows`。现有内置命令 Switch Windows 和窗口布局改用它。
+Corresponds to `platform::windows`. The existing built-in command Switch
+Windows and the window layouts move to it.
 
 ```ts
 export interface Window {
   id: number;
   title: string;
-  /** 应用的窗口类，例如 "firefox"。 */
+  /** The application's window class, for example "firefox". */
   class: string;
-  /** 用户正在用的窗口：面板打开时，是面板出现之前在前台的那个。 */
+  /** The window the user is working in: while the palette is open, the one that was in front before the palette appeared. */
   active: boolean;
-  /** 物理像素。改：已提供；桌面不报告位置时为 undefined。 */
+  /** Physical pixels. Changed: now provided; undefined when the desktop does not report positions. */
   bounds?: Rect;
-  /** 在 monitors() 里的下标。 */
+  /** The index in monitors(). */
   monitor?: number;
 }
 
@@ -328,80 +434,87 @@ export type Layout =
   | "top-left" | "top-right" | "bottom-left" | "bottom-right"
   | "first-third" | "center-third" | "last-third" | "first-two-thirds" | "last-two-thirds"
   | "almost-maximize" | "maximize" | "center" | "next-display"
-  /** 工作区的十二等分：x、y、宽、高。 */
+  /** Twelfths of the work area: x, y, width, height. */
   | { fraction: [number, number, number, number] };
 
 export const Windows: {
   supported(): Promise<Support>;
   /**
-   * 改：最近使用的在前，所以第一项就是用户正在用的窗口（`active` 为真），
-   * 其余按最近使用排；不含 Heyo 自己的窗口。
+   * Changed: most recently used first, so the first item is the window the
+   * user is working in (`active` is true), and the rest are in order of
+   * recent use; Heyo's own windows are not included.
    */
   list(): Promise<Window[]>;
-  /** Heyo 出现之前在前台的窗口。 */
+  /** The window that was in front before Heyo appeared. */
   active(): Promise<Window | undefined>;
-  /** 面板为该窗口让路，与 Heyo 自己的切换一样。 */
+  /** The palette makes way for that window, as with Heyo's own switching. */
   activate(id: number): Promise<void>;
   close(id: number): Promise<void>;
   arrange(id: number, layout: Layout): Promise<void>;
-  /** 改：已提供。精确位置，供"保存并恢复布局"使用。 */
+  /** Changed: now provided. An exact position, for "save and restore a layout". */
   setBounds(id: number, bounds: Rect): Promise<void>;
   monitors(): Promise<Rect[]>;
-  /** v1.1（阶段 F）：窗口获得焦点、打开、关闭。返回取消函数。 */
+  /** v1.1 (phase F): a window gains focus, opens, closes. Returns a function that cancels. */
   watch(listener: (event: WindowEvent) => void): () => void;
 };
 ```
 
-说明：`bounds`、`setBounds`、`monitors` 已在三个适配器上实现（X11 实测，GNOME Wayland 和 Windows 只过了编译）。
-`watch` 需要 6.2 的事件通道，仍在 v1.1。顺序约定的来由：Switch Windows 要的是"切回上一个"，
-它把第一项（当前窗口）挪到列表末尾；接口本身不替命令做这个决定。
+Notes: `bounds`, `setBounds` and `monitors` are implemented on all three
+adapters (measured on X11; on GNOME Wayland and Windows they have only been
+compiled). `watch` needs the event channel of 6.2 and is still v1.1. Where
+the order comes from: what Switch Windows wants is "back to the previous
+one", so it moves the first item (the current window) to the end of the
+list; the API itself does not make that decision for a command.
 
-### 7.3 Screen（v1，权限 `screen.capture`、`screen.text`）
+### 7.3 Screen (v1, permissions `screen.capture`, `screen.text`)
 
-对应 `platform::capture` 和 `ocr.rs`。
+Corresponds to `platform::capture` and `ocr.rs`.
 
 ```ts
 export type CaptureTarget =
-  | "selection"          // 用户框选，复用截图覆盖层
-  | "screen"             // 指针所在的显示器
+  | "selection"          // the user selects an area; reuses the screenshot overlay
+  | "screen"             // the monitor the pointer is on
   | { window: number }
   | { rect: Rect };
 
 export interface Capture {
-  /** PNG 文件，位于扩展的缓存目录，命令结束后由 Heyo 清理。 */
+  /** A PNG file in the extension's cache directory; Heyo cleans it up after the command ends. */
   path: string;
   width: number;
   height: number;
 }
 
 export interface RecognizedText {
-  /** 按阅读顺序拼好的全文。 */
+  /** The whole text, joined in reading order. */
   text: string;
-  /** v1.1：每一行及其位置。 */
+  /** v1.1: each line and its position. */
   lines?: { text: string; box: Rect; confidence: number }[];
 }
 
 export const Screen: {
   supported(): Promise<Support>;
   capture(target: CaptureTarget): Promise<Capture>;
-  /** 识别引擎未安装时以 "unavailable" 失败。 */
+  /** Fails with "unavailable" when the recognition engine is not installed. */
   recognizeText(image: string | CaptureTarget): Promise<RecognizedText>;
 };
 ```
 
-- `"selection"` 由用户亲手框选，本身就是同意，所以不另外询问。
-- `"screen"`、`{ window }`、`{ rect }` 不经用户操作就能拿到屏幕内容，首次使用时询问。
+- `"selection"` is selected by the user's own hand, which is itself
+  consent, so nothing more is asked.
+- `"screen"`, `{ window }` and `{ rect }` get what is on the screen without
+  the user doing anything, and are asked about on first use.
 
-### 7.4 Dictation（v1，权限 `microphone`）
+### 7.4 Dictation (v1, permission `microphone`)
 
-对应 `dictation.rs`。同一时间只有一段录音；已有录音时调用以 `failed` 失败。
+Corresponds to `dictation.rs`. There is only one recording at a time; a call
+while one is under way fails with `failed`.
 
 ```ts
 export interface ListenOptions {
   language?: "auto" | "zh" | "en" | "ja" | "ko" | "yue";
-  /** 是否显示 Heyo 的听写浮窗。默认显示。 */
+  /** Whether to show Heyo's dictation indicator. Shown by default. */
   indicator?: boolean;
-  /** 每识别完一句调用一次。 */
+  /** Called once for each sentence recognized. */
   onSegment?: (text: string) => void;
   signal?: AbortSignal;
 }
@@ -409,278 +522,336 @@ export interface ListenOptions {
 export const Dictation: {
   supported(): Promise<Support>;
   installed(): Promise<boolean>;
-  /** 开始录音，直到调用返回对象的 stop()、用户按热键结束，或 signal 取消。 */
+  /** Starts recording, until stop() of the returned object is called, the user ends it with the hotkey, or signal is aborted. */
   listen(options?: ListenOptions): { stop(): void; result: Promise<string> };
-  /** v1.1：转写一个音频文件（16 kHz 单声道 WAV）。 */
+  /** v1.1: transcribes an audio file (16 kHz mono WAV). */
   transcribe(file: string, options?: { language?: string }): Promise<string>;
 };
 ```
 
-与现有听写的区别：`listen()` 把文字**交给扩展**，不粘贴到前台应用。
+The difference from the existing dictation: `listen()` **hands the text to
+the extension**, and does not paste it into the frontmost application.
 
-### 7.5 Memory 与 ClipboardHistory（v1，权限 `memory.read`、`memory.write`、`clipboard.history`）
+### 7.5 Memory and ClipboardHistory (v1, permissions `memory.read`, `memory.write`, `clipboard.history`)
 
-`Memory` 是跨来源的记忆搜索，对应今天的 `clipboard/store.rs` 和 `clipboard/vectors.rs`，随记忆搜索后续阶段扩展来源；
-v1 里唯一的来源就是剪贴板。改：`ClipboardHistory` 不再是另一个读取入口——读历史就是 `Memory.search`
-（来源只有剪贴板时无需筛 `sources`）；它剩下的是只有剪贴板才有的动作：把一条放回剪贴板。
-Heyo 自己的 Clipboard History 命令就是这样写的（固定、删除、清空、暂停记录仍是它的私有请求，因为那是"保管历史"而不是"读历史"）。
+`Memory` is the search of memory across sources. It corresponds to today's
+`clipboard/store.rs` and `clipboard/vectors.rs`, and gains sources as the
+later phases of memory search arrive; in v1 the only source is the
+clipboard. Changed: `ClipboardHistory` is no longer a second way in for
+reading: reading the history is `Memory.search` (while the clipboard is the
+only source there is no need to filter by `sources`); what it is left with
+is the action only the clipboard has: putting an entry back on the
+clipboard. Heyo's own Clipboard History command is written this way
+(pinning, deleting, clearing and pausing recording are still private
+requests of its own, because that is "keeping the history", not "reading
+the history").
 
 ```ts
 export type MemorySource = "clipboard" | "screenshot" | "dictation" | "file" | "web" | `ext:${string}`;
 
 export interface MemoryItem {
-  /** 来源加来源里的编号，如 "clipboard:412"。 */
+  /** The source plus the number within the source, such as "clipboard:412". */
   id: string;
   source: MemorySource;
   kind: "text" | "link" | "color" | "file" | "image";
   text?: string;
-  /** 图像条目的 PNG 文件。 */
+  /** The PNG file of an image entry. */
   image?: string;
-  /** 改：图像的像素尺寸。 */
+  /** Changed: the size of the image in pixels. */
   width?: number;
   height?: number;
-  /** 来自哪个应用（窗口类）。 */
+  /** Which application it came from (window class). */
   app?: string;
-  /** 改：该应用的名称（没有对应已安装应用时就是窗口类）和图标文件。 */
+  /** Changed: that application's name (the window class when no installed application matches) and icon file. */
   appName?: string;
   appIcon?: string;
-  /** 最后一次复制的毫秒时间戳。 */
+  /** The timestamp of the last copy, in milliseconds. */
   at: number;
-  /** 改：首次复制的时间和复制次数。剪贴板来源会计数；别的来源不一定有，所以可选。 */
+  /** Changed: the time of the first copy and the number of copies. The clipboard source counts; other sources may not have them, hence optional. */
   firstAt?: number;
   timesCopied?: number;
   pinned: boolean;
-  /** 改：按语义找到的——查询的词并不在条目里。 */
+  /** Changed: found by meaning: the words of the query are not in the entry. */
   byMeaning?: boolean;
 }
 
 export interface MemoryQuery {
-  /** 自然语言查询，可含时间、来源、类型（"上周 从 chrome 复制的 链接"）。 */
+  /** A query in natural language; it may contain a time, a source and a kind ("上周 从 chrome 复制的 链接": links copied from chrome last week). */
   text?: string;
   sources?: MemorySource[];
   kinds?: MemoryItem["kind"][];
   since?: Date;
   until?: Date;
-  limit?: number; // 默认 50，改：上限 300（Heyo 自己的历史视图显示的条数）
+  limit?: number; // 50 by default. Changed: at most 300 (the number of entries Heyo's own history view shows)
   /**
-   * 改：也找与 `text` 意思相同但不含其词的条目，前提是用户在设置里开了"按语义查找"
-   * （没开时此项无效）。结果等它：首次一两秒（加载模型），之后几毫秒。找到的标 `byMeaning`。
+   * Changed: also find entries that mean the same as `text` without
+   * containing its words, provided the user has turned on "Find by Meaning"
+   * in the settings (without it this option has no effect). The result
+   * waits for it: a second or two the first time (loading the model), a few
+   * milliseconds after that. What is found this way is marked `byMeaning`.
    */
   byMeaning?: boolean;
 }
 
 export interface MemoryResult {
   items: MemoryItem[];
-  /** 查询被读成了什么，供界面显示"正在搜索：上周 · 链接"。 */
+  /** What the query was read as, so that the interface can show "Searching: last week · links". */
   understood: { terms: string[]; app?: string; kind?: MemoryItem["kind"]; from?: number; to?: number };
-  /** 读出的条件没有匹配，已按纯文字重新搜索。 */
+  /** The conditions that were read out matched nothing, and the search was run again as plain text. */
   relaxed: boolean;
 }
 
 export const Memory: {
   supported(): Promise<Support>;
-  /** 改：query 可省略：没有 `text` 就是最近的。 */
+  /** Changed: query may be left out: without `text` it is the most recent. */
   search(query?: MemoryQuery): Promise<MemoryResult>;
   get(id: string): Promise<MemoryItem | undefined>;
-  /** 待定（第 12 节问题 4），v1 未实现：写入扩展自己的条目，来源记为 `ext:<扩展名>`；只能删除自己写入的。 */
+  /** Undecided (question 4 of section 12), not implemented in v1: writes the extension's own entry, with the source recorded as `ext:<extension name>`; an extension can only remove what it wrote. */
   add(item: { text: string; kind?: MemoryItem["kind"]; at?: Date; meta?: Record<string, string> }): Promise<string>;
   remove(id: string): Promise<void>;
 };
 
 export const ClipboardHistory: {
   supported(): Promise<Support>;
-  /** 把一条历史放回剪贴板。 */
+  /** Puts an entry of the history back on the clipboard. */
   copy(id: string): Promise<void>;
 };
 ```
 
-- 被标记为机密的复制内容（`concealed`）从不进入历史，因此也不会被返回。
-- `Memory.search` 不提供"导出全部"：没有 `text` 且没有时间范围的查询最多返回 `limit` 条最近的。
-- 改：`ClipboardHistory.search(text, { kind, limit })` 去掉了。它只是 `Memory.search({ text, kinds: [kind], limit })` 的子集，
-  内置命令没有用到它，两个读取入口只会让权限表多一行要解释的东西。`has("ClipboardHistory.search")` 为假。
+- What was copied marked as secret (`concealed`) never enters the history,
+  and so is never returned either.
+- `Memory.search` offers no "export everything": a query with no `text` and
+  no time range returns at most the `limit` most recent entries.
+- Changed: `ClipboardHistory.search(text, { kind, limit })` is gone. It was
+  only a subset of `Memory.search({ text, kinds: [kind], limit })`, the
+  built-in commands did not use it, and two ways in for reading would only
+  give the table of permissions one more row to explain.
+  `has("ClipboardHistory.search")` is false.
 
-### 7.6 Files（v1，权限 `files.search`）
+### 7.6 Files (v1, permission `files.search`)
 
-对应 `files.rs`，只返回路径，不读内容。
+Corresponds to `files.rs`. It only returns paths and does not read
+contents.
 
 ```ts
 export const Files: {
   supported(): Promise<Support>;
   search(query: string, options?: { limit?: number }): Promise<{
     files: { path: string; isDirectory: boolean }[];
-    /** 索引仍在扫描，结果可能不全。 */
+    /** The index is still scanning, and the results may be incomplete. */
     scanning: boolean;
-    /** 改：索引里一共有多少个文件和目录，供界面显示"在 183,204 项中搜索"。 */
+    /** Changed: how many files and directories the index has in all, so that the interface can show "Searching 183,204 items". */
     total: number;
   }>;
 };
 ```
 
-### 7.7 System 与 Clipboard（v1，权限 `system`、`input.paste`）
+### 7.7 System and Clipboard (v1, permissions `system`, `input.paste`)
 
-对应 `platform/system.rs` 和 `platform/input.rs`。
+Corresponds to `platform/system.rs` and `platform/input.rs`.
 
 ```ts
 export type SystemAction =
   | "lock-screen" | "sleep" | "restart" | "shut-down" | "log-out"
   | "empty-trash" | "toggle-dark-mode" | "volume-up" | "volume-down" | "toggle-mute";
 
-/** 改：扬声器或麦克风。 */
+/** Changed: a speaker or a microphone. */
 export interface AudioDevice {
-  /** 声音服务器里的名字；useAudioDevice 用它。 */
+  /** Its name in the sound server; useAudioDevice takes it. */
   name: string;
-  /** 给用户看的描述。 */
+  /** The description shown to the user. */
   description: string;
   kind: "output" | "input";
-  /** 声音现在是否走它。 */
+  /** Whether sound goes through it now. */
   current: boolean;
 }
 
 export const System: {
   supported(): Promise<Support>;
-  /** 返回值是可以展示给用户的一句话（"Volume 40%"），没有则为 undefined。 */
+  /** The return value is a sentence that can be shown to the user ("Volume 40%"), or undefined when there is none. */
   run(action: SystemAction): Promise<string | undefined>;
   appearance(): Promise<"light" | "dark">;
-  /** 短暂的桌面通知。 */
+  /** A brief desktop notification. */
   notify(title: string, body?: string): Promise<void>;
-  /** 改：扬声器和麦克风，各标出当前在用的。 */
+  /** Changed: the speakers and microphones, with the one in use marked for each. */
   audioDevices(): Promise<AudioDevice[]>;
-  /** 改：按 `name` 切换声音走哪个设备。 */
+  /** Changed: switches which device sound goes through, by `name`. */
   useAudioDevice(kind: AudioDevice["kind"], name: string): Promise<void>;
 };
 ```
 
-`restart`、`shut-down`、`log-out` 会结束会话，由主机弹确认框，扩展不能绕过：每次都问，不记答案；
-用户选"否"时以 `cancelled` 失败。改：Heyo 自己的系统命令已经用自己的措辞问过一次，主机不再问第二次。
-`appearance` 和 `notify` 需要 `system` 权限但不询问（只读、无害）。
-改：音频设备原本是 Heyo 自己的命令直接调 `pactl` 做的，阶段 E 把它收进主机并开放给扩展；结束进程没有收进来（它不在权限表里，仍是私有请求）。
+`restart`, `shut-down` and `log-out` end the session, so the host shows a
+confirmation that an extension cannot get around: it asks every time and
+does not remember the answer; when the user chooses "No" the call fails with
+`cancelled`. Changed: Heyo's own system commands have already asked once in
+their own words, and the host does not ask a second time.
+`appearance` and `notify` need the `system` permission but are not asked
+about (read-only, harmless).
+Changed: audio devices used to be done by Heyo's own commands calling
+`pactl` directly; phase E took them into the host and opened them to
+extensions. Ending a process was not taken in (it is not in the table of
+permissions and is still a private request).
 
-粘贴和读取选中文字 Raycast 已有接口（`Clipboard.paste`、`getSelectedText`），不另起名字，
-只在原接口上加可选参数：
+For pasting and for reading the selected text Raycast already has
+interfaces (`Clipboard.paste`, `getSelectedText`). No new names are made;
+the original only gains an optional parameter:
 
 ```ts
 export const Clipboard: RaycastClipboard & {
-  /** Raycast 的签名不变；多一个可选项：粘贴后把剪贴板恢复成原来的内容。 */
+  /** Raycast's signature is unchanged; one more option: after pasting, restore the clipboard to what it held before. */
   paste(content: string | Clipboard.Content, options?: { restoreClipboard?: boolean }): Promise<void>;
 };
 ```
 
-终端里粘贴用 Ctrl+Shift+V，这由主机判断，扩展不需要知道。
+Pasting in a terminal uses Ctrl+Shift+V; the host works that out, and an
+extension does not need to know.
 
-### 7.8 AI（v1，权限 `ai`）
+### 7.8 AI (v1, permission `ai`)
 
-在 Raycast 的 `AI` 上扩展。`AI.ask(prompt, { model, creativity, signal })` 的签名和返回值
-（一个同时能 `.on("data", …)` 的 Promise）保持不变。改：Heyo 自己的 Ask AI、AI Chat 和选中文字操作
-就是用这个 `ask` 写的（以 `@heyo` 的身份，见 5.4 和 `permissions::identity`），运行时里不再有另一条到模型的路。
+Extends Raycast's `AI`. The signature and the return value of
+`AI.ask(prompt, { model, creativity, signal })` (a Promise that can also
+`.on("data", …)`) stay unchanged. Changed: Heyo's own Ask AI, AI Chat and
+selected-text actions are written with this very `ask` (under the identity
+`@heyo`, see 5.4 and `permissions::identity`), and the runtime no longer has
+another road to the model.
 
 ```ts
 export const AI: RaycastAI & {
-  /** 当前配置：用的是哪家、是否本地。供扩展决定要不要发送敏感内容。 */
+  /** The current configuration: whose model it is and whether it is local. For an extension to decide whether to send sensitive content. */
   provider(): Promise<{ kind: "claude" | "local"; model: string; local: boolean }>;
   ask(prompt: string, options?: RaycastAI.AskOptions & {
-    /** 代替 Heyo 给扩展的默认指令（"你是桌面启动器扩展里的助手……"）。 */
+    /** Replaces the default instructions Heyo gives extensions ("You are a helpful assistant inside a desktop launcher extension…"). */
     system?: string;
-    /** 图像文件路径（PNG、JPEG、GIF、WebP）；模型不支持图像时以 "unsupported" 失败。 */
+    /** Paths of image files (PNG, JPEG, GIF, WebP); fails with "unsupported" when the model does not take images. */
     images?: string[];
     /**
-     * 改：到目前为止的对话，最早的在前，一问一答交替；prompt 是用户的下一句。
-     * 不交替、或者不以回答结尾，以 "invalid" 失败。
+     * Changed: the conversation so far, earliest first, question and answer
+     * alternating; prompt is the user's next line. If they do not alternate,
+     * or do not end with an answer, it fails with "invalid".
      */
     messages?: AI.Message[];
     /**
-     * 改：prompt 是要处理的文字（翻译、改写……）而不是要回答的话：它会被围起来当作材料，
-     * 模型按 `system` 做事而不听材料里的话（本地小模型尤其需要这一层）。不能与 `messages` 同用。
+     * Changed: prompt is text to work on (translate, rewrite…) and not
+     * something to answer: it is fenced off and treated as material, and the
+     * model does what `system` says and does not obey what the material says
+     * (small local models need this layer in particular). Cannot be used
+     * together with `messages`.
      */
     material?: boolean;
-    /** 改：每次有新内容时拿到目前为止的整段回答（`on("data")` 给的是增量）。 */
+    /** Changed: gets the whole answer so far each time there is more (`on("data")` gives the increments). */
     onText?: (text: string) => void;
   }): Promise<string> & { on(event: "data", listener: (chunk: string) => void): void };
 };
 
 export namespace AI {
-  /** 改：对话里先前的一问或一答。 */
+  /** Changed: an earlier question or answer of the conversation. */
   interface Message { role: "user" | "assistant"; content: string }
 }
 ```
 
-- 改（已实现）：`creativity` 映射到本地模型的温度（`none` 0、`low` 0.5、`medium` 1、`high` 1.5、`maximum` 2，或 0–2 的数字）；
-  Claude 不带温度。`model` 被接受但仍按用户在设置里选的模型执行，因为 Raycast 的模型名在这里没有对应物。这是一处有文档的降级。
-- `images` 让"截屏后提问"成为两行：`Screen.capture("selection")`，然后
-  `AI.ask(question, { images: [capture.path] })`。
-- 改：三种用法对应三种发给模型的形状。只有 `prompt`（或加 `system`）：一条用户消息；`messages`：
-  先前的轮次原样在前，`prompt` 是新的一条——AI Chat 就是这样把整段对话交给模型的；`material`：
-  `prompt` 不是消息，而是围在 `<text>` 里的材料，`system` 说明对它做什么——选中文字操作就是这样做的。
-- 改：失败一律是 `HeyoError`：`signal` 取消是 `cancelled`；参数不对是 `invalid`；本地模型不收图像是 `unsupported`；
-  其余是 `failed`，`message` 是给用户看的一句话（"No Claude API key is set. Add one in Heyo Settings → Advanced."）。
-  Raycast 的 `ask` 不规定失败的形状，所以这不破坏兼容。
-- 改：流式的节奏与 Heyo 自己的命令一样：模型每吐一段，`onText` 和 `on("data")` 就各被叫一次；界面何时重绘由调用方决定
-  （AI Chat 每 80 毫秒取一次，长对话里只有正在写的那条回答会被重发）。
-- 面板关闭后回答继续生成并写进对话（这是 Ask AI 和 AI Chat 的行为，不是接口规定的；第 12 节之外的待决项，见 `TODO.md`）。
-- Heyo 之外（`packages/api/index.js`）：`system`、`messages` 的转写和 `material` 的围栏都拼在 prompt 前面交给 Raycast 的 `ask`；
-  `onText` 由 `on("data")` 累加；`images` 以 `unsupported` 拒绝。
+- Changed (implemented): `creativity` maps to the local model's temperature
+  (`none` 0, `low` 0.5, `medium` 1, `high` 1.5, `maximum` 2, or a number
+  from 0 to 2); Claude is sent no temperature. `model` is accepted, but the
+  call still runs with the model the user chose in the settings, because
+  Raycast's model names have no counterpart here. This is a documented
+  degradation.
+- `images` makes "take a screenshot, then ask" two lines:
+  `Screen.capture("selection")`, then
+  `AI.ask(question, { images: [capture.path] })`.
+- Changed: the three ways of using it correspond to three shapes of what is
+  sent to the model. Only `prompt` (or with `system`): one user message;
+  `messages`: the earlier turns go first as they are, and `prompt` is the
+  new one, which is how AI Chat hands the whole conversation to the model;
+  `material`: `prompt` is not a message but material fenced in `<text>`,
+  and `system` says what to do with it, which is how the selected-text
+  actions do it.
+- Changed: every failure is a `HeyoError`: aborting with `signal` is
+  `cancelled`; wrong parameters are `invalid`; a local model that does not
+  take images is `unsupported`; the rest are `failed`, and `message` is a
+  sentence for the user ("No Claude API key is set. Add one in Heyo
+  Settings → Advanced."). Raycast's `ask` does not specify the shape of a
+  failure, so this does not break compatibility.
+- Changed: the rhythm of streaming is the same as for Heyo's own commands:
+  each time the model puts out a piece, `onText` and `on("data")` are each
+  called once; when the interface redraws is up to the caller (AI Chat
+  takes it every 80 milliseconds, and in a long conversation only the
+  answer being written is sent again).
+- After the palette closes, the answer goes on being generated and is
+  written into the conversation (this is the behavior of Ask AI and AI
+  Chat, not something the API specifies; an undecided item outside
+  section 12, see `TODO.md`).
+- Outside Heyo (`packages/api/index.js`): `system`, a transcript of
+  `messages` and the fence of `material` are all put before the prompt and
+  handed to Raycast's `ask`; `onText` adds up what `on("data")` gives;
+  `images` are refused with `unsupported`.
 
-### 7.9 LiveActivity（v1，权限 `activity`）
+### 7.9 LiveActivity (v1, permission `activity`)
 
-改，新增。对应 `activities.rs`。命令不在面板里的时候，由 Heyo 替它显示"正在进行的事"：面板的"进行中"区域，
-以及（桌面支持时）状态栏。计时和按时间推进的进度由 Heyo 自己走，所以命令不必一直运行。
-设计的来由、各桌面的呈现和上限的依据在 `docs/live-activities.md`（接口是它的第 6 节）；这里只写接口。
+Changed, new. Corresponds to `activities.rs`. While a command is not in the
+palette, Heyo shows "what is in progress" for it: in the palette's "In
+Progress" section and (when the desktop supports it) in the status bar.
+Timers and progress that advances with time are counted by Heyo itself, so
+the command does not have to keep running.
+Where the design comes from, how each desktop presents it and what the
+limits rest on are in `docs/live-activities.md` (the interface is its
+section 6); here only the interface is written down.
 
 ```ts
 export namespace LiveActivity {
-  /** 不变的部分。 */
+  /** The part that does not change. */
   interface Attributes {
-    /** 同一扩展内唯一。再次 start 同一个 id 等于更新。 */
+    /** Unique within one extension. Calling start again with the same id is an update. */
     id: string;
-    /** 这是什么（"Build"、"Timer"）。 */
+    /** What this is ("Build", "Timer"). */
     name: string;
     icon: Image.ImageLike;
     tint?: Color.ColorLike;
-    /** 选中活动本身时做什么。 */
+    /** What to do when the activity itself is chosen. */
     action?: Action;
-    /** 用户能否结束它。默认 true。 */
+    /** Whether the user can end it. true by default. */
     dismissible?: boolean;
-    /** 这个桌面上显示不了时怎么办。默认 "notify"。 */
+    /** What to do when it cannot be shown on this desktop. "notify" by default. */
     fallback?: "notify" | "drop";
   }
 
-  /** 会变的部分。 */
+  /** The part that changes. */
   interface Content {
-    /** 折叠态里的内容。缺省时由 title 截断得到。 */
+    /** What the collapsed state shows. When left out, it is title, truncated. */
     compact?: Value;
     title: string;
     subtitle?: string;
-    /** 展开态的主体，三选一。 */
+    /** The body of the expanded state, one of three. */
     body?: { progress: Progress } | { timer: Timer } | { text: string };
-    /** 最多三个；出现在展开态和面板的动作面板里。 */
+    /** At most three; they appear in the expanded state and in the palette's action panel. */
     actions?: Button[];
-    /** 需要用户处理（确认、回答）：排到前面并标出来。 */
+    /** Needs the user to deal with it (confirm, answer): moved to the front and marked. */
     needsAttention?: boolean;
-    /** 这之后内容可能不准，显示时变淡。不会结束活动。 */
+    /** After this the content may be inaccurate, and it is shown faded. It does not end the activity. */
     staleAt?: Date;
-    /** 同一个扩展的多个活动之间的次序，0–100。 */
+    /** The order among several activities of the same extension, 0–100. */
     relevance?: number;
   }
 
-  /** 一小段会自己变的内容。 */
+  /** A small piece of content that changes by itself. */
   type Value = string | { timer: Timer } | { progress: Progress } | { icon: Image.ImageLike };
 
-  /** 一个时间区间加一个暂停时刻，由 Heyo 走。 */
+  /** A span of time plus a moment of pausing, counted by Heyo. */
   interface Timer {
     start: Date;
-    /** 省略表示正计时，没有终点。 */
+    /** Left out, it counts up and has no end. */
     end?: Date;
-    /** 暂停在哪一刻；省略表示在走。 */
+    /** The moment it was paused at; left out, it is running. */
     pausedAt?: Date;
-    /** 有终点时默认倒数。 */
+    /** With an end it counts down by default. */
     countsDown?: boolean;
-    /** "12:05" 或 "12 min"。 */
+    /** "12:05" or "12 min". */
     style?: "clock" | "relative";
   }
 
   interface Progress {
-    /** 0–1。省略且没有 interval 时为不确定进度。 */
+    /** 0–1. Left out, and with no interval, the progress is indeterminate. */
     value?: number;
-    /** 按时间自己推进。 */
+    /** Advances by itself with time. */
     interval?: Pick<Timer, "start" | "end" | "pausedAt">;
   }
 
@@ -691,7 +862,7 @@ export namespace LiveActivity {
     action: Action;
   }
 
-  /** 前三种由 Heyo 直接执行；`event` 送回扩展。 */
+  /** Heyo carries out the first three directly; `event` is sent back to the extension. */
   type Action =
     | { open: string }
     | { copy: string }
@@ -700,20 +871,20 @@ export namespace LiveActivity {
     | { end: true };
 
   interface StartOptions {
-    /** 出现时短暂展示一次。默认 true。 */
+    /** Shown briefly once when it appears. true by default. */
     announce?: boolean;
   }
 
   interface Alert {
-    /** 短暂展示这次更新。 */
+    /** Shows this update briefly. */
     expand?: boolean;
   }
 
   interface Handle {
     readonly id: string;
-    /** 每个活动每秒一次，超出的合并。 */
+    /** Once a second per activity; what exceeds that is merged. */
     update(content: Partial<Content>, options?: { alert?: Alert }): Promise<void>;
-    /** 最终内容显示片刻（"brief"，默认）或立即消失（"none"）。 */
+    /** The final content is shown for a moment ("brief", the default) or disappears at once ("none"). */
     end(final?: Partial<Content>, options?: { keep?: "none" | "brief" }): Promise<void>;
   }
 
@@ -724,70 +895,92 @@ export namespace LiveActivity {
     | { kind: "elapsed"; id: string; at: number };
 
   interface Presentation {
-    /** 指状态栏；面板里的区域总在。 */
+    /** This is about the status bar; the section in the palette is always there. */
     support: Support;
-    /** 折叠态能放多少字。 */
+    /** How many characters fit in the collapsed state. */
     compactCharacters: number;
-    /** 展开态是否显示，它的按钮是否显示。 */
+    /** Whether the expanded state is shown, and whether its buttons are. */
     expanded: boolean;
     buttons: boolean;
-    /** 版式的版本，以后加版式时递增。 */
+    /** The version of the layouts, raised when layouts are added later. */
     version: number;
   }
 }
 
 export const LiveActivity: {
   supported(): Promise<Support>;
-  /** 发起一个活动，或更新同 id 的那个。 */
+  /** Starts an activity, or updates the one with the same id. */
   start(attributes: LiveActivity.Attributes, content: LiveActivity.Content, options?: LiveActivity.StartOptions): Promise<LiveActivity.Handle>;
-  /** 本扩展正在进行的活动。 */
+  /** The activities this extension has in progress. */
   list(): Promise<LiveActivity.Handle[]>;
   get(id: string): Promise<LiveActivity.Handle | undefined>;
-  /** 这个桌面上活动显示成什么样，扩展可据此调整内容。 */
+  /** What an activity looks like on this desktop, so that an extension can adjust its content to it. */
   presentation(): Promise<LiveActivity.Presentation>;
-  /** 命令运行期间收本扩展活动的事件。返回取消函数。 */
+  /** Receives the events of this extension's activities while the command runs. Returns a function that cancels. */
   onEvent(listener: (event: LiveActivity.Event) => void): Promise<() => void>;
 };
 ```
 
-每个函数发的请求和要的权限（取自 `runtime/src/heyo/members.ts` 的声明和主机的 `needed`）：
+The request each function sends and the permission it needs (taken from the
+declaration in `runtime/src/heyo/members.ts` and the host's `needed`):
 
-| 函数 | 请求 | 权限 |
+| Function | Request | Permission |
 |---|---|---|
-| `supported()` | `ext.supported`（`module: "activity"`） | 无 |
+| `supported()` | `ext.supported` (`module: "activity"`) | none |
 | `start` | `ext.activity.start` | `activity` |
 | `list` | `ext.activity.list` | `activity` |
 | `get` | `ext.activity.get` | `activity` |
-| `presentation` | `ext.activity.presentation` | 无 |
-| `onEvent` | `ext.activity.onEvent`（订阅，见 6.2） | `activity` |
-| `Handle.update`、`Handle.end` | `ext.activity.update`、`ext.activity.end` | `activity` |
+| `presentation` | `ext.activity.presentation` | none |
+| `onEvent` | `ext.activity.onEvent` (a subscription, see 6.2) | `activity` |
+| `Handle.update`, `Handle.end` | `ext.activity.update`, `ext.activity.end` | `activity` |
 
-- **权限**：清单里列出 `activity` 即可，首次使用不询问。用户在设置里可以按扩展关掉，也可以整个关掉；关掉后以 `denied` 失败，
-  Heyo 自己的活动也一样。没列权限时主机的拒绝写的是作者调用的那个名字：
+- **Permission**: listing `activity` in the manifest is enough, and nothing
+  is asked on first use. The user can turn it off per extension in the
+  settings, or turn it off altogether; when it is off the call fails with
+  `denied`, and the same goes for Heyo's own activities. When the permission
+  is not listed, the host's refusal names what the author called:
   `LiveActivity.start needs the "activity" permission; add it to "heyo.permissions" in package.json.`
-- **谁能发起**：只有用户运行的命令，或用户点了活动上的按钮之后被运行的处理命令。定时在后台运行的命令 `start` 一个新活动
-  以 `denied` 失败，更新自己已有的活动不受限。运行时把命令是怎么启动的（`launchType`）写进请求，扩展不传。
-- **上限**：每个扩展同时 3 个活动，属性加内容共 4 KB，按钮 3 个，超出以 `invalid` 失败；折叠态约 10 个字，超出截断
-  （确切值问 `presentation().compactCharacters`）。
-- **先后**：线上的日期是毫秒。每次 `start` 和 `update` 由运行时带一个只增的序号，主机丢掉序号不比已应用的大的更新，
-  所以发起活动的命令和处理按钮的命令同时更新时，旧的不会盖掉新的。句柄不论在哪里被调用，都以创建它的那个命令的名义发请求。
-- **事件**：正在运行的命令用 `onEvent` 订阅；没有命令在听时，主机在后台运行清单里标了 `"heyo": { "handles": "activity" }` 的命令，
-  事件在它的 `launchContext.activity` 里。`elapsed` 是倒计时走到头。
-- **现状**：`supported()` 答 `"limited"`，`presentation()` 答 `support: "none"`、`expanded` 和 `buttons` 为假——活动显示在面板的
-  "进行中"区域，需要用户知道的事另发通知；状态栏还没有画。
-- Heyo 之外（`packages/api/index.js`）：`supported()` 答 `"none"`，其余以 `unsupported` 拒绝。
+- **Who can start one**: only a command the user ran, or the handler
+  command that is run after the user chose a button on an activity. A
+  command running in the background on a schedule that calls `start` for a
+  new activity fails with `denied`; updating an activity it already has is
+  not restricted. The runtime writes how the command was started
+  (`launchType`) into the request; the extension does not pass it.
+- **Limits**: 3 activities at a time per extension, 4 KB for attributes
+  plus content, 3 buttons, and beyond that the call fails with `invalid`;
+  the collapsed state holds about 10 characters and what is beyond that is
+  truncated (for the exact value ask `presentation().compactCharacters`).
+- **Order**: dates on the wire are milliseconds. The runtime gives every
+  `start` and `update` a sequence number that only grows, and the host
+  drops an update whose number is not greater than the one already
+  applied, so when the command that started an activity and the command
+  that handles its buttons update at the same time, the older does not
+  overwrite the newer. Wherever a handle is called, it sends its requests in
+  the name of the command that created it.
+- **Events**: a running command subscribes with `onEvent`; when no command
+  is listening, the host runs in the background the command the manifest
+  marks `"heyo": { "handles": "activity" }`, and the event is in its
+  `launchContext.activity`. `elapsed` is a countdown reaching its end.
+- **As it is now**: `supported()` answers `"limited"`, and `presentation()`
+  answers `support: "none"` with `expanded` and `buttons` false: activities
+  are shown in the palette's "In Progress" section, and what the user needs
+  to know is sent as a notification as well; the status bar is not drawn
+  yet.
+- Outside Heyo (`packages/api/index.js`): `supported()` answers `"none"`,
+  and the rest are refused with `unsupported`.
 
-### 7.10 根搜索结果提供者（v1.1，权限 `search.provider`）
+### 7.10 Root search result providers (v1.1, permission `search.provider`)
 
-Raycast 没有的能力：扩展不必被打开，就能让自己的条目出现在根搜索里。
+An ability Raycast does not have: an extension can make its own items appear
+in the root search without being opened.
 
-清单里声明一个 `provider` 模式的命令：
+The manifest declares a command of mode `provider`:
 
 ```json
 { "name": "issues", "title": "Issues", "mode": "provider", "heyo": { "debounce": 120, "minLength": 2 } }
 ```
 
-命令文件默认导出一个函数：
+The command file's default export is a function:
 
 ```ts
 import type { SearchProvider } from "@heyo/api";
@@ -798,7 +991,7 @@ const provider: SearchProvider = async (query, { signal }) => [
     title: "Crash when the palette is toggled twice",
     subtitle: "HEYO-12 · open",
     icon: "bug-16",
-    /** 0–100；与内置条目的模糊匹配分数同一量纲。 */
+    /** 0–100; on the same scale as the fuzzy-match scores of built-in items. */
     score: 70,
     action: { open: "https://example.com/HEYO-12" },
   },
@@ -806,180 +999,259 @@ const provider: SearchProvider = async (query, { signal }) => [
 export default provider;
 ```
 
-约束，都是为了不拖慢根搜索：
+The constraints, all of them so as not to slow the root search down:
 
-- 提供者在后台运行时进程里执行，与面板里的命令互不影响。
-- 每次按键不等待提供者：先显示内置结果，提供者的结果在 250 ms 内到达则并入，超时丢弃。
-- 新的查询到来时，上一次的 `signal` 被取消。
-- 每个提供者每次最多 5 条；条目归在以扩展标题命名的小节下，位于内置结果之后，除非分数更高。
-- 连续 5 次超时或抛错的提供者在本次会话里停用，并在设置里标出。
-- `action` 只能是：打开链接或文件、复制文本、粘贴文本、启动本扩展的另一个命令（可带参数）。不能是任意函数，因为结果要跨进程传给界面。
+- Providers run in the background runtime process, and they and the command
+  in the palette do not affect each other.
+- A keystroke never waits for providers: the built-in results are shown
+  first, a provider's results are merged in if they arrive within 250 ms,
+  and are dropped if they are later.
+- When a new query arrives, the `signal` of the previous one is aborted.
+- At most 5 items per provider per query; the items go in a section named
+  after the extension's title, after the built-in results unless their
+  score is higher.
+- A provider that times out or throws 5 times in a row is disabled for this
+  session, and marked in the settings.
+- `action` can only be: opening a link or a file, copying text, pasting
+  text, or launching another command of this extension (with arguments if
+  wanted). It cannot be an arbitrary function, because the result has to be
+  passed across processes to the interface.
 
-### 7.11 后续（不在 v1）
+### 7.11 Later (not in v1)
 
-| 接口 | 用途 | 依赖 |
+| Interface | Use | Depends on |
 |---|---|---|
-| `Clipboard.watch` | 复制时触发扩展 | 6.2 的事件通道、后台进程 |
-| `Hotkeys.onHold` | 扩展自己的"按住说话"式交互 | 权限与冲突处理的设计 |
-| `Overlay` | 扩展在屏幕上画东西（标尺、取色） | 新的窗口类型 |
-| `Browser.tabs` | 标签页搜索 | 配套的浏览器扩展 |
+| `Clipboard.watch` | Triggering an extension on a copy | The event channel of 6.2, the background process |
+| `Hotkeys.onHold` | An extension's own interaction in the manner of hold-to-talk | The design of permissions and of handling conflicts |
+| `Overlay` | An extension drawing on the screen (a ruler, a color picker) | A new kind of window |
+| `Browser.tabs` | Searching tabs | A companion browser extension |
 
 ---
 
-## 8. Raycast 接口的覆盖
+## 8. Coverage of Raycast's API
 
-"换一个 import 就能迁移"要求 Raycast 部分没有缺口。下表是按 `runtime/src/api/` 现在的
-实现整理的现状。它是导出级别的；每个组件的每个属性是否都实现，我没有逐一核对，
-那正是 8.3 的一致性测试要自动回答的。
+"Migrating takes changing one import" requires the Raycast part to have no
+gaps. The table below is the present state, put together from what
+`runtime/src/api/` implements now. It is at the level of exports; whether
+every property of every component is implemented I have not checked one by
+one, and that is exactly what the conformance tests of 8.3 are to answer
+automatically.
 
-### 8.1 现状
+### 8.1 Present state
 
-| 导出 | 现状 | 要补什么 |
+| Export | Present state | What is to be filled in |
 |---|---|---|
-| `List`、`Grid`、`Detail`、`Form`、`ActionPanel`、`MenuBarExtra`、`useNavigation` | 已实现 | 属性级核对（8.3） |
-| `Action` 及 `CopyToClipboard`、`Paste`、`Open`、`OpenInBrowser`、`OpenWith`、`ShowInFinder`、`Trash`、`Push`、`SubmitForm` | 已实现 | `OpenWith` 目前不让用户选应用 |
-| `Action.CreateSnippet`、`Action.CreateQuicklink` | 已实现。改：打开 Heyo 自己的创建片段、创建快捷链接表单，按传入的内容填好 | 快捷链接的 `application` 和 `icon` 没有去处（一律用默认应用打开） |
-| `Action.PickDate` | 已实现。改：在动作面板里选日期 | — |
-| `Action.ToggleQuickLook` | 已实现。改：图像和文本在压到列表上的一个视图里显示 | 其他类型的文件交给桌面的默认应用打开 |
-| `showToast`、`Toast`、`showHUD`、`confirmAlert`、`Alert` | 已实现 | `showHUD` 的选项被忽略 |
-| `Clipboard`（`copy`、`paste`、`clear`、`read`、`readText`） | 已实现 | — |
-| `LocalStorage`、`Cache` | 已实现 | — |
-| `getPreferenceValues`、`openExtensionPreferences`、`openCommandPreferences` | 已实现 | — |
-| `OAuth.PKCEClient` | 已实现 | — |
-| `open`、`trash`、`showInFinder`、`getApplications`、`getDefaultApplication` | 已实现 | `getApplications(path)` 的参数被忽略 |
-| `getSelectedText` | 已实现 | — |
-| `closeMainWindow`、`popToRoot`、`clearSearchBar` | 已实现 | 选项（`clearRootSearch`、`popToRootType`）被忽略 |
-| `launchCommand` | 已实现。改：也能启动其他已安装扩展的命令，首次由用户同意（面板里问一次，按发起方记住；菜单栏和后台里没人可问，未获同意时失败） | 带视图的命令不能在后台启动；只有面板里的那个命令，或用户点了菜单项的菜单栏命令，能把别的命令开进面板 |
-| `environment` | 已实现。改：`appearance` 跟着 Heyo 界面的明暗走（运行时启动时由主机告知，之后随设置变化更新） | `raycastVersion` 是固定字符串；`textSize` 恒为 `"medium"`；`launchContext` 和三个 `entryPoint*` 字段还没有（8.3） |
-| `AI.ask` | 已实现（改：含 `creativity` → 温度，以及 7.8 的 `system`、`messages`、`images`、`material`、`onText`） | `model` 按设置里的模型执行；见 7.8 |
-| `Icon`、`Color`、`Image`、`Keyboard` | 已实现 | 图标表随 Raycast 版本更新 |
-| `getFrontmostApplication` | 已实现（2026-10-10） | 找不到对应的已安装应用时，只返回窗口类名 |
-| `WindowManagement`（4 个函数） | 已实现（2026-10-10），X11 上实测 | "桌面"按显示器算；`"fullscreen"` 是最大化；单位是物理像素；窗口的 `application` 字段未填 |
-| `updateCommandMetadata` | 空操作 | 让根搜索显示命令的动态副标题 |
-| `getSelectedFinderItems` | 返回空数组 | 文件管理器里选中的文件；GNOME 上需经 Shell 扩展，其余会话返回空 |
-| `BrowserExtension` | 抛错 | 需要配套的浏览器扩展（7.11） |
-| `Tool`（AI 扩展的工具确认） | 没有 | 取决于是否支持 Raycast 的 AI 扩展 |
-| 已弃用的导出（`copyTextToClipboard`、旧的 Action 组件、`getLocalStorageItem` 等） | 已实现。改：作为现有实现的别名补齐（8.3） | — |
+| `List`, `Grid`, `Detail`, `Form`, `ActionPanel`, `MenuBarExtra`, `useNavigation` | Implemented | Checking at the level of properties (8.3) |
+| `Action` and `CopyToClipboard`, `Paste`, `Open`, `OpenInBrowser`, `OpenWith`, `ShowInFinder`, `Trash`, `Push`, `SubmitForm` | Implemented | `OpenWith` does not yet let the user choose an application |
+| `Action.CreateSnippet`, `Action.CreateQuicklink` | Implemented. Changed: opens Heyo's own Create Snippet and Create Quicklink forms, filled in with what was passed | A quicklink's `application` and `icon` have nowhere to go (it always opens with the default application) |
+| `Action.PickDate` | Implemented. Changed: the date is picked in the action panel | — |
+| `Action.ToggleQuickLook` | Implemented. Changed: images and text are shown in a view pushed over the list | Files of other types are handed to the desktop's default application |
+| `showToast`, `Toast`, `showHUD`, `confirmAlert`, `Alert` | Implemented | The options of `showHUD` are ignored |
+| `Clipboard` (`copy`, `paste`, `clear`, `read`, `readText`) | Implemented | — |
+| `LocalStorage`, `Cache` | Implemented | — |
+| `getPreferenceValues`, `openExtensionPreferences`, `openCommandPreferences` | Implemented | — |
+| `OAuth.PKCEClient` | Implemented | — |
+| `open`, `trash`, `showInFinder`, `getApplications`, `getDefaultApplication` | Implemented | The parameter of `getApplications(path)` is ignored |
+| `getSelectedText` | Implemented | — |
+| `closeMainWindow`, `popToRoot`, `clearSearchBar` | Implemented | The options (`clearRootSearch`, `popToRootType`) are ignored |
+| `launchCommand` | Implemented. Changed: it can also launch commands of other installed extensions, with the user's consent the first time (asked once in the palette and remembered per caller; in the menu bar and the background there is nobody to ask, and it fails without consent) | A command with a view cannot be launched in the background; only the command in the palette, or a menu bar command whose menu item the user chose, can open another command into the palette |
+| `environment` | Implemented. Changed: `appearance` follows the light or dark of Heyo's interface (the host tells the runtime when it starts, and it is updated as the setting changes) | `raycastVersion` is a fixed string; `textSize` is always `"medium"`; `launchContext` and the three `entryPoint*` fields are not there yet (8.3) |
+| `AI.ask` | Implemented (changed: including `creativity` → temperature, and the `system`, `messages`, `images`, `material` and `onText` of 7.8) | `model` runs with the model in the settings; see 7.8 |
+| `Icon`, `Color`, `Image`, `Keyboard` | Implemented | The table of icons is updated with Raycast's versions |
+| `getFrontmostApplication` | Implemented (2026-10-10) | When no installed application matches, only the window class name is returned |
+| `WindowManagement` (4 functions) | Implemented (2026-10-10), measured on X11 | A "desktop" is counted per monitor; `"fullscreen"` is maximize; the unit is physical pixels; a window's `application` field is not filled in |
+| `updateCommandMetadata` | Does nothing | Have the root search show a command's dynamic subtitle |
+| `getSelectedFinderItems` | Returns an empty array | The files selected in the file manager; on GNOME this has to go through the Shell extension, and other sessions return empty |
+| `BrowserExtension` | Throws | Needs a companion browser extension (7.11) |
+| `Tool` (confirming the tools of AI extensions) | Not there | Depends on whether Raycast's AI extensions are supported |
+| Deprecated exports (`copyTextToClipboard`, the old Action components, `getLocalStorageItem` and so on) | Implemented. Changed: filled in as aliases of the existing implementation (8.3) | — |
 
-### 8.2 做不到同行为的地方
+### 8.2 Where the same behavior is not possible
 
-以下是 macOS 的概念，在 Heyo 上给出确定的降级，写进文档：
+The following are macOS concepts; on Heyo each has a definite degradation,
+written into the documentation:
 
-| 接口 | Heyo 上的行为 |
+| Interface | Behavior on Heyo |
 |---|---|
-| `Application.bundleId` | 桌面文件名（Linux）或程序路径（Windows） |
-| `showInFinder` | 用文件管理器打开所在目录 |
-| `Action.ShowInFinder` 的标题 | "Show in Files" |
-| `Keyboard.Shortcut` 里的 `cmd` | 映射为 Ctrl（现已如此） |
-| `environment.raycastVersion` | 一个固定的、高于扩展常见最低要求的版本号 |
-| `AI.ask` 的 `model` | 忽略，用设置里的模型 |
-| `getDesktops` | 每个显示器算一个桌面；没有全屏桌面 |
-| `setWindowBounds` 的 `"fullscreen"` | 最大化 |
-| 窗口的位置和尺寸 | 物理像素（macOS 上是点） |
+| `Application.bundleId` | The name of the desktop file (Linux) or the path of the program (Windows) |
+| `showInFinder` | Opens the containing directory in the file manager |
+| The title of `Action.ShowInFinder` | "Show in Files" |
+| `cmd` in `Keyboard.Shortcut` | Mapped to Ctrl (already so) |
+| `environment.raycastVersion` | A fixed version number, higher than the minimum extensions commonly require |
+| The `model` of `AI.ask` | Ignored; the model in the settings is used |
+| `getDesktops` | Each monitor counts as one desktop; there are no fullscreen desktops |
+| `"fullscreen"` in `setWindowBounds` | Maximize |
+| The position and size of a window | Physical pixels (points on macOS) |
 
-### 8.3 一致性测试
+### 8.3 Conformance tests
 
-**现状（2026-10-10，对照 `@raycast/api` 2.7.2）**：名字级别的测试已经写好并通过，位于
-`runtime/src/api/conformance.test.ts`。它比较每个导出及其成员的名字，深入三层，
-不比较函数签名和组件属性。首次运行找出的缺口里，旧版别名（`CopyToClipboardAction`、
-`FormTextField`、`getLocalStorageItem` 等 37 个）、`AI.Model` 的取值和 `Color.Brown` 已经补上。
-仍然缺的 16 个名字记在 `conformance.gaps.json` 里，分三类：
+**Present state (2026-10-10, against `@raycast/api` 2.7.2)**: the test at
+the level of names is written and passes, in
+`runtime/src/api/conformance.test.ts`. It compares the names of every export
+and of its members, three levels deep, and does not compare function
+signatures or component properties. Of the gaps the first run found, the
+old aliases (`CopyToClipboardAction`, `FormTextField`,
+`getLocalStorageItem` and others, 37 in all), the values of `AI.Model` and
+`Color.Brown` have been filled in. The 16 names still missing are recorded
+in `conformance.gaps.json`, in three groups:
 
-- 旧式入口 `render()`（1 个）。
-- Raycast 标为不稳定或内部使用的（7 个）：`unstable_AI`、`useUnstableAI`、`AI.experimental_decide`、
-  `AI.refreshModels`、`captureMemorySnapshot`、`specialKeys`、`useActionPanel`。
-- 较新的、还没有研究的（8 个）：`environment.launchContext` 和三个 `entryPoint*` 字段、
-  OAuth 的客户端元数据文档方式、`Cache` 的两个静态常量。
+- The old-style entry point `render()` (1).
+- What Raycast marks as unstable or for internal use (7): `unstable_AI`,
+  `useUnstableAI`, `AI.experimental_decide`, `AI.refreshModels`,
+  `captureMemorySnapshot`, `specialKeys`, `useActionPanel`.
+- Newer ones that have not been studied yet (8):
+  `environment.launchContext` and the three `entryPoint*` fields, OAuth by
+  client metadata document, and two static constants of `Cache`.
 
-注意名字存在不等于行为完整：8.1 里"抛错"和"提示不支持"的那些名字都在，所以不在这 16 个里。
+Note that a name being there does not mean the behavior is complete: the
+names that "throw" or "say it is not supported" in 8.1 are all there, so
+they are not among these 16.
 
-**组件属性**：第二个测试 `runtime/src/api/props.test.ts` 从类型里取出每个 Raycast 组件的属性名，
-检查渲染组件的代码里有没有出现过。从未出现的属性一定是被忽略的。首次运行后修掉了三处
-（旧属性名 `enableFiltering`、`accessoryTitle`、`accessoryIcon`，以及 `Action.CopyToClipboard` 的 `transient`），
-剩下的记在 `props.gaps.json`。改：现在只剩三个——`Form.enableDrafts`、`Form.TextArea.enableMarkdown`、
-`MenuBarExtra.Item.alternate`；当初记下的 `storeValue`、`Form.FilePicker` 的选项、`quickLook` 和 `Action.CreateSnippet.snippet` 后来都接上了，已不在清单里。
+**Component properties**: a second test, `runtime/src/api/props.test.ts`,
+takes the property names of every Raycast component from the types and
+checks whether each has ever appeared in the code that renders the
+component. A property that never appears is certainly ignored. After the
+first run three things were fixed (the old property names `enableFiltering`,
+`accessoryTitle` and `accessoryIcon`, and the `transient` of
+`Action.CopyToClipboard`), and the rest were recorded in `props.gaps.json`.
+Changed: only three are left now: `Form.enableDrafts`,
+`Form.TextArea.enableMarkdown` and `MenuBarExtra.Item.alternate`;
+`storeValue`, the options of `Form.FilePicker`, `quickLook` and
+`Action.CreateSnippet.snippet`, which were recorded at first, have since
+been connected and are no longer in the list.
 
-这个测试只能找出"肯定没处理"的属性。名字出现过的属性仍可能只处理了一部分，那要靠逐个组件对照，
-数不出来。
+This test can only find the properties that are "certainly not handled". A
+property whose name does appear may still be handled only in part; that
+takes comparing component by component, and cannot be counted.
 
-函数签名的比对还没有做：
+Comparing function signatures has not been done yet:
 
-- 真正的 `@raycast/api` 已作为开发依赖装入，只用它的类型声明。
-- 一个类型测试断言我们的实现可以赋值给它：
-  `const check: typeof import("@raycast/api") = heyoApi;`。少一个导出、少一个函数、参数不对，
-  `tsc` 就失败。组件的属性用同样的办法逐个组件比对。
-- 降级和暂缺的项列在一个允许清单里，清单里的每一项必须对应 8.1 或 8.2 的一行。
-- Raycast 发新版本时升级这个开发依赖，测试失败的地方就是新增的接口。
+- The real `@raycast/api` is installed as a development dependency, and
+  only its type declarations are used.
+- A type test asserts that our implementation can be assigned to it:
+  `const check: typeof import("@raycast/api") = heyoApi;`. One export too
+  few, one function too few, or a wrong parameter, and `tsc` fails. The
+  properties of components are compared the same way, component by
+  component.
+- What degrades and what is missing for now is listed in an allowlist, and
+  every item in the allowlist must correspond to a row of 8.1 or 8.2.
+- When Raycast releases a new version this development dependency is
+  upgraded, and the places where the test fails are the new interfaces.
 
-### 8.4 权限
+### 8.4 Permissions
 
-Raycast 部分的接口不要求 `heyo` 清单字段，否则商店里的扩展都跑不了。它们映射到的权限
-（`WindowManagement` → `windows`）同样在首次使用时询问，这样没有清单的扩展不能绕过用户。
+The Raycast part of the API does not require the `heyo` manifest field,
+otherwise none of the store's extensions could run. The permissions it maps
+to (`WindowManagement` → `windows`) are asked about on first use all the
+same, so that an extension without a manifest cannot get around the user.
 
 ---
 
-## 9. 开发者体验
+## 9. Developer experience
 
-- `heyo migrate <目录>`：把 `@raycast/api` 的 import 换成 `@heyo/api`，加上 `heyo` 清单字段。
-- `heyo build <目录>`：构建扩展，产物与 `ray build` 相同（每个命令一个 `.js`，接口和 React 留给运行时提供）。
-  Raycast 自己的构建工具 `ray` 能否在 Linux 上运行我没有核实；有 `heyo build` 就不依赖它。
-- `heyo dev <目录>`：监听并构建扩展，装入正在运行的 Heyo，运行时错误显示在终端。
-- `heyo ext check <目录>`：检查清单、`apiVersion`、声明的权限是否覆盖代码里用到的接口；
-  并找出接口之外的移植问题（调用 macOS 程序、AppleScript、写死的 macOS 路径）。
-- 错误信息面向扩展作者时包含接口名和所需权限，例如
+- `heyo migrate <dir>`: changes the imports of `@raycast/api` to
+  `@heyo/api`, and adds the `heyo` manifest field.
+- `heyo build <dir>`: builds the extension, producing the same as
+  `ray build` (one `.js` per command, with the API and React left for the
+  runtime to provide). Whether Raycast's own build tool `ray` runs on Linux
+  I have not verified; with `heyo build` nothing depends on it.
+- `heyo dev <dir>`: watches and builds the extension, loads it into the
+  running Heyo, and shows runtime errors in the terminal.
+- `heyo ext check <dir>`: checks the manifest, `apiVersion`, and whether
+  the declared permissions cover the interfaces the code uses; and finds
+  the porting problems outside the API (calls to macOS programs,
+  AppleScript, hard-coded macOS paths).
+- Error messages meant for extension authors include the name of the
+  interface and the permission needed, for example
   `Windows.list needs the "windows" permission; add it to "heyo.permissions" in package.json.`
-- 示例扩展放在 `examples/`，每个模块一个，同时作为端到端测试的对象。
+- Example extensions go in `examples/`, one per module, and are also what
+  the end-to-end tests run on.
 
 ---
 
-## 10. 测试
+## 10. Testing
 
-| 层 | 怎么测 |
+| Layer | How it is tested |
 |---|---|
-| 请求格式 | `wire.rs` 的单元测试：每个 `ext.*` 的读入、未知方法被拒绝 |
-| 权限判定 | 纯函数 `permitted(extension, permission, grants) -> Decision`，表驱动测试 |
-| 平台行为 | 用现有的 `desktop::fake::Fake`，断言主机向桌面问了什么 |
-| Raycast 一致性 | 8.3 的类型测试，在 `tsc` 里运行 |
-| 运行时垫片 | vitest：`@heyo/api` 的每个函数发出的请求与类型一致；Heyo 之外的桩行为 |
-| 迁移 | 取几个商店扩展，跑 `heyo migrate` 和 `heyo build`，断言改 import 前后行为相同 |
-| 端到端 | `scripts/gui-test/` 里装入 `examples/` 的扩展，在沙箱里跑 |
-| 提供者时限 | 一个故意慢的提供者，断言根搜索不被拖慢、并在多次超时后停用 |
+| Request format | Unit tests in `wire.rs`: every `ext.*` is read in, unknown methods are refused |
+| Permission decisions | A pure function `permitted(extension, permission, grants) -> Decision`, with table-driven tests |
+| Platform behavior | With the existing `desktop::fake::Fake`, asserting what the host asked of the desktop |
+| Raycast conformance | The type test of 8.3, run in `tsc` |
+| The runtime shim | vitest: the request each function of `@heyo/api` sends agrees with the types; the behavior of the stubs outside Heyo |
+| Migration | Take a few store extensions, run `heyo migrate` and `heyo build`, and assert the behavior is the same before and after the imports change |
+| End to end | `scripts/gui-test/` loads the extensions of `examples/` and runs them in the sandbox |
+| Provider time limits | A deliberately slow provider, asserting that the root search is not slowed down and that it is disabled after several timeouts |
 
 ---
 
-## 11. 实现计划
+## 11. Implementation plan
 
-改：A–E 已完成（2026-10-10 至 10-11），表里加了"状态"一列。
+Changed: A–E are done (2026-10-10 to 10-11), and the table gained a
+"Status" column.
 
-| 阶段 | 状态 | 内容 | 涉及的文件 |
+| Phase | Status | What | Files involved |
 |---|---|---|---|
-| A | 完成 | `ExtRequest` 枚举、`{ code, message }` 错误、请求带扩展名和目录 | `wire.rs`、`ext.rs`、`runtime.rs`、`runtime/src/protocol.ts` |
-| B | 完成 | 权限：清单读取、判定函数 `decide`、询问框、存储、设置页；拒绝记 60 秒（5.2） | `permissions.rs`、`extensions.rs`、`src/Settings.tsx`、`src/App.tsx` |
-| C | 完成 | `@heyo/api` 垫片与类型包；`provided` 表里两个包名指向同一对象；类型测试 `types.check.ts` 把 `index.d.ts` 和运行时扣在一起 | `runtime/src/heyo/`、`runtime/src/runtime.ts`、`packages/api/` |
-| C2 | 完成 | Raycast 一致性测试（8.3），并按它补齐 8.1 的缺口 | `runtime/src/api/conformance.test.ts`、`props.test.ts` |
-| C3 | 完成 | `heyo build`、`heyo migrate`、`heyo ext check` | `packages/cli/` |
-| D | 完成 | v1 模块：Windows、Screen、Dictation、Memory、Files、System、Input、AI | `ext.rs` 调用现有 `platform::*`、`clipboard`、`files`、`ocr`、`dictation` |
-| E | 完成 | 内置命令改用 `@heyo/api`：切换窗口、系统命令、音频设备、文件搜索、剪贴板历史的读取与复制，删掉 15 个 `host.*`；v0.3 又把 Ask AI、AI Chat、选中文字操作改走 `AI.ask` | `runtime/src/builtins/*`、`host.rs` |
-| F | 未做 | 事件通道（6.2）：`Windows.watch`，以及 7.11 里凡是"主机主动发消息"的接口。`bounds`、`setBounds` 已随 D 做完，不再属于 F | `wire.rs`、`platform/desktop.rs` 及三个适配器、GNOME 扩展、`runtime/src/heyo/events.ts`（订阅的运行时一侧已有） |
-| G | 未做 | 根搜索提供者（7.10）：`provider` 命令模式、`search.provider` 权限、后台进程里的时限与停用 | `root.rs`、`runtime/src/background.ts`、`src/RootSearch.tsx` |
-| H（v2） | 未做 | 每个扩展一个进程，主机按进程识别来源；权限才成为边界（5.4）。`ExtCaller` 的"来源由通道决定"已为此留位 | `runtime.rs`、`helper.rs` |
+| A | Done | The `ExtRequest` enum, `{ code, message }` errors, requests carrying the extension's name and directory | `wire.rs`, `ext.rs`, `runtime.rs`, `runtime/src/protocol.ts` |
+| B | Done | Permissions: reading the manifest, the deciding function `decide`, the prompt, storage, the settings page; a refusal is remembered for 60 seconds (5.2) | `permissions.rs`, `extensions.rs`, `src/Settings.tsx`, `src/App.tsx` |
+| C | Done | The `@heyo/api` shim and the types package; both package names point to the same object in the `provided` table; the type test `types.check.ts` fastens `index.d.ts` and the runtime together | `runtime/src/heyo/`, `runtime/src/runtime.ts`, `packages/api/` |
+| C2 | Done | The Raycast conformance tests (8.3), and filling in the gaps of 8.1 by them | `runtime/src/api/conformance.test.ts`, `props.test.ts` |
+| C3 | Done | `heyo build`, `heyo migrate`, `heyo ext check` | `packages/cli/` |
+| D | Done | The v1 modules: Windows, Screen, Dictation, Memory, Files, System, Input, AI | `ext.rs` calling the existing `platform::*`, `clipboard`, `files`, `ocr`, `dictation` |
+| E | Done | The built-in commands move to `@heyo/api`: switching windows, the system commands, audio devices, file search, reading and copying from the clipboard history, with 15 `host.*` requests deleted; v0.3 also moved Ask AI, AI Chat and the selected-text actions to `AI.ask` | `runtime/src/builtins/*`, `host.rs` |
+| F | Not done | The event channel (6.2): `Windows.watch`, and every interface in 7.11 where "the host sends messages of its own accord". `bounds` and `setBounds` were done along with D and no longer belong to F | `wire.rs`, `platform/desktop.rs` and the three adapters, the GNOME extension, `runtime/src/heyo/events.ts` (the runtime's side of subscriptions is already there) |
+| G | Not done | Root search providers (7.10): the `provider` command mode, the `search.provider` permission, time limits and disabling in the background process | `root.rs`, `runtime/src/background.ts`, `src/RootSearch.tsx` |
+| H (v2) | Not done | One process per extension, with the host telling the origin by process; only then do permissions become a boundary (5.4). "The origin is decided by the channel" of `ExtCaller` already leaves room for this | `runtime.rs`, `helper.rs` |
 
-A–E（含 C2、C3）是 v1，F–G 是 v1.1。阶段 E 验证了设计：内置命令用这套接口写得顺的地方照旧，写不顺的地方都改成了接口
-（`MemoryItem` 的字段、`byMeaning`、`total`、音频设备、`AI.ask` 的 `messages` 和 `material`），本版规格就是那份清单的结果。
-没有照搬进接口的：固定/删除/清空历史、结束进程、对话的保存——它们是"保管"而不是"读取"，留作 Heyo 的私有请求。
+A–E (with C2 and C3) are v1; F–G are v1.1. Phase E proved the design: where
+the built-in commands were easy to write with this API it stayed as it was,
+and where they were not, the API was changed (the fields of `MemoryItem`,
+`byMeaning`, `total`, audio devices, the `messages` and `material` of
+`AI.ask`); this version of the specification is the result of that list.
+What was not carried over into the API: pinning, deleting and clearing the
+history, ending a process, saving conversations. They are "keeping", not
+"reading", and stay as private requests of Heyo's.
 
 ---
 
-## 12. 待决问题
+## 12. Open questions
 
-1. **包名**：`@heyo/api` 需要在 npm 上注册 `@heyo` 组织，是否可用我没有核实。备选 `heyo-api`。改：包还没发布（`"private": true`），所以还不急。
-2. **对没有 `heyo` 清单的商店扩展**：它们通过 Raycast 接口用到窗口时，是首次询问（本文的选择），还是默认允许以减少打扰？改：现在的实现是首次询问（`Route::Raycast`，8.4）。
-3. **`search.provider` 能看到每次输入**：是否接受安装时一次性同意，还是要求用户在设置里逐个开启？（阶段 G 之前要定。）
-4. **`Memory.add`**：是否在 v1 就开放写入？它让扩展把自己的数据放进统一搜索，但也让索引的内容不再全由 Heyo 决定。改：v1 没有实现，`has("Memory.add")` 为假。
-5. ~~**权限的"仅这一次"**~~ 改：已由实现回答——只有"允许/拒绝"，拒绝记 60 秒（5.2）。要改回三个选项，`permissions.rs` 的 `Decision` 要多一种。
-6. **进程隔离（阶段 H）提前到 v1**：代价是每个扩展多一个 Node.js 进程的内存（实测前我估不出具体数字），好处是权限成为真正的边界。
-7. ~~**Raycast 部分的类型**~~ 改：已由实现回答——转导出（`packages/api/index.d.ts` 里 `export * from "@raycast/api"`，`@raycast/api` 是 peerDependency）。
-8. **Raycast 的 AI 扩展（`Tool`）**：是否在 v1 支持。它是 Raycast 较新的一类扩展，不支持的话"全部能力"要打一个折扣。
-9. **`BrowserExtension`**：需要我们自己发布浏览器扩展才能实现。是否纳入 v1，还是列为已知缺口。改：现在是已知缺口，按名字存在、调用即抛错。
-10. 改，新增：**`AI.ask` 的 `material`**。它是为选中文字操作加的（本地小模型会听材料里的指令，需要围栏和复述任务），
-    扩展同样会遇到这个问题。但 Raycast 没有对应物，在 Raycast 里只能退化成在 prompt 前后加围栏。是保留，还是让扩展自己拼围栏？
+1. **The package name**: `@heyo/api` needs the `@heyo` organization to be
+   registered on npm, and I have not verified whether it is available. The
+   alternative is `heyo-api`. Changed: the package is not published yet
+   (`"private": true`), so there is no hurry.
+2. **Store extensions without a `heyo` manifest**: when they use windows
+   through Raycast's API, are they asked the first time (what this document
+   chooses), or allowed by default so as to interrupt less? Changed: the
+   implementation now asks the first time (`Route::Raycast`, 8.4).
+3. **`search.provider` sees everything typed**: is consent once at install
+   time acceptable, or must the user turn each one on in the settings? (To
+   be settled before phase G.)
+4. **`Memory.add`**: is writing opened in v1 already? It lets an extension
+   put its own data into the unified search, but it also means that what is
+   in the index is no longer all decided by Heyo. Changed: v1 does not
+   implement it, and `has("Memory.add")` is false.
+5. ~~**"Only This Once" for permissions**~~ Changed: answered by the
+   implementation: there is only "Allow" and "Deny", and a refusal is
+   remembered for 60 seconds (5.2). To go back to three choices, `Decision`
+   in `permissions.rs` would need one more variant.
+6. **Bringing process isolation (phase H) forward to v1**: the cost is the
+   memory of one more Node.js process per extension (I cannot estimate the
+   actual figure before measuring), and the gain is that permissions become
+   a real boundary.
+7. ~~**The types of the Raycast part**~~ Changed: answered by the
+   implementation: re-export (`export * from "@raycast/api"` in
+   `packages/api/index.d.ts`, with `@raycast/api` as a peerDependency).
+8. **Raycast's AI extensions (`Tool`)**: whether to support them in v1.
+   They are a newer kind of Raycast extension, and without them "every
+   ability" falls somewhat short.
+9. **`BrowserExtension`**: it can only be implemented if we publish a
+   browser extension of our own. Does it go into v1, or is it listed as a
+   known gap? Changed: it is a known gap now, there by name and throwing
+   when called.
+10. Changed, new: **the `material` of `AI.ask`**. It was added for the
+    selected-text actions (a small local model will obey instructions in
+    the material, and needs the fence and the task repeated), and
+    extensions will meet the same problem. But Raycast has no counterpart,
+    and in Raycast it can only degrade to putting a fence before and after
+    the prompt. Keep it, or let extensions put the fence together
+    themselves?
