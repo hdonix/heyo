@@ -40,8 +40,10 @@ export default defineConfig(() => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching `src-tauri`, and other checkouts of
+      //    this repository under .claude/: one being made or changed would
+      //    reload the interface in the middle of whatever is being tried.
+      ignored: ["**/src-tauri/**", "**/.claude/**"],
     },
   },
 }));
