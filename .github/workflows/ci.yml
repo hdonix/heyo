@@ -13,6 +13,26 @@ permissions:
   contents: read
 
 jobs:
+  commits:
+    name: Commit messages
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # What this push or pull request adds; a branch pushed for the first
+      # time has nothing to be compared with but its own last commit.
+      - name: Check the commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            scripts/check-commits.sh "$HEAD~1..$HEAD"
+          else
+            scripts/check-commits.sh "$BASE..$HEAD"
+          fi
+
   linux:
     name: Linux
     runs-on: ubuntu-24.04

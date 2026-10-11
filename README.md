@@ -59,6 +59,8 @@ the runtime, and `scripts/gui-test/` for what only shows in a window (an X
 server, a session bus and a home directory of its own, so that the desktop
 it runs on is left alone).
 
+How commits are written is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Usage
 
 - Type to fuzzy-search applications; `↑`/`↓` (or `Ctrl+P`/`Ctrl+N`) to move, `Enter` to launch.
