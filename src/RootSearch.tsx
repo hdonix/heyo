@@ -771,7 +771,7 @@ export function RootSearch(props: {
                 ? current.fallback.title
                 : current?.type === "activity"
                   ? current.activity.title
-                  : "Calculator"
+                  : current && "Calculator"
           }
           sections={panelSections}
           onRun={runNode}

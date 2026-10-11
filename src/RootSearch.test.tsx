@@ -248,6 +248,14 @@ test("what is typed in a field, and the focus in it, survive a refresh", async (
   expect(document.activeElement).toBe(fields()[0]);
 });
 
+test("with no row there is nothing the action panel could be named after", async () => {
+  await show([]);
+  expect(container.querySelector(".empty")?.textContent).toBe("No results");
+  await act(async () => [...container.querySelectorAll<HTMLElement>(".footer-button")].pop()!.click());
+  expect(container.querySelector(".action-panel")?.textContent).toContain("No actions");
+  expect(container.querySelector(".action-panel-title")).toBeNull();
+});
+
 test("a click on the calculator does what the calculator does, whichever row is selected", async () => {
   host.calc = { question: "6 × 7", answer: "42", value: "42", label: "Result" };
   await show([item("a")]);
