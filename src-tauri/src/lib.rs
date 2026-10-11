@@ -251,16 +251,6 @@ pub fn run() {
             menubar::start(app.handle());
             updates::start(app.handle());
             expand::start(app.handle());
-            // The dictation window must never take keyboard focus from the
-            // application being dictated into.
-            #[cfg(target_os = "linux")]
-            if let Some(window) = app.get_webview_window(dictation::WINDOW) {
-                use gtk::prelude::GtkWindowExt;
-                if let Ok(gtk_window) = window.gtk_window() {
-                    gtk_window.set_accept_focus(false);
-                    gtk_window.set_focus_on_map(false);
-                }
-            }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let index = Index::new(
