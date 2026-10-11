@@ -90,9 +90,10 @@ you when it ends.
 - **Screenshots**: select an area or a window, annotate, blur, then copy,
   save or pin it on screen; or copy the text in it, recognized on your
   computer.
-- **Dictation**: hold a key, speak, let go; the text is pasted where you
-  are working. Recognized on your computer (Mandarin, Cantonese, English,
-  Japanese, Korean).
+- **Dictation**: hold a key and speak; the words appear where you are
+  working as you say them, through the input method where there is one.
+  Recognized on your computer (Mandarin, Cantonese, English, Japanese,
+  Korean).
 - **Quicklinks and snippets**, with placeholders; snippets can expand as
   you type their keyword.
 - **AI**, if you set it up: ask a question from the search with `Tab`,
