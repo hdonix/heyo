@@ -7,7 +7,8 @@ Windows that runs Raycast extensions.
 here under the same name, so an extension moves over by changing its
 imports; on top are the things Heyo can do that Raycast's API has no name
 for: other applications' windows, the screen and the text on it, dictation,
-the clipboard history, the file index and the system.
+the clipboard history, the file index, the system, and showing what a
+command has in progress while it is away.
 
 The package is not published yet (`"private": true` keeps it from being
 published by accident). The specification is `docs/extension-api.md`.
@@ -63,13 +64,13 @@ an extension can ask before it uses anything:
 |---|---|---|
 | `Windows` | `windows` | `list`, `active`, `activate`, `close`, `arrange`, `setBounds`, `monitors` |
 | `Screen` | `screen.capture`, `screen.text` | `capture` an area the user selects, the screen, a window or a rectangle; `recognizeText` |
-| `Dictation` | `microphone` | `listen`: the text of what is said comes to the extension |
+| `Dictation` | `microphone` | `listen`: the text of what is said comes to the extension; `installed`: whether the speech engine has been downloaded |
 | `Memory`, `ClipboardHistory` | `memory.read`, `clipboard.history` | `Memory.search` (by words, and with `byMeaning` by what they mean), `Memory.get`; `ClipboardHistory.copy` puts an entry back on the clipboard |
 | `Files` | `files.search` | `search`: paths, by name |
 | `System` | `system` | `run` an action (lock, sleep, volume, …), `appearance`, `notify`, `audioDevices`, `useAudioDevice` |
 | `Clipboard.paste(…, { restoreClipboard })` | `input.paste` | puts back what was on the clipboard |
 | `AI.provider()`, `AI.ask(…, { system, messages, images, material, onText })` | `ai` | which model answers; a system prompt; the conversation so far; pictures; text to work on; the answer as it grows |
-| `LiveActivity` | `activity` | `start` something in progress that Heyo shows while the command is away (timers and timed progress counted by Heyo), `update`, `end`; `list`, `get`, `presentation`; events through `onEvent` or a command marked `"heyo": { "handles": "activity" }` |
+| `LiveActivity` | `activity` | `start` something in progress that Heyo shows while the command is away (timers and timed progress counted by Heyo); the handle it gives can `update` and `end` it; `list`, `get`, `presentation`; events through `onEvent` or a command marked `"heyo": { "handles": "activity" }` |
 
 Also `environment.heyoVersion`, `apiVersion`, `platform`, `session` and
 `offline`, and `has("Module.function")`.
@@ -88,6 +89,17 @@ and can be taken back in Heyo's settings, on the extension's page. A
 command in the menu bar or the background cannot ask: until the user has
 allowed it from a command opened in Heyo, its calls fail with `denied`.
 Restarting, shutting down and logging out are confirmed every time.
+
+`screen.text`, `files.search`, `input.paste`, `ai` and `activity` are not
+asked about: listing them is enough. For `activity` the user has a switch
+per extension in Heyo's settings instead, and only a command the user ran
+(or the handler of a button they chose) can start an activity; one run on
+a schedule can update what it has.
+
+A call that needs a permission the manifest does not list fails with
+`denied`, and says which: `LiveActivity.start needs the "activity"
+permission; add it to "heyo.permissions" in package.json.` `heyo ext
+check` finds these before the user does.
 
 Permissions are about what Heyo hands over or does for an extension. They
 do not confine it: an extension is a program that runs as the user, and can

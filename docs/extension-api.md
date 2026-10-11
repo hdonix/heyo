@@ -5,7 +5,7 @@
 本文定义 `@heyo/api`。它是 `@raycast/api` 的**超集**：Raycast 接口的每一个导出都以
 同样的名字和签名存在，所以迁移一个扩展只需要把 `import … from "@raycast/api"` 换成
 `import … from "@heyo/api"`。在此之上，它增加 Heyo 自有的能力（窗口、屏幕与文字识别、
-听写、本地记忆、文件索引、系统操作、根搜索结果）。
+听写、本地记忆、文件索引、系统操作、进行中的活动、根搜索结果）。
 
 不改 import 的 Raycast 扩展照常运行；两个包名在 Heyo 里指向同一份实现。
 
@@ -20,6 +20,7 @@ v0.3 相对 v0.2 的变化：阶段 A–E 做完之后（第 11 节），把规�
 带对话历史（`messages`）、文本材料（`material`）和整段回调（`onText`），Heyo 自己的 Ask AI、AI Chat
 和选中文字操作改走它，失败一律是 `HeyoError`。与实现对齐的还有：权限的拒绝只记 60 秒、没有
 "仅这一次"；`offline` 恒为假；`apiVersion` 不拦安装。第 12 节的问题 5 和 7 已由实现回答。
+此前漏写的 `LiveActivity` 模块（7.9）和 `activity` 权限（5.1）也补上了；它的设计在 `docs/live-activities.md`。
 
 文末第 12 节列出需要你拍板的问题；它们会影响实现，但不影响整体结构。
 
@@ -57,6 +58,11 @@ v0.3 相对 v0.2 的变化：阶段 A–E 做完之后（第 11 节），把规�
   所以 Windows 与 Wayland 的差异不会泄漏到扩展里。
 - **一处声明**。请求与返回类型在 `src-tauri/src/wire.rs` 声明，由 `cargo test`
   生成到 `shared/bindings/`，`@heyo/api` 的类型从那里来。
+  改：Heyo 加的每个函数（所在模块、名字、它发的请求）在 `runtime/src/heyo/members.ts` 声明一次。
+  它需要的权限由主机说了算（`permissions.rs` 的 `needed`，`cargo test` 写到 `shared/bindings/needs.ts`），
+  回复的类型按请求记在 `shared/wire.ts` 的 `ExtReplies` 里。只是转发请求的函数直接由声明生成；
+  类型包、Heyo 之外的桩、`heyo ext check` 认得的模块和权限、测试里的调用表，都拿这份声明对照，
+  少一处多一处都过不了编译或测试。
 
 ---
 
@@ -147,7 +153,7 @@ Raycast 部分的类型有两种做法，需要你决定（第 12 节问题 7）
 
 沿用 `view`、`no-view`、`menu-bar`，新增一种：
 
-- `provider`：向根搜索贡献结果（见 7.9）。
+- `provider`：向根搜索贡献结果（见 7.10）。
 
 ---
 
@@ -184,6 +190,7 @@ if (has("Screen.recognizeText")) { /* … */ }
 | `input.paste` | 向前台应用粘贴文本 | 不询问（与 Raycast 的 `Clipboard.paste` 等同） |
 | `ai` | 使用用户配置的模型 | 不询问（与 Raycast 的 `AI.ask` 等同）。改：Raycast 原有的调用方式不需要清单；用到 Heyo 加的选项（`system`、`messages`、`images`、`material`）或 `AI.provider()` 时，清单里必须列出 `ai`，否则以 `denied` 失败 |
 | `search.provider` | 向根搜索贡献结果，因而能看到用户输入的每个查询 | 安装时询问 |
+| `activity` | 改，新增：在面板的"进行中"区域显示扩展正在做的事，做完时告诉用户（7.9） | 不询问；设置里每个扩展有一个开关，另有总开关，关掉后以 `denied` 失败。只有用户运行的命令能发起新活动 |
 
 ### 5.2 询问与存储
 
@@ -291,9 +298,10 @@ export class HeyoError extends Error {
 `offline` 为真时，扩展应避免联网；Heyo 自己的 `AI` 会只用本地模型。改：Heyo 还没有这个开关，
 `offline` 恒为 `false`；要知道模型是否在本机，问 `AI.provider()`（7.8）。
 
-改：第 7 节的每个 Heyo 模块（`Windows`、`Screen`、`Dictation`、`Memory`、`ClipboardHistory`、`Files`、`System`）
+改：第 7 节的每个 Heyo 模块（`Windows`、`Screen`、`Dictation`、`Memory`、`ClipboardHistory`、`Files`、`System`、`LiveActivity`）
 都有 `supported(): Promise<Support>`，下文不再逐个写出。`Memory` 和 `ClipboardHistory` 在没有剪贴板监听的会话里答 `"limited"`
-（历史仍可读，只是不再增长）；`Files`、`System`、`AI` 总是 `"full"`。
+（历史仍可读，只是不再增长）；`Files`、`System` 总是 `"full"`；`LiveActivity` 目前总是 `"limited"`（7.9）。
+问 `supported()` 不需要权限。
 
 ### 7.2 Windows（v1，权限 `windows`）
 
@@ -611,7 +619,165 @@ export namespace AI {
 - Heyo 之外（`packages/api/index.js`）：`system`、`messages` 的转写和 `material` 的围栏都拼在 prompt 前面交给 Raycast 的 `ask`；
   `onText` 由 `on("data")` 累加；`images` 以 `unsupported` 拒绝。
 
-### 7.9 根搜索结果提供者（v1.1，权限 `search.provider`）
+### 7.9 LiveActivity（v1，权限 `activity`）
+
+改，新增。对应 `activities.rs`。命令不在面板里的时候，由 Heyo 替它显示"正在进行的事"：面板的"进行中"区域，
+以及（桌面支持时）状态栏。计时和按时间推进的进度由 Heyo 自己走，所以命令不必一直运行。
+设计的来由、各桌面的呈现和上限的依据在 `docs/live-activities.md`（接口是它的第 6 节）；这里只写接口。
+
+```ts
+export namespace LiveActivity {
+  /** 不变的部分。 */
+  interface Attributes {
+    /** 同一扩展内唯一。再次 start 同一个 id 等于更新。 */
+    id: string;
+    /** 这是什么（"Build"、"Timer"）。 */
+    name: string;
+    icon: Image.ImageLike;
+    tint?: Color.ColorLike;
+    /** 选中活动本身时做什么。 */
+    action?: Action;
+    /** 用户能否结束它。默认 true。 */
+    dismissible?: boolean;
+    /** 这个桌面上显示不了时怎么办。默认 "notify"。 */
+    fallback?: "notify" | "drop";
+  }
+
+  /** 会变的部分。 */
+  interface Content {
+    /** 折叠态里的内容。缺省时由 title 截断得到。 */
+    compact?: Value;
+    title: string;
+    subtitle?: string;
+    /** 展开态的主体，三选一。 */
+    body?: { progress: Progress } | { timer: Timer } | { text: string };
+    /** 最多三个；出现在展开态和面板的动作面板里。 */
+    actions?: Button[];
+    /** 需要用户处理（确认、回答）：排到前面并标出来。 */
+    needsAttention?: boolean;
+    /** 这之后内容可能不准，显示时变淡。不会结束活动。 */
+    staleAt?: Date;
+    /** 同一个扩展的多个活动之间的次序，0–100。 */
+    relevance?: number;
+  }
+
+  /** 一小段会自己变的内容。 */
+  type Value = string | { timer: Timer } | { progress: Progress } | { icon: Image.ImageLike };
+
+  /** 一个时间区间加一个暂停时刻，由 Heyo 走。 */
+  interface Timer {
+    start: Date;
+    /** 省略表示正计时，没有终点。 */
+    end?: Date;
+    /** 暂停在哪一刻；省略表示在走。 */
+    pausedAt?: Date;
+    /** 有终点时默认倒数。 */
+    countsDown?: boolean;
+    /** "12:05" 或 "12 min"。 */
+    style?: "clock" | "relative";
+  }
+
+  interface Progress {
+    /** 0–1。省略且没有 interval 时为不确定进度。 */
+    value?: number;
+    /** 按时间自己推进。 */
+    interval?: Pick<Timer, "start" | "end" | "pausedAt">;
+  }
+
+  interface Button {
+    title: string;
+    icon?: Image.ImageLike;
+    style?: "regular" | "destructive";
+    action: Action;
+  }
+
+  /** 前三种由 Heyo 直接执行；`event` 送回扩展。 */
+  type Action =
+    | { open: string }
+    | { copy: string }
+    | { launch: { command: string; arguments?: Record<string, string>; context?: unknown } }
+    | { event: string; data?: unknown }
+    | { end: true };
+
+  interface StartOptions {
+    /** 出现时短暂展示一次。默认 true。 */
+    announce?: boolean;
+  }
+
+  interface Alert {
+    /** 短暂展示这次更新。 */
+    expand?: boolean;
+  }
+
+  interface Handle {
+    readonly id: string;
+    /** 每个活动每秒一次，超出的合并。 */
+    update(content: Partial<Content>, options?: { alert?: Alert }): Promise<void>;
+    /** 最终内容显示片刻（"brief"，默认）或立即消失（"none"）。 */
+    end(final?: Partial<Content>, options?: { keep?: "none" | "brief" }): Promise<void>;
+  }
+
+  type Event =
+    | { kind: "action"; id: string; event: string; data?: unknown }
+    | { kind: "dismissed"; id: string }
+    | { kind: "expired"; id: string }
+    | { kind: "elapsed"; id: string; at: number };
+
+  interface Presentation {
+    /** 指状态栏；面板里的区域总在。 */
+    support: Support;
+    /** 折叠态能放多少字。 */
+    compactCharacters: number;
+    /** 展开态是否显示，它的按钮是否显示。 */
+    expanded: boolean;
+    buttons: boolean;
+    /** 版式的版本，以后加版式时递增。 */
+    version: number;
+  }
+}
+
+export const LiveActivity: {
+  supported(): Promise<Support>;
+  /** 发起一个活动，或更新同 id 的那个。 */
+  start(attributes: LiveActivity.Attributes, content: LiveActivity.Content, options?: LiveActivity.StartOptions): Promise<LiveActivity.Handle>;
+  /** 本扩展正在进行的活动。 */
+  list(): Promise<LiveActivity.Handle[]>;
+  get(id: string): Promise<LiveActivity.Handle | undefined>;
+  /** 这个桌面上活动显示成什么样，扩展可据此调整内容。 */
+  presentation(): Promise<LiveActivity.Presentation>;
+  /** 命令运行期间收本扩展活动的事件。返回取消函数。 */
+  onEvent(listener: (event: LiveActivity.Event) => void): Promise<() => void>;
+};
+```
+
+每个函数发的请求和要的权限（取自 `runtime/src/heyo/members.ts` 的声明和主机的 `needed`）：
+
+| 函数 | 请求 | 权限 |
+|---|---|---|
+| `supported()` | `ext.supported`（`module: "activity"`） | 无 |
+| `start` | `ext.activity.start` | `activity` |
+| `list` | `ext.activity.list` | `activity` |
+| `get` | `ext.activity.get` | `activity` |
+| `presentation` | `ext.activity.presentation` | 无 |
+| `onEvent` | `ext.activity.onEvent`（订阅，见 6.2） | `activity` |
+| `Handle.update`、`Handle.end` | `ext.activity.update`、`ext.activity.end` | `activity` |
+
+- **权限**：清单里列出 `activity` 即可，首次使用不询问。用户在设置里可以按扩展关掉，也可以整个关掉；关掉后以 `denied` 失败，
+  Heyo 自己的活动也一样。没列权限时主机的拒绝写的是作者调用的那个名字：
+  `LiveActivity.start needs the "activity" permission; add it to "heyo.permissions" in package.json.`
+- **谁能发起**：只有用户运行的命令，或用户点了活动上的按钮之后被运行的处理命令。定时在后台运行的命令 `start` 一个新活动
+  以 `denied` 失败，更新自己已有的活动不受限。运行时把命令是怎么启动的（`launchType`）写进请求，扩展不传。
+- **上限**：每个扩展同时 3 个活动，属性加内容共 4 KB，按钮 3 个，超出以 `invalid` 失败；折叠态约 10 个字，超出截断
+  （确切值问 `presentation().compactCharacters`）。
+- **先后**：线上的日期是毫秒。每次 `start` 和 `update` 由运行时带一个只增的序号，主机丢掉序号不比已应用的大的更新，
+  所以发起活动的命令和处理按钮的命令同时更新时，旧的不会盖掉新的。句柄不论在哪里被调用，都以创建它的那个命令的名义发请求。
+- **事件**：正在运行的命令用 `onEvent` 订阅；没有命令在听时，主机在后台运行清单里标了 `"heyo": { "handles": "activity" }` 的命令，
+  事件在它的 `launchContext.activity` 里。`elapsed` 是倒计时走到头。
+- **现状**：`supported()` 答 `"limited"`，`presentation()` 答 `support: "none"`、`expanded` 和 `buttons` 为假——活动显示在面板的
+  "进行中"区域，需要用户知道的事另发通知；状态栏还没有画。
+- Heyo 之外（`packages/api/index.js`）：`supported()` 答 `"none"`，其余以 `unsupported` 拒绝。
+
+### 7.10 根搜索结果提供者（v1.1，权限 `search.provider`）
 
 Raycast 没有的能力：扩展不必被打开，就能让自己的条目出现在根搜索里。
 
@@ -649,7 +815,7 @@ export default provider;
 - 连续 5 次超时或抛错的提供者在本次会话里停用，并在设置里标出。
 - `action` 只能是：打开链接或文件、复制文本、粘贴文本、启动本扩展的另一个命令（可带参数）。不能是任意函数，因为结果要跨进程传给界面。
 
-### 7.10 后续（不在 v1）
+### 7.11 后续（不在 v1）
 
 | 接口 | 用途 | 依赖 |
 |---|---|---|
@@ -672,9 +838,9 @@ export default provider;
 |---|---|---|
 | `List`、`Grid`、`Detail`、`Form`、`ActionPanel`、`MenuBarExtra`、`useNavigation` | 已实现 | 属性级核对（8.3） |
 | `Action` 及 `CopyToClipboard`、`Paste`、`Open`、`OpenInBrowser`、`OpenWith`、`ShowInFinder`、`Trash`、`Push`、`SubmitForm` | 已实现 | `OpenWith` 目前不让用户选应用 |
-| `Action.CreateSnippet`、`Action.CreateQuicklink` | 点击后提示不支持 | 接到 Heyo 自己的片段和快捷链接（已有内置命令） |
-| `Action.PickDate` | 点击后提示不支持 | 日期选择界面 |
-| `Action.ToggleQuickLook` | 点击后提示不支持 | 用默认应用预览；或在 Detail 里显示图像和文本 |
+| `Action.CreateSnippet`、`Action.CreateQuicklink` | 已实现。改：打开 Heyo 自己的创建片段、创建快捷链接表单，按传入的内容填好 | 快捷链接的 `application` 和 `icon` 没有去处（一律用默认应用打开） |
+| `Action.PickDate` | 已实现。改：在动作面板里选日期 | — |
+| `Action.ToggleQuickLook` | 已实现。改：图像和文本在压到列表上的一个视图里显示 | 其他类型的文件交给桌面的默认应用打开 |
 | `showToast`、`Toast`、`showHUD`、`confirmAlert`、`Alert` | 已实现 | `showHUD` 的选项被忽略 |
 | `Clipboard`（`copy`、`paste`、`clear`、`read`、`readText`） | 已实现 | — |
 | `LocalStorage`、`Cache` | 已实现 | — |
@@ -683,17 +849,17 @@ export default provider;
 | `open`、`trash`、`showInFinder`、`getApplications`、`getDefaultApplication` | 已实现 | `getApplications(path)` 的参数被忽略 |
 | `getSelectedText` | 已实现 | — |
 | `closeMainWindow`、`popToRoot`、`clearSearchBar` | 已实现 | 选项（`clearRootSearch`、`popToRootType`）被忽略 |
-| `launchCommand` | 只能启动本扩展的命令 | 跨扩展启动，需用户同意（Raycast 也如此） |
-| `environment` | 已实现 | `appearance` 写死为 `"dark"`；`raycastVersion` 是固定字符串 |
+| `launchCommand` | 已实现。改：也能启动其他已安装扩展的命令，首次由用户同意（面板里问一次，按发起方记住；菜单栏和后台里没人可问，未获同意时失败） | 带视图的命令不能在后台启动；只有面板里的那个命令，或用户点了菜单项的菜单栏命令，能把别的命令开进面板 |
+| `environment` | 已实现。改：`appearance` 跟着 Heyo 界面的明暗走（运行时启动时由主机告知，之后随设置变化更新） | `raycastVersion` 是固定字符串；`textSize` 恒为 `"medium"`；`launchContext` 和三个 `entryPoint*` 字段还没有（8.3） |
 | `AI.ask` | 已实现（改：含 `creativity` → 温度，以及 7.8 的 `system`、`messages`、`images`、`material`、`onText`） | `model` 按设置里的模型执行；见 7.8 |
 | `Icon`、`Color`、`Image`、`Keyboard` | 已实现 | 图标表随 Raycast 版本更新 |
 | `getFrontmostApplication` | 已实现（2026-10-10） | 找不到对应的已安装应用时，只返回窗口类名 |
 | `WindowManagement`（4 个函数） | 已实现（2026-10-10），X11 上实测 | "桌面"按显示器算；`"fullscreen"` 是最大化；单位是物理像素；窗口的 `application` 字段未填 |
 | `updateCommandMetadata` | 空操作 | 让根搜索显示命令的动态副标题 |
 | `getSelectedFinderItems` | 返回空数组 | 文件管理器里选中的文件；GNOME 上需经 Shell 扩展，其余会话返回空 |
-| `BrowserExtension` | 抛错 | 需要配套的浏览器扩展（7.10） |
+| `BrowserExtension` | 抛错 | 需要配套的浏览器扩展（7.11） |
 | `Tool`（AI 扩展的工具确认） | 没有 | 取决于是否支持 Raycast 的 AI 扩展 |
-| 已弃用的导出（`copyTextToClipboard`、`showInFinder` 之外的旧 Action 组件、`getLocalStorageItem` 等） | 只有 `randomId` | 作为现有实现的别名补齐，旧扩展才能直接运行 |
+| 已弃用的导出（`copyTextToClipboard`、旧的 Action 组件、`getLocalStorageItem` 等） | 已实现。改：作为现有实现的别名补齐（8.3） | — |
 
 ### 8.2 做不到同行为的地方
 
@@ -730,12 +896,8 @@ export default provider;
 **组件属性**：第二个测试 `runtime/src/api/props.test.ts` 从类型里取出每个 Raycast 组件的属性名，
 检查渲染组件的代码里有没有出现过。从未出现的属性一定是被忽略的。首次运行后修掉了三处
 （旧属性名 `enableFiltering`、`accessoryTitle`、`accessoryIcon`，以及 `Action.CopyToClipboard` 的 `transient`），
-剩下的记在 `props.gaps.json`：
-
-- `storeValue`（表单各字段和下拉框：记住上次的值），9 个组件。
-- `Form.FilePicker` 的四个选项（多选、选目录、选文件、显示隐藏文件）。
-- `quickLook`（列表项和网格项）、`Form.enableDrafts`、`Form.TextArea.enableMarkdown`、
-  `Action.CreateSnippet.snippet`、`MenuBarExtra.Item.alternate`。
+剩下的记在 `props.gaps.json`。改：现在只剩三个——`Form.enableDrafts`、`Form.TextArea.enableMarkdown`、
+`MenuBarExtra.Item.alternate`；当初记下的 `storeValue`、`Form.FilePicker` 的选项、`quickLook` 和 `Action.CreateSnippet.snippet` 后来都接上了，已不在清单里。
 
 这个测试只能找出"肯定没处理"的属性。名字出现过的属性仍可能只处理了一部分，那要靠逐个组件对照，
 数不出来。
@@ -798,8 +960,8 @@ Raycast 部分的接口不要求 `heyo` 清单字段，否则商店里的扩展�
 | C3 | 完成 | `heyo build`、`heyo migrate`、`heyo ext check` | `packages/cli/` |
 | D | 完成 | v1 模块：Windows、Screen、Dictation、Memory、Files、System、Input、AI | `ext.rs` 调用现有 `platform::*`、`clipboard`、`files`、`ocr`、`dictation` |
 | E | 完成 | 内置命令改用 `@heyo/api`：切换窗口、系统命令、音频设备、文件搜索、剪贴板历史的读取与复制，删掉 15 个 `host.*`；v0.3 又把 Ask AI、AI Chat、选中文字操作改走 `AI.ask` | `runtime/src/builtins/*`、`host.rs` |
-| F | 未做 | 事件通道（6.2）：`Windows.watch`，以及 7.10 里凡是"主机主动发消息"的接口。`bounds`、`setBounds` 已随 D 做完，不再属于 F | `wire.rs`、`platform/desktop.rs` 及三个适配器、GNOME 扩展、`runtime/src/heyo/events.ts`（订阅的运行时一侧已有） |
-| G | 未做 | 根搜索提供者（7.9）：`provider` 命令模式、`search.provider` 权限、后台进程里的时限与停用 | `root.rs`、`runtime/src/background.ts`、`src/RootSearch.tsx` |
+| F | 未做 | 事件通道（6.2）：`Windows.watch`，以及 7.11 里凡是"主机主动发消息"的接口。`bounds`、`setBounds` 已随 D 做完，不再属于 F | `wire.rs`、`platform/desktop.rs` 及三个适配器、GNOME 扩展、`runtime/src/heyo/events.ts`（订阅的运行时一侧已有） |
+| G | 未做 | 根搜索提供者（7.10）：`provider` 命令模式、`search.provider` 权限、后台进程里的时限与停用 | `root.rs`、`runtime/src/background.ts`、`src/RootSearch.tsx` |
 | H（v2） | 未做 | 每个扩展一个进程，主机按进程识别来源；权限才成为边界（5.4）。`ExtCaller` 的"来源由通道决定"已为此留位 | `runtime.rs`、`helper.rs` |
 
 A–E（含 C2、C3）是 v1，F–G 是 v1.1。阶段 E 验证了设计：内置命令用这套接口写得顺的地方照旧，写不顺的地方都改成了接口
