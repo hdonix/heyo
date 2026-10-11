@@ -1,5 +1,5 @@
 //! Which colour scheme the interface uses: the system's, or the one chosen
-//! in the settings. The colours themselves are in styles/tokens.css, which
+//! in the settings. The colours themselves are in styles/base/_tokens.scss, which
 //! follows `color-scheme`; all this does is say which, on the root element.
 
 import type { Appearance } from "../shared/bindings/Appearance";
