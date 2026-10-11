@@ -6,13 +6,15 @@
 //! toggles), shows the progress window, and writes what is heard into the
 //! application the user is working in.
 //!
-//! How it is written is `onscreen`'s to say: the words as they are spoken,
-//! corrected where they stand ("type as you speak", where the session and
-//! the window allow it), or each sentence when it is finished, or the
-//! polished text once at the end. A thread per recording (`write`) carries
-//! that out, so that a slow application holds up neither the helper nor
-//! the window, and of the sentence in progress only the newest state is
-//! ever written: what was heard meanwhile is skipped.
+//! How the words reach the application is a [`Way`], chosen when the
+//! recording starts. There is one so far: pasted (`Paster`, which does
+//! what `onscreen` decides): the words as they are spoken, corrected where
+//! they stand ("type as you speak", where the session and the window allow
+//! it), or each sentence when it is finished, or the polished text once at
+//! the end. A thread per recording (`write`) carries that out, so that a
+//! slow application holds up neither the helper nor the window, and of the
+//! sentence in progress only the newest state is ever written: what was
+//! heard meanwhile is skipped.
 
 mod onscreen;
 
@@ -314,9 +316,39 @@ fn not_here(class: Option<&str>, own: bool, excluded: impl FnOnce(&str) -> bool)
     }
 }
 
-/// Writes one recording into the application: carries out what `OnScreen`
+/// What is heard of a recording, as whoever writes it into the application
+/// is told.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Spoken<'a> {
+    /// The sentence in progress, as far as it is recognized.
+    Partial(&'a str),
+    /// A finished sentence, as it is written after those before it.
+    Sentence(&'a str),
+    /// The recording is over: `text` is what should stand, which is other
+    /// than what was heard if it was `polished`.
+    Result { text: &'a str, polished: bool },
+    Cancelled,
+    /// The recording broke off: no more will be heard.
+    Failed,
+}
+
+/// A way for the words of one recording to reach the application.
+trait Way: Send {
+    /// Something was heard.
+    fn hear(&mut self, spoken: Spoken);
+
+    /// Whether the words are on screen in the application as they are
+    /// spoken, once that is decided: what the dictation window need not
+    /// show too.
+    fn live(&self) -> Option<bool>;
+
+    /// What could not be done at the end, once the recording is over.
+    fn shortfall(&self) -> Option<Shortfall>;
+}
+
+/// The words pasted into the application: carries out what `OnScreen`
 /// says, and tells it when a step could not be carried out.
-struct Writer {
+struct Paster {
     /// The words are wanted as they are spoken (the setting, the session).
     live: bool,
     /// The text is polished when the recording ends.
@@ -338,19 +370,9 @@ struct Writer {
     put_off: bool,
 }
 
-impl Writer {
-    fn new(live: bool, polishing: bool, clipboard: pasting::Loan, own_presses: Arc<AtomicU32>, here: Box<dyn Fn() -> Result<Vec<String>, &'static str> + Send>) -> Writer {
-        Writer { live, polishing, here, clipboard, screen: None, hand: None, own_presses, put_off: false }
-    }
-
-    /// Whether the words are going in as they are spoken, once that is
-    /// decided: what the window need not show too.
-    fn writing_live(&self) -> Option<bool> {
-        self.screen.as_ref().map(|screen| screen.live() && !self.put_off)
-    }
-
-    fn shortfall(&self) -> Option<Shortfall> {
-        self.screen.as_ref().and_then(OnScreen::shortfall)
+impl Paster {
+    fn new(live: bool, polishing: bool, clipboard: pasting::Loan, own_presses: Arc<AtomicU32>, here: Box<dyn Fn() -> Result<Vec<String>, &'static str> + Send>) -> Paster {
+        Paster { live, polishing, here, clipboard, screen: None, hand: None, own_presses, put_off: false }
     }
 
     /// Decides, at the first words, how this recording is written.
@@ -364,8 +386,8 @@ impl Writer {
         OnScreen::new(self.hand.is_some(), self.polishing)
     }
 
-    /// Something was heard.
-    fn hear(&mut self, event: onscreen::Event) {
+    /// Something was heard, or became of the last step.
+    fn on(&mut self, event: onscreen::Event) {
         let mut screen = match self.screen.take() {
             Some(screen) => screen,
             // With nothing said there is nothing to decide.
@@ -403,20 +425,64 @@ impl Writer {
         }
         self.screen = Some(screen);
     }
+}
+
+impl Way for Paster {
+    fn hear(&mut self, spoken: Spoken) {
+        match spoken {
+            Spoken::Partial(text) => self.on(onscreen::Event::Partial(text)),
+            Spoken::Sentence(text) => self.on(onscreen::Event::Sentence(text)),
+            Spoken::Result { text, polished } => self.on(onscreen::Event::Result { text, polished }),
+            Spoken::Cancelled => self.on(onscreen::Event::Cancelled),
+            // Not another word is written.
+            Spoken::Failed => {}
+        }
+    }
+
+    fn live(&self) -> Option<bool> {
+        self.screen.as_ref().map(|screen| screen.live() && !self.put_off)
+    }
+
+    fn shortfall(&self) -> Option<Shortfall> {
+        self.screen.as_ref().and_then(OnScreen::shortfall)
+    }
+}
+
+/// Writes one recording into the application.
+struct Writer {
+    way: Box<dyn Way>,
+}
+
+impl Writer {
+    fn new(paster: Paster) -> Writer {
+        Writer { way: Box::new(paster) }
+    }
+
+    /// Something was heard.
+    fn hear(&mut self, spoken: Spoken) {
+        self.way.hear(spoken);
+    }
+
+    /// Whether the words are going in as they are spoken, once that is
+    /// decided: what the window need not show too.
+    fn writing_live(&self) -> Option<bool> {
+        self.way.live()
+    }
 
     /// The helper's last word on the recording, as the window is to be
     /// told it: with what could not be done added.
     fn end(&mut self, mut event: Value) -> Value {
         if event["type"] != "result" {
+            self.hear(Spoken::Failed);
             return event;
         }
         let text = event["text"].as_str().unwrap_or_default().to_owned();
         let heard = match event["cancelled"] == true {
-            true => onscreen::Event::Cancelled,
-            false => onscreen::Event::Result { text: &text, polished: event["polished"] == true },
+            true => Spoken::Cancelled,
+            false => Spoken::Result { text: &text, polished: event["polished"] == true },
         };
         self.hear(heard);
-        match self.shortfall() {
+        match self.way.shortfall() {
             // The text in the application is what was heard.
             Some(Shortfall::NotPolished(why)) => {
                 event["warning"] = json!(why);
@@ -456,16 +522,16 @@ fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool) ->
     let app = app.clone();
     let spawned = std::thread::Builder::new().name("dictation-writing".into()).spawn(move || {
         let asking = app.clone();
-        let mut writer = Writer::new(live, polishing, pasting::borrow(), mailbox.own_presses.clone(), Box::new(move || here(&asking)));
+        let mut writer = Writer::new(Paster::new(live, polishing, pasting::borrow(), mailbox.own_presses.clone(), Box::new(move || here(&asking))));
         let mut told = None;
         let last = loop {
             let last = match mailbox.next() {
                 Said::Partial(text) => {
-                    writer.hear(onscreen::Event::Partial(&text));
+                    writer.hear(Spoken::Partial(&text));
                     None
                 }
                 Said::Sentence(text) => {
-                    writer.hear(onscreen::Event::Sentence(&text));
+                    writer.hear(Spoken::Sentence(&text));
                     None
                 }
                 Said::Ended(event) => Some(writer.end(event)),
@@ -823,7 +889,6 @@ mod tests {
     use crate::platform::desktop::fake::Fake;
     use crate::platform::desktop::Supported;
     use crate::platform::Support;
-    use onscreen::Event;
 
     const HOTKEY: &str = "<Control><Alt>d";
     const SECOND: Duration = Duration::from_secs(1);
@@ -831,7 +896,7 @@ mod tests {
     /// A writer for the window in front of a desk (`pasting::scripted`),
     /// which takes words as they are spoken.
     fn writer(pasting: &'static pasting::Pasting, live: bool, polishing: bool) -> Writer {
-        Writer::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()])))
+        Writer::new(Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()]))))
     }
 
     /// What the helper said, line by line: `~text` is the sentence in
@@ -839,8 +904,8 @@ mod tests {
     fn hear(writer: &mut Writer, said: &[&str]) {
         for line in said {
             match line.strip_prefix('~') {
-                Some(partial) => writer.hear(Event::Partial(partial)),
-                None => writer.hear(Event::Sentence(line)),
+                Some(partial) => writer.hear(Spoken::Partial(partial)),
+                None => writer.hear(Spoken::Sentence(line)),
             }
         }
     }
@@ -954,7 +1019,7 @@ mod tests {
         let (desktop, _, pasting) = desk("org.gnome.Ptyxis", None);
         desktop.during(|| {
             let here = || not_here(crate::windows::active_class().as_deref(), false, |_| false).map_or(Ok(Vec::new()), Err);
-            let mut writer = Writer::new(true, false, pasting.borrow(), Arc::default(), Box::new(here));
+            let mut writer = Writer::new(Paster::new(true, false, pasting.borrow(), Arc::default(), Box::new(here)));
             hear(&mut writer, &["~ls", "ls minus la.", "~ And", " And then\nmake."]);
             assert_eq!(asked(desktop), ["copy ls minus la.", "wait 60", "paste terminal", "copy  And then\nmake.", "wait 60", "copy And then make.", "wait 60", "paste terminal"]);
             assert_eq!(writer.writing_live(), Some(false));
@@ -1064,11 +1129,11 @@ mod tests {
         let (desktop, _, pasting) = desk("firefox", None);
         desktop.during(|| {
             let mailbox = Mailbox::default();
-            let mut writer = Writer::new(true, false, pasting.borrow(), mailbox.own_presses.clone(), Box::new(|| Ok(Vec::new())));
-            writer.hear(Event::Partial("One"));
+            let mut writer = Writer::new(Paster::new(true, false, pasting.borrow(), mailbox.own_presses.clone(), Box::new(|| Ok(Vec::new()))));
+            writer.hear(Spoken::Partial("One"));
             // The window's own button is pressed, to finish.
             mailbox.own_presses.fetch_add(1, Ordering::SeqCst);
-            writer.hear(Event::Sentence("One two."));
+            writer.hear(Spoken::Sentence("One two."));
             assert_eq!(asked(desktop), ["write", "rewrite 0 with One", "own presses 1", "rewrite 0 with  two."]);
         });
     }
