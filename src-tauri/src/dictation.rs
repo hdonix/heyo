@@ -862,6 +862,10 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
         let settings = settings.0.read().unwrap();
         (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live)
     };
+    // Before the helper is told: one that is already running answers at
+    // once, and the window must not hear that it is ready before it hears
+    // that a recording begins.
+    emit(app, json!({ "type": "start", "polish": polish }));
     let started = (|| {
         if state.helper.is_none() {
             state.helper = Some(start_helper(app)?);
@@ -886,7 +890,6 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
             }
             drop(state);
             show_window(app);
-            emit(app, json!({ "type": "start", "polish": polish }));
         }
         Err(e) => {
             drop(state);
