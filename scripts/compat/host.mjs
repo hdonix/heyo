@@ -4,6 +4,9 @@
 //! with small, plausible, made-up data, and DOES nothing. A request that
 //! would open, paste, trash, end or change something is written down and
 //! answered as done.
+//!
+//! Every `ext.*` request there is has an answer here: `host.test.ts` goes
+//! through the host's own list of them (`shared/bindings/needs.ts`).
 
 /// The requests that would do something to the user's computer.
 export const EFFECTS = new Set([
@@ -20,6 +23,11 @@ export const EFFECTS = new Set([
   "ext.system.useAudioDevice",
   "host.processes.end",
   "ext.clipboardHistory.copy",
+  "ext.clipboard.paste",
+  "ext.system.notify",
+  "ext.activity.start",
+  "ext.activity.update",
+  "ext.activity.end",
   "host.clipboardHistory.chose",
   "host.clipboardHistory.pin",
   "host.clipboardHistory.delete",
@@ -44,6 +52,14 @@ const WINDOWS = [
   { id: 6291463, title: "notes.txt — Text Editor", class: "org.gnome.TextEditor", active: false, bounds: { x: 1280, y: 32, width: 640, height: 1048 } },
 ];
 
+/// What the host refuses for want of something the test machine has not
+/// got, with the code it refuses with (`ErrorCode` in wire.rs).
+const REFUSED = {
+  "ext.screen.capture": { code: "unsupported", message: "There is no screen to take a picture of here." },
+  "ext.screen.recognizeText": { code: "unavailable", message: "Text recognition is not set up yet. Download it in Heyo Settings → Screenshots." },
+  "ext.dictation.listen": { code: "unavailable", message: "Dictation is not set up yet. Download it in Heyo Settings → Dictation." },
+};
+
 const short = (value, limit = 200) => {
   const text = typeof value === "string" ? value : JSON.stringify(value ?? null);
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
@@ -59,6 +75,7 @@ export function createHost({ home = "/home/user" } = {}) {
   const effects = [];
   /// Requests this stand-in has no answer for.
   const unknown = [];
+  let subscriptions = 0;
 
   const answers = {
     "host.hide": () => null,
@@ -98,6 +115,20 @@ export function createHost({ home = "/home/user" } = {}) {
       { pid: 2733, cpu: 0.1, memory: 48_000_000, name: "node", command: "node server.js", ports: [3000] },
     ],
     "ext.memory.search": () => ({ items: [], understood: { terms: [] }, relaxed: false }),
+    "ext.memory.get": () => null,
+    // Nothing to capture and no engines, which is what the refusals say.
+    "ext.supported": ({ module } = {}) => (module === "screen" ? "none" : module === "activity" ? "limited" : "full"),
+    "ext.dictation.installed": () => false,
+    "ext.dictation.stop": () => null,
+    "ext.unsubscribe": () => null,
+    "ext.system.appearance": () => "dark",
+    // As `host.ai` has it: Claude, with no key.
+    "ext.ai.provider": () => ({ kind: "claude", model: "", local: false }),
+    "ext.activity.start": ({ attributes } = {}) => ({ id: String(attributes?.id ?? "") }),
+    "ext.activity.list": () => [],
+    "ext.activity.get": () => false,
+    "ext.activity.presentation": () => ({ support: "none", compactCharacters: 10, expanded: false, buttons: false, version: 1 }),
+    "ext.activity.onEvent": () => ({ subscription: ++subscriptions }),
     "host.clipboardHistory.status": () => ({ recording: true, paused: false }),
     // The alert a command raises before doing something: declined, so the
     // launch stays the least a command does.
@@ -105,9 +136,11 @@ export function createHost({ home = "/home/user" } = {}) {
   };
 
   /// The reply to a request: `{ result }`, or `{ error }` as the host
-  /// refuses a request it does not know.
+  /// refuses a request it does not know (in words) or cannot do here (with
+  /// a code).
   function answer(method, params) {
     used[method] = (used[method] ?? 0) + 1;
+    if (REFUSED[method]) return { error: REFUSED[method] };
     if (EFFECTS.has(method) && effects.length < 40) effects.push({ method, params: short(params) });
     if (method === "host.hud" && effects.length < 40) effects.push({ method, params: short(params?.text) });
     const known = answers[method];

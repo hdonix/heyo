@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { needs } from "../../shared/bindings/needs";
 import { createHost, EFFECTS } from "./host.mjs";
 
 describe("the stand-in host", () => {
@@ -33,8 +34,29 @@ describe("the stand-in host", () => {
 
   it("answers every request that does something without doing it", () => {
     const host = createHost();
-    for (const method of EFFECTS) expect(host.answer(method, {})).toEqual({ result: null });
+    // Done, as far as the command is told: null, or what the host answers with (an activity's id).
+    for (const method of EFFECTS) expect(host.answer(method, {}), method).toEqual({ result: method === "ext.activity.start" ? { id: "" } : null });
     expect(host.unknown).toEqual([]);
+    expect(host.effects.map((e) => e.method)).toEqual([...EFFECTS]);
+  });
+
+  it("answers everything an extension can ask through @heyo/api, by the host's own list of it", () => {
+    const host = createHost();
+    const refused: string[] = [];
+    for (const method of Object.keys(needs)) {
+      const reply = host.answer(method, {});
+      if (!("error" in reply)) expect(reply, method).toHaveProperty("result");
+      // Refused as the host refuses what it cannot do: with a code.
+      else expect(refused.push(method) && reply.error, method).toEqual({ code: expect.stringMatching(/^un(supported|available)$/), message: expect.any(String) });
+    }
+    expect(host.unknown).toEqual([]);
+    // There is no screen, and neither engine.
+    expect(refused).toEqual(["ext.dictation.listen", "ext.screen.capture", "ext.screen.recognizeText"]);
+    expect(host.answer("ext.supported", { module: "screen" }).result).toBe("none");
+    expect(host.answer("ext.supported", { module: "windows" }).result).toBe("full");
+    expect(host.answer("ext.activity.start", { attributes: { id: "build" } }).result).toEqual({ id: "build" });
+    expect(host.answer("ext.activity.onEvent").result).not.toEqual(host.answer("ext.activity.onEvent").result);
+    expect(host.effects.map((e) => e.method)).toContain("ext.activity.start");
   });
 
   it("gives back from the clipboard what was copied to it", () => {
