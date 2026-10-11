@@ -153,6 +153,8 @@ fn start_helper(app: &AppHandle) -> Result<Helper, String> {
             let state = ended.state::<Dictation>();
             let mut state = state.0.lock().unwrap();
             state.helper = None;
+            // A recording that ends this way borrowed the clipboard too.
+            let _clipboard = state.clipboard.take();
             if std::mem::take(&mut state.recording) {
                 let listener = state.listener.take();
                 drop(state);
@@ -185,7 +187,12 @@ fn paste(app: &AppHandle, text: &str) {
     if let Err(e) = pasted {
         eprintln!("heyo: dictation could not paste: {e}");
     }
-    app.state::<Dictation>().0.lock().unwrap().clipboard = Some(clipboard);
+    let state = app.state::<Dictation>();
+    let mut state = state.0.lock().unwrap();
+    // Kept for the next sentence, unless the recording ended meanwhile.
+    if state.recording {
+        state.clipboard = Some(clipboard);
+    }
 }
 
 /// What an event from the helper calls for.
@@ -322,7 +329,9 @@ pub fn finish(app: &AppHandle) {
     if let Err(e) = send(&mut state, &json!({ "cmd": "stop", "polish": polish, "apiKey": api_key, "ai": ai })) {
         state.recording = false;
         let listener = state.listener.take();
+        let clipboard = state.clipboard.take();
         drop(state);
+        drop(clipboard);
         if let Some(listener) = listener {
             listener(Heard::Failed(e.clone()));
         }
