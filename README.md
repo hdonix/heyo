@@ -1,18 +1,154 @@
-<img src="src-tauri/icons/128x128@2x.png" width="96" alt="" align="right">
+<p align="center">
+  <img src="src-tauri/icons/128x128@2x.png" width="96" alt="">
+</p>
+<h1 align="center">Heyo</h1>
+<p align="center">A command palette for Linux that runs Raycast extensions.</p>
+<p align="center">
+  <a href="https://github.com/hdonix/heyo/actions/workflows/ci.yml"><img src="https://github.com/hdonix/heyo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
-# Heyo
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/palette-dark.png">
+    <img src="docs/images/palette-light.png" width="830" alt="Heyo's palette as it opens: a search field over a list of favorites (Files, Firefox, Clipboard History) and suggestions (Terminal, Search Emoji &amp; Symbols, Calendar, Capture Screenshot, Switch Windows)">
+  </picture>
+</p>
 
-[![CI](https://github.com/hdonix/heyo/actions/workflows/ci.yml/badge.svg)](https://github.com/hdonix/heyo/actions/workflows/ci.yml)
+Heyo is a launcher you drive from the keyboard: press a hotkey, type a few
+letters, press `Enter`. It opens applications, calculates, keeps a
+clipboard history, arranges windows, takes screenshots and dictation, and
+runs extensions written for [Raycast](https://www.raycast.com): the same
+builds the Raycast Store hands out, installed from inside Heyo.
 
-A cross-platform command palette launcher. It launches desktop applications
-and runs [Raycast](https://www.raycast.com) extensions on Linux.
+It is early: there has been no release yet. Heyo is developed and used
+every day on Ubuntu 24.04 (GNOME on X11); [where else it
+runs](#where-it-runs), and how far along, is below. Heyo is not affiliated
+with Raycast.
 
-Heyo is early. It is developed and used daily on Ubuntu 24.04 (GNOME on
-X11, arm64); GNOME on Wayland is tested in a container, and the Windows
-build starts and launches applications in a virtual machine. How the 100
-most-downloaded extensions of the Raycast Store fare is measured in
-[docs/compatibility.md](docs/compatibility.md). Heyo is not affiliated with
-Raycast.
+## What it does
+
+### Search, and act on what you find
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/search-dark.png">
+    <img src="docs/images/search-light.png" width="830" alt="The search for “fi”: Files and Firefox, marked as favorites, then other applications and commands; the action panel is open on Files with Open Application, Remove from Favorites, Set Alias, Set Hotkey and Reset Ranking">
+  </picture>
+</p>
+
+One search over applications, commands, quicklinks and snippets. It
+learns from use: what you open often comes first, and the empty search
+shows your favorites and suggestions. `Ctrl+K` opens what can be done
+with the selected row; any row can have an alias and a hotkey of its own.
+What the search does not find can be handed on to the web, to files or to
+your own quicklinks.
+
+### Calculate and convert
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/calculator-dark.png">
+    <img src="docs/images/calculator-light.png" width="830" alt="“128 usd in eur” typed into the search, answered by the calculator with the amount in euros and the date of the rates">
+  </picture>
+</p>
+
+Arithmetic, units, currencies and time zones, answered as you type:
+`15% of 80`, `5 km in mi`, `100 usd in cny`, `3pm pst in beijing`. `Enter`
+copies the answer.
+
+### Clipboard History
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/clipboard-history-dark.png">
+    <img src="docs/images/clipboard-history-light.png" width="830" alt="Clipboard History: on the left a note, a link, an image, a color and two commands, each with the icon of the application it was copied in; on the right the selected entry and where and when it was copied">
+  </picture>
+</p>
+
+Text, links, colors, file paths and images, with the application each was
+copied in. Search it by words, by when (`yesterday`, `上周三`), by where
+from (`from firefox`) or by kind (`images`). It is kept on your computer,
+and what a password manager marks as secret is never recorded.
+
+### What is in progress
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/live-activity-dark.png">
+    <img src="docs/images/live-activity-light.png" width="830" alt="The palette with an In Progress section above the favorites: a 25 minute timer counting down, with Pause as its action">
+  </picture>
+</p>
+
+A timer, or something an extension reports as under way, stays at the top
+of the palette while its command is away, with its own actions, and tells
+you when it ends.
+
+### And the rest
+
+- **Windows**: switch between open windows; halves, quarters, thirds,
+  maximize, center and next display for the focused one.
+- **Screenshots**: select an area or a window, annotate, blur, then copy,
+  save or pin it on screen; or copy the text in it, recognized on your
+  computer.
+- **Dictation**: hold a key, speak, let go; the text is pasted where you
+  are working. Recognized on your computer (Mandarin, Cantonese, English,
+  Japanese, Korean).
+- **Quicklinks and snippets**, with placeholders; snippets can expand as
+  you type their keyword.
+- **AI**, if you set it up: ask a question from the search with `Tab`,
+  act on the text selected in any application. With Claude, or a model on
+  your own computer.
+- **Emoji and symbols**, file search, bookmarks and history of your
+  browsers, audio devices, processes, lock, sleep and the other system
+  commands.
+
+[docs/usage.md](docs/usage.md) describes each, with its keys.
+
+## Raycast extensions
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/store-dark.png">
+    <img src="docs/images/store-light.png" width="830" alt="Search Raycast Store in Heyo: the store's most-downloaded extensions, each with its number of commands and downloads, and Install Extension as the action">
+  </picture>
+</p>
+
+**Search Raycast Store** browses the store, and `Enter` installs an
+extension; its commands then appear in the search like Heyo's own. They
+run unchanged, in Node.js, and Heyo draws their lists, grids, details and
+forms itself.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/extension-dark.png">
+    <img src="docs/images/extension-light.png" width="830" alt="The Tailwind CSS extension from the Raycast Store running in Heyo: its Search Colors command showing the shades of blue as a grid">
+  </picture>
+</p>
+
+Not all of them work. Many extensions are written for macOS alone
+(AppleScript, macOS programs), and those parts cannot run here. Of the 100
+most-downloaded extensions, launched command by command on Linux, 15
+launch cleanly, 19 stop at something only their user can give (an API
+key, a sign-in), 49 launch but contain parts that cannot work here, 8 are
+inconclusive and 9 fail. [docs/compatibility.md](docs/compatibility.md)
+has the method and the full results.
+
+To write an extension, or bring one over: `heyo dev`, `heyo build`,
+`heyo ext check` and `heyo migrate` do without Raycast's own tool
+([docs/developing-extensions.md](docs/developing-extensions.md)), and
+[`@heyo/api`](packages/api/README.md) is `@raycast/api` with more on top:
+windows, the screen, dictation, the clipboard history, live activities.
+
+## Where it runs
+
+| Platform | State |
+|---|---|
+| **Linux, GNOME on X11** | Where Heyo is developed and used every day (Ubuntu 24.04, arm64; CI builds and tests on x86_64). Everything on this page works here. |
+| **Linux, GNOME on Wayland** | Through a small Shell extension that Heyo carries and offers to install (GNOME 45 to 50). Windows, pasting, the clipboard history and screenshots then work as on X11; snippets do not expand as you type. Tested in a container running GNOME 50, not yet on a real session. |
+| **Linux, other X11 desktops** | The X11 code is not GNOME's alone, but hotkeys are only set up for you on GNOME (elsewhere, bind a shortcut to `heyo`), and no other desktop has had daily use. |
+| **KDE, Sway, Hyprland and other Wayland desktops** | Not supported. Heyo has no adapter for them, which leaves launching, extensions and what generic tools can do; [docs/wayland.md](docs/wayland.md) says what each would take. |
+| **Windows** | Behind. It compiles in CI, and a build ran in a Windows 11 virtual machine: the palette on `Alt+Space`, the Start menu's applications, a window layout, pasting, the clipboard history. Screen capture, the selected text, the hold-to-talk key, application icons and the installer are written and have only been compiled. Dictation does not work there yet. |
+| **macOS** | No. |
 
 ## Install
 
@@ -20,509 +156,66 @@ There are no released packages yet: build from source, or have the
 packages built, for Linux and Windows on x86_64 and arm64, as
 [packaging/README.md](packaging/README.md) describes.
 
-Heyo needs WebKitGTK 4.1 and, for extensions, dictation and text
-recognition, Node.js 22 or newer: `node` on `PATH`, or its path in
-Settings → Advanced. The launcher itself works without Node.js.
-
-- **Debian, Ubuntu**: `sudo apt install ./Heyo_<version>_<arch>.deb`. The
-  package only recommends Node.js, because most releases ship an older one
-  than Heyo needs; install a current one from nodejs.org or with a version
-  manager.
-- **Fedora, openSUSE**: `sudo dnf install ./Heyo-<version>-1.<arch>.rpm`.
-- **From source**, for the current user, under `~/.local`:
-
-  ```sh
-  pnpm install
-  scripts/install.sh --build       # scripts/install.sh --uninstall removes it
-  ```
-
-How the packages are built, and the state of the AppImage, the Windows
-installer, the AUR package and Flatpak, is in
-[packaging/README.md](packaging/README.md).
-
-## Development
-
-System packages (Ubuntu/Debian):
+From source, for the current user, under `~/.local` (what the build needs
+is in [docs/development.md](docs/development.md#what-you-need)):
 
 ```sh
-sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
-  build-essential curl wget file libxdo-dev libssl-dev
-```
-
-Extensions run in Node.js, so `node` (22 or newer) must be on `PATH`
-(or set `HEYO_NODE`). Then:
-
-```sh
+git clone https://github.com/hdonix/heyo.git && cd heyo
 pnpm install
-pnpm tauri dev
+scripts/install.sh --build       # scripts/install.sh --uninstall removes it
 ```
 
-The tests: `cargo test` in `src-tauri/`, `pnpm test` for the web view and
-the runtime, and `scripts/gui-test/` for what only shows in a window (an X
-server, a session bus and a home directory of its own, so that the desktop
-it runs on is left alone).
+A package you built installs as packages do:
 
-How commits are written is in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Debian, Ubuntu: `sudo apt install ./Heyo_<version>_<arch>.deb`
+- Fedora, openSUSE: `sudo dnf install ./Heyo-<version>-1.<arch>.rpm`
 
-## Usage
+Heyo needs WebKitGTK 4.1. Extensions, dictation and text recognition also
+need Node.js 22 or newer (`node` on `PATH`, or its path in Settings →
+Advanced); the launcher itself works without. The packages only recommend
+Node.js, because most distributions ship an older one: install a current
+one from nodejs.org or with a version manager. On X11, pasting into other
+applications uses `xdotool`.
 
-- Type to fuzzy-search applications; `↑`/`↓` (or `Ctrl+P`/`Ctrl+N`) to move, `Enter` to launch.
-- `Esc` clears the query, or hides the window when the query is empty.
-- The window hides when it loses focus.
-- `Ctrl+,` (or **Heyo Settings** in the search) opens the settings window,
-  laid out like Raycast's: a sidebar with **General** (open at login, hotkey,
-  window behavior), **Shortcuts** (aliases and hotkeys for every command and
-  application), **Advanced** (Node.js) and **About**, followed by one page per
-  extension (enable or disable commands, preferences, uninstall), plus
-  **Applications** and **Heyo Commands**. Settings are saved to
-  `~/.config/heyo/settings.json`.
+## The first minute
 
-### Root search
+1. Start **Heyo** from the applications menu, or run `heyo`. The palette
+   opens.
+2. Give it a hotkey. On GNOME: `Ctrl+,` opens the settings, and General →
+   Heyo Hotkey records one. On another desktop, bind a shortcut of the
+   desktop's own to the command `heyo`: running it again shows and hides
+   the palette.
+3. Type a few letters of an application or a command, `↑`/`↓` to choose,
+   `Enter` to open. `Esc` clears what you typed, then hides the palette.
+4. `Ctrl+K` shows everything that can be done with the selected row: add
+   it to the favorites, give it an alias or a hotkey.
+5. Open **Search Raycast Store** and install an extension.
 
-- Results learn from use: what you open often ranks higher, and the empty
-  search shows **Favorites** and **Suggestions**.
-- `Ctrl+K` on a result: add to favorites (`Ctrl+Shift+F`), set an alias
-  (`Ctrl+Shift+A`), reset its ranking.
-- Calculator: `2^10`, `15% of 80`, `5 km in mi`, `100 f to c`,
-  `100 usd in cny` (rates from open.er-api.com, refreshed every 6 hours),
-  `time in tokyo`, `3pm pst in beijing`. `Enter` copies the answer.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/settings-dark.png">
+    <img src="docs/images/settings-light.png" width="830" alt="Heyo's settings window on its General page: open at login, the hotkey, the theme, window behavior and live activities; the sidebar lists Shortcuts, Dictation, Screenshots, Advanced, About, Applications, Heyo Commands and an installed extension">
+  </picture>
+</p>
 
-Below the results, **Use "…" with…** offers what you typed to Google, to
-Search Files and to your quicklinks that take a query — so `Enter` on a
-search with no results searches the web.
+The interface is light or dark, following the system unless you choose.
 
-Opening an application that is already running goes to its window instead
-of starting it again. Asked once more while that window is in front, it
-moves on to the application's next window, or, if it has only one, back to
-the window you were in before — so an application's hotkey flips between it
-and your other work. (X11 only.)
+## Documentation
 
-### Quicklinks and snippets
-
-**Create Quicklink** saves a URL (or path) template such as
-`https://github.com/search?q={query}`; give it an alias like `gh` and type
-`gh heyo` to open it directly. **Create Snippet** saves text to paste, with
-an optional keyword that selects it in the root search. Both support
-placeholders: `{query}`/`{argument}`, `{clipboard}`, `{date}`, `{time}`,
-`{datetime}`, `{day}`, `{uuid}` and `{date format="yyyy-MM-dd"}`. They are
-stored in `~/.local/share/heyo/quicklinks.json` and `snippets.json`.
-
-### Selected Text Actions
-
-Select text in any application and run **Selected Text Actions** (give it a
-hotkey): Heyo reads the selection without you copying it and offers to
-translate it, improve the writing, fix spelling and grammar, shorten, explain
-or summarize it with Claude, or to search the web for it. Claude's answer
-streams in; `Enter` replaces the selection with it (or copies it, for
-explanations). These actions use Claude (an API key in Settings → Advanced,
-or `ANTHROPIC_API_KEY`) or a model on your own computer — see
-[Local model](#local-model).
-
-`Ctrl+N` adds an action of your own: a name and the instruction Claude gets,
-for example "Translate the text into natural Japanese".
-
-### Ask AI
-
-Type a question in the root search and press `Tab`: the answer streams in.
-`Enter` asks a follow-up that keeps the conversation so far; the answer can
-be copied or pasted. **Ask AI** is also a command of its own. It uses the
-same model as Selected Text Actions.
-
-### Local model
-
-Selected Text Actions and dictation polishing can use a model running on
-your computer instead of Claude, so the text never leaves it. In Settings →
-Advanced → AI choose **Local Model** and point it at any OpenAI-compatible
-server (vLLM, LM Studio, Ollama, llama.cpp); the default address is
-`http://127.0.0.1:8000/v1`.
-
-`scripts/local-model.sh start` runs one with vLLM in Docker: Qwen3-4B
-Instruct by default, about 8 GB to download, listening only on this
-computer. `stop`, `status` and `logs` do what they say. vLLM reserves GPU
-memory up front — 12% by default (`HEYO_LLM_MEMORY`), which matters on
-machines where the GPU shares memory with the system. The container does
-not restart by itself after a reboot.
-
-A small model is quick and fine for translating and tidying text, but it
-follows instructions less reliably than Claude on long or tricky input.
-
-### Screenshots
-
-**Capture Screenshot** freezes the screen: drag to select an area (drag it or
-its handles to adjust), mark it up with rectangles, arrows, the pen or text,
-blur what should stay private (anything you added can be dragged to another
-place), then copy it (`Enter`), save it to
-`Pictures/Screenshots` (`Ctrl+S`), pin it on top of other windows, or copy the
-text in it. A pinned capture can be dragged around; double-click or
-right-click closes it.
-
-**Capture Text from Screen** copies the text in the area you drag over, using
-PaddleOCR on your computer (Chinese and English; a one-time download of about
-340 MB in Settings → Screenshots).
-
-Both capture straight from the X server; elsewhere `gnome-screenshot` is used.
-
-### Dictation
-
-Hold the dictation hotkey while you speak and let go — or tap it, speak, and
-tap it again: the text is pasted into the window you are working in.
-
-A single key can do the same: choose a **Hold-to-Talk Key** (Right Alt, Left
-Alt, Right Ctrl, …) in Settings → Dictation, hold it and speak, let go to
-finish. The key keeps its normal meaning: a quick tap does nothing, and so
-does using it in a shortcut such as Alt+Tab. (X11 only.) A small window at the bottom of the screen
-shows the microphone level and the words as they are recognized.
-
-- Speech is recognized on your computer with
-  [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) (Mandarin,
-  Cantonese, English, Japanese, Korean; mixed Chinese and English works). Set
-  it up once in Settings → Dictation; the download is about 270 MB.
-- By default each sentence is pasted when you pause. With **Polish with
-  Claude** set to *Clean Up* or *Translate to English*, the transcript (not
-  the audio) is sent to Claude when you finish and the result is pasted once.
-  This needs a Claude API key (in the settings, or `ANTHROPIC_API_KEY`).
-- Text is pasted through the clipboard, which is restored afterwards;
-  terminals get `Ctrl+Shift+V`.
-- `heyo --dictate` starts or finishes dictation, for binding your own
-  shortcut. Needs `parec` (PulseAudio/PipeWire) or `arecord`, and `xdotool`
-  (X11) or `wtype` (Wayland).
-
-### Windows
-
-**Switch Windows** lists the open windows, the one you were last in first, so
-running it and pressing `Enter` goes back and forth between two windows.
-`Ctrl+X` closes a window.
-
-The window layout commands move the focused window: **Left Half**, **Right
-Half**, top and bottom halves, the four quarters, thirds and two thirds,
-**Maximize**, **Almost Maximize**, **Center** and **Move to Next Display**.
-Give the ones you use a hotkey in Settings. These need X11.
-
-### System and utilities
-
-- **Lock Screen**, **Sleep**, **Restart**, **Shut Down**, **Log Out** and
-  **Empty Trash** (the last four ask first), **Toggle Dark Mode**, **Volume
-  Up**/**Down**, **Toggle Mute**, and **Toggle Keep Awake**, which stops the
-  computer from sleeping until you turn it off or quit Heyo.
-- **Search Emoji & Symbols**: search in English or Chinese; `Enter` pastes.
-- **Search Files**: fuzzy search over the names of the files and folders
-  under your home folder (hidden folders, `node_modules` and the like are
-  skipped). The names are read into memory when the command opens — a
-  fraction of a second, about 80 MB per million files — and released a few
-  minutes after you last used it; there is no index on disk.
-- **Kill Process**: search by name, command line or listening port (`3000`).
-- **Switch Audio Device**: pick the default speaker and microphone.
-- **Search Browser Bookmarks** and **Search Browser History**: Firefox,
-  Chrome, Chromium, Brave, Edge and Vivaldi. Read from a copy of the
-  browser's own files; needs Node.js 22.5 or newer.
-
-**Paste as Plain Text** pastes what you copied without its formatting; give
-it a hotkey.
-
-### Clipboard History
-
-Heyo records what you copy (text, links, colors, file paths and images)
-while it runs; open **Clipboard History** to search it, preview entries, and
-paste (`Enter`), copy (`Ctrl+Enter`), pin or delete them. Copies that password
-managers mark as secret are skipped. History is kept for 3 months by default
-(pinned entries forever) in `~/.local/share/heyo/clipboard/`. Pasting into
-the previous window uses `xdotool` (X11) or `wtype` (Wayland).
-
-The search understands more than words:
-
-- Chinese of any length (`发票`, `票`), and pieces of URLs, paths and
-  identifiers (`issues/42`, `0.3.17`). Every word typed must occur.
-- When: `昨天`, `昨天下午`, `上周三`, `最近三天`, `10月1号`, `yesterday`,
-  `last week`, `2 days ago`, `2026-10-03`…
-- Where from: `from firefox`, `来自firefox`, `code里的`, `app:code` (the
-  application copied from).
-- What: a query that is only a kind (`链接`, `图片`, `images`, `昨天的链接`).
-
-How the query was read is shown above the results. A reading that finds
-nothing is dropped, and the query searched for as plain words. Results are
-newest first.
-
-`heyo --clipboard` opens Clipboard History directly.
-
-`heyo --clipboard-eval [FILE]` measures the search: how often the right
-entry is in the first 1, 5 and 10 results, by kind of query, and how long a
-search takes. Without a file it uses the searches you picked a result from,
-which the history records (and forgets with the entry); the file format is
-described in `src-tauri/src/clipboard/eval.rs`.
-
-Not recorded: what a password manager marks as secret, anything copied
-while a password manager's window is focused (KeePassXC, 1Password,
-Bitwarden and the like), what an extension copies as concealed, and Heyo's
-own pasting during dictation. The history is readable only by you.
-
-### Hotkey
-
-Wayland has no global hotkeys, so Heyo is single-instance: running `heyo`
-again toggles the existing window. Bind a desktop shortcut to it, e.g. on GNOME:
-
-Settings → Keyboard → Custom Shortcuts → command `/path/to/heyo`, shortcut `Alt+Space`.
-
-On GNOME, Heyo's settings window records these shortcuts for you (General →
-Heyo Hotkey, and the Clipboard History hotkey under Extensions).
-
-Any application, command (built-in or from an extension), quicklink or
-snippet can have its own hotkey: `Ctrl+K → Set Hotkey` (`Ctrl+Shift+H`) in
-the root search, or the Hotkey column in Settings → Extensions, which also
-lists applications. A hotkey runs `heyo --open <item id>`: applications
-launch without showing Heyo, commands open in the palette, and snippets
-paste into the focused window.
-
-Start it in the background with `heyo --hidden`.
-
-## Raycast extensions
-
-Run **Search Raycast Store** to browse the store and press `Enter` to install
-an extension; its commands then appear in the root search. **Manage
-Extensions** checks the store for updates (update one or all), configures
-preferences and uninstalls.
-
-Extensions are the same builds Raycast downloads, unpacked into
-`~/.local/share/heyo/extensions/<name>/`. An extension built locally with
-`ray build -e dist` can be copied there too.
-
-Inside a command: `Enter` runs the primary action, `Ctrl+Enter` the second
-one (or submits a form), `Ctrl+K` opens all actions, and `Esc` goes back.
-Shortcuts written for macOS map `⌘` to `Ctrl`.
-
-What works: `List`, `Grid`, `Detail`, `Form`, action panels, navigation,
-toasts, alerts, clipboard, `open`, `LocalStorage`, `Cache`, preferences,
-arguments, OAuth, menu bar commands, background refresh, `AI.ask` and
-`@raycast/utils` hooks. Not supported: the browser extension API, window
-management, and extensions that only work on macOS (AppleScript, Swift
-binaries).
-
-Menu bar commands appear as icons in the top bar (GNOME needs the
-AppIndicator extension, which Ubuntu ships enabled). Run one from the root
-search once to turn it on; from then on it comes back when Heyo starts and
-refreshes at the interval its extension asks for. Commands that refresh in
-the background work the same way: they start doing so after you have run
-them once. Disable a command in Settings to stop it. `AI.ask` answers with
-the model chosen in Settings → Advanced → AI.
-
-Signing in (OAuth): an extension that connects to a service opens its
-sign-in page in your browser. Those services send you back through a
-`raycast://` link, so Heyo registers itself as the handler for `raycast://`
-and `com.raycast:` links (`~/.local/share/applications/heyo-links.desktop`);
-the browser may ask once whether to open it. Tokens are stored per extension
-under `~/.local/share/heyo/support/`, readable only by you.
-
-Data lives in `~/.config/heyo/preferences/` (preferences),
-`~/.local/share/heyo/support/` (`environment.supportPath`, `LocalStorage`)
-and `~/.cache/heyo/` (`Cache`).
-
-## Developing extensions
-
-The `heyo` program builds and runs an extension from its sources, without
-Raycast's `ray` tool. In the extension's directory (after `npm install`):
-
-| Command | What it does |
+| Document | What is in it |
 |---|---|
-| `heyo dev` | Builds on every change and loads the result into the running Heyo: its commands are in the root search marked **Development**, the one open in the palette restarts, and what it logs (with errors pointing at your source lines) is printed in the terminal. It stays in Heyo until `heyo dev --remove` |
-| `heyo build` | Builds into `dist/` what Heyo and Raycast load: one `<command>.js` per command, with `@raycast/api`, `@heyo/api` and React left for Heyo to provide |
-| `heyo ext check` | Reports what will not work on Heyo: AppleScript, `open -a`, macOS programs and paths, native addons, API members Heyo lacks. `--json` for programs |
-| `heyo migrate` | Rewrites `@raycast/api` imports to `@heyo/api` and adds the `heyo` manifest field. `--dry-run` shows the diff |
+| [docs/usage.md](docs/usage.md) | every feature, its keys, and where Heyo keeps things |
+| [docs/compatibility.md](docs/compatibility.md) | which Raycast extensions run, measured |
+| [docs/developing-extensions.md](docs/developing-extensions.md) | writing extensions with `heyo dev`, `build`, `ext check`, `migrate` |
+| [docs/extension-api.md](docs/extension-api.md) | the specification of `@heyo/api` (in Chinese); [packages/api/README.md](packages/api/README.md) is the short English introduction |
+| [docs/architecture.md](docs/architecture.md) | how Heyo is built: the host, the web view, the runtime, and how they talk |
+| [docs/development.md](docs/development.md) | building, running, testing and debugging Heyo |
+| [packaging/README.md](packaging/README.md) | how the packages are built, and what a release still needs |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | how to contribute, and how commits are written |
 
-[docs/developing-extensions.md](docs/developing-extensions.md) has the details.
-
-## Layout
-
-```
-src/              UI (React)
-  App.tsx         hosts the root search or a running command
-  RootSearch.tsx  root search: the list as drawn, its keys and clicks
-  rows.ts         what a row of the root search is and does
-  calculator.ts   arithmetic, units, currency and time zones
-  hotkey.tsx      hotkey recorder
-  host.ts         the host as a window calls it: typed commands and events
-  Dictation.tsx   dictation progress window
-  Screenshot.tsx  screenshot overlay and pinned captures
-  Settings.tsx    settings window
-  raycast/        renders extension views (List, Grid, Detail, Form, actions)
-shared/           placeholder expansion used by the UI and the runtime
-runtime/src/      extension runtime (Node), bundled to runtime/dist/
-  dictation.ts    dictation helper: recording, speech recognition, polishing
-  ocr.ts          text-recognition helper (PaddleOCR)
-  ai.ts           Claude or a local model, for Heyo's own commands
-  background.ts   menu bar and background commands (a process of their own)
-  main.ts         entry: the process and its pipes
-  runtime.ts      provides @raycast/api and React to extensions, takes the host's messages
-  protocol.ts     the conversation with the host: requests, replies, events
-  transport.ts    what carries it: stdin and stdout, or a pair in memory for tests
-  renderer.ts     React reconciler whose tree is streamed to the UI
-  session.ts      runs one command at a time, sends incremental renders
-  api/            the @raycast/api implementation
-  heyo/           the @heyo/api implementation; members.ts declares each function once
-  builtins/       Heyo's own commands (store, clipboard, emoji, system, …)
-src-tauri/src/
-  lib.rs          startup, shared state, the application index
-  commands/       what the webview can invoke: palette, settings, media
-  host.rs         what the runtime asks of the host (`host.*`)
-  ext.rs, ext/    what extensions ask (`ext.*`): answered in ext/answer.rs, without the application
-  permissions.rs  what an extension may have, and asking the user
-  pasting.rs      putting text into another application, with the clipboard lent and given back
-  activities.rs   live activities: the table, and showing what is in progress
-  palette.rs      the palette window, and all that is done with it
-  cli.rs          command-line flags and opening an item by id
-  platform/       everything that touches the desktop (see below)
-  apps.rs         .desktop discovery and launching
-  extensions.rs   installed extension discovery
-  runtime.rs      the Node processes and their message relay
-  settings.rs     settings file and the autostart entry
-  clipboard.rs    clipboard history: what is recorded
-  clipboard/      its storage and search (SQLite), reading queries, measuring
-  dictation.rs    dictation: helper process, progress window, pasting
-  screenshot.rs   capturing, the selection overlay's outcome, pinning
-  ocr.rs          text recognition for screenshots
-  files.rs        file search: in-memory scan of the home directory
-  links.rs        raycast:// link handler registration (OAuth redirects)
-  menubar.rs      menu bar commands as tray icons, background schedule
-  root.rs         root search index and ranking (fuzzy, frecency, aliases)
-  usage.rs        usage counts for ranking
-  library.rs      quicklinks and snippets
-  search.rs       fuzzy matching (nucleo)
-src-tauri/icons/  the application's icons, made by scripts/app-icon.py from
-                  the picture in source/ (where the mark alone is kept too)
-```
-
-### Settings
-
-A setting is declared once, as a field of `Settings` in
-`src-tauri/src/settings.rs`. The windows' TypeScript types are generated
-from the Rust ones into `shared/bindings/` (by `cargo test`; commit what
-it writes). A window changes settings by sending only the fields that
-change (`change_settings`); the host merges them into the rest, saves, does
-what the change calls for and tells every window. So adding a setting is
-adding the field, its default and its control.
-
-### Commands
-
-What a window asks of the host is a command: a `#[tauri::command]`
-function, registered in `lib.rs`. Each is said twice more, and `cargo test`
-fails until both are there: which windows may call it
-(`commands/access.rs`), and what it takes and answers as a window sees it
-(`commands/bindings.rs`, which also says what every event carries). That
-last table is written to `shared/bindings/commands.ts`, and the web view
-calls through it: `call("copy_text", { text, paste })` and
-`listen("settingsChanged", …)` from `src/host.ts` do not compile with a
-name, an argument or a payload the host does not have. A call that fails
-is handled where it matters and otherwise ends in `.catch(reported(…))`,
-which shows it in the window's toast or error line. Tests of the web view
-play the host with `fakeHost` (`src/host.fake.ts`), typed by the same
-table.
-
-### Styles and themes
-
-The interface has a light and a dark scheme, following the system unless
-Settings → General → Theme says otherwise. Both are one two-tone design:
-neutrals for everything, one accent for what is active.
-
-The stylesheet is SCSS, in `src/styles/`:
-
-- `abstracts/_scales.scss` holds the scales as Sass maps, the single source
-  for every colour (as a light and dark pair), the 4 px spacing grid, the
-  type scale (each size with its line height and letter spacing), radii,
-  control heights, shadows, durations and easings.
-- `abstracts/_mixins.scss` is what components are assembled from: `text`,
-  `truncate`, `fade-end`, `scroll-fade`, `interactive` (resting, hovered,
-  pressed, disabled), `field`, `select`, `card`, `floating`, `focus-ring`,
-  `enter`.
-- `base/_tokens.scss` turns the scales into custom properties. Colours are
-  emitted as CSS `light-dark()` and follow `color-scheme`, so there is no
-  second stylesheet and no script deciding colours; `src/theme.ts` only sets
-  `data-theme` when the setting overrides the system. `base/_motion.scss`
-  has the keyframes, `base/_reset.scss` the page.
-- `components/` has a partial per part of the interface. They use the
-  tokens and mixins and no colours or sizes of their own.
-
-Details that go with it: the palette's window is larger than its panel by a
-transparent margin for the panel's shadow (a click there hides it); the
-selected row is marked by one element that slides between rows
-(`SelectionIndicator.tsx`); the icon at the start of a row is an
-application's own, a symbol on a tile, or an initial (`ItemIcon.tsx`);
-lists that are loading show skeleton rows; views, the action panel and
-dialogs arrive with a short animation. What floats over the screen (the
-screenshot tools, the dictation pill) stays dark. Colours that extensions
-name (`Color.Blue`, `{ light, dark }`) map to tokens too. More contrast and
-less motion are given where the system asks for them.
-
-### The platform layer
-
-`platform/` is where Heyo meets the desktop it runs on. Its modules of
-plain functions are what the rest of Heyo uses: `windows`, `input` (paste,
-selected text), `clipboard_watch`, `capture`, `overlay`, `keys`
-(hold-to-talk), `hotkeys`, `focus`, `common` (notifications). They hold
-what is the same everywhere and ask the session's adapter for the rest.
-
-The seam is one trait, `desktop::Desktop`: everything Heyo asks of a
-desktop. Each session has one adapter (`x11::X11`, `gnome::Gnome` for GNOME
-on Wayland, `win::Windows`, and `desktop::Generic` where there is none),
-chosen once. What an adapter does not implement stays at the trait's
-default, which says "not supported"; `platform::capabilities()` reports
-it, so commands that cannot work are left out of the search and the
-settings say why. Supporting another desktop is one more adapter; a
-capability new to all of them is one more method, and the compiler finds
-nothing else to change. Tests put `desktop::fake::Fake` in its place.
-
-`scripts/gui-test/regress.sh` exercises the X11 adapter end to end in a
-sandbox (paste, a window layout, the clipboard, the screenshot overlay).
-
-#### GNOME on Wayland
-
-On Wayland an application cannot see other windows, type into them, follow
-the clipboard while unfocused, or read the screen; the Shell can. Heyo ships
-a small Shell extension, `gnome-extension/heyo@heyo.app` (GNOME 45–50),
-that does those things for it over D-Bus, and answers only the process that
-owns Heyo's bus name. Heyo carries the extension: Settings → General
-offers to install it, and to update it when a newer Heyo carries a newer
-one, after which you log out and in again (GNOME only loads a new or
-updated extension when a session starts; an older one keeps working until
-then). `docs/wayland.md` has the details, and what other Wayland desktops
-could offer.
-
-With it, window switching and layouts, pasting, selected text, clipboard
-history and screenshots work as on X11. The hold-to-talk key works with the
-modifier keys (Alt, Ctrl, Right Shift): the Shell reports the press, and
-tells from the modifier state when it is let go. Without the extension (or on another Wayland desktop) the
-window commands are unavailable, the clipboard is polled, pasting needs
-`wtype` or `ydotool`, and capturing goes through `gnome-screenshot`.
-
-`scripts/wayland-test/` runs a GNOME Wayland session in Docker to test this.
-
-`scripts/gui-test/` drives a debug build in a sandbox of its own (an X
-server, a private bus, its own home directories), under a plain window
-manager or a real GNOME Shell, and takes pictures of it: `look.sh light L`.
-
-#### Windows
-
-Heyo runs on Windows, with part of what it does on Linux (`platform/win/`,
-through the Win32 API):
-
-- the palette, shown and hidden by a global hotkey (Alt+Space until another
-  is chosen; hotkeys are kept in `hotkeys.json` beside the settings);
-- the Start menu's applications, and launching them;
-- Heyo's own commands and extensions, which run in Node.js: a `node.exe`
-  beside `heyo.exe` is used, so nothing needs installing;
-- switching between windows and arranging them (halves, quarters, …);
-- pasting into the application in front; clipboard history.
-
-Not there yet: screenshots and text recognition, the selected text, the
-hold-to-talk key and dictation, application icons, an installer. Settings
-and data are in `%APPDATA%\heyo`, caches and the log (`heyo.log`) in
-`%LOCALAPPDATA%\heyo`.
-
-`scripts/windows-test/` runs a Windows 11 machine in Docker and
-cross-compiles Heyo for it from Linux: `run.sh start`, `build.sh`, then
-inside the machine `\\host.lan\Data\scripts\windows-test\in\update.bat`.
-
-The runtime talks JSON lines over stdin/stdout. Rust answers `host.*`
-requests (clipboard, window, reloading the index) and relays everything else
-between the runtime and the webview.
+[docs/README.md](docs/README.md) lists everything.
 
 ## Licence
 
-[GPL-3.0](LICENSE).
+[GPL-3.0](LICENSE). Heyo is an independent project and is not affiliated
+with or endorsed by Raycast.
