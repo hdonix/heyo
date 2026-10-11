@@ -1,343 +1,621 @@
-# 实时活动（灵动岛）技术方案（草案 v0.3）
+# Live activities (a Dynamic Island): technical design (draft v0.3)
 
-状态：草案，待评审。日期：2026-10-10。
+Status: draft, awaiting review. Date: 2026-10-10.
 
-面板关掉以后，正在发生的事没有地方显示：听写在录、计时器在走、AI 还在答、后台命令在跑。
-本文提出"实时活动"：一件正在进行的事，由 Heyo 或扩展发起，显示在**当前桌面环境最原生的位置**。
+Once the palette is closed, what is going on has nowhere to be shown:
+dictation is recording, a timer is running, the AI is still answering, a
+background command is at work.
+This document proposes "live activities": something in progress, started by
+Heyo or by an extension, and shown **in the place most native to the current
+desktop environment**.
 
-**v0.2 相对 v0.1 的变化。** v0.1 里关于各平台的内容是凭记忆写的，并且在所有桌面上都用同一个浮动窗口。
-这一版基于四份带出处的调研笔记重写（手机平台接口、Linux 各桌面环境、桌面上已有的同类产品、
-本技术栈的窗口实验），笔记在 `research_notes/live-activities/`（`mobile.md`、`linux.md`、`products.md`、
-`window.md`，每条事实后附来源链接；该目录不进版本库）。主要改动：
+**What changed from v0.1 to v0.2.** In v0.1 what was said about each
+platform was written from memory, and every desktop used the same floating
+window. This version is rewritten on four sets of research notes with
+sources (the interfaces of the phone platforms, the Linux desktop
+environments, similar products that already exist on the desktop, and
+window experiments on this technology stack). The notes are in
+`research_notes/live-activities/` (`mobile.md`, `linux.md`, `products.md`,
+`window.md`, with a link to the source after every fact; the directory is
+not in the repository). The main changes:
 
-- 呈现方式从"一个浮动窗口"改为**一个接口、每个桌面一种呈现**（第 5 节）。
-- GNOME 上采用**折叠态画进顶栏、展开态紧贴其下**的混合方式（5.2）。
-- 修正了 v0.1 里五处与事实不符的说法（第 13 节列出）。
-- 补上多个平台都有而 v0.1 缺的三样：更新的先后保护、降级方式由发起方选择、首次出现时展开一次。
-- 增加防误触、屏幕共享、勿扰的处理；重排了内置活动的优先级。
+- The presentation went from "one floating window" to **one interface, and
+  one presentation per desktop** (section 5).
+- GNOME takes a hybrid: **the collapsed state drawn in the top bar, the
+  expanded state right below it** (5.2).
+- Five statements of v0.1 that did not match the facts are corrected
+  (listed in section 13).
+- Three things that several platforms have and v0.1 lacked are added:
+  protection of the order of updates, the fallback being chosen by whoever
+  starts the activity, and expanding once on first appearance.
+- Handling of accidental triggering, screen sharing and Do Not Disturb is
+  added; the priorities of the built-in activities are reordered.
 
-文末第 12 节是需要你决定的问题。
+Section 12, at the end, has the questions that need your decision.
 
-**v0.3 相对 v0.2 的变化**（来自 2026-10-11 的三轮讨论，不是新的调研）：
+**What changed from v0.2 to v0.3** (from three rounds of discussion on
+2026-10-11, not from new research):
 
-- 新增第 0 节：手机和桌面的本质区别，以及由此推出的"桌面上真实的需求"。桌面不缺屏幕空间，缺的是注意力，所以默认安静。
-- **状态栏成为主阵地**，并且同时承载两类东西：常驻的**状态项**（Raycast 的菜单栏扩展）和有始有终的**活动**。菜单栏扩展从"收窄的例外"改为一等公民（第 3、7 节）。
-- **展开态允许扩展自定义界面**：折叠态仍只收数据（各桌面的原生位置只能画数据），展开态用我们的组件集，不写界面时自动生成默认卡片（4.1）。撤回 v0.2"不做任意界面"的非目标。
-- **面板里新增"进行中"区域**，给键盘用户（5.0）。
-- 悬停展开的卡片降为"状态栏指示的增强"，不再是功能的核心（第 0 节）。
-- 展开界面用网页视图画（Flutter 已搁置，`docs/flutter-evaluation.md`）。
+- New section 0: the essential difference between the phone and the
+  desktop, and the "real needs on the desktop" that follow from it. The
+  desktop is not short of screen space; it is short of attention, so the
+  default is quiet.
+- **The status bar becomes the main ground**, and carries two kinds of
+  thing at once: **status items**, which are permanent (Raycast's menu bar
+  extensions), and **activities**, which have a beginning and an end. Menu
+  bar extensions go from "a narrowed exception" to first-class citizens
+  (sections 3 and 7).
+- **The expanded state allows an extension its own interface**: the
+  collapsed state still takes only data (the native places of each desktop
+  can only draw data), and the expanded state uses our set of components; a
+  default card is generated when no interface is written (4.1). The
+  non-goal of v0.2, "no arbitrary interface", is withdrawn.
+- **The palette gains an "In Progress" section**, for keyboard users (5.0).
+- The card that expands on hover is demoted to "an enhancement of the
+  indication in the status bar", and is no longer the heart of the feature
+  (section 0).
+- The expanded interface is drawn with the web view (Flutter is shelved,
+  `docs/flutter-evaluation.md`).
 
 ---
 
-## 0. 手机上的岛为什么成立，桌面上为什么不一样
+## 0. Why the island works on the phone, and why the desktop is different
 
-手机上的岛同时解决了四个手机特有的问题：一次只能看一个应用，后台的事完全不可见；挖孔周围有一块本来就废掉的屏幕；人大部分时间不在看手机，实时活动的主战场其实是锁屏；内容是现实世界的事（外卖、打车、导航）。
+The island on the phone solves four problems at once that only the phone
+has: only one application can be seen at a time, and what happens in the
+background is entirely invisible; around the camera cutout there is a piece
+of screen that was wasted anyway; people are not looking at the phone most
+of the time, and the main ground of live activities is in fact the lock
+screen; the content is things of the real world (a food delivery, a ride, a
+route).
 
-这四条在桌面上都不成立：
+None of the four holds on the desktop:
 
-| 手机 | 桌面 |
+| Phone | Desktop |
 |---|---|
-| 一次一个应用，后台不可见 | 多窗口、多显示器、有任务栏，后台的事往往本来就看得见 |
-| 有废像素可用 | 每个像素都有主：顶部中间是标题栏、标签页、时钟 |
-| 偶尔瞥一眼 | 连续盯着屏幕几小时，稀缺的是注意力，打扰的代价高得多 |
-| 现实世界的事件 | 主要是电脑自己在干的活：构建、下载、AI 任务、会议、录音 |
+| One application at a time, the background invisible | Several windows, several monitors, a taskbar; what happens in the background can often be seen anyway |
+| There are wasted pixels to use | Every pixel has an owner: the middle of the top is title bars, tabs, the clock |
+| A glance now and then | Hours of looking at the screen without a break; what is scarce is attention, and the cost of interrupting is far higher |
+| Events of the real world | Mostly work the computer itself is doing: builds, downloads, AI tasks, meetings, recordings |
 
-还有三个桌面独有的约束：键盘焦点是神圣的；我们不是操作系统，能放进去的只有 Heyo 自己和 Heyo 扩展的内容；屏幕会被共享。
+There are also three constraints only the desktop has: the keyboard focus
+is sacred; we are not the operating system, and all we can put in is the
+content of Heyo itself and of Heyo's extensions; the screen gets shared.
 
-由此推出桌面上真实的需求是三件事，而不是"持续看着进度"：**做完了或出错了告诉我**；**需要我的时候叫我**；**正在占用麦克风这类敏感资源时让我一直看得见**。Heyo 的用户还是用键盘唤出面板的人，一个只能用鼠标悬停展开的东西和他们的习惯相反。
+From this, the real needs on the desktop are three things, not "watching
+the progress all the time": **tell me when it is done or has gone wrong**;
+**call me when I am needed**; **let me see it all the time while a sensitive
+resource such as the microphone is in use**. Heyo's users are also people
+who call up the palette from the keyboard, and something that can only be
+expanded by hovering with the mouse goes against their habits.
 
-所以本方案里，"活动"是数据模型（手机上的那套生命周期、宿主自走的计时、上限、由用户发起，在桌面上完全适用），而显示分成四个各司其职的出口：状态栏里的一个小指示（始终可见的最低限度）；面板里的"进行中"区域（键盘可达）；结束或需要处理时的提醒；短暂的操作反馈。悬停展开的卡片只是第一个出口的增强。默认安静：短于几秒的任务不显示，进行中只占一个图标，只有状态变化才主动引起注意；动作的重心是"带我过去"（聚焦相关窗口或打开那个命令），按钮次要。
+So in this design the "activity" is the data model (the life cycle from the
+phone, timers the host counts by itself, limits, being started by the user:
+all of it applies on the desktop), and showing it is divided among four
+outlets that each have their own job: a small indication in the status bar
+(the minimum that is always visible); the "In Progress" section in the
+palette (reachable from the keyboard); an alert when it ends or needs
+dealing with; brief feedback on an action. The card that expands on hover
+is only an enhancement of the first outlet. The default is quiet: a task
+shorter than a few seconds is not shown, something in progress takes only
+one icon, and only a change of state actively draws attention; the weight
+of the actions is on "take me there" (focus the window concerned, or open
+that command), and buttons come second.
 
-桌面还有两个手机没有的机会，本方案记下但不在第一版实现：把活动数据交给用户自己的状态栏（Hyprland、Sway 用户都有，一条命令或一个 D-Bus 接口即可）；汇集别的应用已经在广播的进度（任务栏进度、媒体播放、KDE 的任务）。后者决定这个功能是"Heyo 的状态显示"还是"桌面的活动中心"，需要单独调研。
+The desktop also has two opportunities the phone does not, which this
+design records but does not implement in the first version: handing the
+activity data to the user's own status bar (users of Hyprland and Sway all
+have one; a command or a D-Bus interface would do); gathering the progress
+other applications already broadcast (taskbar progress, media playback,
+KDE's jobs). The latter decides whether this feature is "Heyo's status
+display" or "the desktop's activity center", and needs research of its own.
 
 ---
 
-## 1. 调研结论
+## 1. What the research found
 
-### 1.1 手机平台怎么做（`mobile.md`）
+### 1.1 How the phone platforms do it (`mobile.md`)
 
-| | 内容是界面还是数据 | 计时与进度谁来走 | 时长上限 | 多个活动并存 |
+| | Is the content interface or data | Who counts timers and progress | Limit on duration | Several activities at once |
 |---|---|---|---|---|
-| iOS ActivityKit | 界面（SwiftUI），唯一的例外 | 系统（按起止时间自走的文本和进度） | 活动 8 小时，锁屏再留 4 小时；属性加状态共 4 KB | 两个都显示成最小态；相关度只在同一应用内排序 |
-| Android 16 Live Updates | 数据（进度样式的通知）；带自定义界面的通知不能升格 | 系统 | — | 系统决定哪条升格 |
-| 华为实况窗 | 数据，五种模板：进度、强调文本、左右文本、比分、导航 | 系统（计时占位符） | 8 小时；闲置 2 小时隐藏胶囊、4 小时结束 | — |
-| 小米超级岛（焦点通知） | 数据，模板 | 系统 | — | — |
+| iOS ActivityKit | Interface (SwiftUI), the only exception | The system (text and progress that advance by themselves from a start and an end time) | The activity 8 hours, then 4 more hours on the lock screen; attributes plus state 4 KB in all | Both are shown in the minimal state; relevance only orders within one application |
+| Android 16 Live Updates | Data (a progress-style notification); a notification with a custom interface cannot be promoted | The system | — | The system decides which one is promoted |
+| Huawei Live View | Data, five templates: progress, emphasized text, left and right text, score, navigation | The system (a timer placeholder) | 8 hours; the capsule is hidden after 2 idle hours and the activity ends after 4 | — |
+| Xiaomi Super Island (focus notifications) | Data, templates | The system | — | — |
 
-对设计有直接影响的四点：
+Four points that bear directly on the design:
 
-1. **只收数据是主流**，不是折中。谷歌明文规定带自定义界面的通知不能升格。iOS 是唯一允许自由界面的，代价是界面要被归档、动画被限制在 2 秒内。
-2. **计时由系统走是所有平台的共同做法**。iOS 的形状最干净：一个起止时间区间，加一个可选的暂停时刻。
-3. **"过期"和"结束"是两件事**。iOS 的过期时间只把内容标成可能不准，不结束活动；华为分两步降级。
-4. **发起要由用户触发**：苹果和华为要求应用在前台或有明确的用户意图，Android 排除"常驻的环境信息"。
+1. **Taking only data is the mainstream**, not a compromise. Google states
+   in so many words that a notification with a custom interface cannot be
+   promoted. iOS is the only one to allow a free interface, and the price
+   is that the interface has to be archived and animations are limited to
+   2 seconds.
+2. **Timers counted by the system is what every platform does.** The shape
+   iOS has is the cleanest: a span from a start to an end time, plus an
+   optional moment of pausing.
+3. **"Stale" and "ended" are two things.** The stale date of iOS only marks
+   the content as possibly inaccurate and does not end the activity; Huawei
+   degrades in two steps.
+4. **Starting has to be triggered by the user**: Apple and Huawei require
+   the application to be in the foreground or a clear intent of the user,
+   and Android excludes "permanent ambient information".
 
-没能核实：iOS 的更新频率配额和并发数量上限官方没有公布；OPPO、vivo 的内容来自第三方文档；荣耀没找到开发者文档。
+Could not be verified: iOS's quota for update frequency and its limit on
+concurrent activities are not published officially; what is said of OPPO
+and vivo comes from third-party documents; no developer documentation was
+found for Honor.
 
-### 1.2 桌面上已有的同类产品（`products.md`）
+### 1.2 Similar products that already exist on the desktop (`products.md`)
 
-- **没有一个有用户量的产品是在栏的下方浮一个胶囊。** macOS 上的同类应用全都贴着屏幕顶边、处在菜单栏那一条带里；
-  苹果把 iPhone 的实时活动放进了 Mac 的菜单栏；GNOME 上唯一的同类扩展替换了顶栏的时钟；Windows 上星标最多的项目嵌进任务栏。
-- **v0.1 选的位置在 GNOME 上会撞车**：通知横幅就出现在顶栏正下方居中。
-- **内容按证据排序**：正在播放的媒体 > 计时器和专注 > 短暂的系统反馈（音量、已复制）> 有结果的长任务（下载、AI 任务）>
-  录音录屏状态 > 下一个会议。AI 任务有价值的状态是"进行中""需要你确认或输入""已完成"。
-- **被抱怨最多的**：待机耗电（最伤口碑）、拖动标签页时误展开、盖住下面的内容、全屏检测失灵、弹性形变动画。
-- **目前唯一上线的第三方桌面岛接口**（AtollExtensionKit）也独立选择了"数据描述、固定槽位、宿主自走倒计时"。
-- **悬停时间**：300 ms 展开、600 ms 收起，与现有产品的默认值和可用性研究的建议一致。
+- **Not one product with a user base floats a capsule below the bar.** The
+  similar applications on macOS all sit against the top edge of the screen,
+  in the band the menu bar is in; Apple put the iPhone's live activities
+  into the Mac's menu bar; the only similar extension on GNOME replaces the
+  clock in the top bar; the most-starred project on Windows embeds itself
+  in the taskbar.
+- **The position v0.1 chose would collide on GNOME**: notification banners
+  appear centered right below the top bar.
+- **Content ordered by the evidence**: media that is playing > timers and
+  focus > brief system feedback (volume, copied) > long tasks with a result
+  (downloads, AI tasks) > the state of audio and screen recording > the
+  next meeting. The states of an AI task that are worth something are "in
+  progress", "needs you to confirm or type" and "done".
+- **What is complained about most**: power use when idle (the worst for
+  reputation), expanding by accident while a tab is dragged, covering the
+  content below, fullscreen detection failing, springy shape-changing
+  animations.
+- **The only third-party desktop island interface that has shipped so far**
+  (AtollExtensionKit) also chose, independently, "described by data, fixed
+  slots, countdowns counted by the host".
+- **Hover times**: 300 ms to expand and 600 ms to collapse, which agrees
+  with the defaults of existing products and with what usability research
+  recommends.
 
-### 1.3 Linux 各桌面环境（`linux.md`）
+### 1.3 The Linux desktop environments (`linux.md`)
 
-- **GNOME 已经有原生的实时活动，就是顶栏项**：录屏指示器是一个顶栏按钮，带 Shell 自己走的计时，点击即停止。
-  扩展接口允许往顶栏的中间区域加项（GNOME 45 和 50 均可），审核规则不禁止。
-- **KDE 有任务进度接口**（`org.kde.JobViewServerV2` / `JobViewV3`）：标题、一行说明、百分比、取消和暂停；Plasma 会把进度同步到任务栏图标上。
-- **除 GNOME 外的主流 Wayland 合成器都实现了 layer-shell 协议**（KWin、Hyprland、niri、COSMIC、Sway、labwc、river）；Mutter 没有。
-- **通知承载不了进度**：通知规范没有进度字段，GNOME 和 Plasma 都不显示它。
-- **跨桌面的便宜通道**：Dock 图标上的进度条（`com.canonical.Unity.LauncherEntry`，Dash to Dock、Plasma 任务栏、Plank 都认）、托盘标题。
+- **GNOME already has a native live activity, and it is the top bar item**:
+  the screen recording indicator is a button in the top bar, with a timer
+  the Shell counts by itself, and a click stops it. The extension interface
+  allows adding items to the middle area of the top bar (on GNOME 45 and
+  on 50), and the review rules do not forbid it.
+- **KDE has a job progress interface** (`org.kde.JobViewServerV2` /
+  `JobViewV3`): a title, one line of description, a percentage, cancel and
+  pause; Plasma mirrors the progress onto the taskbar icon.
+- **Every mainstream Wayland compositor except GNOME's implements the
+  layer-shell protocol** (KWin, Hyprland, niri, COSMIC, Sway, labwc,
+  river); Mutter does not.
+- **Notifications cannot carry progress**: the notification specification
+  has no progress field, and neither GNOME nor Plasma shows it.
+- **Cheap channels that work across desktops**: the progress bar on a Dock
+  icon (`com.canonical.Unity.LauncherEntry`, which Dash to Dock, the Plasma
+  taskbar and Plank all honor), and the tray title.
 
-### 1.4 本技术栈能做到什么（`window.md`，含本机实验）
+### 1.4 What this technology stack can do (`window.md`, with experiments on this machine)
 
-在独立的虚拟显示器上实测（xfwm4 和 GNOME Shell 46 的 X11 会话）：
+Measured on a separate virtual display (xfwm4, and an X11 session of GNOME
+Shell 46):
 
-- **X11 上的点击穿透成立**：固定大小的透明窗口，给顶层窗口设输入区域后，区域外的点击落到下面的应用上；
-  悬停、点击、滚轮都能在窗口不获得焦点的情况下到达。改一次区域约 36 微秒。
-- **X11 上用"停靠栏"窗口类型且不设置顶**：它在普通窗口之上，遇到全屏窗口会自动沉下去，GNOME 也不给它加开关动画。设了置顶或用"通知"类型的窗口则会盖在全屏上面。
-- **固定窗口优于改变窗口大小**：每次展开或收起，改大小的做法会出现一到两帧错误画面，固定窗口加改输入区域没有。
-- **渲染成本只和变化的面积有关，与窗口大小无关**；空闲时为零；计时器每秒只重画一个小矩形。
-- **v0.1 的一个前提不对**：这条渲染路径上没有显卡图层，`transform` 和改宽高一样都是 CPU 重画。真正贵的是带模糊的阴影和持续不断的动画（一个脉动的小圆点会一直占用约 8% 的一个核）。
-- **GNOME Wayland 上应用窗口做不到**：GTK 3 的"不接受焦点、置顶、不进任务栏"在 Wayland 后端是空实现；实验中窗口一显示就拿走了键盘焦点。扩展能摆位置、调层级、跟踪全屏，但没有办法让窗口不可聚焦。
-- **Windows 上 v0.1 的做法不对**：命中测试返回"透明"只对同一线程的窗口有效。应该用窗口区域（`SetWindowRgn`）裁剪顶层窗口。
-- **屏幕捕获排除只在 Windows 和 macOS 上有接口**；X11 和 GNOME 上没有找到办法。
+- **Click-through holds on X11**: with a transparent window of fixed size,
+  once an input region is set on the top-level window, clicks outside the
+  region land on the application below; hovering, clicks and the wheel all
+  arrive without the window gaining focus. Changing the region once takes
+  about 36 microseconds.
+- **On X11, use the "dock" window type and do not set keep-above**: it is
+  above ordinary windows, sinks by itself when it meets a fullscreen
+  window, and GNOME does not give it opening and closing animations either.
+  A window with keep-above set, or of the "notification" type, covers
+  fullscreen windows.
+- **A fixed window is better than resizing the window**: with resizing,
+  every expanding or collapsing shows one or two wrong frames; a fixed
+  window with a changing input region shows none.
+- **The cost of rendering depends only on the area that changes, not on the
+  size of the window**; it is zero when idle; a timer redraws only one
+  small rectangle a second.
+- **One premise of v0.1 is wrong**: there are no GPU layers on this
+  rendering path, and `transform` is a redraw on the CPU just as changing
+  width and height is. What is really expensive is blurred shadows and
+  animations that never stop (one small pulsing dot keeps about 8% of a
+  core busy).
+- **Not possible with an application window on GNOME Wayland**: GTK 3's
+  "does not accept focus, keep above, not in the taskbar" are empty
+  implementations in the Wayland backend; in the experiment the window took
+  the keyboard focus as soon as it was shown. The extension can place it,
+  adjust its layer and track fullscreen, but there is no way to make the
+  window unfocusable.
+- **What v0.1 does on Windows is wrong**: a hit test that returns
+  "transparent" only works for windows of the same thread. The top-level
+  window should be clipped with a window region (`SetWindowRgn`).
+- **Only Windows and macOS have an interface for excluding a window from
+  screen capture**; no way was found on X11 or GNOME.
 
-没有测到的：Windows、任何 layer-shell 合成器、你的真实桌面。
+Not measured: Windows, any layer-shell compositor, your real desktop.
 
-### 1.5 Flutter 试验
+### 1.5 The Flutter trial
 
-试过用 Flutter 画界面（它在开发机上能用显卡，岛的形变每帧不到 3 ms），后来搁置了，原因和数据见 `docs/flutter-evaluation.md`。
-对本方案的结论是：展开界面用网页画。1.4 的实验已经确认网页视图的成本只和变化的面积有关、空闲为零。
+Drawing the interface with Flutter was tried (on the development machine it
+can use the GPU, and the island's change of shape took under 3 ms a frame)
+and later shelved; the reasons and the figures are in
+`docs/flutter-evaluation.md`.
+The conclusion for this design: the expanded interface is drawn as a web
+page. The experiments of 1.4 have already confirmed that the cost of the
+web view depends only on the area that changes, and is zero when idle.
 
 ---
 
-## 2. 目标与非目标
+## 2. Goals and non-goals
 
-**目标**
+**Goals**
 
-1. 用户不打开面板就能看到正在进行的事，并能对它做一两个动作。
-2. 在每个桌面环境里，出现在该环境自己显示这类东西的地方。
-3. Heyo 自己的活动和扩展的活动用同一套机制。
-4. 扩展只填数据，不写界面，也不需要为了让计时器走动而常驻。
-5. 永不抢键盘焦点（用户主动触发的键盘操作除外），不拦截输入，全屏时让开。
-6. 空闲时零开销。
+1. The user can see what is in progress without opening the palette, and
+   can take one or two actions on it.
+2. In each desktop environment it appears where that environment itself
+   shows this kind of thing.
+3. Heyo's own activities and those of extensions use the same mechanism.
+4. An extension only fills in data, writes no interface, and does not have
+   to stay running for a timer to keep counting.
+5. It never takes the keyboard focus (except for keyboard actions the user
+   triggers on purpose), does not intercept input, and gets out of the way
+   of fullscreen.
+6. Zero overhead when idle.
 
-**非目标**
+**Non-goals**
 
-- 不是通知中心：不保留历史。
-- 折叠态不做任意界面（理由见 4.1）；展开态可以。
-- 常驻信息（天气、未读数）不是**活动**，但可以作为**状态项**存在（第 3 节）：两者规则不同，位置相同。
-- v1 不做远程推送更新、不做锁屏显示。
-
----
-
-## 3. 概念
-
-- **状态栏上的一项**：主机里的统一概念，各桌面的呈现器只管画它。它有两种来源，规则不同：
-  - **状态项**：常驻，用户启用了就一直在。来源是 Raycast 的菜单栏扩展（`MenuBarExtra`），折叠态是图标加标题，展开态是菜单（分组、子菜单、图标）或一块自定义面板。由用户决定显示哪些、怎么排；默认沿用现在的规则（菜单栏命令被用户运行过一次后才出现）。
-  - **活动**：一件有开始有结束、中间状态会变的事。来源是 `LiveActivity` 和 Heyo 内置。受时长上限、必须由用户发起、勿扰时不打扰这些规则约束。
-- **活动**：一件有开始有结束、中间状态会变的事。
-- **属性**：发起时确定、之后不变的部分。**内容**：会变的部分。
-- **三种大小**：最小态（一个图标，可带进度环）、紧凑态（图标加一小段会自己变的内容）、展开态（标题、主体、最多三个按钮）。
-- **呈现器（presenter）**：把"当前该显示的活动"画到某个桌面的某个位置上的那段代码。每个会话选一个主呈现器，另有若干辅助通道。
+- It is not a notification center: no history is kept.
+- No arbitrary interface in the collapsed state (the reasons are in 4.1);
+  the expanded state may have one.
+- Permanent information (the weather, an unread count) is not an
+  **activity**, but can exist as a **status item** (section 3): the two
+  have different rules and the same place.
+- v1 does no remote push updates and nothing on the lock screen.
 
 ---
 
-## 4. 三个关键取舍
+## 3. Concepts
 
-### 4.1 折叠态收数据，展开态可以是扩展自己的界面
-
-**折叠态只收数据**。决定性的理由只有一条：各桌面的原生位置（GNOME 顶栏里的项、KDE 的任务条目、托盘标题、通知）都只能画数据，画不了我们的组件。其余理由在桌面上都不成立或可以解决——省电在桌面上不重要，而且后台运行时本来就让菜单栏扩展常驻；"活动要比发起它的命令活得长"靠主机保留最后一次渲染结果解决；外观靠组件集保证，不需要靠禁止界面。
-
-**展开态允许扩展自定义界面**。渲染扩展的组件树本来就是 Heyo 的核心能力（列表、详情、表单都是这样画的），在卡片里再画一棵小的组件树用的是同一套管线。扩展可以用现有组件（Markdown 详情、元数据、列表行、图片、动作）加几个新的排版组件（横排、竖排、文本、进度条、按钮，以及由我们自己走的计时器组件）来拼。一个音乐扩展可以画封面加播放控制，一个 CI 扩展可以画各阶段状态，AI 任务可以显示流式输出和"批准"按钮。不写界面的扩展得到由标题、主体、按钮自动生成的默认卡片。
-
-仍然要加的限制，原因都和省电无关：卡片有最大尺寸（它浮在别的应用上面）；常驻的扩展数量有上限（后台运行时现在最多挂 6 个，每个占内存；需要实测后再定数）；原生位置上会降级（KDE 的任务条目、通知只显示数据部分）。更新频率在网页视图里要限制（CPU 渲染下流畅度有限）。
-
-v0.1 列的四条理由，在桌面上的情况：
-
-1. 计时器由宿主走，扩展不必常驻（所有手机平台都这样）。
-2. 活动能比发起它的命令活得长。
-3. 外观统一，成本可控。
-4. **只有数据才能交给不同的呈现器**：GNOME 的顶栏项、KDE 的任务进度、Dock 的进度条、通知，收的都是数据。
-   如果内容是一棵组件树，就只能在我们自己的窗口里画，"按桌面环境适配"就无从谈起。
-
-### 4.2 状态归宿主
-
-活动表在 Rust 主机里。运行时重启、扩展更新、发起的命令结束，活动都还在。
-声明式动作由主机直接执行；回调动作需要时再把扩展的处理命令在后台拉起（6.5）。
-
-### 4.3 一个接口，多种呈现
-
-扩展看到的接口只有一套。主机里有一个呈现器接口，输入是"按优先级排好的活动列表"，各桌面各自实现。
-同一个活动在不同桌面上看起来会不一样，这是有意的：换来的是它出现在用户本来就会去看的地方。
+- **An item on the status bar**: one concept in the host, which the
+  presenters of each desktop only have to draw. It comes from two sources,
+  with different rules:
+  - **Status item**: permanent; once the user has enabled it, it is always
+    there. The source is Raycast's menu bar extensions (`MenuBarExtra`);
+    the collapsed state is an icon plus a title, and the expanded state is
+    a menu (sections, submenus, icons) or a custom panel. The user decides
+    which are shown and in what order; by default the present rule stays
+    (a menu bar command only appears after the user has run it once).
+  - **Activity**: something with a beginning and an end, whose state
+    changes in between. The source is `LiveActivity` and what is built into
+    Heyo. It is bound by these rules: a limit on duration, having to be
+    started by the user, and not interrupting under Do Not Disturb.
+- **Activity**: something with a beginning and an end, whose state changes
+  in between.
+- **Attributes**: the part that is fixed at the start and does not change
+  afterwards. **Content**: the part that changes.
+- **Three sizes**: minimal (one icon, possibly with a progress ring),
+  compact (an icon plus a small piece of content that changes by itself),
+  expanded (a title, a body, at most three buttons).
+- **Presenter**: the piece of code that draws "the activities that should
+  be shown now" at some place on some desktop. Each session chooses one
+  main presenter, and there are several auxiliary channels besides.
 
 ---
 
-## 5. 各桌面环境的呈现
+## 4. Three key trade-offs
 
-### 5.0 面板里的"进行中"区域（所有桌面）
+### 4.1 The collapsed state takes data; the expanded state can be the extension's own interface
 
-唤出面板时，根搜索顶部列出进行中的活动（和状态项无关）：方向键选中，回车执行默认动作，Ctrl+K 看全部动作。这是键盘用户的主要出口，不涉及任何窗口技术和桌面适配，应该最先做。
+**The collapsed state takes only data.** There is just one decisive reason:
+the native places of each desktop (an item in GNOME's top bar, a KDE job
+entry, the tray title, a notification) can only draw data, and cannot draw
+our components. The other reasons either do not hold on the desktop or can
+be solved: saving power matters little on the desktop, and the background
+runtime keeps menu bar extensions resident anyway; "an activity has to
+outlive the command that started it" is solved by the host keeping the last
+rendered result; the appearance is assured by the set of components, and
+does not need interfaces to be forbidden.
 
-### 5.1 总表
+**The expanded state allows an extension its own interface.** Rendering an
+extension's component tree is Heyo's core ability to begin with (lists,
+details and forms are all drawn this way), and drawing another small
+component tree in a card uses the same pipeline. An extension can put one
+together from the existing components (a Markdown detail, metadata, list
+rows, images, actions) plus a few new layout components (a row, a column,
+text, a progress bar, a button, and a timer component that we count
+ourselves). A music extension can draw a cover with playback controls, a CI
+extension can draw the state of each stage, and an AI task can show
+streamed output and an "Approve" button. An extension that writes no
+interface gets a default card generated from the title, the body and the
+buttons.
 
-| 会话 | 紧凑态 | 展开态 | 主机要做的 | 做不到或有风险的 |
+The restrictions that still have to be added, none of them for saving
+power: a card has a maximum size (it floats above other applications); the
+number of resident extensions has an upper limit (the background runtime
+holds at most 6 now, and each takes memory; the number is to be settled
+after measuring); in the native places it degrades (a KDE job entry and a
+notification show only the data part). The update frequency has to be
+limited in the web view (with CPU rendering, smoothness is limited).
+
+The four reasons v0.1 listed, and how they stand on the desktop:
+
+1. Timers are counted by the host, and an extension does not have to stay
+   resident (every phone platform does this).
+2. An activity can outlive the command that started it.
+3. A uniform appearance, at a cost that can be controlled.
+4. **Only data can be handed to different presenters**: GNOME's top bar
+   item, KDE's job progress, the Dock's progress bar and notifications all
+   take data. If the content were a component tree it could only be drawn
+   in our own window, and "adapting to each desktop environment" would be
+   out of the question.
+
+### 4.2 The state belongs to the host
+
+The table of activities is in the Rust host. When the runtime restarts, an
+extension is updated, or the command that started it ends, the activity is
+still there.
+Declarative actions are carried out by the host directly; for callback
+actions the extension's handler command is brought up in the background
+when needed (6.5).
+
+### 4.3 One interface, several presentations
+
+An extension sees only one interface. The host has a presenter interface
+whose input is "the list of activities, in order of priority", and each
+desktop implements it in its own way.
+The same activity will look different on different desktops, and this is
+intended: what it buys is that the activity appears where the user would
+look anyway.
+
+---
+
+## 5. Presentation in each desktop environment
+
+### 5.0 The "In Progress" section in the palette (every desktop)
+
+When the palette is called up, the top of the root search lists the
+activities in progress (status items have nothing to do with it): the arrow
+keys select, Enter carries out the default action, Ctrl+K shows all the
+actions. This is the main outlet for keyboard users; it involves no window
+techniques and no adapting to desktops, and should be done first.
+
+### 5.1 Overview
+
+| Session | Compact | Expanded | What the host has to do | What cannot be done, or is a risk |
 |---|---|---|---|---|
-| **GNOME（X11 和 Wayland）** | Heyo 的 Shell 扩展在顶栏画出每一项（状态项和活动）：图标加文字、计时或进度 | 菜单由 Shell 原生弹出；自定义卡片是我们的窗口，紧贴顶栏项下方（5.2） | 扩展加一个"替换整份活动列表"的方法和一个"动作被点了"的信号 | 展开面板在 Wayland 下的焦点（5.2）；没装扩展时退化到辅助通道 |
-| **KDE Plasma（Wayland）、Hyprland、Sway、niri、COSMIC 等** | layer-shell 窗口：顶层、贴顶边、不要键盘、输入区域等于岛的形状 | 同一个窗口 | 一个 layer-shell 呈现器，全体共用 | GTK 3 的 Rust 绑定已无人维护，需直接绑 C 库；已知在 Hyprland 上透明的 layer-shell 网页窗口内存随重绘增长；本机没有测试环境 |
-| **KDE 上的任务类活动**（下载、后台命令） | 额外接任务进度接口 | 通知面板里的任务条目，带取消 | 一个小的 D-Bus 客户端 | 只有取消和暂停，放不了自定义按钮 |
-| **其他 X11 桌面**（Xfce、Cinnamon、MATE、i3 等），以及 KDE 的 X11 会话 | 浮动窗口：停靠栏类型、不置顶、不接受焦点、输入区域等于岛的形状 | 同一个窗口 | v0.1 的做法只用在这里 | 需要合成器才有透明；平铺式窗口管理器可能要用户加浮动规则 |
-| **Windows** | 置顶、不激活、工具窗口，用窗口区域裁剪成岛的形状 | 同一个窗口 | 一个 Win32 呈现器 | 全部未实测；全屏用系统的"忙碌状态"查询来判断 |
+| **GNOME (X11 and Wayland)** | Heyo's Shell extension draws every item (status items and activities) in the top bar: an icon plus text, a timer or progress | Menus are popped up natively by the Shell; a custom card is our window, right below the top bar item (5.2) | The extension gains a method "replace the whole list of activities" and a signal "an action was clicked" | The focus of the expanded panel under Wayland (5.2); without the extension installed it falls back to the auxiliary channels |
+| **KDE Plasma (Wayland), Hyprland, Sway, niri, COSMIC and others** | A layer-shell window: top layer, against the top edge, no keyboard, an input region equal to the shape of the island | The same window | One layer-shell presenter, shared by all of them | The Rust bindings for GTK 3 are no longer maintained, so the C library has to be bound directly; on Hyprland a transparent layer-shell web window is known to grow in memory with redraws; there is no test environment on this machine |
+| **Job-like activities on KDE** (downloads, background commands) | The job progress interface as well | A job entry in the notification panel, with cancel | A small D-Bus client | Only cancel and pause; custom buttons have no place |
+| **Other X11 desktops** (Xfce, Cinnamon, MATE, i3 and others), and KDE's X11 session | A floating window: dock type, not kept above, does not accept focus, an input region equal to the shape of the island | The same window | What v0.1 did is used only here | Transparency needs a compositor; tiling window managers may need the user to add a floating rule |
+| **Windows** | A topmost, non-activating tool window, clipped to the shape of the island with a window region | The same window | One Win32 presenter | None of it has been measured; fullscreen is judged with the system's "busy state" query |
 
-**所有会话都有的辅助通道**（主呈现器不可用时就是全部）：
+**The auxiliary channels every session has** (they are everything when the
+main presenter is not available):
 
-- Dock 图标上的进度条和计数（约 40 行，一条 D-Bus 信号）。
-- 托盘标题显示第一个活动的紧凑文字（Ubuntu 的托盘扩展会显示；别处无害）。
-- 通知：只用于"提醒"和"结束态"，同一个活动复用一条通知。**不用通知显示进行中的进度**，因为 GNOME 和 Plasma 都不显示进度。
+- The progress bar and the count on the Dock icon (about 40 lines, one
+  D-Bus signal).
+- The tray title shows the compact text of the first activity (Ubuntu's
+  tray extension shows it; it is harmless elsewhere).
+- Notifications: only for "alerts" and "the ended state", with one
+  notification reused for the same activity. **Notifications are not used
+  to show progress under way**, because neither GNOME nor Plasma shows
+  progress.
 
-### 5.2 GNOME：折叠态在顶栏，展开态紧贴其下
+### 5.2 GNOME: the collapsed state in the top bar, the expanded state right below it
 
-这是按你的提议定的。
+This was settled as you proposed.
 
-- **折叠态**由 Shell 扩展用 Shell 自己的界面工具画在顶栏里，仿照 GNOME 的录屏指示器。位置默认在中间区域时钟的旁边，可在设置里改到右侧。
-  这样它天然不抢焦点、全屏时随顶栏隐藏、不和通知横幅抢位置、勿扰时仍然可见（GNOME 自己的指示器也是如此）。
-- **展开态分两种**。状态项的菜单由 Shell 原生弹出（键盘导航、焦点、点外面关闭都由系统处理，菜单项图标和子菜单都能显示，比现在的托盘好得多）。活动的卡片和状态项的自定义面板是 Heyo 自己的一个窗口，由扩展摆到顶栏项的正下方，上沿与顶栏下沿相接，宽度和水平位置由扩展按顶栏项的实际位置给出。
-  这个窗口的界面和 KDE、X11、Windows 上的展开界面是同一份（网页）。
-- **衔接**：折叠态不动，展开窗口从顶栏下沿向下长出来，这样两个进程的动画不需要逐帧对齐。展开窗口读取顶栏的高度和底色来贴合。
-- **窗口常驻、只切换可见性**，并让扩展对它关掉系统的开关动画，避免每次展开都有映射延迟。
+- **The collapsed state** is drawn in the top bar by the Shell extension
+  with the Shell's own interface toolkit, modeled on GNOME's screen
+  recording indicator. By default it is beside the clock in the middle
+  area, and the settings can move it to the right.
+  That way it does not take focus by its nature, hides with the top bar in
+  fullscreen, does not compete with notification banners for position, and
+  stays visible under Do Not Disturb (as GNOME's own indicators do).
+- **The expanded state is of two kinds.** The menu of a status item is
+  popped up natively by the Shell (keyboard navigation, focus and closing
+  on a click outside are all handled by the system, and the icons of menu
+  items and submenus can all be shown, far better than the tray today). The
+  card of an activity and the custom panel of a status item are one window
+  of Heyo's own, which the extension places directly below the top bar
+  item, its top edge meeting the bottom edge of the top bar, with the width
+  and the horizontal position given by the extension from where the top bar
+  item really is.
+  The interface of this window is the same one as the expanded interface on
+  KDE, X11 and Windows (a web page).
+- **The join**: the collapsed state does not move, and the expanded window
+  grows downward from the bottom edge of the top bar, so the animations of
+  the two processes do not have to be aligned frame by frame. The expanded
+  window reads the height and the background color of the top bar to fit
+  it.
+- **The window stays resident and only its visibility is switched**, and
+  the extension turns off the system's opening and closing animations for
+  it, to avoid a mapping delay on every expansion.
 
-**X11 会话**（你现在用的）：展开窗口用 1.4 里实测过的做法，没有焦点问题。
+**The X11 session** (what you use now): the expanded window uses what was
+measured in 1.4, and has no focus problem.
 
-**Wayland 会话**：应用窗口无法拒绝焦点。对自定义卡片，这一点现在认为可以接受：用户主动点了卡片，它获得焦点，和点开任何弹出面板一样；只悬停不点击时不会抢焦点；点完由扩展把焦点还给原窗口。仍按把握从大到小试三个办法：
+**The Wayland session**: an application window cannot refuse focus. For a
+custom card this is now considered acceptable: the user clicked the card on
+purpose and it gains focus, the same as opening any popover; hovering
+without clicking does not take focus; after the click the extension gives
+the focus back to the original window. Three ways are still to be tried, in
+order from the most to the least certain:
 
-1. 展开窗口的输入区域设为空，它就永远收不到鼠标；由扩展在它上面盖一个透明的可交互区域，把悬停和点击通过现有的 D-Bus 接口转给 Heyo。窗口首次显示时的焦点由扩展立即还给原窗口。
-2. 展开窗口正常接收点击，点完由扩展把焦点还回去。实现最简单，但被点的那一下焦点会离开当前应用。
-3. 展开态也由扩展用 Shell 的弹出面板来画。没有任何焦点和衔接问题，代价是展开界面在 GNOME 上单独写一份，表现力受 Shell 组件限制。
+1. The input region of the expanded window is set empty, so it never
+   receives the mouse; the extension covers it with a transparent
+   interactive area and passes hovering and clicks on to Heyo through the
+   existing D-Bus interface. The focus the window gets when first shown is
+   given back to the original window by the extension at once.
+2. The expanded window receives clicks normally, and after a click the
+   extension gives the focus back. The simplest to implement, but for the
+   moment of the click the focus leaves the current application.
+3. The expanded state is drawn by the extension too, with the Shell's
+   popover. There are no focus or joining problems at all; the price is
+   that the expanded interface is written separately for GNOME, and what it
+   can express is limited by the Shell's components.
 
-如果前两个办法在原型里调不到看不出破绽，就用第三个；折叠态的代码不受影响。
+If the first two cannot be tuned in the prototype until no flaw shows, the
+third is used; the code of the collapsed state is not affected.
 
-**扩展一侧**沿用现有的安全模型：只应答 Heyo 进程。新增的顶栏项要在扩展说明里写明，`disable()` 时全部销毁，以便通过审核。
+**The extension's side** keeps the existing security model: it answers only
+the Heyo process. The new top bar items have to be stated in the
+extension's description, and all destroyed on `disable()`, so as to pass
+review.
 
-### 5.3 位置
+### 5.3 Position
 
-v0.1 的"顶栏下方居中浮动"取消。原则改为：**有栏就进栏；没有栏可进时贴着屏幕边，不悬在中间。**
+"Floating centered below the top bar" of v0.1 is dropped. The principle is
+now: **where there is a bar, go into the bar; where there is no bar to go
+into, sit against the edge of the screen, and do not hang in the middle.**
 
-- GNOME：顶栏里。
-- layer-shell 和 X11 浮动窗口：贴屏幕顶边居中，上沿与屏幕边缘重合（和 macOS 上那些应用一样）；可在设置里改为底边，或左右偏移以避开用户自己的状态栏。
-- Windows：贴屏幕顶边居中。任务栏里嵌入是更原生的位置，但实现方式（另一个项目的做法）没有调研到足以下结论的程度，列为后续。
+- GNOME: in the top bar.
+- layer-shell and X11 floating windows: centered against the top edge of
+  the screen, the top edge coinciding with the edge of the screen (like
+  those applications on macOS); the settings can change this to the bottom
+  edge, or offset it left or right to keep clear of the user's own status
+  bar.
+- Windows: centered against the top edge of the screen. Embedding in the
+  taskbar is the more native position, but how it is implemented (the way
+  another project does it) has not been researched enough to conclude
+  anything, and it is listed for later.
 
-### 5.4 交互与防误触
+### 5.4 Interaction and guarding against accidental triggering
 
-| 操作 | 效果 |
+| Action | Effect |
 |---|---|
-| 指针进入 | 100 ms 内给出反馈（轻微提亮），表示"这里可以展开" |
-| 悬停 300 ms | 展开；移开 600 ms 后收起 |
-| **鼠标按键按下时、或正在拖动时** | 不展开（同类产品里拖动标签页时误展开是头号抱怨） |
-| 单击折叠态 | 执行默认动作；没有则展开并保持，直到点关闭按钮或点别处 |
-| 展开态上的关闭按钮 | 收起。始终可见，不依赖移开指针 |
-| 滚轮 | 在多个活动之间切换 |
-| 右键 | 菜单由我们自己画（网页引擎自带的右键菜单会让下面的应用丢焦点）：结束这个活动、改为普通通知、不再显示这个扩展的活动、设置 |
-| "立即隐藏"热键（设置里绑定） | 隐藏到下一个活动开始。全屏检测在实践中会漏（某些播放器、无边框游戏），需要兜底 |
-| "把键盘交给岛"热键（设置里绑定，默认不绑） | 唯一会让岛拿到键盘的情况 |
+| The pointer enters | Feedback within 100 ms (a slight brightening), to say "this can be expanded" |
+| Hovering for 300 ms | Expands; collapses 600 ms after the pointer leaves |
+| **While a mouse button is down, or during a drag** | Does not expand (in similar products, expanding by accident while a tab is dragged is the number one complaint) |
+| A click on the collapsed state | Carries out the default action; without one, expands and stays so until the close button or somewhere else is clicked |
+| The close button on the expanded state | Collapses. Always visible; it does not depend on moving the pointer away |
+| The wheel | Switches between several activities |
+| Right click | A menu we draw ourselves (the web engine's own context menu would make the application below lose focus): end this activity, make it an ordinary notification, no longer show this extension's activities, settings |
+| The "hide now" hotkey (bound in the settings) | Hides until the next activity starts. Fullscreen detection misses in practice (some players, borderless games), and a fallback is needed |
+| The "give the keyboard to the island" hotkey (bound in the settings, unbound by default) | The only case in which the island gets the keyboard |
 
-设置里可以关掉悬停展开，改为只有单击才展开。
+The settings can turn off expanding on hover, so that only a click expands.
 
-### 5.5 全屏、勿扰、屏幕共享
+### 5.5 Fullscreen, Do Not Disturb, screen sharing
 
-- **全屏**：隐藏。GNOME 顶栏项和 X11 的停靠栏类型窗口自动如此；其他呈现器自己判断。听写是例外：它在占用麦克风，全屏时仍要有一个最小的指示（Wayland 和 X11 上的做法在原型里定）。
-- **勿扰**：只压掉提醒式更新和自动展开，**折叠态照常显示**。GNOME 对自己的指示器就是这样做的。v0.1 写的"勿扰时隐藏"取消。
-- **屏幕共享和录屏**：活动的内容可能含私密文字（听写的转写、AI 的回答）。Windows 上提供"不出现在屏幕捕获里"的开关（有正式接口）。
-  Linux 上没有对应接口，所以改为：检测到屏幕正在被共享或录制时（GNOME 顶栏自己会显示这个状态），折叠态只显示图标不显示文字，展开态不自动展开。这个检测的可行性在原型里确认。
+- **Fullscreen**: hidden. GNOME's top bar items and X11 windows of the dock
+  type do so automatically; the other presenters judge for themselves.
+  Dictation is the exception: it is using the microphone, and in fullscreen
+  there still has to be a minimal indication (how, on Wayland and on X11,
+  is to be settled in the prototype).
+- **Do Not Disturb**: only alerting updates and automatic expansion are
+  suppressed, and **the collapsed state is shown as usual**. This is what
+  GNOME does with its own indicators. "Hidden under Do Not Disturb", which
+  v0.1 wrote, is dropped.
+- **Screen sharing and screen recording**: the content of an activity may
+  contain private text (the transcript of dictation, the AI's answer). On
+  Windows a switch "does not appear in screen capture" is offered (there is
+  a proper interface).
+  Linux has no corresponding interface, so instead: when the screen is
+  detected as being shared or recorded (GNOME's top bar shows this state
+  itself), the collapsed state shows only the icon and no text, and the
+  expanded state does not expand automatically. Whether this detection is
+  feasible is to be confirmed in the prototype.
 
-### 5.6 多个活动
+### 5.6 Several activities
 
-iOS 在多个应用都有活动时显示两个最小态，没有"一个紧凑加一个最小"的先例；跨应用怎么排也没有先例（它的相关度只在应用内部有效）。所以这一部分是我们自己的设计，放在原型里验证：
+When several applications have activities, iOS shows two in the minimal
+state; there is no precedent for "one compact plus one minimal", and none
+for how to order across applications either (its relevance only works
+inside an application). So this part is our own design, to be verified in
+the prototype:
 
-- 排序依据，从高到低：占用麦克风的（听写）→ 用户刚刚交互过的 → 正在提醒的 → 最近更新的。
-  扩展自己给的 `relevance` **只在同一个扩展的多个活动之间排序**，不参与跨扩展的排序，否则每个扩展都会填 100。
-- 显示：第一名紧凑态，其余合成一个带数字的最小态。空间不够时（GNOME 顶栏拥挤），全部退成最小态。
+- What the order goes by, from high to low: the one using the microphone
+  (dictation) → the one the user has just interacted with → the one that is
+  alerting → the most recently updated.
+  The `relevance` an extension gives **only orders among the several
+  activities of the same extension** and takes no part in the order across
+  extensions, otherwise every extension would fill in 100.
+- Showing: the first is compact, and the rest are combined into one minimal
+  state with a number. When there is not enough room (a crowded GNOME top
+  bar), all fall back to the minimal state.
 
-### 5.7 渲染
+### 5.7 Rendering
 
-- 空闲时零重绘：没有活动变化就没有任何定时器在跑。
-- **不要持续动画**。听写的音量指示每秒最多更新 10 次，用几个离散的高度，而不是连续波形；进度环用离散步进。
-- **不用模糊阴影**：阴影用预渲染的图片（面板已是这样做）。
-- 网页呈现器里，展开和收起用一次 160 ms 的过渡；因为这条路径上 `transform` 并不比改尺寸便宜，直接过渡尺寸即可，不需要 v0.1 里的九宫格技巧。
+- Zero redraws when idle: with no change in the activities, no timer of any
+  kind is running.
+- **No continuous animation.** The volume indication of dictation is
+  updated at most 10 times a second, with a few discrete heights and not a
+  continuous waveform; the progress ring moves in discrete steps.
+- **No blurred shadows**: shadows use a pre-rendered image (the palette
+  already does this).
+- In the web presenter, expanding and collapsing use one transition of
+  160 ms; since on this path `transform` is no cheaper than changing the
+  size, the size is simply transitioned, and the nine-slice trick of v0.1
+  is not needed.
 
 ---
 
-## 6. 接口
+## 6. The interface
 
-`@heyo/api` 新增 `LiveActivity` 模块。权限名 `activity`。相对 v0.1 的改动处标了"改"。
+`@heyo/api` gains a `LiveActivity` module. The permission is named
+`activity`. Where it differs from v0.1 it is marked "Changed".
 
-### 6.1 发起、更新、结束
+### 6.1 Starting, updating, ending
 
 ```ts
 export namespace LiveActivity {
-  /** 不变的部分。 */
+  /** The part that does not change. */
   interface Attributes {
-    /** 同一扩展内唯一。再次 start 同一个 id 等于 update。 */
+    /** Unique within one extension. Calling start again with the same id is an update. */
     id: string;
-    /** 这是什么（"Build"、"Timer"）。 */
+    /** What this is ("Build", "Timer"). */
     name: string;
     icon: Image.ImageLike;
     tint?: Color.ColorLike;
-    /** 点击折叠态时做什么。 */
+    /** What to do when the collapsed state is clicked. */
     action?: Action;
-    /** 用户能否从菜单结束它。默认 true。 */
+    /** Whether the user can end it from the menu. true by default. */
     dismissible?: boolean;
-    /** 改：这个桌面上显示不了时怎么办。默认 "notify"。 */
+    /** Changed: what to do when it cannot be shown on this desktop. "notify" by default. */
     fallback?: "notify" | "drop";
   }
 
-  /** 会变的部分。 */
+  /** The part that changes. */
   interface Content {
-    /** 折叠态里的内容。缺省时由 title 截断得到。 */
+    /** What the collapsed state shows. When left out, it is title, truncated. */
     compact?: Value;
     title: string;
     subtitle?: string;
-    /** 展开态的主体，三选一。 */
+    /** The body of the expanded state, one of three. */
     body?: { progress: Progress } | { timer: Timer } | { text: string };
-    /** 最多三个，只出现在展开态。 */
+    /** At most three, and they appear only in the expanded state. */
     actions?: Button[];
-    /** 改：需要用户处理（确认、输入）。呈现器会把它排到前面并用强调色。 */
+    /** Changed: needs the user to deal with it (confirm, type). The presenter moves it to the front and uses the accent color. */
     needsAttention?: boolean;
-    /** 改：这之后内容可能不准，显示时变淡。不会结束活动。 */
+    /** Changed: after this the content may be inaccurate, and it is shown faded. It does not end the activity. */
     staleAt?: Date;
-    /** 同一个扩展的多个活动之间的次序，0–100。 */
+    /** The order among several activities of the same extension, 0–100. */
     relevance?: number;
   }
 
-  /** 一小段会自己变的内容。计时和进度由 Heyo 自己走。 */
+  /** A small piece of content that changes by itself. Timers and progress are counted by Heyo itself. */
   type Value = string | { timer: Timer } | { progress: Progress } | { icon: Image.ImageLike };
 
-  /** 改：一个时间区间加一个暂停时刻，倒计时、正计时、按时间推进的进度都用它。 */
+  /** Changed: a span of time plus a moment of pausing; countdowns, counting up and progress that advances with time all use it. */
   interface Timer {
     start: Date;
-    /** 省略表示正计时，没有终点。 */
+    /** Left out, it counts up and has no end. */
     end?: Date;
-    /** 暂停在哪一刻；省略表示在走。 */
+    /** The moment it was paused at; left out, it is running. */
     pausedAt?: Date;
-    /** 有终点时默认倒数。 */
+    /** With an end it counts down by default. */
     countsDown?: boolean;
-    style?: "clock" | "relative"; // "12:05" 或 "12 分钟"
+    style?: "clock" | "relative"; // "12:05" or "12 min"
   }
 
   interface Progress {
-    /** 0–1。省略且没有 interval 时为不确定进度。 */
+    /** 0–1. Left out, and with no interval, the progress is indeterminate. */
     value?: number;
-    /** 按时间自己推进。 */
+    /** Advances by itself with time. */
     interval?: Pick<Timer, "start" | "end" | "pausedAt">;
   }
 
   function start(attributes: Attributes, content: Content, options?: StartOptions): Promise<Handle>;
 
   interface StartOptions {
-    /** 改：首次出现时展开一次，约 4 秒。默认 true；勿扰或全屏时不展开。 */
+    /** Changed: expands once on first appearance, for about 4 seconds. true by default; it does not expand under Do Not Disturb or in fullscreen. */
     announce?: boolean;
   }
 
@@ -350,44 +628,55 @@ export namespace LiveActivity {
   function list(): Promise<Handle[]>;
   function get(id: string): Promise<Handle | undefined>;
 
-  /** 改：这个桌面上活动会显示成什么样，扩展可据此调整内容。 */
+  /** Changed: what an activity will look like on this desktop, so that an extension can adjust its content to it. */
   function presentation(): Promise<{
     support: Support;
-    /** 折叠态能放多少字（顶栏里很窄）。 */
+    /** How many characters fit in the collapsed state (the top bar is narrow). */
     compactCharacters: number;
-    /** 展开态是否可用、能否放按钮（KDE 的任务条目不能）。 */
+    /** Whether the expanded state is available, and whether it can hold buttons (a KDE job entry cannot). */
     expanded: boolean;
     buttons: boolean;
-    /** 模板版本，以后加版式时递增。 */
+    /** The version of the templates, raised when layouts are added later. */
     version: number;
   }>;
 }
 ```
 
-### 6.2 更新的先后（改，新增）
+### 6.2 The order of updates (changed, new)
 
-每次 `update` 由运行时垫片带上一个递增的序号；主机丢弃序号不大于已应用序号的更新。
-这是因为一个活动可能同时被发起它的命令、后台的处理命令和主机执行的动作更新，晚到的旧更新不能覆盖新的。
-iOS、小米、vivo 都有同样的保护。扩展不需要关心这个字段。
+The runtime shim gives every `update` an increasing sequence number; the
+host drops an update whose number is not greater than the one already
+applied.
+This is because one activity may be updated at the same time by the command
+that started it, by the handler command in the background and by an action
+the host carries out, and an old update that arrives late must not
+overwrite a newer one.
+iOS, Xiaomi and vivo all have the same protection. An extension does not
+have to care about this field.
 
-### 6.3 提醒式更新
+### 6.3 Alerting updates
 
 ```ts
 interface Alert {
-  /** 短暂展开来显示这次更新，约 4 秒。勿扰或全屏时不展开。 */
+  /** Expands briefly to show this update, for about 4 seconds. It does not expand under Do Not Disturb or in fullscreen. */
   expand?: boolean;
 }
 ```
 
-没有声音。需要更强的提醒是通知的事。
+There is no sound. A stronger alert is the business of notifications.
 
-### 6.4 结束
+### 6.4 Ending
 
-- `end()` 默认 `keep: "brief"`：显示最终内容 4 秒后消失。`"none"` 立即消失。
-- **改**：v0.1 允许把结束态保留最长 15 分钟，现在取消。长时间保留的结果（"构建失败，点这里看"）改为主机发一条通知，
-  因为桌面上没有锁屏那样的第二个地方可以放它。**需要用户处理的结果**用 `needsAttention` 保持活动不结束。
+- `end()` defaults to `keep: "brief"`: the final content is shown for
+  4 seconds and then disappears. `"none"` disappears at once.
+- **Changed**: v0.1 allowed the ended state to be kept for up to 15
+  minutes, and this is now dropped. For a result that stays for a long time
+  ("The build failed, click here to see") the host sends a notification
+  instead, because the desktop has no second place like the lock screen to
+  put it. **A result that needs the user to deal with it** uses
+  `needsAttention` to keep the activity from ending.
 
-### 6.5 按钮、动作与事件
+### 6.5 Buttons, actions and events
 
 ```ts
 interface Button {
@@ -398,146 +687,206 @@ interface Button {
 }
 
 type Action =
-  | { open: string }                                   // 主机直接执行
+  | { open: string }                                   // carried out by the host directly
   | { copy: string }
   | { launch: { command: string; arguments?: Record<string, string>; context?: unknown } }
-  | { event: string; data?: unknown }                  // 送回扩展
+  | { event: string; data?: unknown }                  // sent back to the extension
   | { end: true };
 ```
 
-这种两级划分和 iOS 的一致：声明式动作对应它的链接，回调动作对应它的意图（也是在后台把应用拉起来处理）。
+This division into two levels is the same as that of iOS: declarative
+actions correspond to its links, and callback actions to its intents (which
+also bring the application up in the background to handle them).
 
-事件送给扩展的方式不变：清单里声明一个活动处理命令（`"heyo": { "handles": "activity" }`），有事件时主机在后台运行时里运行它；
-正在运行的命令也可以用 `LiveActivity.onEvent()` 直接订阅。事件种类：`action`、`dismissed`、`expired`。
+How events are sent to an extension does not change: the manifest declares
+an activity handler command (`"heyo": { "handles": "activity" }`), and when
+there is an event the host runs it in the background runtime; a running
+command can also subscribe directly with `LiveActivity.onEvent()`. The
+kinds of event: `action`, `dismissed`, `expired`.
 
-### 6.6 上限
+### 6.6 Limits
 
-| 项 | 值 | 依据 |
+| Item | Value | Based on |
 |---|---|---|
-| 单个活动最长存在 | 8 小时 | iOS 和华为都是 8 小时 |
-| 无更新的活动 | **改**：2 小时后降为最小态，4 小时后结束。`staleAt` 只让显示变淡，不结束活动 | 华为的两步降级；v0.1 的"1 小时后结束"比任何平台都严，会误杀长时间安静的活动（长构建、会议） |
-| 内容大小 | 属性加内容共 4 KB | iOS |
-| 折叠态文字 | **改**：建议 10 个字以内，超出截断；确切值由 `presentation().compactCharacters` 给出 | Android 的状态栏胶囊约 7 个字符；v0.1 的 20 太宽 |
-| 按钮 | 3 个，只在展开态 | Android 允许 3 个；iOS 建议更少 |
-| 更新频率 | 每个活动每秒 1 次，超出的合并 | 自定，无平台先例可对照 |
-| 每个扩展同时的活动数 | 3 | 自定 |
-| 提醒式更新 | 每个活动每分钟 2 次 | 自定 |
+| The longest a single activity exists | 8 hours | iOS and Huawei both have 8 hours |
+| An activity without updates | **Changed**: reduced to the minimal state after 2 hours, ended after 4 hours. `staleAt` only fades the display and does not end the activity | Huawei's two-step degradation; "ended after 1 hour" in v0.1 was stricter than any platform, and would kill activities that are quiet for a long time (long builds, meetings) by mistake |
+| Size of the content | Attributes plus content, 4 KB in all | iOS |
+| Text of the collapsed state | **Changed**: 10 characters or fewer are advised, and what is beyond is truncated; the exact value is given by `presentation().compactCharacters` | Android's status bar chip is about 7 characters; the 20 of v0.1 was too wide |
+| Buttons | 3, only in the expanded state | Android allows 3; iOS advises fewer |
+| Update frequency | Once a second per activity; what exceeds that is merged | Our own; no platform precedent to compare with |
+| Activities at a time per extension | 3 | Our own |
+| Alerting updates | Twice a minute per activity | Our own |
 
-### 6.7 权限与发起条件
+### 6.7 Permission and the conditions for starting
 
-- **谁能发起**（改，新增）：活动必须由用户的动作引出——一个用户运行的命令，或用户点了活动上的按钮之后。
-  **定时在后台运行的命令不能凭空发起新活动**，只能更新自己已有的活动。这是所有手机平台的共同规则，也堵住了"后台扩展刷存在感"。
-- **同意**：清单里要列 `activity`。首次使用不弹询问（没有哪个手机平台按活动询问，都是每个应用一个开关），
-  但每个扩展在设置里有开关，右键菜单里也能直接关掉某个扩展的活动。另有总开关。
-  （唯一上线的第三方桌面岛接口是询问的，所以这仍是第 12 节的问题之一。）
+- **Who can start one** (changed, new): an activity must be brought about
+  by an action of the user: a command the user ran, or after the user chose
+  a button on an activity.
+  **A command running in the background on a schedule cannot start a new
+  activity out of nothing**; it can only update an activity it already has.
+  This is the common rule of all the phone platforms, and it also stops
+  "background extensions making themselves noticed".
+- **Consent**: the manifest has to list `activity`. Nothing is asked on
+  first use (no phone platform asks per activity; they all have one switch
+  per application), but every extension has a switch in the settings, and
+  the context menu can also turn off an extension's activities directly.
+  There is a switch for all of them besides.
+  (The only third-party desktop island interface that has shipped does ask,
+  so this is still one of the questions of section 12.)
 
 ---
 
-## 7. 让现有的东西自动受益
+## 7. Letting what already exists benefit automatically
 
-1. **`showHUD`**：面板关着时现在是一条系统通知，改为活动通道上一次 1.5–2 秒的短暂显示（同类产品里这类提示的时长在 1.3–3 秒之间）。
-2. **面板关闭后进行中的 Toast**（`Animated` 样式）：变成一个活动，成功或失败时变成结束态。无界面命令的进度第一次有地方显示。
-3. **菜单栏命令（`MenuBarExtra`）**：改（v0.3），成为一等公民。它们在 macOS 上本来就住在菜单栏里，现在在 Linux 上被映射成托盘图标是打了折扣的替代（原生 GNOME 没有托盘，标题和菜单项图标显示不了）。前 100 个热门扩展里有 26 个带菜单栏命令，这正是让状态栏不空的现成内容。它们作为**状态项**进入状态栏（第 3 节），不受活动的时长和发起规则约束；折叠态的标题除了文字也可以用活动的计时和进度（会议扩展写一个截止时间，由我们自己走，不用每分钟刷新），这是在 Raycast 接口之上的增强，不改它原有的行为。KDE、Hyprland、Windows 上继续用托盘。
+1. **`showHUD`**: with the palette closed it is a system notification
+   today; it becomes one brief display of 1.5–2 seconds on the activity
+   channel (in similar products such hints last between 1.3 and 3 seconds).
+2. **A toast still in progress after the palette closes** (the `Animated`
+   style): it becomes an activity, and turns into the ended state on
+   success or failure. For the first time the progress of commands without
+   a view has somewhere to be shown.
+3. **Menu bar commands (`MenuBarExtra`)**: changed (v0.3), they become
+   first-class citizens. On macOS they live in the menu bar to begin with,
+   and mapping them to tray icons, as is done on Linux today, is a
+   substitute that falls short (stock GNOME has no tray, and titles and the
+   icons of menu items cannot be shown). Of the 100 most popular
+   extensions, 26 have menu bar commands, which is exactly the ready-made
+   content that keeps the status bar from being empty. They enter the
+   status bar as **status items** (section 3), and are not bound by the
+   rules on duration and starting that activities have; besides text, the
+   title of the collapsed state can also use the timers and progress of
+   activities (a meeting extension writes an end time and we count it
+   ourselves, with no refresh every minute), which is an enhancement on top
+   of Raycast's API and does not change its existing behavior. KDE,
+   Hyprland and Windows go on using the tray.
 
 ---
 
-## 8. 内置活动
+## 8. Built-in activities
 
-按 1.2 的证据重排，并补上 v0.1 缺的状态。
+Reordered by the evidence of 1.2, with the states v0.1 lacked filled in.
 
-| 活动 | 折叠态 | 展开态 | 说明 |
+| Activity | Collapsed | Expanded | Notes |
 |---|---|---|---|
-| 听写 | 麦克风图标加识别出的末尾几个字 | 已识别的文字、润色状态；完成、取消 | 永远排第一。GNOME 录音时自己已有麦克风指示，所以这里显示它没有的东西（转写和按钮），不重复一个麦克风图标 |
-| 计时器、番茄钟 | 图标加倒计时 | 大号计时；暂停、加 1 分钟、结束 | 新的内置命令；验证宿主自走的计时 |
-| AI 任务 | 图标加状态 | 问题和回答的开头；停止、打开对话 | 三个状态：进行中、**需要你确认或输入**、**已完成**（用 `needsAttention` 和结束态） |
-| 短暂提示 | 图标加两三个字 | 无 | 即 `showHUD`：已复制、已静音等 |
-| 引擎下载、后台命令 | 图标加进度 | 进度、已用时间；取消 | 只在超过 2 秒时出现；KDE 上同时进任务进度 |
-| 正在播放的媒体 | — | — | **有意推后**。它是所有同类产品里排第一的内容，但它需要接入系统的媒体接口、处理封面和多个播放器，是一块独立的工作；而且 GNOME 自己的日期菜单里已经有媒体控制。放在扩展接口稳定之后做 |
+| Dictation | A microphone icon plus the last few characters recognized | The text recognized, the state of polishing; finish, cancel | Always first. GNOME already has its own microphone indication while recording, so this shows what that does not have (the transcript and the buttons), and does not repeat a microphone icon |
+| Timer, Pomodoro | An icon plus a countdown | A large timer; pause, add 1 minute, end | A new built-in command; it proves the timers the host counts by itself |
+| AI task | An icon plus a state | The question and the beginning of the answer; stop, open the conversation | Three states: in progress, **needs you to confirm or type**, **done** (with `needsAttention` and the ended state) |
+| Brief hint | An icon plus two or three characters | None | That is, `showHUD`: copied, muted and so on |
+| Engine downloads, background commands | An icon plus progress | Progress, time elapsed; cancel | Appears only beyond 2 seconds; on KDE it also goes into job progress |
+| Media that is playing | — | — | **Deliberately put off.** It is the content that comes first in every similar product, but it needs connecting to the system's media interface and handling covers and several players, which is a separate piece of work; and GNOME's own date menu already has media controls. To be done after the extension interface is stable |
 
 ---
 
-## 9. 实现
+## 9. Implementation
 
-### 9.1 结构
+### 9.1 Structure
 
 ```
-扩展 ──LiveActivity.*──▶ 运行时垫片 ──ext.activity.*──▶ 主机 activities.rs（活动表、上限、排序、到期）
-                                                             │
-                                                    呈现器接口：present(排好序的活动)
-              ┌───────────────┬───────────────┬──────────────┼───────────────┬──────────────┐
-          GNOME 扩展        layer-shell      X11 浮动窗口    Windows 窗口    KDE 任务进度   Dock/托盘/通知
-        （顶栏项 + 展开窗口）   窗口                                              （辅助）       （辅助）
+extension ──LiveActivity.*──▶ runtime shim ──ext.activity.*──▶ host activities.rs (the table of activities, limits, order, expiry)
+                                                                  │
+                                       presenter interface: present(the activities, in order)
+        ┌──────────────────┬──────────────────┬───────────────────┼──────────────────┬────────────────────┐
+ GNOME extension      layer-shell       X11 floating       Windows window    KDE job progress  Dock/tray/notification
+ (top bar item +        window             window                               (auxiliary)          (auxiliary)
+expanded window)
 ```
 
-- **`src-tauri/src/activities.rs`（新）**：活动表。上限检查、序号保护、排序、降级与到期、"现在该显示哪几个"都是不依赖窗口的函数，时间作为参数传入，全部单元测试。
-- **`src-tauri/src/activities/presenter.rs`（新）**：呈现器接口，以及按会话选择主呈现器和辅助通道。选择逻辑也是可测试的纯函数。
-- **`wire.rs`**：`ext.activity.start/update/end/list/presentation`；内容类型用 ts-rs 导出。
-- **展开界面**（网页）：只画不存状态。
-- **`gnome-extension/`**：新增 `Activities(json)` 方法和 `ActivityAction(id, action)` 信号；协议版本加一，旧扩展下 GNOME 退化到辅助通道。
-- **`runtime/src/heyo/activity.ts`（新）**：垫片；`showHUD` 和 Toast 的接入点。
+- **`src-tauri/src/activities.rs` (new)**: the table of activities.
+  Checking limits, sequence protection, ordering, degradation and expiry,
+  and "which ones should be shown now" are all functions that do not depend
+  on windows, with the time passed in as a parameter, and all unit tested.
+- **`src-tauri/src/activities/presenter.rs` (new)**: the presenter
+  interface, and choosing the main presenter and the auxiliary channels by
+  session. The choosing logic is a testable pure function too.
+- **`wire.rs`**: `ext.activity.start/update/end/list/presentation`; the
+  content types are exported with ts-rs.
+- **The expanded interface** (a web page): it only draws and holds no
+  state.
+- **`gnome-extension/`**: gains an `Activities(json)` method and an
+  `ActivityAction(id, action)` signal; the protocol version goes up by one,
+  and with an old extension GNOME falls back to the auxiliary channels.
+- **`runtime/src/heyo/activity.ts` (new)**: the shim; where `showHUD` and
+  toasts connect.
 
-### 9.2 分期
+### 9.2 Phases
 
-| 阶段 | 内容 | 要回答的问题 |
+| Phase | What | Questions to answer |
 |---|---|---|
-| 0 原型 | 活动表；GNOME 顶栏项（X11 会话）；展开窗口紧贴其下；一个内置计时器 | 衔接看不看得出破绽？放在时钟旁边碍不碍事？多个活动怎么显示顺眼？ |
-| 0b | 同样的东西在 GNOME Wayland 容器里 | 5.2 的三个焦点办法哪个行得通 |
-| 1 内置 | 听写、短暂提示、AI 任务、下载和后台命令；辅助通道（Dock 进度、通知） | — |
-| 2 扩展接口 | `LiveActivity`、发起条件、设置里的开关、处理命令、事件、上限 | 用探针扩展和两三个真实场景检验接口 |
-| 3 其他呈现器 | X11 浮动窗口（非 GNOME）；KDE 任务进度；layer-shell | 需要一个 KDE 或 Hyprland 的测试环境 |
-| 4 | Windows；菜单栏命令上岛；媒体 | — |
+| 0 Prototype | The table of activities; a GNOME top bar item (X11 session); the expanded window right below it; one built-in timer | Does a flaw show at the join? Is it in the way beside the clock? How do several activities look right? |
+| 0b | The same thing in the GNOME Wayland container | Which of the three focus approaches of 5.2 works |
+| 1 Built-in | Dictation, brief hints, AI tasks, downloads and background commands; the auxiliary channels (Dock progress, notifications) | — |
+| 2 Extension interface | `LiveActivity`, the conditions for starting, the switches in the settings, handler commands, events, limits | Test the interface with a probe extension and two or three real scenarios |
+| 3 Other presenters | The X11 floating window (outside GNOME); KDE job progress; layer-shell | Needs a KDE or Hyprland test environment |
+| 4 | Windows; menu bar commands onto the island; media | — |
 
-阶段 0 和 0b 做完之前不往下走。
+Nothing further is started until phases 0 and 0b are done.
 
 ---
 
-## 10. 测试
+## 10. Testing
 
-| 层 | 怎么测 |
+| Layer | How it is tested |
 |---|---|
-| 活动表 | 表驱动的单元测试：上限、序号保护（晚到的旧更新被丢弃）、两步降级和到期（注入时间）、排序、后台命令不能发起新活动 |
-| 计时与进度的文字 | 纯函数：给定区间、暂停时刻和现在，得到显示的文字 |
-| 呈现器选择 | 纯函数：会话类型加能力 → 主呈现器和辅助通道 |
-| 协议与垫片 | 每个 `ext.activity.*` 的读入；超限返回 `invalid`；Heyo 之外的桩 |
-| GNOME 顶栏项 | Wayland 容器里的检查脚本（现有的 `scripts/wayland-test/`）：项出现、文字随更新变化、全屏时不可见、点击发出动作信号 |
-| 展开窗口 | X11 沙箱：位置紧贴顶栏项、不抢焦点（焦点窗口不变）、透明处点击落到下面的窗口、按键按下时悬停不展开 |
-| 空闲开销 | 有一个静止的活动时，10 秒内界面进程的 CPU 时间为零；计时器走动时每秒只重画一次 |
-| 流畅度 | 展开、收起各 3 秒，统计超过 20 ms 的帧 |
+| The table of activities | Table-driven unit tests: limits, sequence protection (an old update that arrives late is dropped), the two-step degradation and expiry (with the time injected), ordering, a background command cannot start a new activity |
+| The text of timers and progress | A pure function: given the span, the moment of pausing and now, it gives the text shown |
+| Choosing the presenter | A pure function: session type plus abilities → the main presenter and the auxiliary channels |
+| Protocol and shim | Every `ext.activity.*` is read in; exceeding a limit returns `invalid`; the stubs outside Heyo |
+| The GNOME top bar item | The check script in the Wayland container (the existing `scripts/wayland-test/`): the item appears, the text changes with updates, it is not visible in fullscreen, a click sends the action signal |
+| The expanded window | The X11 sandbox: positioned right below the top bar item, does not take focus (the focused window does not change), a click on a transparent part lands on the window below, hovering does not expand while a button is down |
+| Idle overhead | With one activity at rest, the CPU time of the interface process over 10 seconds is zero; while a timer is counting there is only one redraw a second |
+| Smoothness | Expand and collapse for 3 seconds each, and count the frames over 20 ms |
 
 ---
 
-## 11. 界面引擎
+## 11. The interface engine
 
-展开界面用现有的网页视图来画。曾经评估过 Flutter，已搁置（`docs/flutter-evaluation.md`）。
-
----
-
-## 12. 待决问题
-
-1. **GNOME 顶栏里的位置**：时钟旁边（中间区域），还是右侧状态区的左边？中间更显眼，也更容易让人觉得挤。
-1a. **每个扩展一项，还是合并成一个 Heyo 项？** macOS 上是各占一个位置；GNOME 顶栏空间有限。倾向：用户在设置里选哪几个单独显示，其余收进一个"Heyo"项的菜单里。
-1b. **悬停展开的卡片**是降为后续增强（第 0 节的推理），还是你认为它是这个功能的灵魂？
-1c. **汇集别的应用的进度**值不值得调研？
-2. **GNOME 的展开态**：按 5.2 先试"我们自己的窗口紧贴顶栏项"，不行再退回 Shell 原生弹出。可以吗？
-3. **权限**：`activity` 首次使用不询问、只给开关（本文的选择），还是询问一次？
-4. **发起条件**：定时后台命令不能发起新活动（6.7）。这会挡住"每 5 分钟检查一次构建，失败了就亮出来"这类用法，它们得改用通知。接受吗？
-5. **听写并入**：GNOME 上听写会从屏幕下方的浮窗变成顶栏里的一项加展开面板，离输入的地方更远。并入，还是听写保留现在的浮窗、只在顶栏多一个状态项？
-6. **正在播放的媒体**推后（第 8 节）。同意吗？
-7. **名字**：接口叫 `LiveActivity`。界面文案里不宜用"灵动岛"（苹果的产品名）；设置里叫"实时活动"/ Live Activities？
+The expanded interface is drawn with the existing web view. Flutter was
+evaluated once and is shelved (`docs/flutter-evaluation.md`).
 
 ---
 
-## 13. v0.1 里与事实不符、已改正的说法
+## 12. Open questions
 
-| v0.1 的说法 | 实际 | 来源 |
+1. **The position in GNOME's top bar**: beside the clock (the middle area),
+   or to the left of the status area on the right? The middle is more
+   conspicuous, and also more likely to feel crowded.
+1a. **One item per extension, or merged into one Heyo item?** On macOS each takes a place of its own; GNOME's top bar has limited room. Leaning toward: the user chooses in the settings which ones are shown separately, and the rest go into the menu of one "Heyo" item.
+1b. **The card that expands on hover**: is it demoted to a later enhancement (the reasoning of section 0), or do you think it is the soul of this feature?
+1c. **Gathering the progress of other applications**: is it worth researching?
+2. **The expanded state on GNOME**: by 5.2, first try "our own window right
+   below the top bar item", and fall back to the Shell's native popup if
+   that does not work. Is that all right?
+3. **Permission**: `activity` is not asked about on first use and there is
+   only a switch (what this document chooses), or is it asked once?
+4. **Conditions for starting**: a scheduled background command cannot start
+   a new activity (6.7). This blocks uses such as "check the build every
+   5 minutes and show it when it fails", which would have to use
+   notifications instead. Acceptable?
+5. **Merging dictation in**: on GNOME, dictation would go from the floating
+   indicator at the bottom of the screen to an item in the top bar plus an
+   expanded panel, farther from where the typing is. Merge it in, or does
+   dictation keep the floating indicator it has now, with only one more
+   status item in the top bar?
+6. **Media that is playing** is put off (section 8). Do you agree?
+7. **The name**: the interface is called `LiveActivity`. "Dynamic Island"
+   (Apple's product name) should not be used in the wording of the
+   interface; is it called "Live Activities" in the settings?
+
+---
+
+## 13. Statements in v0.1 that did not match the facts, and have been corrected
+
+| What v0.1 said | What is the case | Source |
 |---|---|---|
-| iOS 多个活动并存时显示"一个紧凑态加一个最小态" | 显示两个最小态；相关度只在同一应用内排序 | `mobile.md` |
-| 三星 Now Bar 可左右切换多个活动 | 官方说明是向上滑动后选择；没有找到公开的开发者接口 | `mobile.md` |
-| 华为的模板有"进度类、取件码类、计时类" | 五种：进度、强调文本、左右文本、比分、导航；计时是占位符 | `mobile.md` |
-| 现有的听写浮窗是"通知类型的窗口"，岛可以照着做 | 代码里没有设窗口类型；Shell 扩展里也没有置顶、定位、全屏处理 | `linux.md`、`window.md` |
-| Windows 上用命中测试返回"透明"实现点击穿透 | 只对同一线程的窗口有效；应该用窗口区域 | `window.md` |
-| 用 `transform` 做动画可以避免重绘 | 这条渲染路径上没有显卡图层，`transform` 同样是 CPU 重画 | `window.md`（实测） |
-| GNOME Wayland 上由扩展摆放一个应用窗口即可 | 应用窗口在那里无法拒绝焦点 | `linux.md`、`window.md`（实测） |
-| "其他 Wayland 桌面第一版不支持" | layer-shell 覆盖了 GNOME 以外的主流合成器，KDE 也在其中 | `linux.md` |
+| With several activities at once iOS shows "one compact plus one minimal" | It shows two in the minimal state; relevance only orders within one application | `mobile.md` |
+| Samsung's Now Bar can switch between several activities left and right | The official description is swiping up and then choosing; no public developer interface was found | `mobile.md` |
+| Huawei's templates are "progress, pickup code, timer" | Five: progress, emphasized text, left and right text, score, navigation; the timer is a placeholder | `mobile.md` |
+| The existing dictation indicator is "a window of the notification type", and the island can do likewise | The code sets no window type; the Shell extension has no keep-above, positioning or fullscreen handling either | `linux.md`, `window.md` |
+| On Windows, click-through is done with a hit test that returns "transparent" | It only works for windows of the same thread; a window region should be used | `window.md` |
+| Animating with `transform` avoids redraws | There are no GPU layers on this rendering path, and `transform` is a redraw on the CPU all the same | `window.md` (measured) |
+| On GNOME Wayland it is enough for the extension to place an application window | An application window cannot refuse focus there | `linux.md`, `window.md` (measured) |
+| "Other Wayland desktops are not supported in the first version" | layer-shell covers the mainstream compositors other than GNOME's, KDE among them | `linux.md` |
 
-被证实的：最长 8 小时、内容上限 4 KB（iOS 官方文档）；内容只收数据；计时由宿主走；悬停 300 ms 展开、600 ms 收起。
+Confirmed: at most 8 hours, a content limit of 4 KB (the official iOS
+documentation); the content takes only data; timers are counted by the
+host; hovering expands after 300 ms and collapses after 600 ms.
