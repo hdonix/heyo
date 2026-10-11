@@ -143,6 +143,15 @@ fn session_name() -> &'static str {
     }
 }
 
+/// The answer to a request of the runtime's, as the runtime reads it: the
+/// result, or what went wrong (a sentence, or an error with its code).
+pub(crate) fn reply(id: Value, answer: Result<Value, impl serde::Serialize>) -> Value {
+    match answer {
+        Ok(result) => json!({ "type": "reply", "id": id, "result": result }),
+        Err(error) => json!({ "type": "reply", "id": id, "error": error }),
+    }
+}
+
 /// Writes to the palette's runtime process or the background one, if it is
 /// running: a reply to a request of its own, or an event it subscribed to.
 pub(crate) fn reply_to(app: &AppHandle, background: bool, message: &Value) {
@@ -169,8 +178,8 @@ fn handle(app: &AppHandle, message: Value, background: bool) {
             let _ = app.emit(event::RUNTIME, message);
         } else if message["type"] == "request" {
             // Nobody is there to answer a dialog (`ui.confirm`): decline it.
-            let reply = json!({ "type": "reply", "id": message["id"], "result": false });
-            runtime_of(app, true, |runtime| drop(runtime.reply(&reply)));
+            let declined = reply(message["id"].clone(), Ok::<_, String>(false.into()));
+            runtime_of(app, true, |runtime| drop(runtime.reply(&declined)));
         } else {
             crate::menubar::handle(app, &message);
         }
@@ -185,9 +194,22 @@ fn handle(app: &AppHandle, message: Value, background: bool) {
             request if background && request.moves_palette() => Ok(Value::Null),
             request => crate::host_call(app, request),
         });
-    let reply = match answer {
-        Ok(result) => json!({ "type": "reply", "id": id, "result": result }),
-        Err(error) => json!({ "type": "reply", "id": id, "error": error }),
-    };
-    reply_to(app, background, &reply);
+    reply_to(app, background, &reply(id, answer));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::wire::{ErrorCode, ExtError};
+
+    #[test]
+    fn a_reply_carries_a_result_or_what_went_wrong() {
+        assert_eq!(reply(json!(41), Ok::<_, String>(json!([1]))), json!({ "type": "reply", "id": 41, "result": [1] }));
+        assert_eq!(reply(json!(7), Err("the window is gone")), json!({ "type": "reply", "id": 7, "error": "the window is gone" }));
+        // What an extension asked for fails with a code.
+        assert_eq!(
+            reply(json!(41), Err(ExtError::new(ErrorCode::Denied, "Window access was not allowed."))),
+            json!({ "type": "reply", "id": 41, "error": { "code": "denied", "message": "Window access was not allowed." } })
+        );
+    }
 }

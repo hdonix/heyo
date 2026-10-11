@@ -48,16 +48,9 @@ pub(crate) fn handle(app: &AppHandle, message: Value, background: bool) {
     let app = app.clone();
     // The answer may wait for the user, or for a recording to start.
     std::thread::spawn(move || {
-        let reply = reply(id, answer(&app, message, background));
+        let reply = crate::runtime::reply(id, answer(&app, message, background));
         crate::runtime::reply_to(&app, background, &reply);
     });
-}
-
-fn reply(id: Value, answer: Answer) -> Value {
-    match answer {
-        Ok(result) => json!({ "type": "reply", "id": id, "result": result }),
-        Err(error) => json!({ "type": "reply", "id": id, "error": error }),
-    }
 }
 
 fn answer(app: &AppHandle, message: Value, background: bool) -> Answer {
@@ -749,15 +742,6 @@ mod tests {
         }
         // Nor is one that says it comes from nowhere.
         assert_eq!(caller(given("tiles", ""), installed("tiles"), false).unwrap().builtin, false);
-    }
-
-    #[test]
-    fn a_reply_carries_a_result_or_an_error_with_its_code() {
-        assert_eq!(reply(json!(41), Ok(json!([1]))), json!({ "type": "reply", "id": 41, "result": [1] }));
-        assert_eq!(
-            reply(json!(41), Err(ExtError::new(ErrorCode::Denied, "Window access was not allowed."))),
-            json!({ "type": "reply", "id": 41, "error": { "code": "denied", "message": "Window access was not allowed." } })
-        );
     }
 
     #[test]
