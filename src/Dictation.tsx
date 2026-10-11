@@ -1,7 +1,8 @@
 // The dictation window: a small pill at the bottom of the screen with a live
 // waveform of the microphone, which widens to show the latest words as they
-// are recognized. It never takes keyboard focus; clicking it finishes the
-// recording.
+// are recognized, unless those are going into the application as they are
+// spoken: then they are there to be read, and the pill only listens. It
+// never takes keyboard focus; clicking it finishes the recording.
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
@@ -19,6 +20,8 @@ export function DictationWindow() {
   const [partial, setPartial] = useState("");
   const [levels, setLevels] = useState(silence);
   const [note, setNote] = useState("");
+  /// The words are going into the application as they are spoken.
+  const [live, setLive] = useState(false);
   /// The loudest level lately, slowly forgotten.
   const peak = useRef(0.2);
 
@@ -30,6 +33,7 @@ export function DictationWindow() {
           setCommitted("");
           setPartial("");
           setNote("");
+          setLive(false);
           setLevels(silence());
           break;
         case "ready":
@@ -56,6 +60,9 @@ export function DictationWindow() {
           setCommitted((c) => c + e.text);
           setPartial("");
           break;
+        case "writing":
+          setLive(e.live);
+          break;
         case "polishing":
           setPhase("polishing");
           setPartial("");
@@ -64,7 +71,7 @@ export function DictationWindow() {
           setPhase("done");
           setPartial("");
           if (e.warning) setNote(`Not polished: ${e.warning}`);
-          else if (e.cancelled) setNote("Cancelled");
+          else if (e.cancelled) setNote(e.kept ? "Cancelled. What was written is still there." : "Cancelled");
           else if (!e.raw) setNote("Didn't catch anything");
           else if (e.text) setCommitted(e.text);
           break;
@@ -77,10 +84,12 @@ export function DictationWindow() {
   }, []);
 
   const recording = phase === "loading" || phase === "listening";
-  const text = note || committed + partial;
+  const text = note || (live ? "" : committed + partial);
 
   return (
-    <div className="dictation-window">
+    // A press anywhere on the window is said at once, before the click it
+    // may become: the host must not take it for a click in the application.
+    <div className="dictation-window" onMouseDown={() => call("dictation_pressed").catch(reported())}>
       <div
         className={`dictation ${phase}`}
         title={recording ? "Click to finish" : undefined}

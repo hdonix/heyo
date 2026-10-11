@@ -183,3 +183,34 @@ test("settings changed elsewhere are asked for whole, and a failed call is said 
   expect(text(".st-titlebar-title")).toBe("Dictation");
   expect(text(".st-error")).toBe("pactl is not installed");
 });
+
+/// Opens the Dictation page.
+async function dictation() {
+  host.answer("dictation_status", { installed: true, installing: false, microphones: [] });
+  act(() => [...page.querySelectorAll<HTMLButtonElement>(".st-nav-item")].find((item) => item.textContent === "Dictation")!.click());
+  await settle();
+}
+
+test("typing as you speak has a switch where the session can do it", async () => {
+  await dictation();
+  expect(toggle("Type as You Speak").checked).toBe(true);
+  host.answer("change_settings", ({ changes }) => ({ ...settings, ...changes }));
+  host.forget();
+  act(() => toggle("Type as You Speak").click());
+  await settle();
+  expect(host.calls).toEqual([["change_settings", { changes: { dictationLive: false } }]]);
+  expect(toggle("Type as You Speak").checked).toBe(false);
+});
+
+test("where the session cannot type as you speak, the page says so and offers no switch", async () => {
+  act(() => root.unmount());
+  host.answer("get_capabilities", { ...capabilities, session: "wayland", liveDictation: "none" });
+  root = createRoot(page);
+  act(() => root.render(<SettingsWindow />));
+  await settle();
+  await dictation();
+  const row = [...page.querySelectorAll(".st-row")].find((row) => row.querySelector(".st-row-label")?.textContent === "Type as You Speak")!;
+  expect(row.querySelector("input.st-switch")).toBeNull();
+  expect(row.querySelector(".st-row-description")?.textContent).toContain("Not available on Wayland");
+  expect(row.querySelector(".st-row-description")?.textContent).toContain("Each sentence is pasted when it is finished.");
+});

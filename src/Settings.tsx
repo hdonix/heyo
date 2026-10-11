@@ -675,6 +675,20 @@ function Dictation({ settings, save, hotkeys, setHotkey }: PageProps) {
             </select>
           )}
         </Row>
+        {capabilities && (
+          <Row
+            label="Type as You Speak"
+            description={
+              capabilities.liveDictation !== "none"
+                ? "Your words go into the window as they are recognized, and are corrected there when a later word changes an earlier one. Heyo only ever erases what it wrote itself: once you press a key or click while dictating, it stops correcting and adds each finished sentence where the cursor is. In terminals, password managers and the applications excluded from snippet expansion, and when this is off, each sentence is pasted when it is finished."
+                : capabilities.session === "wayland"
+                  ? "Not available on Wayland, where Heyo cannot tell whether you typed in between, and so must not erase anything. Each sentence is pasted when it is finished."
+                  : "Not available in this desktop session. Each sentence is pasted when it is finished."
+            }
+          >
+            {capabilities.liveDictation !== "none" && <Switch checked={settings.dictationLive} onChange={(dictationLive) => save({ dictationLive })} />}
+          </Row>
+        )}
       </Card>
 
       <Card title="Input">
