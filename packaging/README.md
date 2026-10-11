@@ -46,17 +46,86 @@ or too old.
 - **Windows: bundled.** There is no package manager to lean on; the
   installer carries `node.exe` beside `heyo.exe`, as the test build always
   has.
-- **AppImage: not bundled yet.** It is the one Linux format that is meant
-  to stand alone, so it should carry one (`bundle.linux.appimage.files`,
-  `"/usr/bin/node"`: beside the program is where Heyo looks first). Not
-  done: it needs a download step for the right architecture.
+- **AppImage: bundled.** It is the one Linux format that is meant to stand
+  alone, so it carries one at `usr/bin/node`: beside the program is where
+  Heyo looks first (`packaging/linux/appimage.conf.json`). It makes the
+  AppImage 119 MiB where it was 81.
+
+Which Node.js those two carry is said once, in `packaging/node.json`: the
+version, and what each download from nodejs.org must hash to (from its
+`SHASUMS256.txt`). `scripts/package/node.mjs` fetches it, keeps it in
+`~/.cache/heyo-build/`, and uses nothing that hashes differently. To move to
+another version, change the version and the four hashes together.
+
+## Building and packaging: `scripts/package/`
+
+A package is made in two steps, which need not happen on the same machine:
+
+    scripts/package/build.sh <target>…           # compiles, packages nothing
+    scripts/package/bundle.sh <target> [bundles]  # packages, compiles nothing
+
+| Target | Packages | Compiled from Linux with |
+| --- | --- | --- |
+| `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` | deb, rpm, AppImage | the system's compiler; for the other processor, llvm-mingw's clang and that architecture's libraries in a sysroot (`scripts/package/sysroot.sh arm64`, or `amd64`) |
+| `x86_64-pc-windows-gnullvm`, `aarch64-pc-windows-gnullvm` | NSIS installer | llvm-mingw (`scripts/package/toolchain.sh` fetches a pinned release) |
+
+Linux for the other processor is not compiled against libraries installed
+on the machine: Ubuntu's development packages for two architectures cannot
+be installed side by side (WebKitGTK's and others conflict). `sysroot.sh`
+instead downloads them, and all they depend on, with an apt that knows only
+the other architecture, and unpacks them into a directory of its own, from
+Ubuntu 22.04 whatever the machine runs; it needs no root.
+
+`build.sh` takes any number of targets and compiles them into one target
+directory, so that what is compiled for the building machine itself (build
+scripts, macros) is compiled once for all, and one cache serves them all.
+It leaves each program in `src-tauri/target/<target>/release/`. `bundle.sh`
+needs only that directory's program (for Windows also the two libraries
+beside it) and `runtime/dist/heyo-*.cjs`: Tauri's `bundle` command packs
+what is already built. The packages are in
+`src-tauri/target/<target>/release/bundle/` and copied together to
+`src-tauri/target/packages/`.
+
+One thing cannot be done from another processor: an AppImage is made of the
+libraries of the machine that makes it, so the arm64 AppImage is made on
+arm64 and the x86_64 one on x86_64. The deb, the rpm and the Windows
+installers can be made anywhere.
+
+### In GitHub Actions: `.github/workflows/package.yml`
+
+    gh workflow run package.yml            # the packages, left on the run to download
+    git tag v0.1.0 && git push origin v0.1.0     # the same, and a draft release
+
+One job on x86_64 Ubuntu 22.04 (the oldest with WebKitGTK 4.1: a program
+runs where the C library is at least as new as where it was built) compiles
+all four targets with `build.sh`; four jobs then make the packages with
+`bundle.sh` from its programs, the arm64 Linux one on an arm64 machine. For
+a tag, the tag must be the version in `tauri.conf.json`, and the packages
+with a `SHA256SUMS` become a draft release: nothing is published until
+someone publishes it.
+
+The compiling job keeps one cache of the dependencies for all four targets.
+A run for a tag can read the cache of the default branch but not another
+tag's, so the job also runs, alone, for a push to master that changes
+`Cargo.lock` or the packaging scripts: the cache a release starts from is
+then never older than the dependencies.
+
+Verified (11 October 2026): the workflow made all eight packages. The
+compiling job took 21 minutes with no cache and 13 with one (what is left
+is each target's own final optimisation, which no cache holds); each
+packaging job one to three. Of what it made, on arm64 Ubuntu 24.04: the
+program in the arm64 deb, which was compiled on x86_64, starts, shows the
+palette and runs a command in the runtime; the arm64 AppImage does the
+same through its own launcher and carries Node.js 24. The deb for x86_64
+has the control fields and the files it should. Not verified: starting
+anything for x86_64, and the Windows installers beyond their being made.
+Compiling Linux for x86_64 from arm64, the other way round, was done on the
+development machine with the same scripts.
 
 ## Linux packages
 
-    pnpm install
-    pnpm tauri build --bundles deb,rpm      # or appimage; no --bundles builds all three
-
-Results are in `src-tauri/target/release/bundle/{deb,rpm,appimage}/`.
+    scripts/package/build.sh aarch64-unknown-linux-gnu      # or x86_64-…
+    scripts/package/bundle.sh aarch64-unknown-linux-gnu deb,rpm     # no list: all three
 
 Dependencies: Tauri adds `libwebkit2gtk-4.1-0`, `libgtk-3-0` and
 `libayatana-appindicator3-1` (the rpm: the matching `lib….so` names) by
@@ -75,14 +144,12 @@ Verified:
   `bsdtar`) is the same, and the header holds the required and recommended
   names. There is no `rpm` on the machine, so `rpm -qlp`/`rpm -qpR` and
   `rpmlint` were not run.
-- AppImage (`Heyo_0.1.0_aarch64.AppImage`, 81 MiB): built; the AppDir holds
-  `usr/bin/heyo`, `usr/lib/Heyo/*.cjs` and WebKitGTK's libraries. Not
-  started.
+- AppImage (`Heyo_0.1.0_aarch64.AppImage`, 119 MiB): built; the AppDir holds
+  `usr/bin/heyo`, `usr/bin/node` (which runs and says its version),
+  `usr/lib/Heyo/*.cjs` and WebKitGTK's libraries. Not started.
 
-Not verified: installing any of them, `lintian`, x86_64 builds (build on
-an x86_64 machine: Tauri does not cross-build Linux packages), and the rpm
-names on openSUSE (`nodejs-npm`, `pulseaudio-utils`, `libnotify` are
-Fedora's).
+Not verified: installing any of them, `lintian`, and the rpm names on
+openSUSE (`nodejs-npm`, `pulseaudio-utils`, `libnotify` are Fedora's).
 
 Known gap:
 
@@ -148,18 +215,21 @@ offer a Flatpak until launching and hotkeys go through portals.
 
 ## Windows installer
 
-    INSTALLER=1 scripts/windows-test/build.sh        # ARCH=x86_64 for Intel/AMD
+    scripts/package/build.sh aarch64-pc-windows-gnullvm     # or x86_64-…
+    scripts/package/bundle.sh aarch64-pc-windows-gnullvm
 
-Cross-compiles as before and then has Tauri make an NSIS installer
-(`Heyo_<version>_<arch>-setup.exe`, copied to
-`src-tauri/target/heyo-windows/`). It installs for the current user without
+(`INSTALLER=1 scripts/windows-test/build.sh` does both and copies the
+result where the test machine sees it.) Tauri makes an NSIS installer,
+`Heyo_<version>_<arch>-setup.exe`. It installs for the current user without
 administrator rights (`bundle.windows.nsis.installMode`), fetches WebView2
 if the machine lacks it, and carries `node.exe`, `libunwind.dll` and
 `WebView2Loader.dll` beside `heyo.exe` (`packaging/windows/installer.conf.json`,
-merged in only for this build because those files exist only once the
-script has fetched or built them; Tauri by itself packs none of the three).
+merged in only for this step because those files exist only once the
+scripts have fetched or built them; Tauri by itself packs none of the three).
 
-It needs `makensis` (NSIS 3) on `PATH`: `sudo apt install nsis`. Without
+It needs `makensis` of NSIS 3.09 or newer on `PATH` (the script Tauri gives
+it includes a file older ones lack): `sudo apt install nsis` on Ubuntu 24.04;
+22.04's is 3.08. Without
 root, as was done here: `apt-get download nsis nsis-common`, unpack both
 with `dpkg-deb -x` into one directory, and put on `PATH` a two-line script
 named `makensis` that sets `NSISDIR` to that directory's `usr/share/nsis`
@@ -237,9 +307,9 @@ and the webview's button, which nobody has seen. The feature adds 36 crates
    what the program and its scripts compare.
 2. All of the verification in the repository's rules passes (`cargo test`,
    both `tsc`, `vitest`, the Windows `cargo check`).
-3. On x86_64 and on aarch64: `pnpm tauri build`, then for each package
-   read `dpkg-deb -I`/`-c` and `rpm -qpi`/`-qpR`/`-qlp`, and run `lintian`
-   and `rpmlint`.
+3. Run the packaging workflow by hand (`gh workflow run package.yml`) and
+   download its packages; for each read `dpkg-deb -I`/`-c` and
+   `rpm -qpi`/`-qpR`/`-qlp`, and run `lintian` and `rpmlint`.
 4. Install each package on a clean machine of its kind (Ubuntu LTS, Debian
    stable, Fedora) and check: Heyo is in the applications menu with its
    icon; it starts; an extension runs (so the scripts were found and Node.js
@@ -247,11 +317,12 @@ and the webview's button, which nobody has seen. The feature adds 36 crates
    still works; launch at login survives a sign-out; removing the package
    leaves nothing in `/usr`.
 5. Start the AppImage on a distribution other than the one it was built on.
-6. `INSTALLER=1 scripts/windows-test/build.sh` for each architecture;
-   install on Windows, start, run an extension, turn launch at login on and
-   sign in again, uninstall.
+6. Install each Windows installer on Windows of its processor, start, run
+   an extension, turn launch at login on and sign in again, uninstall.
 7. Upgrade over the previous release on each platform; settings,
    extensions and history must survive.
 8. If updates are on: sign, publish the artefacts with their signatures and
    the JSON, and update a copy of the previous release through the button.
-9. Tag the release; update the PKGBUILD's `pkgver` and checksum.
+9. Tag the release (`v` and the version) and push the tag: the workflow
+   drafts the release with the packages and their hashes. Read it, publish
+   it, and update the PKGBUILD's `pkgver` and checksum.

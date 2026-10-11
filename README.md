@@ -16,8 +16,9 @@ Raycast.
 
 ## Install
 
-There are no released packages yet: build from source, or build the
-packages as [packaging/README.md](packaging/README.md) describes.
+There are no released packages yet: build from source, or have the
+packages built, for Linux and Windows on x86_64 and arm64, as
+[packaging/README.md](packaging/README.md) describes.
 
 Heyo needs WebKitGTK 4.1 and, for extensions, dictation and text
 recognition, Node.js 22 or newer: `node` on `PATH`, or its path in
