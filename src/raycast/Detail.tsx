@@ -1,10 +1,10 @@
 // Markdown detail views and their metadata panels.
 
 import { useContext, useMemo } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
+import { assetUrl } from "../host";
 import { isFilePath } from "./glyph";
 import { ExtensionDir, Image } from "./Image";
 import { content, cssColor, isFn, sendToRuntime, slot, textOf, type Node } from "./model";
@@ -51,9 +51,9 @@ export function Markdown({ markdown, untrusted }: { markdown: string; untrusted?
         return "";
       });
       img.setAttribute("src", src);
-      if (src.startsWith("file://")) img.src = convertFileSrc(decodeURI(src.slice(7)));
-      else if (isFilePath(src)) img.src = convertFileSrc(src);
-      else if (extensionDir && !/^(https?|data):/.test(src)) img.src = convertFileSrc(`${extensionDir}/assets/${src}`);
+      if (src.startsWith("file://")) img.src = assetUrl(decodeURI(src.slice(7)));
+      else if (isFilePath(src)) img.src = assetUrl(src);
+      else if (extensionDir && !/^(https?|data):/.test(src)) img.src = assetUrl(`${extensionDir}/assets/${src}`);
     });
     // Sanitized last, so nothing is parsed or rewritten after the check.
     return DOMPurify.sanitize(doc.body.innerHTML, SANITIZE);

@@ -2,8 +2,8 @@
 // name, emoji, or `{ source, tintColor, mask, fallback }`.
 
 import { createContext, useContext, useState } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { icons, type LucideIcon } from "lucide-react";
+import { assetUrl } from "../host";
 import { isDark } from "../theme";
 
 import { isFilePath, isGlyph } from "./glyph";
@@ -106,7 +106,7 @@ export function Image(props: { image: unknown; size?: number; className?: string
     // Raw SVG markup; an unescaped `#` would end the URL.
     url = `data:image/svg+xml,${encodeURIComponent(src.slice(19))}`;
   } else if (/^(https?|data|blob):/.test(src)) url = src;
-  else if (isFilePath(src)) url = convertFileSrc(src);
+  else if (isFilePath(src)) url = assetUrl(src);
   else if (isGlyph(src)) {
     // An emoji or a short symbol.
     return (
@@ -114,7 +114,7 @@ export function Image(props: { image: unknown; size?: number; className?: string
         {src}
       </span>
     );
-  } else url = extensionDir ? convertFileSrc(`${extensionDir}/assets/${src}`) : src;
+  } else url = extensionDir ? assetUrl(`${extensionDir}/assets/${src}`) : src;
 
   const radius = mask === "circle" ? "50%" : mask === "roundedRectangle" ? "22%" : undefined;
   if (tint) {

@@ -4,22 +4,10 @@
 // recording.
 
 import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { X } from "lucide-react";
-import { event } from "../shared/bindings/events";
+import { call, listen, reported } from "./host";
 
 type Phase = "loading" | "listening" | "polishing" | "done" | "error";
-
-interface DictationEvent {
-  type: string;
-  text?: string;
-  raw?: string;
-  value?: number;
-  message?: string;
-  warning?: string;
-  cancelled?: boolean;
-}
 
 /// Bars in the waveform; the newest level is on the right.
 const BARS = 22;
@@ -35,7 +23,7 @@ export function DictationWindow() {
   const peak = useRef(0.2);
 
   useEffect(() => {
-    const unlisten = listen<DictationEvent>(event.dictation, ({ payload: e }) => {
+    return listen("dictation", (e) => {
       switch (e.type) {
         case "start":
           setPhase("loading");
@@ -62,10 +50,10 @@ export function DictationWindow() {
           }
           break;
         case "partial":
-          setPartial(e.text ?? "");
+          setPartial(e.text);
           break;
         case "segment":
-          setCommitted((c) => c + (e.text ?? ""));
+          setCommitted((c) => c + e.text);
           setPartial("");
           break;
         case "polishing":
@@ -82,13 +70,10 @@ export function DictationWindow() {
           break;
         case "error":
           setPhase("error");
-          setNote(e.message ?? "Dictation failed");
+          setNote(e.message);
           break;
       }
     });
-    return () => {
-      void unlisten.then((off) => off());
-    };
   }, []);
 
   const recording = phase === "loading" || phase === "listening";
@@ -99,7 +84,7 @@ export function DictationWindow() {
       <div
         className={`dictation ${phase}`}
         title={recording ? "Click to finish" : undefined}
-        onClick={() => recording && invoke("dictation_toggle")}
+        onClick={() => recording && call("dictation_toggle").catch(reported())}
       >
         <div className="waveform">
           {levels.map((level, i) => (
@@ -122,7 +107,7 @@ export function DictationWindow() {
             title="Cancel"
             onClick={(e) => {
               e.stopPropagation();
-              invoke("dictation_cancel");
+              call("dictation_cancel").catch(reported());
             }}
           >
             <X size={12} />

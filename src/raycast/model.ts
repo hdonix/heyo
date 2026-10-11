@@ -1,7 +1,7 @@
 // The UI tree the extension runtime sends, plus helpers to read it.
 
-import { invoke } from "@tauri-apps/api/core";
 import type { Toast, WebviewMessage, WireView } from "../../shared/wire";
+import { call } from "../host";
 
 export type { Toast, WireView };
 
@@ -19,7 +19,7 @@ export interface View {
 }
 
 export function sendToRuntime(message: WebviewMessage) {
-  return invoke("runtime_send", { message }).catch((e) => console.error("runtime_send", e));
+  return call("runtime_send", { message }).catch((e) => console.error("runtime_send", e));
 }
 
 /// Revives `{ $date }` values in props received from the runtime.

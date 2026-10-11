@@ -5,8 +5,6 @@
 
 import { composing } from "./ime";
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   AppWindow,
@@ -28,60 +26,23 @@ import appIcon from "../src-tauri/icons/128x128.png";
 import type { Capabilities } from "../shared/bindings/Capabilities";
 import type { ClipboardMeaningStatus } from "../shared/bindings/ClipboardMeaningStatus";
 import type { ClipboardSource } from "../shared/bindings/ClipboardSource";
+import type { CommandInfo } from "../shared/bindings/CommandInfo";
+import type { DictationStatus } from "../shared/bindings/DictationStatus";
+import type { ExtensionInfo } from "../shared/bindings/ExtensionInfo";
+import type { HotkeyName } from "../shared/bindings/HotkeyName";
 import type { Hotkeys } from "../shared/bindings/Hotkeys";
+import type { OcrStatus } from "../shared/bindings/OcrStatus";
+import type { Permission } from "../shared/bindings/Permission";
+import type { PermissionRow } from "../shared/bindings/PermissionRow";
+import type { Preference } from "../shared/bindings/Preference";
 import type { SettingsView } from "../shared/bindings/SettingsView";
+import { call, listen, reported, reportFailure, reportFailuresIn, type Args } from "./host";
 import { HotkeyRecorder } from "./hotkey";
 import { classifyModelAddress } from "./modelAddress";
 import { Image } from "./raycast/Image";
-import { event } from "../shared/bindings/events";
 
-/// The settings as the host sends them: what is stored, and what is derived
-/// for this page. Generated from the host's own declaration
-/// (`src-tauri/src/settings.rs`), so a setting is declared once.
-export type SettingsData = SettingsView;
-
-type HotkeyName = "toggle" | "clipboard" | "dictation";
-
-interface Preference {
-  name: string;
-  type: string;
-  title?: string;
-  label?: string;
-  description?: string;
-  placeholder?: string;
-  required?: boolean;
-  default?: unknown;
-  data?: { title: string; value: string }[];
-}
-
-interface CommandInfo {
-  id: string;
-  name: string;
-  title: string;
-  description?: string;
-  mode: string;
-  icon?: string;
-  preferences: Preference[];
-}
-
-interface ExtensionInfo {
-  id: string;
-  name: string;
-  title: string;
-  description?: string;
-  author?: string;
-  icon?: string;
-  builtin: boolean;
-  /// The source directory of an extension being developed (`heyo dev`).
-  development?: string;
-  commands: CommandInfo[];
-  preferences: Preference[];
-  values: { extension?: Record<string, unknown>; commands?: Record<string, Record<string, unknown>> };
-}
-
-export function loadSettings() {
-  return invoke<SettingsData>("get_settings");
-}
+/// The settings that change, as `change_settings` takes them.
+type Changes = Args<"change_settings">["changes"];
 
 const RETENTION = [
   { days: 1, title: "1 Day" },
@@ -214,15 +175,14 @@ function PreferenceRow(props: { pref: Preference; value: unknown; onChange(value
 // --- Pages -----------------------------------------------------------------
 
 interface PageProps {
-  settings: SettingsData;
-  save(changes: Partial<SettingsData>): void;
+  settings: SettingsView;
+  save(changes: Changes): void;
   hotkeys: Hotkeys | null;
   setHotkey(name: HotkeyName, accel: string): void;
   itemHotkeys: Record<string, string>;
   setItemHotkey(item: { id: string; title: string }, accel: string): void;
   extensions: ExtensionInfo[];
   reload(): void;
-  setError(error: string | null): void;
   /// Stores the Claude API key; an empty one removes it.
   setApiKey(key: string): void;
 }
@@ -247,16 +207,18 @@ const SHELL_EXTENSION: Record<Exclude<Capabilities["extension"], "none" | "activ
 /// On GNOME's Wayland sessions most of what Heyo does with other
 /// applications goes through its Shell extension; this installs it, and
 /// updates it when Heyo carries a newer one.
-function ShellExtension({ setError }: { setError(error: string | null): void }) {
+function ShellExtension() {
   const [state, setState] = useState<Capabilities["extension"]>("none");
   useEffect(() => {
-    invoke<Capabilities>("get_capabilities").then((c) => setState(c.extension));
+    call("get_capabilities")
+      .then((c) => setState(c.extension))
+      .catch(reported());
   }, []);
   if (state === "none" || state === "active") return null;
   const install = () =>
-    invoke<Capabilities>("install_shell_extension")
+    call("install_shell_extension")
       .then((c) => setState(c.extension))
-      .catch((e) => setError(String(e)));
+      .catch(reported());
   const { description, action } = SHELL_EXTENSION[state];
   return (
     <Card title="Wayland">
@@ -271,10 +233,10 @@ function ShellExtension({ setError }: { setError(error: string | null): void }) 
   );
 }
 
-function General({ settings, save, hotkeys, setHotkey, setError }: PageProps) {
+function General({ settings, save, hotkeys, setHotkey }: PageProps) {
   return (
     <>
-      <ShellExtension setError={setError} />
+      <ShellExtension />
       <Card>
         <Row label="Open at Login">
           <Switch checked={settings.launchAtLogin} onChange={(launchAtLogin) => save({ launchAtLogin })} />
@@ -294,7 +256,7 @@ function General({ settings, save, hotkeys, setHotkey, setError }: PageProps) {
       </Card>
       <Card title="Appearance">
         <Row label="Theme" description="Light, dark, or whichever the system is using">
-          <select className="st-select" value={settings.appearance} onChange={(e) => save({ appearance: e.target.value as SettingsData["appearance"] })}>
+          <select className="st-select" value={settings.appearance} onChange={(e) => save({ appearance: e.target.value as SettingsView["appearance"] })}>
             <option value="system">System</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
@@ -564,16 +526,10 @@ function Shortcuts(props: PageProps) {
   );
 }
 
-interface DictationStatus {
-  installed: boolean;
-  installing: boolean;
-  microphones: { name: string; description: string }[];
-}
-
 function useCapabilities() {
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   useEffect(() => {
-    invoke<Capabilities>("get_capabilities").then(setCapabilities);
+    call("get_capabilities").then(setCapabilities).catch(reported());
   }, []);
   return capabilities;
 }
@@ -627,35 +583,31 @@ function Vocabulary({ lines, onCommit }: { lines: string[]; onCommit(lines: stri
   );
 }
 
-function Dictation({ settings, save, hotkeys, setHotkey, setError }: PageProps) {
+function Dictation({ settings, save, hotkeys, setHotkey }: PageProps) {
   const capabilities = useCapabilities();
   const [status, setStatus] = useState<DictationStatus | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
 
-  const refresh = () => invoke<DictationStatus>("dictation_status").then(setStatus);
+  const refresh = () => call("dictation_status").then(setStatus).catch(reported());
   useEffect(() => {
     refresh();
-    const unlisten = listen<{ type: string; step?: string; received?: number; total?: number; message?: string }>(
-      event.dictationInstall,
-      ({ payload: e }) => {
-        if (e.type === "progress") {
-          const percent = e.total ? ` ${Math.round(((e.received ?? 0) / e.total) * 100)}%` : "…";
-          setProgress(`${e.step}${percent}`);
-        } else {
-          setProgress(null);
-          if (e.type === "error") setError(e.message ?? "The download failed");
-          refresh();
-        }
-      },
-    );
-    return () => void unlisten.then((off) => off());
+    return listen("dictationInstall", (e) => {
+      if (e.type === "progress") {
+        const percent = e.total ? ` ${Math.round(((e.received ?? 0) / e.total) * 100)}%` : "…";
+        setProgress(`${e.step}${percent}`);
+      } else {
+        setProgress(null);
+        if (e.type === "error") reportFailure(e.message);
+        refresh();
+      }
+    });
   }, []);
 
   const install = () => {
     setProgress("Starting…");
-    invoke("dictation_install").catch((e) => {
+    call("dictation_install").catch((e) => {
       setProgress(null);
-      setError(String(e));
+      reportFailure(String(e));
     });
   };
 
@@ -796,7 +748,7 @@ function LocalModelStatus({ url }: { url: string }) {
   useEffect(() => {
     let current = true;
     setStatus("Checking…");
-    invoke<string[]>("local_models", { url })
+    call("local_models", { url })
       .then((models) => current && setStatus(models.length ? `Connected: ${models.join(", ")}` : "Connected, but the server lists no models."))
       .catch((e) => current && setStatus(`Not reachable: ${e}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama).`));
     return () => {
@@ -826,20 +778,19 @@ function ModelAddressNote({ url }: { url: string }) {
 }
 
 function Screenshots(props: PageProps) {
-  const { hotkeys, itemHotkeys, setItemHotkey, setError } = props;
-  const [status, setStatus] = useState<{ installed: boolean; installing: boolean } | null>(null);
+  const { hotkeys, itemHotkeys, setItemHotkey } = props;
+  const [status, setStatus] = useState<OcrStatus | null>(null);
   const [installing, setInstalling] = useState(false);
 
-  const refresh = () => invoke<{ installed: boolean; installing: boolean }>("ocr_status").then(setStatus);
+  const refresh = () => call("ocr_status").then(setStatus).catch(reported());
   useEffect(() => {
     refresh();
-    const unlisten = listen<{ type: string; message?: string }>(event.ocrInstall, ({ payload: e }) => {
+    return listen("ocrInstall", (e) => {
       if (e.type === "progress") return setInstalling(true);
       setInstalling(false);
-      if (e.type === "error") setError(e.message ?? "The download failed");
+      if (e.type === "error") reportFailure(e.message);
       refresh();
     });
-    return () => void unlisten.then((off) => off());
   }, []);
 
   const hotkeyRow = (id: string, title: string, description: string) => (
@@ -877,9 +828,9 @@ function Screenshots(props: PageProps) {
               className="button"
               onClick={() => {
                 setInstalling(true);
-                invoke("ocr_install").catch((e) => {
+                call("ocr_install").catch((e) => {
                   setInstalling(false);
-                  setError(String(e));
+                  reportFailure(String(e));
                 });
               }}
             >
@@ -892,7 +843,7 @@ function Screenshots(props: PageProps) {
   );
 }
 
-function Advanced({ settings, save, setError, setApiKey }: PageProps) {
+function Advanced({ settings, save, setApiKey }: PageProps) {
   const node = settings.nodeVersion;
   // Bumped after a key is stored, to empty the field it was typed into.
   const [keyField, setKeyField] = useState(0);
@@ -911,7 +862,7 @@ function Advanced({ settings, save, setError, setApiKey }: PageProps) {
           <TextInput value={settings.nodePath} placeholder="node (from PATH)" onCommit={(nodePath) => save({ nodePath })} />
         </Row>
         <Row label="Extensions Folder" description={settings.extensionsDir}>
-          <button className="button" onClick={() => invoke("open_extensions_folder").catch((e) => setError(String(e)))}>
+          <button className="button" onClick={() => call("open_extensions_folder").catch(reported())}>
             <FolderOpen size={14} /> Open
           </button>
         </Row>
@@ -921,7 +872,7 @@ function Advanced({ settings, save, setError, setApiKey }: PageProps) {
           label="Renderer"
           description="How the interface is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started."
         >
-          <select className="st-select" value={settings.renderer} onChange={(e) => save({ renderer: e.target.value as SettingsData["renderer"] })}>
+          <select className="st-select" value={settings.renderer} onChange={(e) => save({ renderer: e.target.value as SettingsView["renderer"] })}>
             <option value="auto">Automatic</option>
             <option value="cpu">CPU</option>
             <option value="gpu-shared-memory">GPU, shared memory</option>
@@ -982,44 +933,44 @@ function Advanced({ settings, save, setError, setApiKey }: PageProps) {
 }
 
 /// Looking for a newer Heyo, in copies of Heyo that can install one.
-function Updates({ setError }: { setError(error: string | null): void }) {
+function Updates() {
   // undefined: not asked yet; null: this is the newest; else the newer version.
   const [newer, setNewer] = useState<string | null>();
   const [busy, setBusy] = useState(false);
   const run = (work: Promise<unknown>) => {
     setBusy(true);
-    work.catch((e) => setError(String(e))).finally(() => setBusy(false));
+    work.catch(reported()).finally(() => setBusy(false));
   };
   if (newer) {
     return (
-      <button className="button" disabled={busy} onClick={() => run(invoke("install_update"))}>
+      <button className="button" disabled={busy} onClick={() => run(call("install_update"))}>
         {busy ? "Installing…" : `Install Heyo ${newer} and Restart`}
       </button>
     );
   }
   return (
-    <button className="button" disabled={busy} onClick={() => run(invoke<string | null>("check_for_update").then(setNewer))}>
+    <button className="button" disabled={busy} onClick={() => run(call("check_for_update").then(setNewer))}>
       {busy ? "Checking…" : newer === null ? "Heyo Is Up to Date" : "Check for Updates"}
     </button>
   );
 }
 
-function About({ settings, setError }: PageProps) {
+function About({ settings }: PageProps) {
   const [copied, setCopied] = useState(false);
   const copyDiagnostics = () =>
-    invoke("copy_diagnostics")
+    call("copy_diagnostics")
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
       })
-      .catch((e) => setError(String(e)));
+      .catch(reported());
   return (
     <div className="st-about">
       <img src={appIcon} width={96} height={96} alt="" />
       <div className="st-about-name">Heyo</div>
       <div className="st-about-version">Version {settings.version}</div>
       <p>A command palette launcher for Linux that runs Raycast extensions.</p>
-      {settings.canUpdate && <Updates setError={setError} />}
+      {settings.canUpdate && <Updates />}
       <button className="button" onClick={copyDiagnostics}>
         {copied ? "Copied" : "Copy Diagnostics"}
       </button>
@@ -1032,12 +983,10 @@ function About({ settings, setError }: PageProps) {
 
 /// The applications whose copies are never recorded: those listed, and a
 /// menu of the installed ones and the ones copied from to add another.
-function IgnoredApplications({ settings, save, setError }: PageProps) {
+function IgnoredApplications({ settings, save }: PageProps) {
   const [sources, setSources] = useState<ClipboardSource[]>([]);
   useEffect(() => {
-    invoke<ClipboardSource[]>("clipboard_sources")
-      .then(setSources)
-      .catch((e) => setError(String(e)));
+    call("clipboard_sources").then(setSources).catch(reported());
   }, []);
   const ignored = settings.clipboardIgnoredApps;
   const offered = sources.filter((source) => !ignored.includes(source.id));
@@ -1078,19 +1027,18 @@ function IgnoredApplications({ settings, save, setError }: PageProps) {
 
 /// Finding clipboard entries by what they mean: the switch, the download it
 /// needs, and how far reading the history has got.
-function FindByMeaning({ settings, save, setError }: PageProps) {
+function FindByMeaning({ settings, save }: PageProps) {
   const [status, setStatus] = useState<ClipboardMeaningStatus | null>(null);
   const [installing, setInstalling] = useState(false);
-  const refresh = () => invoke<ClipboardMeaningStatus>("clipboard_meaning_status").then(setStatus);
+  const refresh = () => call("clipboard_meaning_status").then(setStatus).catch(reported());
   useEffect(() => {
     refresh();
-    const unlisten = listen<{ type: string; message?: string }>(event.clipboardMeaningInstall, ({ payload: e }) => {
+    return listen("clipboardMeaningInstall", (e) => {
       if (e.type === "progress") return setInstalling(true);
       setInstalling(false);
-      if (e.type === "error") setError(e.message ?? "The download failed");
+      if (e.type === "error") reportFailure(e.message);
       refresh();
     });
-    return () => void unlisten.then((off) => off());
   }, [settings.clipboardMeaning]);
   // While entries are being read, say how many are left.
   const reading = settings.clipboardMeaning && status?.installed && status.waiting > 0;
@@ -1130,9 +1078,9 @@ function FindByMeaning({ settings, save, setError }: PageProps) {
             className="button"
             onClick={() => {
               setInstalling(true);
-              invoke("clipboard_meaning_install").catch((e) => {
+              call("clipboard_meaning_install").catch((e) => {
                 setInstalling(false);
-                setError(String(e));
+                reportFailure(String(e));
               });
             }}
           >
@@ -1147,7 +1095,7 @@ function FindByMeaning({ settings, save, setError }: PageProps) {
 }
 
 function ClipboardCard(props: PageProps) {
-  const { settings, save, hotkeys, setHotkey, setError } = props;
+  const { settings, save, hotkeys, setHotkey } = props;
   return (
     <>
       <Card title="Clipboard History">
@@ -1184,7 +1132,7 @@ function ClipboardCard(props: PageProps) {
           <ConfirmButton
             label="Clear…"
             confirm="Click Again to Clear"
-            onConfirm={() => invoke("clear_clipboard_history").catch((e) => setError(String(e)))}
+            onConfirm={() => call("clear_clipboard_history").catch(reported())}
           />
         </Row>
         {settings.clipboardHistory && <FindByMeaning {...props} />}
@@ -1192,14 +1140,6 @@ function ClipboardCard(props: PageProps) {
       {settings.clipboardHistory && <IgnoredApplications {...props} />}
     </>
   );
-}
-
-/// A permission of an extension (`permissions::Row` in the host).
-interface PermissionRow {
-  permission: string;
-  /// What it lets the extension do, after "allow it to".
-  allows: string;
-  state: "allowed" | "asks" | "free";
 }
 
 const PERMISSION_STATES: Record<PermissionRow["state"], string> = {
@@ -1211,21 +1151,18 @@ const PERMISSION_STATES: Record<PermissionRow["state"], string> = {
 /// What an extension may ask Heyo for: what it lists in its manifest, and
 /// what the user has allowed, which can be taken back here. Live
 /// activities are not asked about; they have a switch instead.
-function Permissions({ ext, settings, save, setError }: { ext: ExtensionInfo; settings: SettingsData; save(changes: Partial<SettingsData>): void; setError(error: string | null): void }) {
+function Permissions({ ext, settings, save }: { ext: ExtensionInfo; settings: SettingsView; save(changes: Changes): void }) {
   const [rows, setRows] = useState<PermissionRow[]>([]);
-  const load = () =>
-    invoke<PermissionRow[]>("extension_permissions", { id: ext.id })
-      .then(setRows)
-      .catch((e) => setError(String(e)));
+  const load = () => call("extension_permissions", { id: ext.id }).then(setRows).catch(reported());
   useEffect(() => {
     setRows([]);
     load();
   }, [ext.id]);
 
-  const revoke = (permission: string) =>
-    invoke("revoke_extension_permission", { extension: ext.name, permission })
+  const revoke = (permission: Permission) =>
+    call("revoke_extension_permission", { extension: ext.name, permission })
       .then(load)
-      .catch((e) => setError(String(e)));
+      .catch(reported());
 
   const activitiesOff = settings.activitiesOff.includes(ext.name);
   const setActivities = (on: boolean) => save({ activitiesOff: on ? settings.activitiesOff.filter((name) => name !== ext.name) : [...settings.activitiesOff, ext.name] });
@@ -1262,15 +1199,13 @@ function Permissions({ ext, settings, save, setError }: { ext: ExtensionInfo; se
 
 /// Snippets that expand as their keyword is typed: the switch, and the
 /// applications it leaves alone.
-function SnippetExpansionCard({ settings, save, setError }: PageProps) {
+function SnippetExpansionCard({ settings, save }: PageProps) {
   const capabilities = useCapabilities();
   const [sources, setSources] = useState<ClipboardSource[]>([]);
   const on = settings.snippetExpansion;
   useEffect(() => {
     if (!on) return;
-    invoke<ClipboardSource[]>("clipboard_sources")
-      .then(setSources)
-      .catch((e) => setError(String(e)));
+    call("clipboard_sources").then(setSources).catch(reported());
   }, [on]);
   if (!capabilities) return null;
   const available = capabilities.snippetExpansion !== "none";
@@ -1328,7 +1263,7 @@ function SnippetExpansionCard({ settings, save, setError }: PageProps) {
 
 /// The page of one extension (or of Heyo's own commands, or Applications).
 function ExtensionPage(props: PageProps & { ext: ExtensionInfo; onUninstalled(): void }) {
-  const { ext, settings, save, setError } = props;
+  const { ext, settings, save } = props;
   const [query, setQuery] = useState("");
   const isApps = ext.id === APPLICATIONS;
   const disabled = new Set(settings.disabledCommands);
@@ -1341,21 +1276,21 @@ function ExtensionPage(props: PageProps & { ext: ExtensionInfo; onUninstalled():
   };
 
   const savePreference = async (command: string | null, name: string, value: unknown) => {
-    const values = { extension: { ...(ext.values.extension ?? {}) }, commands: { ...(ext.values.commands ?? {}) } };
-    if (command) values.commands[command] = { ...(values.commands[command] ?? {}), [name]: value };
+    const values = { extension: { ...ext.values.extension }, commands: { ...ext.values.commands } };
+    if (command) values.commands[command] = { ...values.commands[command], [name]: value };
     else values.extension[name] = value;
     try {
-      await invoke("set_extension_preferences", { extension: ext.name, values });
+      await call("set_extension_preferences", { extension: ext.name, values });
       props.reload();
     } catch (e) {
-      setError(String(e));
+      reportFailure(String(e));
     }
   };
 
   const uninstall = () =>
-    invoke("uninstall_extension", { id: ext.id })
+    call("uninstall_extension", { id: ext.id })
       .then(props.onUninstalled)
-      .catch((e) => setError(String(e)));
+      .catch(reported());
 
   const q = query.toLowerCase();
   const commands = ext.commands.filter((c) => !q || c.title.toLowerCase().includes(q));
@@ -1379,7 +1314,7 @@ function ExtensionPage(props: PageProps & { ext: ExtensionInfo; onUninstalled():
             <PreferenceRow
               key={pref.name}
               pref={pref}
-              value={ext.values.extension?.[pref.name]}
+              value={ext.values.extension[pref.name]}
               onChange={(v) => savePreference(null, pref.name, v)}
             />
           ))}
@@ -1415,14 +1350,14 @@ function ExtensionPage(props: PageProps & { ext: ExtensionInfo; onUninstalled():
               <PreferenceRow
                 key={pref.name}
                 pref={pref}
-                value={ext.values.commands?.[c.name]?.[pref.name]}
+                value={ext.values.commands[c.name]?.[pref.name]}
                 onChange={(v) => savePreference(c.name, pref.name, v)}
               />
             ))}
           </Card>
         ))}
 
-      {!ext.builtin && !isApps && <Permissions ext={ext} settings={settings} save={save} setError={setError} />}
+      {!ext.builtin && !isApps && <Permissions ext={ext} settings={settings} save={save} />}
 
       {!ext.builtin && (
         <Card>
@@ -1457,51 +1392,54 @@ const PAGES = [
 export function SettingsWindow() {
   const [page, setPage] = useState<string>("general");
   const [search, setSearch] = useState("");
-  const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [settings, setSettings] = useState<SettingsView | null>(null);
   const [hotkeys, setHotkeys] = useState<Hotkeys | null>(null);
   const [extensions, setExtensions] = useState<ExtensionInfo[]>([]);
   const [itemHotkeys, setItemHotkeys] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const reload = async () => {
-    const [list, apps, bound] = await Promise.all([
-      invoke<ExtensionInfo[]>("list_extensions"),
-      invoke<{ id: string; title: string; icon?: string; subtitle?: string }[]>("list_applications"),
-      invoke<Record<string, string>>("item_hotkeys"),
-    ]);
-    const applications: ExtensionInfo = {
-      id: APPLICATIONS,
-      name: APPLICATIONS,
-      title: "Applications",
-      description: "Give an application a hotkey to launch it from anywhere.",
-      icon: "app-window-grid-3x3-16",
-      builtin: true,
-      commands: apps.map((a) => ({
-        id: a.id,
-        name: a.id,
-        title: a.title,
-        description: a.subtitle ?? undefined,
-        mode: "application",
-        icon: a.icon ?? undefined,
-        preferences: [],
-      })),
-      preferences: [],
-      values: {},
-    };
-    setExtensions([...list, applications]);
-    setItemHotkeys(bound);
-  };
+  // A call to the host that failed is said in the line at the bottom.
+  useEffect(() => reportFailuresIn(({ message }) => setError(message)), []);
+
+  const reload = () =>
+    Promise.all([call("list_extensions"), call("list_applications"), call("item_hotkeys")])
+      .then(([list, apps, bound]) => {
+        const applications: ExtensionInfo = {
+          id: APPLICATIONS,
+          name: APPLICATIONS,
+          title: "Applications",
+          description: "Give an application a hotkey to launch it from anywhere.",
+          author: null,
+          icon: "app-window-grid-3x3-16",
+          builtin: true,
+          commands: apps.map((a) => ({
+            id: a.id,
+            name: a.id,
+            title: a.title,
+            description: a.subtitle,
+            mode: "application",
+            icon: a.icon,
+            preferences: [],
+          })),
+          preferences: [],
+          values: { extension: {}, commands: {} },
+        };
+        setExtensions([...list, applications]);
+        setItemHotkeys(bound);
+      })
+      .catch(reported());
+
+  const read = () => call("get_settings").then(setSettings).catch(reported());
 
   useEffect(() => {
-    loadSettings().then(setSettings);
-    invoke<Hotkeys>("get_hotkeys").then(setHotkeys);
+    read();
+    call("get_hotkeys").then(setHotkeys).catch(reported());
     reload();
-    // Favorites and aliases also change from the palette. Saving sends the
-    // whole of this window's copy, so the copy must follow those changes.
-    // The event goes to every window and leaves out what only this one may
-    // know (where the files are): ask for the whole.
-    const unlisten = listen(event.settingsChanged, () => void loadSettings().then(setSettings));
-    return () => void unlisten.then((off) => off());
+    // Favorites and aliases also change from the palette, and this window's
+    // copy must follow those changes. The event goes to every window and
+    // leaves out what only this one may know (where the files are): ask
+    // for the whole.
+    return listen("settingsChanged", () => void read());
   }, []);
 
   // Esc closes the window wherever focus is (even on the page body). The
@@ -1519,29 +1457,29 @@ export function SettingsWindow() {
 
   /// Changes some settings: only what changes is sent, and the host answers
   /// with all of them as they now are.
-  const save = async (changes: Partial<SettingsData>) => {
+  const save = async (changes: Changes) => {
     if (!settings) return;
     setSettings({ ...settings, ...changes });
     try {
-      setSettings(await invoke<SettingsData>("change_settings", { changes }));
+      setSettings(await call("change_settings", { changes }));
       setError(null);
     } catch (e) {
-      setError(String(e));
-      loadSettings().then(setSettings);
+      reportFailure(String(e));
+      read();
     }
   };
 
   const setHotkey = (name: HotkeyName, accelerator: string) =>
-    invoke<Hotkeys>("set_hotkey", { name, accelerator })
+    call("set_hotkey", { name, accelerator })
       .then((h) => {
         setHotkeys(h);
         setError(null);
       })
-      .catch((e) => setError(String(e)));
+      .catch(reported());
 
   const setItemHotkey = async (item: { id: string; title: string }, accelerator: string) => {
     try {
-      await invoke("set_item_hotkey", { id: item.id, title: item.title, accelerator });
+      await call("set_item_hotkey", { id: item.id, title: item.title, accelerator });
       setItemHotkeys((h) => {
         const next = { ...h };
         if (accelerator) next[item.id] = accelerator;
@@ -1550,7 +1488,7 @@ export function SettingsWindow() {
       });
       setError(null);
     } catch (e) {
-      setError(String(e));
+      reportFailure(String(e));
     }
   };
 
@@ -1578,14 +1516,13 @@ export function SettingsWindow() {
     setItemHotkey,
     extensions,
     reload,
-    setError,
     setApiKey: (key) =>
-      invoke<SettingsData>("set_anthropic_api_key", { key })
+      call("set_anthropic_api_key", { key })
         .then((saved) => {
           setSettings(saved);
           setError(null);
         })
-        .catch((e) => setError(String(e))),
+        .catch(reported()),
   };
 
   return (

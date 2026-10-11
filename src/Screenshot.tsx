@@ -5,26 +5,12 @@
 // small always-on-top window of a pinned capture.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowUpRight, Copy, Download, Grid3x3, Pen, Pin, ScanText, Square, Type, Undo2, X } from "lucide-react";
-import { event } from "../shared/bindings/events";
+import type { ScreenshotCapture } from "../shared/bindings/ScreenshotCapture";
+import type { ScreenshotFinish } from "../shared/bindings/ScreenshotFinish";
+import { assetUrl, call, listen, reported } from "./host";
 import { pixelRatio, toOverlay, windowAt, type Rect } from "./screenshotWindows";
-
-interface Capture {
-  path: string;
-  /// `pick`: an extension asked for the area; selecting it is all there is to do.
-  mode: "capture" | "text" | "pick";
-  x: number;
-  y: number;
-  scale: number;
-  /// Size of the capture in physical pixels.
-  width?: number;
-  height?: number;
-  /// The windows in it, topmost first, in physical pixels from its corner.
-  windows?: Rect[];
-}
 
 type Tool = "select" | "rect" | "arrow" | "pen" | "text" | "mosaic";
 
@@ -165,7 +151,7 @@ function adjusted(from: Rect, handle: Handle | "move", dx: number, dy: number): 
 }
 
 export function ScreenshotOverlay() {
-  const [capture, setCapture] = useState<Capture | null>(null);
+  const [capture, setCapture] = useState<ScreenshotCapture | null>(null);
   const [selection, setSelection] = useState<Rect | null>(null);
   const [tool, setTool] = useState<Tool>("select");
   const [color, setColor] = useState(COLORS[0]);
@@ -196,13 +182,13 @@ export function ScreenshotOverlay() {
   /// into `windowRects()`, or -1. It changes when the pointer crosses into
   /// another window, not as it moves.
   const [hover, setHover] = useState(-1);
-  const placed = useRef<{ capture: Capture; width: number; rects: Rect[] } | null>(null);
+  const placed = useRef<{ capture: ScreenshotCapture; width: number; rects: Rect[] } | null>(null);
 
   /// The capture's windows in overlay pixels, topmost first. Worked out when
   /// first needed and again if the overlay's size has changed: the capture
   /// can arrive before the window has its final size.
   const windowRects = () => {
-    if (!capture?.windows?.length) return [];
+    if (!capture?.windows.length) return [];
     const width = window.innerWidth;
     if (placed.current?.capture !== capture || placed.current.width !== width) {
       const ratio = pixelRatio(capture.width, width, capture.scale);
@@ -212,8 +198,8 @@ export function ScreenshotOverlay() {
   };
 
   useEffect(() => {
-    const unlisten = listen<Capture>(event.screenshot, ({ payload }) => {
-      setCapture(payload);
+    return listen("screenshot", (taken) => {
+      setCapture(taken);
       setSelection(null);
       setShapes([]);
       setTool("select");
@@ -222,7 +208,6 @@ export function ScreenshotOverlay() {
       setHover(-1);
       busy.current = false;
     });
-    return () => void unlisten.then((off) => off());
   }, []);
 
   // The element exists only once the capture has rendered.
@@ -265,9 +250,9 @@ export function ScreenshotOverlay() {
     return out.toDataURL("image/png").split(",")[1];
   };
 
-  const finish = async (action: "copy" | "save" | "pin" | "text" | "pick" | "cancel", rect = selection) => {
+  const finish = async (action: ScreenshotFinish["action"], rect = selection) => {
     // Cancelling must always work, even if this page lost its capture.
-    if (action === "cancel" && !capture) return void invoke("screenshot_finish", { request: { action } });
+    if (action === "cancel" && !capture) return void call("screenshot_finish", { request: { action } }).catch(reported());
     if (busy.current || !capture) return;
     if (action !== "cancel" && !rect) return;
     busy.current = true;
@@ -282,7 +267,7 @@ export function ScreenshotOverlay() {
         setClosing(true);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
-      await invoke("screenshot_finish", {
+      await call("screenshot_finish", {
         request: {
           action,
           png,
@@ -438,7 +423,7 @@ export function ScreenshotOverlay() {
   const toolbarBelow = selection ? selection.y + selection.height + 52 < window.innerHeight : true;
   const selected = selection && selection.width >= MIN_SIZE && selection.height >= MIN_SIZE && !dragging;
 
-  const source = convertFileSrc(capture.path);
+  const source = assetUrl(capture.path);
   const hovered = dragging ? undefined : windowRects()[hover];
 
   return (
@@ -597,7 +582,7 @@ export function PinWindow({ path }: { path: string }) {
         getCurrentWindow().close();
       }}
     >
-      <img src={convertFileSrc(path)} alt="" draggable={false} />
+      <img src={assetUrl(path)} alt="" draggable={false} />
     </div>
   );
 }

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 
 import { CommandView, type CommandState } from "./raycast/CommandView";
 import { sendToRuntime, TreeStore, type Toast } from "./raycast/model";
+import { call, listen, reportFailuresIn, reported } from "./host";
 import { RootSearch } from "./RootSearch";
-import { loadSettings, type SettingsData } from "./Settings";
+import type { SettingsView } from "../shared/bindings/SettingsView";
 import { expand } from "../shared/placeholders";
-import { event, type RuntimeMessage, type UiRequests } from "../shared/wire";
+import type { UiRequests } from "../shared/wire";
 
 type Confirm = UiRequests["ui.confirm"] & { id: number };
 
@@ -22,7 +21,7 @@ export default function App() {
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [searchReset, setSearchReset] = useState(0);
   const [fieldOp, setFieldOp] = useState<{ node: number; op: string; seq: number } | null>(null);
-  const settingsRef = useRef<SettingsData | null>(null);
+  const settingsRef = useRef<SettingsView | null>(null);
   const [compact, setCompact] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const commandRef = useRef(command);
@@ -46,16 +45,21 @@ export default function App() {
     setTimeout(() => inputRef.current?.focus());
   }, []);
 
+  // A call to the host that failed is said in the palette's toast.
+  useEffect(() => reportFailuresIn(({ title, message }) => (title ? showError(title, message) : showError(message))), [showError]);
+
   useEffect(() => {
-    loadSettings().then((s) => {
-      settingsRef.current = s;
-      setCompact(!!s.compactMode);
-    });
+    call("get_settings")
+      .then((s) => {
+        settingsRef.current = s;
+        setCompact(s.compactMode);
+      })
+      .catch(reported("Could not read the settings"));
   }, []);
 
   useEffect(() => {
-    const unlisteners = [
-      listen(event.shown, () => {
+    const heard = [
+      listen("shown", () => {
         // Unless configured otherwise, reopening starts from the root search.
         if (settingsRef.current?.keepCommand && commandRef.current) return;
         if (commandRef.current) sendToRuntime({ type: "close", session: commandRef.current.session });
@@ -71,25 +75,26 @@ export default function App() {
         refresh();
         inputRef.current?.focus();
       }),
-      listen<SettingsData>(event.settingsChanged, ({ payload }) => {
-        settingsRef.current = payload;
-        setCompact(!!payload.compactMode);
+      listen("settingsChanged", (settings) => {
+        settingsRef.current = settings;
+        setCompact(settings.compactMode);
       }),
-      listen(event.indexReady, refresh),
-      listen<string>(event.openItem, ({ payload }) => {
+      listen("indexReady", refresh),
+      listen("openItem", (id) => {
         if (commandRef.current) sendToRuntime({ type: "close", session: commandRef.current.session });
         setCommand(null);
-        setPendingOpen(payload);
+        setPendingOpen(id);
       }),
       // A snippet's keyword was typed in another application: the host
       // has the text, and placeholders are filled in here as for a snippet
       // chosen in the palette. (What would ask for an argument gets its
       // default: there is nobody to ask.)
-      listen<{ request: number; text: string }>(event.expandSnippet, async ({ payload }) => {
-        const text = await expand(payload.text, { readClipboard: () => invoke<string>("read_clipboard") });
-        invoke("snippet_expanded", { request: payload.request, text });
+      listen("expandSnippet", (asked) => {
+        expand(asked.text, { readClipboard: () => call("read_clipboard") })
+          .then((text) => call("snippet_expanded", { request: asked.request, text }))
+          .catch(reported("Could not expand the snippet"));
       }),
-      listen<RuntimeMessage>(event.runtime, ({ payload: m }) => {
+      listen("runtime", (m) => {
         const current = commandRef.current;
         switch (m.type) {
           case "launched":
@@ -108,7 +113,7 @@ export default function App() {
           case "closed":
             if (current && (m.session === undefined || m.session === current.session)) {
               // A finished no-view command closes the window unless it left a message.
-              if (current.mode === "no-view" && !toastRef.current) invoke("hide");
+              if (current.mode === "no-view" && !toastRef.current) call("hide").catch(reported());
               backToRoot();
             }
             break;
@@ -140,7 +145,7 @@ export default function App() {
         }
       }),
     ];
-    return () => unlisteners.forEach((p) => p.then((off) => off()));
+    return () => heard.forEach((stop) => stop());
   }, [refresh, backToRoot]);
 
   // Success toasts fade; failures stay until replaced.
@@ -150,7 +155,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const openSettings = () => invoke("open_settings").catch((e) => showError("Could not open settings", String(e)));
+  const openSettings = () => call("open_settings").catch(reported("Could not open settings"));
 
   const onToastAction = (t: Toast) =>
     sendToRuntime({ type: "toast-action", id: t.id, action: "primary" });

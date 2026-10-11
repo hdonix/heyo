@@ -2,12 +2,8 @@
 //! in the settings. The colours themselves are in styles/tokens.css, which
 //! follows `color-scheme`; all this does is say which, on the root element.
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-
 import type { Appearance } from "../shared/bindings/Appearance";
-import type { SettingsView } from "../shared/bindings/SettingsView";
-import { event } from "../shared/bindings/events";
+import { call, ignored, listen } from "./host";
 
 export type { Appearance };
 
@@ -29,8 +25,8 @@ export function applyAppearance(appearance: Appearance | undefined) {
 /// Keeps this window in the appearance the settings ask for, now and as
 /// they change.
 export function followAppearance() {
-  invoke<SettingsView>("get_settings")
+  call("get_settings")
     .then((settings) => applyAppearance(settings.appearance))
-    .catch(() => {});
-  listen<SettingsView>(event.settingsChanged, ({ payload }) => applyAppearance(payload.appearance));
+    .catch(ignored);
+  listen("settingsChanged", (settings) => applyAppearance(settings.appearance));
 }

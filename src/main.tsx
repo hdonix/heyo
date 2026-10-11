@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import { DictationWindow } from "./Dictation";
+import { call, reported } from "./host";
 import { PinWindow, ScreenshotOverlay } from "./Screenshot";
 import { SettingsWindow } from "./Settings";
 import { applyAppearance, followAppearance } from "./theme";
@@ -30,7 +30,7 @@ if (label === "main") {
   page.classList.add("floating-window");
   window.addEventListener("mousedown", (event) => {
     const target = event.target as HTMLElement;
-    if (target === page || target === document.body || target.id === "root") invoke("hide");
+    if (target === page || target === document.body || target.id === "root") call("hide").catch(reported());
   });
 }
 

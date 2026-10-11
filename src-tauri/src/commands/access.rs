@@ -36,7 +36,7 @@ impl Caller {
 
 use Caller::{Dictation, Palette, Screenshot, Settings};
 
-/// Each command and the windows whose view calls it (`invoke(` in `src/`).
+/// Each command and the windows whose view calls it (`call(` in `src/`).
 const TABLE: &[(&str, &[Caller])] = &[
     // The palette: searching, opening, what it remembers about its items.
     ("search", &[Palette]),
