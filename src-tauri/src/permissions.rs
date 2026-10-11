@@ -159,7 +159,8 @@ pub struct Need {
 }
 
 /// The permission a request needs, if any, and the function it is asked
-/// through.
+/// through. The tests write both out for the runtime and the developer
+/// tools to read (`shared/bindings/needs.ts`).
 pub fn needed(request: &ExtRequest) -> Option<Need> {
     use ExtRequest::*;
     use Permission as P;
@@ -825,6 +826,28 @@ mod tests {
             let Some((_, member)) = need else { continue };
             assert!(member.contains('.') || method == "ext.frontmostApplication", "{method}: {member}");
             assert!(!member.starts_with("ext."), "{method}: {member}");
+        }
+    }
+
+    /// Writes what every request needs for the runtime and the developer
+    /// tools to read, next to the generated types.
+    #[test]
+    fn export_needs() {
+        let mut out = String::from("// Generated from src-tauri/src/permissions.rs by `cargo test`. Do not edit.\n\n");
+        out.push_str("/** The permissions there are, as a manifest lists them. */\nexport const permissions = [");
+        out.push_str(&Permission::ALL.map(|permission| format!("{:?}", permission.name())).join(", "));
+        out.push_str("] as const;\n\n");
+        out.push_str("/**\n * What each request of an extension's needs before it is answered: the\n * permission, and the function of the API it is asked through, which is\n * what a refusal names. Null where it needs nothing.\n */\nexport const needs = {\n");
+        for (method, need) in needs() {
+            match need {
+                Some((permission, member)) => out.push_str(&format!("  {method:?}: {{ permission: {:?}, member: {member:?} }},\n", permission.name())),
+                None => out.push_str(&format!("  {method:?}: null,\n")),
+            }
+        }
+        out.push_str("} as const;\n");
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../shared/bindings/needs.ts");
+        if std::fs::read_to_string(path).ok().as_deref() != Some(&out) {
+            std::fs::write(path, out).unwrap();
         }
     }
 
