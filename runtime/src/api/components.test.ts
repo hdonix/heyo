@@ -4,20 +4,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createElement as h, useState, type ReactNode } from "react";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 
-const sent = vi.hoisted(() => [] as any[]);
-const dataDir = vi.hoisted(() => {
-  const dir = `${process.env.TMPDIR ?? "/tmp"}/heyo-components-test-${process.pid}`;
-  process.env.HEYO_DATA_DIR = dir;
-  return dir;
-});
-// The protocol takes over stdout when loaded.
-vi.mock("../protocol", () => ({
-  request: vi.fn(async (method: string, params: unknown) => void sent.push({ type: "request", method, params })),
-  send: vi.fn((message: unknown) => void sent.push(message)),
-  on: vi.fn(),
-}));
+import { dataDir, requests, reset, sent } from "../testing";
 
 import { foreground, runAs, scoped, type Current } from "../context";
 import { dispatch, mount, visibleChildren, type Container, type HostNode } from "../renderer";
@@ -36,7 +25,7 @@ beforeEach(() => {
   fs.rmSync(dataDir, { recursive: true, force: true });
   fs.mkdirSync(dataDir, { recursive: true });
   command = foreground.value = { extension, command: "main", launchType: "userInitiated" };
-  sent.length = 0;
+  reset();
 });
 
 afterEach(async () => {
@@ -375,9 +364,9 @@ test("Quick Look of what cannot be shown here opens it; of nothing, says so", as
   const view = await render(h(List, { actions: h(ActionPanel, null, h(Action.ToggleQuickLook, null)) }));
   await call(one(view.top(), "Action"), "onAction", { path: binary });
   expect(view.top().type).toBe("List");
-  expect(sent).toContainEqual({ type: "request", method: "host.open", params: expect.objectContaining({ target: binary }) });
+  expect(requests).toContainEqual({ method: "host.open", params: expect.objectContaining({ target: binary }) });
 
-  sent.length = 0;
+  reset();
   await call(one(view.top(), "Action"), "onAction", undefined);
   expect(sent.find((m) => m.type === "toast")?.toast).toMatchObject({ style: "FAILURE", title: "Nothing to preview" });
   await call(one(view.top(), "Action"), "onAction", { path: path.join(dataDir, "missing.txt") });

@@ -1,10 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, expect, test, vi } from "vitest";
-
-// The protocol takes over stdout when loaded; these tests only read files.
-vi.mock("../protocol", () => ({ request: vi.fn(), send: vi.fn(), on: vi.fn() }));
+import { afterAll, expect, test } from "vitest";
 
 import { listDirectory, startDirectory, toggled } from "./files";
 import { looksLikeText, preview, previewMarkdown, resolvePath } from "./quicklook";

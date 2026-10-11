@@ -1,24 +1,10 @@
 // The chat view, rendered as the runtime renders it: what a long
 // conversation costs while an answer is being written.
 import { createElement } from "react";
-import { afterAll, expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 
-// Heyo's data directory, for this test: set before anything reads it.
-const data = await vi.hoisted(async () => {
-  const [fs, os, path] = await Promise.all([import("node:fs"), import("node:os"), import("node:path")]);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-chat-"));
-  process.env.HEYO_DATA_DIR = dir;
-  return { dir, remove: () => fs.rmSync(dir, { recursive: true, force: true }) };
-});
+import { answers, reset } from "../testing";
 
-// The protocol takes over stdout when loaded. `AI.ask` asks the host one
-// thing, which model answers.
-vi.mock("../protocol", () => ({
-  request: vi.fn(async () => undefined),
-  ask: vi.fn(async () => ({ kind: "claude", model: "", local: false })),
-  send: vi.fn(),
-  on: vi.fn(),
-}));
 // The model: answers when the test says so, and fails when its question is withdrawn.
 const model = vi.hoisted(() => ({ calls: [] as { prompt: string; history: unknown[]; signal: AbortSignal; onText(text: string): void; finish(answer: string): void }[] }));
 vi.mock("../ai", () => ({
@@ -32,14 +18,21 @@ vi.mock("../ai", () => ({
 }));
 
 import { Navigator } from "../api/navigation";
+import { foreground, runAs, scoped, type Current } from "../context";
 import { AI } from "../heyo/ai";
 import { dispatch, encodeProps, mount, visibleChildren, type Container, type HostNode } from "../renderer";
 import { AiChat, begin, Chat, chats } from "./chat";
 import { answered, asked, newConversation, type Conversation } from "./conversations";
+import { builtinExtension } from "./index";
 
 const askedOfApi = vi.spyOn(AI, "ask");
+const command: Current = { extension: builtinExtension, command: "ai-chat", launchType: "userInitiated" };
 
-afterAll(data.remove);
+beforeEach(() => {
+  reset();
+  // `AI.ask` asks the host one thing, which model answers.
+  answers["ext.ai.provider"] = () => ({ kind: "claude", model: "", local: false });
+});
 
 const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -47,7 +40,9 @@ const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 async function show(element: React.ReactElement) {
   const errors: unknown[] = [];
   const container: Container = { children: [], onCommit() {} };
-  const unmount = mount(createElement(Navigator, { root: element, onPopRoot() {}, expose() {} }), container, (e) => errors.push(e));
+  const root = createElement(Navigator, { root: element, onPopRoot() {}, expose() {} });
+  foreground.value = command;
+  const unmount = runAs(command, () => mount(scoped(command, root), container, (e) => errors.push(e)));
   await settle();
   const all = () => {
     const out: HostNode[] = [];

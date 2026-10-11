@@ -3,25 +3,8 @@
 import { createElement } from "react";
 import { afterAll, expect, test, vi } from "vitest";
 
-const data = await vi.hoisted(async () => {
-  const [fs, os, path] = await Promise.all([import("node:fs"), import("node:os"), import("node:path")]);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-ask-"));
-  process.env.HEYO_DATA_DIR = dir;
-  return { remove: () => fs.rmSync(dir, { recursive: true, force: true }) };
-});
+import { answers, requests, reset, sent } from "../testing";
 
-// The protocol takes over stdout when loaded; here it records what is sent,
-// and answers `AI.ask`'s one question of the host (which model answers).
-const wire = vi.hoisted(() => ({ sent: [] as any[], asked: [] as string[] }));
-vi.mock("../protocol", () => ({
-  request: vi.fn(async () => undefined),
-  ask: vi.fn(async (method: string) => {
-    wire.asked.push(method);
-    return { kind: "claude", model: "", local: false };
-  }),
-  send: (message: unknown) => wire.sent.push(message),
-  on: vi.fn(),
-}));
 const model = vi.hoisted(() => ({ calls: [] as { prompt: string; onText(text: string): void; finish(answer: string): void }[] }));
 vi.mock("../ai", () => ({
   CLAUDE_MODEL: "claude",
@@ -30,7 +13,7 @@ vi.mock("../ai", () => ({
 }));
 
 import { Navigator } from "../api/navigation";
-import { foreground } from "../context";
+import { foreground, runAs, scoped, type Current } from "../context";
 import { AI } from "../heyo/ai";
 import { dispatch, mount, visibleChildren, type Container, type HostNode } from "../renderer";
 import { close } from "../session";
@@ -39,18 +22,21 @@ import { chats } from "./chat";
 import { builtinExtension } from "./index";
 
 const askedOfApi = vi.spyOn(AI, "ask");
+const command: Current = { extension: builtinExtension, command: "ask-ai", launchType: "userInitiated" };
 
-afterAll(() => {
-  close();
-  data.remove();
-});
+afterAll(() => close());
 
 const settle = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("a question asked is a conversation kept, which AI Chat continues", async () => {
+  // `AI.ask` asks the host one thing, which model answers.
+  answers["ext.ai.provider"] = () => ({ kind: "claude", model: "", local: false });
   const errors: unknown[] = [];
   const container: Container = { children: [], onCommit() {} };
-  const unmount = mount(createElement(Navigator, { root: createElement(AskAi, { fallbackText: " Why is the sky blue? " }), onPopRoot() {}, expose() {} }), container, (e) => errors.push(e));
+  const root = createElement(Navigator, { root: createElement(AskAi, { fallbackText: " Why is the sky blue? " }), onPopRoot() {}, expose() {} });
+  // As the session mounts it: the command in the palette.
+  foreground.value = command;
+  const unmount = runAs(command, () => mount(scoped(command, root), container, (e) => errors.push(e)));
   await settle();
   const all = () => {
     const out: HostNode[] = [];
@@ -69,7 +55,7 @@ test("a question asked is a conversation kept, which AI Chat continues", async (
   expect(askedOfApi).toHaveBeenCalledTimes(1);
   expect(askedOfApi.mock.calls[0][0]).toBe("Why is the sky blue?");
   expect(askedOfApi.mock.calls[0][1]).toMatchObject({ messages: [], system: expect.stringContaining("quick-answer assistant") });
-  expect(wire.asked).toEqual(["ext.ai.provider"]);
+  expect(requests).toEqual([{ method: "ext.ai.provider", extension: "@heyo", dir: "" }]);
   expect(model.calls.map((c) => c.prompt)).toEqual(["Why is the sky blue?"]);
   const [kept] = chats().store.list();
   expect(kept).toMatchObject({ title: "Why is the sky blue?", messages: [{ role: "user", content: "Why is the sky blue?" }] });
@@ -87,13 +73,12 @@ test("a question asked is a conversation kept, which AI Chat continues", async (
   expect(chats().store.get(kept.id)?.messages).toHaveLength(2);
 
   // Continuing starts AI Chat, on this conversation.
-  foreground.value = { extension: builtinExtension, command: "ask-ai", launchType: "userInitiated" };
-  wire.sent.length = 0;
-  dispatch(all().find((n) => n.props.title === "Continue in AI Chat")!.id, "onAction", []);
+  reset();
+  runAs(command, () => dispatch(all().find((n) => n.props.title === "Continue in AI Chat")!.id, "onAction", []));
   await settle(100);
   unmount();
-  expect(wire.sent.find((m) => m.type === "launched")).toMatchObject({ title: "AI Chat" });
-  const shown = wire.sent.filter((m) => m.type === "render" && m.view).at(-1).view;
+  expect(sent.find((m) => m.type === "launched")).toMatchObject({ title: "AI Chat" });
+  const shown = sent.filter((m) => m.type === "render" && m.view).at(-1).view;
   // On top of the list of conversations.
   expect(shown.depth).toBe(2);
   const list = shown.nodes.find((n: { type: string }) => n.type === "List");

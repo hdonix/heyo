@@ -1,7 +1,4 @@
-import { expect, test, vi } from "vitest";
-
-// The protocol takes over stdout when loaded; these tests only map values.
-vi.mock("../protocol", () => ({ request: vi.fn(), askThroughRaycast: vi.fn() }));
+import { expect, test } from "vitest";
 
 import { changed, monitorOf, toWindow } from "./windows";
 
