@@ -39,14 +39,9 @@ const KEYSYMS: &[(&str, &[u32])] = &[
 
 /// The symbols a key (a setting's value) goes by where keys are known by
 /// their X keysyms; none for no key.
+#[cfg(target_os = "linux")]
 pub fn symbols(key: &str) -> &'static [u32] {
-    #[cfg(target_os = "linux")]
-    return KEYSYMS.iter().find(|(value, _)| *value == key).map_or(&[], |(_, symbols)| symbols);
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = key;
-        &[]
-    }
+    KEYSYMS.iter().find(|(value, _)| *value == key).map_or(&[], |(_, symbols)| symbols)
 }
 
 /// The keys this session can watch.

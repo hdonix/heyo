@@ -397,7 +397,7 @@ impl Composer {
     /// Begins composing in the window in front, or says why not. `live`:
     /// the sentence in progress is shown while it is spoken. `own_keys`:
     /// the keys that are pressed for Heyo, and are not typing.
-    fn begin(live: bool, polishing: bool, own_keys: &[u32]) -> Result<Composer, String> {
+    fn begin(live: bool, polishing: bool, own_keys: &[&str]) -> Result<Composer, String> {
         let composed = Arc::new((Mutex::new(Composed::new(live, polishing)), Condvar::new()));
         let heard = composed.clone();
         let field = composing::compose(
@@ -671,7 +671,7 @@ fn composer(app: &AppHandle, live: bool, polishing: bool, session: u64) -> Optio
     }
     let hold_key = app.state::<SettingsState>().0.read().unwrap().dictation_hold_key.clone();
     // Says why not, never what was said.
-    Composer::begin(live, polishing, crate::platform::keys::symbols(&hold_key)).map_err(|why| eprintln!("heyo: dictation: the words are not composed in the application ({why})")).ok()
+    Composer::begin(live, polishing, &[hold_key.as_str()]).map_err(|why| eprintln!("heyo: dictation: the words are not composed in the application ({why})")).ok()
 }
 
 /// Starts the thread that writes recording number `session` into the
@@ -1086,7 +1086,7 @@ mod tests {
     }
 
     /// The key held to talk, which is Heyo's and not typing.
-    const MENU: u32 = 0xff67;
+    const MENU: &str = "menu";
 
     /// A writer for the window in front of a desk whose session has an
     /// input method: the words are composed there, if anything can be.
@@ -1104,7 +1104,7 @@ mod tests {
             desktop.user_types("Dear Ada, ");
             // The input method is Heyo's before a word is heard.
             let mut writer = composer(desktop, pasting, true, false);
-            assert_eq!((writer.writing_live(), asked(desktop)), (Some(true), vec!["composing begins 0xff67".to_owned()]));
+            assert_eq!((writer.writing_live(), asked(desktop)), (Some(true), vec!["composing begins menu".to_owned()]));
             hear(&mut writer, &["~The weather", "~The whether is nise", "~The weather is nice today", "The weather is nice today.", "~ See who", " See you at 3:30."]);
             let last = end(&mut writer, "The weather is nice today. See you at 3:30.", "The weather is nice today. See you at 3:30.");
             // The sentence in progress is composed, whole each time; the
@@ -1134,7 +1134,7 @@ mod tests {
             end(&mut writer, "The weather is nice today. See you.", "The weather is nice today. See you.");
             assert_eq!(
                 asked(desktop),
-                ["composing begins 0xff67", "compose The weather is", "commit The weather is", "compose ", "compose  nice", "commit  nice today.", "compose ", "compose  See", "commit  See you.", "compose "]
+                ["composing begins menu", "compose The weather is", "commit The weather is", "compose ", "compose  nice", "commit  nice today.", "compose ", "compose  See", "commit  See you.", "compose "]
             );
             assert_eq!(desktop.field(), "The weather is! nice today. See you.");
         });
@@ -1308,7 +1308,7 @@ mod tests {
             let mut writer = composer(desktop, pasting, false, false);
             hear(&mut writer, &["~Hel", "Hello.", "~ Wor", " World."]);
             end(&mut writer, "Hello. World.", "Hello. World.");
-            assert_eq!(asked(desktop), ["composing begins 0xff67", "commit Hello.", "commit  World."]);
+            assert_eq!(asked(desktop), ["composing begins menu", "commit Hello.", "commit  World."]);
             assert_eq!((desktop.field().as_str(), writer.writing_live()), ("Hello. World.", Some(false)));
         });
     }

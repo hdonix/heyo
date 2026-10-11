@@ -301,7 +301,7 @@ pub trait Desktop: Send + Sync {
     }
 
     /// See [`super::composing::compose`].
-    fn compose(&self, _own_keys: &[u32], _on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
+    fn compose(&self, _own_keys: &[&str], _on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
         Err(unsupported("Composing text in another application"))
     }
 
@@ -606,12 +606,12 @@ pub mod fake {
             *self.input_method.lock().unwrap()
         }
 
-        fn compose(&self, own_keys: &[u32], on: Hearing) -> Result<Box<dyn Composing>, String> {
+        fn compose(&self, own_keys: &[&str], on: Hearing) -> Result<Box<dyn Composing>, String> {
             let fake = CURRENT.with(|current| current.get()).ok_or("no desktop")?;
             if let Some(why) = fake.no_field.lock().unwrap().clone() {
                 return Err(why);
             }
-            fake.note(format!("composing begins{}", own_keys.iter().map(|key| format!(" {key:#x}")).collect::<String>()));
+            fake.note(format!("composing begins{}", own_keys.iter().map(|key| format!(" {key}")).collect::<String>()));
             *fake.hearing.lock().unwrap() = Some(on);
             Ok(Box::new(Pen { fake, ends: true }))
         }

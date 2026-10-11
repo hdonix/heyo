@@ -73,10 +73,11 @@ pub fn supported() -> bool {
 
 /// Begins composing in the field that has the focus, taking the place of
 /// the session's input method until the answer is dropped. `own_keys` are
-/// keys (X keysyms) that are pressed for Heyo and are not typing. Refuses,
+/// keys that are pressed for Heyo and are not typing, by the names
+/// `keys::KEYS` gives them (the key held to talk). Refuses,
 /// saying why, where there is nothing to compose in: no input method that
 /// Heyo speaks to, no field with the focus that takes one, a password.
-pub fn compose(own_keys: &[u32], on: Hearing) -> Result<Box<dyn Composing>, String> {
+pub fn compose(own_keys: &[&str], on: Hearing) -> Result<Box<dyn Composing>, String> {
     if desktop().supported().composing == Support::None {
         return Err(super::unsupported("Composing text in another application"));
     }

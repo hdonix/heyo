@@ -136,8 +136,10 @@ impl Desktop for X11 {
         super::ibus::running()
     }
 
-    fn compose(&self, own_keys: &[u32], on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
-        super::ibus::compose(own_keys, on)
+    fn compose(&self, own_keys: &[&str], on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
+        // IBus tells of keys by their X keysyms.
+        let symbols: Vec<u32> = own_keys.iter().flat_map(|key| super::keys::symbols(key)).copied().collect();
+        super::ibus::compose(&symbols, on)
     }
 
     fn recover_input_method(&self) {
