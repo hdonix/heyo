@@ -118,6 +118,7 @@ pub(crate) fn guarded<R: Runtime>(handler: impl Fn(Invoke<R>) -> bool + Send + S
 
 #[cfg(test)]
 mod tests {
+    use super::super::bindings::{defined, registered};
     use super::*;
 
     #[test]
@@ -188,14 +189,6 @@ mod tests {
         assert!(TABLE.iter().all(|(command, _)| !allowed("pin-1", command)));
     }
 
-    /// The names between the brackets of `generate_handler![…]` in `lib.rs`.
-    fn registered() -> Vec<String> {
-        let source = include_str!("../lib.rs");
-        let list = source.split("generate_handler![").nth(1).and_then(|rest| rest.split(']').next()).expect("lib.rs registers its commands with generate_handler!");
-        // A command is called by its own name, whatever module it is registered from.
-        list.split(',').map(|name| name.trim().rsplit("::").next().unwrap_or_default().to_owned()).filter(|name| !name.is_empty()).collect()
-    }
-
     /// A command added to `lib.rs` and forgotten here would be refused to
     /// every window; one left here after it is gone would mislead.
     #[test]
@@ -212,16 +205,14 @@ mod tests {
         }
     }
 
-    /// Every `#[tauri::command]` under `commands/` is registered, so the
-    /// check above sees it.
+    /// Every `#[tauri::command]` in the crate, whichever module defines it,
+    /// is registered, so the check above sees it.
     #[test]
     fn every_command_defined_is_registered() {
-        let registered = registered();
-        for source in [include_str!("media.rs"), include_str!("root.rs"), include_str!("settings.rs")] {
-            for after in source.split("#[tauri::command").skip(1) {
-                let name = after.split("fn ").nth(1).and_then(|rest| rest.split('(').next()).unwrap_or_default().trim();
-                assert!(registered.iter().any(|known| known == name), "{name} is a command but lib.rs does not register it");
-            }
+        let (registered, defined) = (registered(), defined());
+        assert!(defined.len() > 30, "could not read the commands out of the sources");
+        for command in defined {
+            assert!(registered.contains(&command.name), "{} is a command but lib.rs does not register it", command.name);
         }
     }
 }
