@@ -5,11 +5,22 @@
 // (`src-tauri/src/wire.rs`) and generated into `./bindings`; this file adds
 // what the host only passes along, so both ends still share one definition.
 
+import type { AiProvider } from "./bindings/AiProvider";
+import type { AudioDevice } from "./bindings/AudioDevice";
+import type { Capture } from "./bindings/Capture";
 import type { ExtCaller } from "./bindings/ExtCaller";
 import type { ExtError } from "./bindings/ExtError";
 import type { ExtRequest } from "./bindings/ExtRequest";
+import type { ExtWindow } from "./bindings/ExtWindow";
 import type { HostMessage } from "./bindings/HostMessage";
 import type { HostRequest } from "./bindings/HostRequest";
+import type { MemoryItem } from "./bindings/MemoryItem";
+import type { MemoryResult } from "./bindings/MemoryResult";
+import type { Presentation } from "./bindings/Presentation";
+import type { RecognizedText } from "./bindings/RecognizedText";
+import type { Rect } from "./bindings/Rect";
+import type { Subscription } from "./bindings/Subscription";
+import type { Support } from "./bindings/Support";
 import type { WebviewMessage } from "./bindings/WebviewMessage";
 
 export type { ExtCaller, ExtError, ExtRequest, HostMessage, HostRequest, WebviewMessage };
@@ -101,6 +112,78 @@ export type Call =
 export type ExtCall = {
   [R in ExtRequest as R["method"]]: R extends { params: infer P } ? [method: R["method"], params: P] : [method: R["method"]];
 }[ExtRequest["method"]];
+
+export type ExtMethod = ExtRequest["method"];
+
+/// What goes after the method in asking for it: its parameters, or nothing.
+export type ExtParams<M extends ExtMethod> = Extract<ExtRequest, { method: M }> extends { params: infer P } ? [params: P] : [];
+
+/// An application as the host describes one (`application` in host.rs).
+export interface Application {
+  name: string;
+  path: string;
+  bundleId?: string;
+  localizedName?: string;
+  /// The file of its icon, which Raycast's does not tell.
+  icon?: string;
+}
+
+/// What a search of the file index finds.
+export interface FoundFiles {
+  files: { path: string; isDirectory: boolean }[];
+  /// The index is still being built: there may be more.
+  scanning: boolean;
+  /// How many files and folders there are to search.
+  total: number;
+}
+
+/// `Table`, which has to say something for every one of `Keys` and for
+/// nothing else.
+type ForEach<Keys extends PropertyKey, Table extends Record<Keys, unknown> & Record<Exclude<keyof Table, Keys>, never>> = Table;
+
+/// What the host answers each request of an extension's with; `null` where
+/// it does something and has nothing to say. This is the one place the
+/// runtime says so: `ext.rs` builds its answers as JSON, some from a type
+/// that is generated into `./bindings` and some (an application, the files
+/// found, the plain values) without one.
+export type ExtReplies = ForEach<
+  ExtMethod,
+  {
+    "ext.unsubscribe": null;
+    "ext.supported": Support;
+    "ext.windows.list": ExtWindow[];
+    "ext.windows.active": ExtWindow | null;
+    "ext.windows.activate": null;
+    "ext.windows.close": null;
+    "ext.windows.arrange": null;
+    "ext.windows.setBounds": null;
+    "ext.windows.monitors": Rect[];
+    "ext.frontmostApplication": Application | null;
+    "ext.screen.capture": Capture;
+    "ext.screen.recognizeText": RecognizedText;
+    "ext.dictation.installed": boolean;
+    "ext.dictation.listen": Subscription;
+    "ext.dictation.stop": null;
+    "ext.memory.search": MemoryResult;
+    "ext.memory.get": MemoryItem | null;
+    "ext.clipboardHistory.copy": null;
+    "ext.files.search": FoundFiles;
+    "ext.system.run": string | null;
+    "ext.system.appearance": "light" | "dark";
+    "ext.system.notify": null;
+    "ext.system.audioDevices": AudioDevice[];
+    "ext.system.useAudioDevice": null;
+    "ext.clipboard.paste": null;
+    "ext.ai.provider": AiProvider;
+    "ext.activity.start": { id: string };
+    "ext.activity.update": null;
+    "ext.activity.end": null;
+    "ext.activity.list": string[];
+    "ext.activity.get": boolean;
+    "ext.activity.presentation": Presentation;
+    "ext.activity.onEvent": Subscription;
+  }
+>;
 
 /// Everything the runtime writes to the host. A request of an extension's
 /// (`ext.*`) says whose it is.

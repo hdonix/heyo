@@ -1,5 +1,6 @@
 // `@heyo/api` as the runtime provides it: what each function asks of the
-// host and in whose name, and what a command leaves behind when it ends.
+// host (which its declaration in `members.ts` says) and in whose name, and
+// what a command leaves behind when it ends.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,6 +16,7 @@ import { envelope } from "./caller";
 import { fromReply, HeyoError } from "./error";
 import api from "./index";
 import { mailbox } from "./mailbox";
+import { gained, members, modules, type Declared } from "./members";
 
 const world = globalThis as any;
 const as = (name: string): Current => ({ extension: extension(name, {}), command: "main", launchType: "userInitiated" });
@@ -51,59 +53,140 @@ test("a request is made in the name of the command that is running", async () =>
   expect(last().params).not.toHaveProperty("extension");
 });
 
-test("each function asks the host for what its name says", async () => {
+/// A function called, and the parameters that makes of its arguments
+/// (none where the request takes none).
+type Call = [call: () => unknown, params?: unknown];
+/// Calls of every function declared. One declared and not called here
+/// does not compile.
+type Calls<Group> = { [Module in keyof Group]: { [Name in keyof Group[Module]]: [Call, ...Call[]] } };
+
+test("each function asks the host for what its declaration says", async () => {
   const since = new Date(1_700_000_000_000);
   const bounds = { x: 1, y: 2, width: 300, height: 200 };
-  const { Windows, Screen, Dictation, Memory, ClipboardHistory, Files, System, AI, Clipboard } = api;
-  answers["ext.screen.capture"] = () => ({ path: path.join(os.tmpdir(), "heyo-no-such-capture.png"), width: 1, height: 1 });
-  const cases: [() => Promise<unknown>, string, unknown][] = [
-    [() => Windows.supported(), "ext.supported", { module: "windows" }],
-    [() => Windows.list(), "ext.windows.list", undefined],
-    [() => Windows.active(), "ext.windows.active", undefined],
-    [() => Windows.activate(7), "ext.windows.activate", { id: 7 }],
-    [() => Windows.close(7), "ext.windows.close", { id: 7 }],
-    [() => Windows.arrange(7, "left-half"), "ext.windows.arrange", { id: 7, layout: "left-half" }],
-    [() => Windows.arrange(7, { fraction: [0, 0, 4, 12] }), "ext.windows.arrange", { id: 7, layout: { fraction: [0, 0, 4, 12] } }],
-    [() => Windows.setBounds(7, bounds), "ext.windows.setBounds", { id: 7, bounds }],
-    [() => Windows.monitors(), "ext.windows.monitors", undefined],
-    [() => Screen.supported(), "ext.supported", { module: "screen" }],
-    [() => Screen.capture("selection"), "ext.screen.capture", { target: "selection" }],
-    [() => Screen.capture({ window: 7 }), "ext.screen.capture", { target: { window: 7 } }],
-    [() => Screen.capture({ rect: bounds }), "ext.screen.capture", { target: { rect: bounds } }],
-    [() => Screen.recognizeText("/tmp/a.png"), "ext.screen.recognizeText", { path: "/tmp/a.png" }],
-    [() => Dictation.supported(), "ext.supported", { module: "dictation" }],
-    [() => Dictation.installed(), "ext.dictation.installed", undefined],
-    [() => Memory.supported(), "ext.supported", { module: "memory" }],
-    [() => Memory.search(), "ext.memory.search", {}],
-    [
-      () => Memory.search({ text: "invoice", sources: ["clipboard"], kinds: ["link"], since, until: since, limit: 5 }),
-      "ext.memory.search",
-      { text: "invoice", sources: ["clipboard"], kinds: ["link"], since: 1_700_000_000_000, until: 1_700_000_000_000, limit: 5 },
-    ],
-    [() => Memory.search({ text: "the bill", limit: 300, byMeaning: true }), "ext.memory.search", { text: "the bill", limit: 300, byMeaning: true }],
-    [() => Memory.get("clipboard:4"), "ext.memory.get", { id: "clipboard:4" }],
-    [() => ClipboardHistory.supported(), "ext.supported", { module: "clipboardHistory" }],
-    [() => ClipboardHistory.copy("clipboard:4"), "ext.clipboardHistory.copy", { id: "clipboard:4" }],
-    [() => Files.supported(), "ext.supported", { module: "files" }],
-    [() => Files.search("notes", { limit: 9 }), "ext.files.search", { query: "notes", limit: 9 }],
-    [() => System.supported(), "ext.supported", { module: "system" }],
-    [() => System.run("volume-up"), "ext.system.run", { action: "volume-up" }],
-    [() => System.appearance(), "ext.system.appearance", undefined],
-    [() => System.notify("Done", "All of it"), "ext.system.notify", { title: "Done", body: "All of it" }],
-    [() => System.audioDevices(), "ext.system.audioDevices", undefined],
-    [() => System.useAudioDevice("input", "alsa_input.usb"), "ext.system.useAudioDevice", { kind: "input", name: "alsa_input.usb" }],
-    [() => AI.provider(), "ext.ai.provider", undefined],
-    [() => Clipboard.paste("hello", { restoreClipboard: true }), "ext.clipboard.paste", { text: "hello" }],
-    [() => Clipboard.paste({ text: "hi", html: "<b>hi</b>" }, { restoreClipboard: true }), "ext.clipboard.paste", { text: "hi", html: "<b>hi</b>" }],
-  ];
+  const { Windows, Screen, Dictation, Memory, ClipboardHistory, Files, System, LiveActivity, AI, Clipboard } = api;
+  let listening: ReturnType<typeof Dictation.listen> | undefined;
+  const calls: Calls<typeof modules> & Calls<typeof gained> = {
+    Windows: {
+      supported: [[() => Windows.supported(), { module: "windows" }]],
+      list: [[() => Windows.list()]],
+      active: [[() => Windows.active()]],
+      activate: [[() => Windows.activate(7), { id: 7 }]],
+      close: [[() => Windows.close(7), { id: 7 }]],
+      arrange: [
+        [() => Windows.arrange(7, "left-half"), { id: 7, layout: "left-half" }],
+        [() => Windows.arrange(7, { fraction: [0, 0, 4, 12] }), { id: 7, layout: { fraction: [0, 0, 4, 12] } }],
+      ],
+      setBounds: [[() => Windows.setBounds(7, bounds), { id: 7, bounds }]],
+      monitors: [[() => Windows.monitors()]],
+    },
+    Screen: {
+      supported: [[() => Screen.supported(), { module: "screen" }]],
+      capture: [
+        [() => Screen.capture("selection"), { target: "selection" }],
+        [() => Screen.capture({ window: 7 }), { target: { window: 7 } }],
+        [() => Screen.capture({ rect: bounds }), { target: { rect: bounds } }],
+      ],
+      recognizeText: [[() => Screen.recognizeText("/tmp/a.png"), { path: "/tmp/a.png" }]],
+    },
+    Dictation: {
+      supported: [[() => Dictation.supported(), { module: "dictation" }]],
+      installed: [[() => Dictation.installed()]],
+      listen: [[() => (listening = Dictation.listen({ language: "en", indicator: false })), { language: "en", indicator: false }]],
+    },
+    Memory: {
+      supported: [[() => Memory.supported(), { module: "memory" }]],
+      search: [
+        [() => Memory.search(), {}],
+        [
+          () => Memory.search({ text: "invoice", sources: ["clipboard"], kinds: ["link"], since, until: since, limit: 5 }),
+          { text: "invoice", sources: ["clipboard"], kinds: ["link"], since: 1_700_000_000_000, until: 1_700_000_000_000, limit: 5 },
+        ],
+        [() => Memory.search({ text: "the bill", limit: 300, byMeaning: true }), { text: "the bill", limit: 300, byMeaning: true }],
+      ],
+      get: [[() => Memory.get("clipboard:4"), { id: "clipboard:4" }]],
+    },
+    ClipboardHistory: {
+      supported: [[() => ClipboardHistory.supported(), { module: "clipboardHistory" }]],
+      copy: [[() => ClipboardHistory.copy("clipboard:4"), { id: "clipboard:4" }]],
+    },
+    Files: {
+      supported: [[() => Files.supported(), { module: "files" }]],
+      search: [
+        [() => Files.search("notes", { limit: 9 }), { query: "notes", limit: 9 }],
+        [() => Files.search("notes"), { query: "notes" }],
+      ],
+    },
+    System: {
+      supported: [[() => System.supported(), { module: "system" }]],
+      run: [[() => System.run("volume-up"), { action: "volume-up" }]],
+      appearance: [[() => System.appearance()]],
+      notify: [
+        [() => System.notify("Done", "All of it"), { title: "Done", body: "All of it" }],
+        [() => System.notify("Done"), { title: "Done" }],
+      ],
+      audioDevices: [[() => System.audioDevices()]],
+      useAudioDevice: [[() => System.useAudioDevice("input", "alsa_input.usb"), { kind: "input", name: "alsa_input.usb" }]],
+    },
+    LiveActivity: {
+      supported: [[() => LiveActivity.supported(), { module: "activity" }]],
+      start: [
+        [
+          () => LiveActivity.start({ id: "a", name: "Build", icon: "hammer-16" }, { title: "Building" }),
+          { attributes: { id: "a", name: "Build", icon: "hammer-16" }, content: { title: "Building" }, launchType: "userInitiated", seq: expect.any(Number) },
+        ],
+      ],
+      list: [[() => LiveActivity.list()]],
+      get: [[() => LiveActivity.get("a"), { id: "a" }]],
+      presentation: [[() => LiveActivity.presentation()]],
+      onEvent: [[() => LiveActivity.onEvent(() => {})]],
+    },
+    AI: {
+      provider: [[() => AI.provider()]],
+      // Pictures, which the model set up here is not given: it is asked which it is.
+      ask: [[() => AI.ask("What is this?", { images: ["/tmp/shot.png"] })]],
+    },
+    Clipboard: {
+      paste: [
+        [() => Clipboard.paste("hello", { restoreClipboard: true }), { text: "hello" }],
+        [() => Clipboard.paste({ text: "hi", html: "<b>hi</b>" }, { restoreClipboard: true }), { text: "hi", html: "<b>hi</b>" }],
+      ],
+    },
+  };
+  Object.assign(answers, {
+    "ext.screen.capture": () => ({ path: path.join(os.tmpdir(), "heyo-no-such-capture.png"), width: 1, height: 1 }),
+    "ext.dictation.listen": () => ({ subscription: 21 }),
+    "ext.activity.start": () => ({ id: "a" }),
+    "ext.activity.list": () => [],
+    "ext.activity.onEvent": () => ({ subscription: 22 }),
+    "ext.ai.provider": () => ({ kind: "local", model: "qwen3", local: true }),
+  });
+
   const command = as("probe");
-  for (const [call, method, params] of cases) {
-    if (method === "ext.ai.provider") answers[method] = () => ({ kind: "claude", model: "", local: false });
-    await runAs(command, call);
-    // As it goes over the wire: what was left out is not there.
-    expect({ method: last().method, params: JSON.parse(JSON.stringify(last().params ?? null)) }, method).toEqual({ method, params: params ?? null });
-    expect(last().via, method).toBeUndefined();
+  const declared: Record<string, Record<string, Declared>> = { ...modules, ...gained };
+  for (const { module, name, member, method } of members) {
+    for (const [call, params] of (calls as Record<string, Record<string, Call[]>>)[module][name]) {
+      const from = requests.length;
+      // What it comes to is not looked at here, only what it asks.
+      await Promise.resolve(runAs(command, call)).catch(() => {});
+      const asked = await until(() => requests.slice(from).find((request) => request.method === method), `${member} to ask for ${method}`);
+      // As it goes over the wire: what was left out is not there.
+      expect(JSON.parse(JSON.stringify(asked.params ?? null)), member).toEqual(params ?? null);
+      expect(asked, member).toMatchObject({ extension: "probe", dir: command.extension.dir });
+      expect(asked.via, member).toBeUndefined();
+      // One that is made from its declaration is that request and no more.
+      if (!("byHand" in declared[module][name])) expect(requests.length - from, member).toBe(1);
+    }
   }
+  // Every function there is was declared, so every one was called.
+  for (const [module, functions] of Object.entries(declared)) {
+    if (module in modules) expect(Object.keys((api as Record<string, unknown>)[module] as object).sort(), module).toEqual(Object.keys(functions).sort());
+    else for (const name of Object.keys(functions)) expect(api.has(`${module}.${name}`), `${module}.${name}`).toBe(true);
+  }
+
+  event(21, { kind: "result", text: "" });
+  await listening!.result;
+  ended(command);
+  await until(() => last().method === "ext.unsubscribe", "the listening for activities to end");
 });
 
 test("what the host answers with nothing comes back as nothing", async () => {

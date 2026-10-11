@@ -1,6 +1,8 @@
 //! An extension's manifest (`package.json`) as the developer tools read it:
 //! what a source directory must have for Heyo to build and load it.
 
+import { permissions as PERMISSIONS } from "../../../shared/bindings/needs";
+
 /// The names both of which the runtime answers with its own API object.
 export const API_MODULES = ["@raycast/api", "@heyo/api"];
 /// What a built command leaves for the runtime to provide (`main.ts`).
@@ -11,22 +13,6 @@ export const MODES = ["view", "no-view", "menu-bar"];
 export const ENTRY_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
 /// The major version of the Heyo API this Heyo provides.
 export const API_VERSION = 1;
-/// The permissions an extension may declare (docs/extension-api.md, 5.1).
-export const PERMISSIONS = [
-  "windows",
-  "screen.capture",
-  "screen.text",
-  "microphone",
-  "clipboard.history",
-  "memory.read",
-  "memory.write",
-  "files.search",
-  "system",
-  "input.paste",
-  "ai",
-  "search.provider",
-  "activity",
-];
 
 export interface Problem {
   severity: "error" | "warning";
@@ -121,7 +107,8 @@ export function validateManifest(manifest: unknown, exists: (file: string) => bo
       else if (apiVersion > API_VERSION) error(`"heyo.apiVersion" is ${apiVersion}, but this Heyo provides version ${API_VERSION}`);
       if (permissions !== undefined && !Array.isArray(permissions)) error(`"heyo.permissions" must be a list`);
       for (const permission of Array.isArray(permissions) ? permissions : []) {
-        if (!PERMISSIONS.includes(String(permission))) warning(`"heyo.permissions" names "${String(permission)}", which is not a permission Heyo has`);
+        // The host's own list of them (docs/extension-api.md, 5.1).
+        if (!(PERMISSIONS as readonly string[]).includes(String(permission))) warning(`"heyo.permissions" names "${String(permission)}", which is not a permission Heyo has`);
       }
     }
   }

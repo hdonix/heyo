@@ -1,7 +1,8 @@
 //! The `@heyo/api` module handed to extensions: everything of
 //! `@raycast/api` under the same names, and Heyo's own on top
-//! (docs/extension-api.md; the types an extension author sees are in
-//! `packages/api/index.d.ts`, and `types.check.ts` holds the two together).
+//! (docs/extension-api.md). Every function of Heyo's is declared once, in
+//! `members.ts`; the types an extension author sees are in
+//! `packages/api/index.d.ts`, and `types.check.ts` holds the two together.
 //!
 //! `@raycast/api` is given this same object. An extension that imports
 //! both, or `@heyo/api` with `@raycast/utils` (which imports the other),
@@ -11,12 +12,11 @@ import type { Support } from "../../../shared/bindings/Support";
 import raycast from "../api";
 import { LiveActivity } from "./activity";
 import { AI } from "./ai";
+import { Clipboard } from "./clipboard";
 import { Dictation } from "./dictation";
 import { HeyoError } from "./error";
-import { ClipboardHistory, Memory } from "./memory";
+import { ClipboardHistory, Files, Memory, System, Windows } from "./plain";
 import { Screen } from "./screen";
-import { Clipboard, Files, System } from "./system";
-import { Windows } from "./windows";
 
 export type { Support };
 

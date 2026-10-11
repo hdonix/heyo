@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { permissions } from "../../../shared/bindings/needs";
 import { parseArgs } from "./main";
 import { validateManifest } from "./manifest";
 import { withEntry, withoutEntry, type Development } from "./registry";
@@ -93,6 +94,9 @@ describe("a manifest", () => {
     expect(errors({ ...good, heyo: { apiVersion: "1" } }, present)[0]).toContain("whole number");
     expect(errors({ ...good, heyo: { apiVersion: 1, permissions: "windows" } }, present)).toEqual(['"heyo.permissions" must be a list']);
     expect(warnings({ ...good, heyo: { apiVersion: 1, permissions: ["telepathy"] } }, present)[0]).toContain('"telepathy"');
+    // Every permission the host has is one a manifest may list.
+    expect(permissions.length).toBeGreaterThan(10);
+    expect(validateManifest({ ...good, heyo: { apiVersion: 1, permissions: [...permissions] } }, present).problems).toEqual([]);
   });
 });
 

@@ -13,11 +13,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Color } from "../api";
 import { Action, ActionPanel, List } from "../api/components";
 import { Icon } from "../api/icon";
-import { closeMainWindow, confirmAlert, getApplications, open, showHUD, showInFinder, showToast, Toast, trash, type Application } from "../api/system";
+import { closeMainWindow, confirmAlert, getApplications, open, showHUD, showInFinder, showToast, Toast, trash } from "../api/system";
+import type { Action as SystemAction } from "../../../shared/bindings/Action";
+import type { AudioDevice } from "../../../shared/bindings/AudioDevice";
+import type { ExtWindow as Window } from "../../../shared/bindings/ExtWindow";
 import type { ProcessInfo } from "../../../shared/bindings/ProcessInfo";
+import type { Application, FoundFiles } from "../../../shared/wire";
 import { cacheRoot } from "../context";
-import { Files, System, type AudioDevice, type FoundFiles, type SystemAction } from "../heyo/system";
-import { Windows, type Window } from "../heyo/windows";
+import { Files, System, Windows } from "../heyo/plain";
 import { request } from "../protocol";
 
 function fail(title: string) {

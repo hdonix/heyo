@@ -14,7 +14,9 @@ import { Action, ActionPanel, List } from "../api/components";
 import { Icon } from "../api/icon";
 import { closeMainWindow, confirmAlert, pasteKeystroke, showHUD, showToast, Toast } from "../api/system";
 import type { Kind } from "../../../shared/bindings/Kind";
-import { ClipboardHistory as History, Memory, type MemoryItem, type MemoryResult } from "../heyo/memory";
+import type { MemoryItem } from "../../../shared/bindings/MemoryItem";
+import type { MemoryResult } from "../../../shared/bindings/MemoryResult";
+import { ClipboardHistory as History, Memory } from "../heyo/plain";
 import { request } from "../protocol";
 
 /// An entry of the history, as any extension is told of one.

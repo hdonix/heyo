@@ -159,8 +159,9 @@ pub struct Need {
 }
 
 /// The permission a request needs, if any, and the function it is asked
-/// through. The tests write both out for the runtime and the developer
-/// tools to read (`shared/bindings/needs.ts`).
+/// through. The tests write both out (`shared/bindings/needs.ts`): the
+/// runtime's declaration of those functions (`runtime/src/heyo/members.ts`)
+/// takes the permission from there and is held to the names.
 pub fn needed(request: &ExtRequest) -> Option<Need> {
     use ExtRequest::*;
     use Permission as P;

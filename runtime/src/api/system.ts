@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { cachePath, current, ownsPalette, readJson, requireCurrent, runAs, supportPath, writeJson, type Current } from "../context";
-import type { Toast as WireToast } from "../../../shared/wire";
+import type { Application, Toast as WireToast } from "../../../shared/wire";
 import { on, request, send } from "../protocol";
 
 // --- Window --------------------------------------------------------------
@@ -221,15 +221,6 @@ export const Clipboard = {
 };
 
 // --- Opening things ------------------------------------------------------
-
-export interface Application {
-  name: string;
-  path: string;
-  bundleId?: string;
-  localizedName?: string;
-  /// The file of its icon, which Raycast's does not tell.
-  icon?: string;
-}
 
 export async function getApplications(_path?: string): Promise<Application[]> {
   return request<Application[]>("host.applications");

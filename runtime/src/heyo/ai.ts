@@ -9,8 +9,9 @@ import path from "node:path";
 
 import type { AiProvider } from "../../../shared/bindings/AiProvider";
 import { CLAUDE_MODEL, describeClaudeError, type PromptImage, streamClaude } from "../ai";
-import { ask } from "../protocol";
+import { ask, implement } from "./asking";
 import { HeyoError } from "./error";
+import { gained } from "./members";
 
 /// An earlier question or answer of a conversation.
 export interface Message {
@@ -90,16 +91,12 @@ function failure(error: unknown, signal?: AbortSignal): HeyoError {
 }
 
 /// Which model answers, with Claude's name filled in.
-async function provider() {
-  const set = await ask<AiProvider>("ext.ai.provider");
+async function provider(): Promise<AiProvider> {
+  const set = await ask("ext.ai.provider");
   return set.kind === "claude" ? { ...set, model: CLAUDE_MODEL } : set;
 }
 
-export const AI = {
-  /// Any model named is answered by the one chosen in Heyo's settings.
-  Model: new Proxy({}, { get: (_, name) => String(name) }) as Record<string, string>,
-  Creativity: { None: "none", Low: "low", Medium: "medium", High: "high", Maximum: "maximum" },
-
+const added = implement(gained.AI, {
   /// Which model answers and whether what is asked stays on this computer,
   /// for deciding what to send it.
   provider,
@@ -147,4 +144,11 @@ export const AI = {
       },
     });
   },
+});
+
+export const AI = {
+  /// Any model named is answered by the one chosen in Heyo's settings.
+  Model: new Proxy({}, { get: (_, name) => String(name) }) as Record<string, string>,
+  Creativity: { None: "none", Low: "low", Medium: "medium", High: "high", Maximum: "maximum" },
+  ...added,
 };

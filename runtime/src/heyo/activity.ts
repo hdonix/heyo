@@ -13,10 +13,10 @@ import type { ActivityAttributes } from "../../../shared/bindings/ActivityAttrib
 import type { ActivityContent } from "../../../shared/bindings/ActivityContent";
 import type { ActivityTimer } from "../../../shared/bindings/ActivityTimer";
 import type { Presentation } from "../../../shared/bindings/Presentation";
-import type { Support } from "../../../shared/bindings/Support";
 import { current, runAs, type Current } from "../context";
-import { ask } from "../protocol";
+import { ask, implement } from "./asking";
 import { subscribe } from "./events";
+import { modules } from "./members";
 
 export interface Timer {
   start: Date;
@@ -155,9 +155,7 @@ function handle(id: string, command: Current | null): Handle {
   };
 }
 
-export const LiveActivity = {
-  supported: () => ask<Support>("ext.supported", { module: "activity" }),
-
+export const LiveActivity = implement(modules.LiveActivity, {
   /// Starts an activity, or updates the one of that id. The host is told
   /// how the command was launched: only one the user ran may start one.
   async start(attributes: Attributes, content: Content, options?: StartOptions): Promise<Handle> {
@@ -170,22 +168,20 @@ export const LiveActivity = {
       launchType: launchType as "userInitiated" | "background",
       seq: sequence(),
     };
-    const { id } = await ask<{ id: string }>("ext.activity.start", params);
+    const { id } = await ask("ext.activity.start", params);
     return handle(id, command);
   },
 
   async list(): Promise<Handle[]> {
     const command = current.value;
-    const ids = await ask<string[]>("ext.activity.list");
+    const ids = await ask("ext.activity.list");
     return ids.map((id) => handle(id, command));
   },
 
   async get(id: string): Promise<Handle | undefined> {
     const command = current.value;
-    return (await ask<boolean>("ext.activity.get", { id })) ? handle(id, command) : undefined;
+    return (await ask("ext.activity.get", { id })) ? handle(id, command) : undefined;
   },
-
-  presentation: () => ask<Presentation>("ext.activity.presentation"),
 
   /// Hears the events of the extension's activities for as long as the
   /// command runs. Returns how to stop.
@@ -193,4 +189,4 @@ export const LiveActivity = {
     const subscribed = await subscribe(["ext.activity.onEvent"], (data) => listener(data as Event));
     return () => void subscribed.cancel();
   },
-};
+});

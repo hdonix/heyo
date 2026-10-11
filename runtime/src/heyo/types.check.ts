@@ -7,14 +7,18 @@
 
 import type * as declared from "../../../packages/api";
 import type * as raycastDeclared from "@raycast/api";
+import type { needs, permissions } from "../../../shared/bindings/needs";
+import type { Permission } from "../../../shared/bindings/Permission";
+import type { ExtMethod } from "../../../shared/wire";
 import type raycast from "../api";
 import api from "./index";
+import type { modules } from "./members";
 
 type Declared = typeof declared;
 type Provided = typeof api;
 
 /// `true` only where both have the same members by name.
-type SameNames<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : never) : never;
+type SameNames<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : false) : false;
 
 /// What each adds to Raycast's API, by name.
 type DeclaredOwn = Exclude<keyof Declared, keyof typeof raycastDeclared>;
@@ -26,17 +30,19 @@ export const sameExports: [DeclaredOwn] extends [ProvidedOwn] ? ([ProvidedOwn] e
 // What is provided under those names is what is declared.
 export const own: Pick<Declared, DeclaredOwn> = api;
 
-// Module by module, the same functions: none undeclared, none declared and missing.
-export const sameFunctions: [
-  SameNames<Declared["Windows"], Provided["Windows"]>,
-  SameNames<Declared["Screen"], Provided["Screen"]>,
-  SameNames<Declared["Dictation"], Provided["Dictation"]>,
-  SameNames<Declared["Memory"], Provided["Memory"]>,
-  SameNames<Declared["ClipboardHistory"], Provided["ClipboardHistory"]>,
-  SameNames<Declared["Files"], Provided["Files"]>,
-  SameNames<Declared["System"], Provided["System"]>,
-  SameNames<Declared["LiveActivity"], Provided["LiveActivity"]>,
-] = [true, true, true, true, true, true, true, true];
+// Module by module, the functions that are declared (`members.ts`), which
+// those provided are made from, are the ones the package declares: none
+// undeclared, none declared and missing.
+type Modules = typeof modules;
+type Differing = {
+  [M in keyof Modules]: M extends keyof Declared & keyof Provided ? ([SameNames<Declared[M], Modules[M]>, SameNames<Provided[M], Modules[M]>] extends [true, true] ? never : M) : M;
+}[keyof Modules];
+export const sameFunctions: [Differing] extends [never] ? true : never = true;
+
+// What the host wrote of its requests (`shared/bindings/needs.ts`) is of
+// the requests and the permissions there are now.
+export const everyRequest: SameNames<typeof needs, Record<ExtMethod, unknown>> = true;
+export const everyPermission: [Permission] extends [(typeof permissions)[number]] ? true : never = true;
 
 // What Raycast's own modules gain.
 type Added<Module, Theirs> = Pick<Module, Exclude<keyof Module, keyof Theirs>>;

@@ -6,9 +6,10 @@
 //! ended for it; the host ends whatever is left when the runtime exits.
 
 import type { Subscription } from "../../../shared/bindings/Subscription";
-import type { ExtCall } from "../../../shared/wire";
+import type { ExtMethod, ExtParams, ExtReplies } from "../../../shared/wire";
 import { current, runAs, whenEnded } from "../context";
-import { ask, hear } from "../protocol";
+import { hear } from "../protocol";
+import { ask } from "./asking";
 
 export interface Subscribed {
   /// The number the host knows it by.
@@ -19,10 +20,13 @@ export interface Subscribed {
   cancel(): Promise<void>;
 }
 
+/// The requests that subscribe.
+type Subscribing = { [M in ExtMethod]: ExtReplies[M] extends Subscription ? M : never }[ExtMethod];
+
 /// Subscribes as the command that is running. `listener` gets each event.
-export async function subscribe(call: ExtCall, listener: (data: unknown) => void): Promise<Subscribed> {
+export async function subscribe<M extends Subscribing>(call: [method: M, ...params: ExtParams<M>], listener: (data: unknown) => void): Promise<Subscribed> {
   const command = current.value;
-  const { subscription } = await ask<Subscription>(...call);
+  const { subscription }: Subscription = await ask(...call);
   let open = true;
   let forget = () => {};
   const deaf = hear(subscription, (data) => {

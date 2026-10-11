@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
+import { modules } from "../heyo/members";
 import { checkExtension, checkManifest, checkSource, formatReport, heyoModulesUsed, knownGaps, ownCode, RULES } from "./check";
 
 const rules = (source: string) => checkSource("src/x.ts", source).map((f) => f.rule);
@@ -120,6 +121,9 @@ export default () => (
     expect(heyoModulesUsed('import * as heyo from "@heyo/api";\nawait heyo.Screen.capture();')).toEqual(["Screen"]);
     // Not from Heyo's package: something else of that name.
     expect(heyoModulesUsed('import { Windows } from "./windows";\nimport { List } from "@raycast/api";')).toEqual([]);
+    // Every module that is declared (`heyo/members.ts`), the newest too.
+    expect(heyoModulesUsed(`import { ${Object.keys(modules).join(", ")} } from "@heyo/api";`)).toEqual(Object.keys(modules).sort());
+    expect(heyoModulesUsed('const heyo = require("@heyo/api");\nheyo.LiveActivity.start(a, b);')).toEqual(["LiveActivity"]);
   });
 });
 
@@ -234,6 +238,25 @@ describe("a whole extension", () => {
     const report = checkExtension(path.join(__dirname, "fixtures/progress"));
     expect(report.findings).toEqual([]);
     expect(formatReport(report)).toContain("Nothing found that would not work on Heyo.");
+  });
+
+  it("misses the permission of whatever module is used, by what its functions need", () => {
+    const copy = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-check-progress-"));
+    fs.cpSync(path.join(__dirname, "fixtures/progress"), copy, { recursive: true });
+    const manifest = JSON.parse(fs.readFileSync(path.join(copy, "package.json"), "utf8"));
+    const missing = (permissions: string[], source?: string) => {
+      fs.writeFileSync(path.join(copy, "package.json"), JSON.stringify({ ...manifest, heyo: { apiVersion: 1, permissions } }));
+      if (source) fs.writeFileSync(path.join(copy, "src/build.js"), source);
+      return checkExtension(copy).findings.filter((f) => f.rule === "permission-missing").map((f) => f.message);
+    };
+    expect(missing([])).toEqual(['uses LiveActivity, which needs the "activity" permission; add it to "heyo.permissions"']);
+    expect(missing(["windows"]).length).toBe(1);
+    expect(missing(["activity"])).toEqual([]);
+    // Any one of a module's will do, but not one that none of its functions needs.
+    const both = 'import { Memory, Screen } from "@heyo/api";\nexport default () => Memory.search();\n';
+    expect(missing(["screen.text", "memory.write"], both)).toEqual(['uses Memory, which needs the "memory.read" permission; add it to "heyo.permissions"']);
+    expect(missing([], both)[1]).toContain('uses Screen, which needs the "screen.capture" or "screen.text" permission');
+    fs.rmSync(copy, { recursive: true, force: true });
   });
 
   it("says so when there is nothing", () => {

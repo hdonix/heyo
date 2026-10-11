@@ -8,18 +8,13 @@
 //! `windows` permission), also for an extension from the store that says
 //! nothing of permissions: the host asks the first time.
 
+import type { ExtWindow } from "../../../shared/bindings/ExtWindow";
 import type { Rect } from "../../../shared/bindings/Rect";
-import { askThroughRaycast as ask } from "../protocol";
-import type { Application } from "./system";
+import type { Application } from "../../../shared/wire";
+import { askThroughRaycast as ask } from "../heyo/asking";
 
 /// A window as the host lists it.
-export interface HostWindow {
-  id: number;
-  title: string;
-  class: string;
-  active: boolean;
-  bounds?: Rect;
-}
+export type HostWindow = Pick<ExtWindow, "id" | "title" | "class" | "active" | "bounds">;
 
 export const DesktopType = { User: "User", FullScreen: "FullScreen" } as const;
 
@@ -63,7 +58,7 @@ export function changed(current: Rect | undefined, change: BoundsChange): Rect {
 }
 
 const listed = async () => {
-  const [windows, monitors] = await Promise.all([ask<HostWindow[]>("ext.windows.list"), ask<Rect[]>("ext.windows.monitors")]);
+  const [windows, monitors] = await Promise.all([ask("ext.windows.list"), ask("ext.windows.monitors")]);
   return { windows, monitors };
 };
 
@@ -71,7 +66,7 @@ export const WindowManagement = {
   DesktopType,
 
   async getActiveWindow() {
-    const [window, monitors] = await Promise.all([ask<HostWindow | null>("ext.windows.active"), ask<Rect[]>("ext.windows.monitors")]);
+    const [window, monitors] = await Promise.all([ask("ext.windows.active"), ask("ext.windows.monitors")]);
     if (!window) throw new Error("No window is focused");
     return toWindow({ ...window, active: true }, monitors);
   },
@@ -106,7 +101,7 @@ export const WindowManagement = {
 };
 
 export async function getFrontmostApplication(): Promise<Application> {
-  const application = await ask<Application | null>("ext.frontmostApplication");
+  const application = await ask("ext.frontmostApplication");
   if (!application) throw new Error("No application is in front");
   return application;
 }

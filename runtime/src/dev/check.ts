@@ -17,6 +17,7 @@ import path from "node:path";
 
 import apiGaps from "../api/conformance.gaps.json";
 import propGaps from "../api/props.gaps.json";
+import { modules, permissionsOf, type ModuleName } from "../heyo/members";
 import { existsIn, readPackage, sourceFiles } from "./files";
 import { lex, withoutComments, type Token } from "./lex";
 import { API_MODULES, validateManifest } from "./manifest";
@@ -95,18 +96,6 @@ const UNSUPPORTED: Record<string, { severity: Severity; message: string }> = {
   "BrowserExtension.getContent": { severity: "error", message: "BrowserExtension.getContent throws on Heyo: there is no browser extension to ask" },
   "BrowserExtension.getTabs": { severity: "error", message: "BrowserExtension.getTabs throws on Heyo: there is no browser extension to ask" },
   updateCommandMetadata: { severity: "info", message: "updateCommandMetadata does nothing on Heyo: the root search shows the subtitle from the manifest" },
-};
-
-/// The Heyo modules of `@heyo/api` and the permission each needs
-/// (docs/extension-api.md, sections 5 and 7).
-const HEYO_MODULES: Record<string, string[]> = {
-  Windows: ["windows"],
-  Screen: ["screen.capture", "screen.text"],
-  Dictation: ["microphone"],
-  ClipboardHistory: ["clipboard.history"],
-  Memory: ["memory.read", "memory.write"],
-  Files: ["files.search"],
-  System: ["system"],
 };
 
 const flat = (lists: Record<string, string[]>) => Object.values(lists).flat();
@@ -313,16 +302,17 @@ export function checkSource(file: string, source: string): Finding[] {
   return findings;
 }
 
-/// The Heyo modules a source uses from `@heyo/api`.
-export function heyoModulesUsed(source: string): string[] {
+/// The modules of Heyo's (those `heyo/members.ts` declares) that a source
+/// uses from `@heyo/api`.
+export function heyoModulesUsed(source: string): ModuleName[] {
   const imports = apiImports(withoutComments(source));
-  const used = new Set<string>();
+  const used = new Set<ModuleName>();
+  const own = Object.keys(modules) as ModuleName[];
   for (const [local, imported] of imports.names) {
     if (!imports.heyo.has(local)) continue;
-    if (imported in HEYO_MODULES) used.add(imported);
-    else if (imported === "*") {
-      for (const module of Object.keys(HEYO_MODULES)) if (new RegExp(`(?<![\\w$.])${escape(local)}\\s*\\.\\s*${module}\\b`).test(source)) used.add(module);
-    }
+    if (imported === "*") {
+      for (const module of own) if (new RegExp(`(?<![\\w$.])${escape(local)}\\s*\\.\\s*${module}\\b`).test(source)) used.add(module);
+    } else if (own.some((module) => module === imported)) used.add(imported as ModuleName);
   }
   return [...used].sort();
 }
@@ -463,7 +453,8 @@ export function checkExtension(dir: string): Report {
   const findings = checkManifest(manifest, (file) => exists(file) || (built && source.test(file) && exists(`${source.exec(file)![1]}.js`)));
 
   const files = sourceFiles(dir);
-  const modules = new Set<string>();
+  /// What is used of Heyo's, with the permissions any one of which will do.
+  const used = new Map<string, readonly string[]>();
   for (const file of files) {
     let source: string;
     try {
@@ -472,18 +463,17 @@ export function checkExtension(dir: string): Report {
       continue;
     }
     findings.push(...checkSource(file, built ? ownCode(source) : source));
-    for (const module of heyoModulesUsed(source)) modules.add(module);
+    for (const module of heyoModulesUsed(source)) used.set(module, permissionsOf(module));
   }
 
   const declared: unknown[] = Array.isArray(manifest?.heyo?.permissions) ? manifest.heyo.permissions : [];
-  for (const module of modules) {
-    const needs = HEYO_MODULES[module];
+  for (const [uses, needs] of used) {
     if (!needs.some((permission) => declared.includes(permission))) {
       findings.push({
         rule: "permission-missing",
         severity: "warning",
         file: "package.json",
-        message: `uses ${module}, which needs the ${needs.map((p) => `"${p}"`).join(" or ")} permission; add it to "heyo.permissions"`,
+        message: `uses ${uses}, which needs the ${needs.map((p) => `"${p}"`).join(" or ")} permission; add it to "heyo.permissions"`,
       });
     }
   }

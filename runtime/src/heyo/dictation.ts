@@ -2,11 +2,11 @@
 //! extension (permission `microphone`). Nothing is pasted anywhere.
 
 import type { ErrorCode } from "../../../shared/bindings/ErrorCode";
-import type { Support } from "../../../shared/bindings/Support";
 import { current, runAs } from "../context";
-import { ask } from "../protocol";
+import { ask, implement } from "./asking";
 import { HeyoError } from "./error";
 import { subscribe, type Subscribed } from "./events";
+import { modules } from "./members";
 
 export interface ListenOptions {
   language?: "auto" | "zh" | "en" | "ja" | "ko" | "yue";
@@ -21,11 +21,7 @@ export interface ListenOptions {
 /// What the host sends while it listens (`heard_event` in ext.rs).
 type Heard = { kind: "segment"; text: string } | { kind: "result"; text: string } | { kind: "error"; code: ErrorCode; message: string };
 
-export const Dictation = {
-  supported: () => ask<Support>("ext.supported", { module: "dictation" }),
-  /// Whether the speech engine has been downloaded (Heyo Settings → Dictation).
-  installed: () => ask<boolean>("ext.dictation.installed"),
-
+export const Dictation = implement(modules.Dictation, {
   /// Starts recording. It goes on until `stop()` is called, the user ends
   /// it (the dictation hotkey, the window's button), or `signal` aborts;
   /// `result` is all that was said. One recording at a time: while another
@@ -84,4 +80,4 @@ export const Dictation = {
       result,
     };
   },
-};
+});

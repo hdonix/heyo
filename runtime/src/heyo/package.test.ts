@@ -10,6 +10,7 @@ import { afterAll, expect, test } from "vitest";
 
 import raycastProvided from "../api";
 import provided from "./index";
+import { gained, modules, type ModuleName } from "./members";
 
 const packageDir = path.join(__dirname, "../../../packages/api");
 
@@ -51,7 +52,7 @@ function install() {
 }
 
 const { heyo, raycast } = install();
-const ownModules = ["Windows", "Screen", "Dictation", "Memory", "ClipboardHistory", "Files", "System"] as const;
+const ownModules = Object.keys(modules) as ModuleName[];
 
 test("the package is @heyo/api and leans on the Raycast API the extension has", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf8"));
@@ -112,7 +113,8 @@ test("outside Heyo, everything else of Heyo's refuses with a code", async () => 
       refused++;
     }
   }
-  expect(refused).toBeGreaterThan(15);
+  // Every function declared (`members.ts`) but `supported` and `listen`.
+  expect(refused).toBe(ownModules.reduce((count, name) => count + Object.keys(modules[name]).length - 1, 0) - 1);
   await expect(heyo.AI.provider()).rejects.toMatchObject({ code: "unsupported" });
 
   // `listen` gives something to stop, whose result is the refusal.
@@ -140,16 +142,24 @@ test("outside Heyo, what Raycast's modules gained falls back to what Raycast doe
   expect(raycast.calls.length).toBe(3);
 });
 
-test("the package has Heyo's part by the names Heyo provides it under", () => {
+test("the package has Heyo's part by the names it is declared under", () => {
   const added = (module: object, base: object) => Object.keys(module).filter((name) => !Object.hasOwn(base, name)).sort();
   // The stand-in for Raycast's API has few names of its own; Heyo's are these.
   const own = Object.keys(heyo).filter((name) => !Object.hasOwn(raycast, name)).sort();
   expect(own).toEqual(added(provided, raycastProvided));
-  for (const name of ownModules) expect(Object.keys(heyo[name]).sort(), name).toEqual(Object.keys(provided[name]).sort());
-  // Raycast's `AI` is one object with Heyo's additions in the runtime, so
-  // they are counted against the names Raycast's own `AI` has.
-  const raycastAi = { Model: 0, Creativity: 0, ask: 0 };
-  expect(added(heyo.AI, raycast.AI)).toEqual(added(provided.AI, raycastAi));
-  expect(added(heyo.AI, raycast.AI)).toEqual(["provider"]);
+  for (const name of ownModules) expect(own, name).toContain(name);
+  // Module by module, the functions that are declared (`members.ts`): no
+  // other, and none missing.
+  for (const name of ownModules) expect(Object.keys(heyo[name]).sort(), name).toEqual(Object.keys(modules[name]).sort());
+  // What a module of Raycast's gains is a function of its own there, a new
+  // one or one that takes more than Raycast's does.
+  for (const [name, functions] of Object.entries(gained)) {
+    for (const [each, declared] of Object.entries(functions)) {
+      expect(Object.hasOwn(heyo[name], each), `${name}.${each}`).toBe(true);
+      expect(heyo[name][each] !== raycast[name][each], `${name}.${each}`).toBe(true);
+      expect(Object.hasOwn(raycast[name], each), `${name}.${each}`).toBe("given" in declared);
+    }
+    expect(added(heyo[name], raycast[name]), name).toEqual(Object.keys(functions).filter((each) => !Object.hasOwn(raycast[name], each)).sort());
+  }
   expect(typeof heyo.has).toBe("function");
 });
