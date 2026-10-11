@@ -109,12 +109,13 @@ fn answered(world: &World, message: Value, background: bool, effects: &mut Vec<E
     let request = ExtRequest::read(message).map_err(|e| ExtError::invalid(format!("Heyo cannot answer {method}: {e}")))?;
     let declared = extensions::declared(Path::new(&given.dir));
     let caller = caller(given, declared, background)?;
+    // First, so that the user is not asked to allow what cannot be done.
+    if let Some(ability) = ability(&request) {
+        can(ability, supported())?;
+    }
     if let Some(need) = permissions::needed(&request) {
         let switched_off = need.permission == Permission::Activity && !activities::enabled(&world.settings.read().unwrap(), &caller.name);
         world.granted.check(&caller, need, &method, switched_off, &|consent| world.running.ask(consent))?;
-    }
-    if let Some(ability) = ability(&request) {
-        can(ability, supported())?;
     }
     carry_out(world, &caller, request, effects)
 }
@@ -1108,6 +1109,9 @@ mod tests {
         for (method, params) in requests {
             assert_eq!(bench.error(&heyo, method, params).code, ErrorCode::Unsupported, "{method}");
         }
+        // Nor is the user asked to allow what cannot be done.
+        let tiles = bench.install("tiles", &["windows"]);
+        assert_eq!(bench.error(&tiles, "ext.windows.list", Value::Null).code, ErrorCode::Unsupported);
         // Nothing was tried, and the palette stayed.
         assert_eq!((bench.desktop.asked(), bench.asked()), (Vec::new(), Vec::new()));
         // The monitors are not the desktop's to refuse.
