@@ -244,8 +244,11 @@ traps it guards against:
   built for; Heyo refuses a script of another version, and `install.sh`
   installs neither unless they agree.
 
-How the packages (deb, rpm, AppImage, the Windows installer) are built is
-in [packaging/README.md](../packaging/README.md).
+The packages (deb, rpm, AppImage, the Windows installer) are built in two
+steps, `scripts/package/build.sh` and `bundle.sh`, by hand or by
+`.github/workflows/package.yml` for all four targets at once:
+[packaging/README.md](../packaging/README.md) has how, and what was
+verified.
 
 ## Other tools
 
