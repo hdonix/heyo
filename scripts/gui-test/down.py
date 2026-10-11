@@ -18,7 +18,7 @@ for pid in filter(str.isdigit, os.listdir('/proc')):
     inside = b'DISPLAY=' + display.encode() + b'\0' in env + b'\0'
     # ibus-daemon and what it starts are GNOME Shell's, and can outlive it.
     if (name == 'Xvfb' and display.encode() in args) or (inside and name.startswith('ibus-')) \
-            or (inside and name in ('dbus-daemon', 'xfwm4', 'heyo', 'python3', 'node', 'gnome-shell', 'dconf-service')) \
+            or (inside and name in ('dbus-daemon', 'xfwm4', 'heyo', 'python3', 'node', 'gnome-shell', 'dconf-service', 'gsd-media-keys')) \
             or (inside and name == 'node' and 'vite' in line and '1420' in line):
         print('stopping', pid, line[:90])
         os.kill(pid, signal.SIGTERM)

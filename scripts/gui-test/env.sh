@@ -26,9 +26,13 @@ fi
 export HEYO_TEST_DISPLAY="${HEYO_TEST_DISPLAY:-:99}"
 export DISPLAY="$HEYO_TEST_DISPLAY" XDG_DATA_HOME="$H/data" XDG_CONFIG_HOME="$H/config" XDG_CACHE_HOME="$H/cache"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$H/run/bus" XDG_RUNTIME_DIR="$H/run"
+# An input method's bus is found through the home directories above, unless
+# the environment names one: which would be the one of the desktop in use.
+unset IBUS_ADDRESS IBUS_ADDRESS_FILE
 w() { python3 -c "import time; time.sleep($1)"; }
 # The build under test: debug (which loads the frontend from the dev server),
-# or release (which carries its own) with HEYO_TEST_BUILD=release.
+# or with HEYO_TEST_BUILD another directory under src-tauri/target whose
+# build carries its own: release, or one made for the purpose.
 BUILD=${HEYO_TEST_BUILD:-debug}
-[ "$BUILD" = release ] && HEYO_TEST_FRONTEND=none
+[ "$BUILD" != debug ] && HEYO_TEST_FRONTEND=none
 heyo() { timeout 10 "$REPO/src-tauri/target/$BUILD/heyo" "$@"; }
