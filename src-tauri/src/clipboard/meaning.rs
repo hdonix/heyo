@@ -274,7 +274,8 @@ pub fn start(app: &AppHandle) {
 pub fn status(app: &AppHandle) -> Status {
     let history = app.state::<ClipboardHistory>();
     let (indexed, waiting) = history.store.lock().unwrap().vector_counts(embed::MODEL).unwrap_or_default();
-    // Whoever asks is looking at the setting, and may just have changed it.
+    // Whoever asks is looking: what failed is tried again now, not when its
+    // wait is over.
     history.meaning.wake();
     let problem = history.meaning.problem.lock().unwrap().clone();
     let enabled = app.state::<SettingsState>().0.read().unwrap().clipboard_meaning;

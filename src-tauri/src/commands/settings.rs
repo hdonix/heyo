@@ -62,6 +62,7 @@ fn carry_out(app: &AppHandle, next: &Settings, consequence: settings::Consequenc
             let _ = crate::runtime::tell_running(app, &HostMessage::Appearance { dark: next.dark() }.json());
         }
         PruneClipboard { days } => app.state::<ClipboardHistory>().prune(days),
+        WakeMeaning => app.state::<ClipboardHistory>().wake_meaning(),
         AtNextStart => eprintln!("heyo: the renderer changes when Heyo is next started"),
     }
 }

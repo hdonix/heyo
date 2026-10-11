@@ -179,6 +179,10 @@ pub enum Consequence {
     TellAppearance,
     /// Clipboard entries older than this many days go now.
     PruneClipboard { days: u32 },
+    /// Finding clipboard entries by meaning was turned on or off (with the
+    /// history itself, too): its work begins now, or stops and lets go of
+    /// the model.
+    WakeMeaning,
     /// The renderer is chosen before the web view exists: it changes when
     /// Heyo is next started.
     AtNextStart,
@@ -201,6 +205,9 @@ pub fn consequences(previous: &Settings, next: &Settings, node_given: bool) -> V
     }
     if previous.clipboard_retention_days != next.clipboard_retention_days {
         all.push(Consequence::PruneClipboard { days: next.clipboard_retention_days });
+    }
+    if (previous.clipboard_meaning, previous.clipboard_history) != (next.clipboard_meaning, next.clipboard_history) {
+        all.push(Consequence::WakeMeaning);
     }
     if previous.renderer != next.renderer {
         all.push(Consequence::AtNextStart);
@@ -448,6 +455,9 @@ mod tests {
             (Settings { aliases: BTreeMap::from([("app:a".into(), "a".into())]), ..was.clone() }, vec![RefreshIndex]),
             (Settings { appearance: Appearance::Dark, ..was.clone() }, vec![RefreshIndex, TellAppearance]),
             (Settings { clipboard_retention_days: 7, ..was.clone() }, vec![RefreshIndex, PruneClipboard { days: 7 }]),
+            (Settings { clipboard_meaning: true, ..was.clone() }, vec![RefreshIndex, WakeMeaning]),
+            // Without a history there is nothing to find by meaning either.
+            (Settings { clipboard_history: false, ..was.clone() }, vec![RefreshIndex, WakeMeaning]),
             (Settings { renderer: crate::renderer::Renderer::Cpu, ..was.clone() }, vec![RefreshIndex, AtNextStart]),
             // Several at once, each with its own.
             (
@@ -482,7 +492,7 @@ mod tests {
     /// setting it is.
     #[test]
     fn a_setting_read_where_it_is_used_sets_nothing_else_in_motion() {
-        let with_their_own = ["nodePath", "disabledCommands", "appearance", "clipboardRetentionDays", "renderer"];
+        let with_their_own = ["nodePath", "disabledCommands", "appearance", "clipboardRetentionDays", "clipboardMeaning", "clipboardHistory", "renderer"];
         let defaults = serde_json::to_value(Settings::default()).unwrap();
         for (name, value) in defaults.as_object().unwrap() {
             if with_their_own.contains(&name.as_str()) {

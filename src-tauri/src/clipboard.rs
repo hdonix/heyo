@@ -294,6 +294,12 @@ impl ClipboardHistory {
         self.deleted(deleted);
     }
 
+    /// Has the work of finding by meaning look at the settings again now:
+    /// they say whether there is any to do.
+    pub fn wake_meaning(&self) {
+        self.meaning.wake();
+    }
+
     /// Notes that searching for `query` led to using the entry at `rank`.
     pub fn chose(&self, query: &str, id: u64, rank: u32) {
         if !query.trim().is_empty() {
