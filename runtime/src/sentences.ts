@@ -63,6 +63,14 @@ export function between(before: string, sentence: string): string {
   return " ";
 }
 
+/// A sentence still being spoken, without the mark the recognizer ends
+/// whatever it is given with: the full stop after "The weather is." would
+/// only have to be taken back when the next word comes.
+export function unfinished(text: string): string {
+  const open = text.replace(/[\s.,!?;:…。，！？；：、~—–-]+$/u, "");
+  return meaningful(open) ? open : text;
+}
+
 /// One recording: feeds audio to the detector and says partial and final text.
 export class Session {
   private pending = new Float32Array(0);
@@ -119,7 +127,7 @@ export class Session {
     const seconds = this.speechSamples / SAMPLE_RATE;
     if (this.speaking && seconds >= MIN_PARTIAL_SECONDS && this.now() - this.lastPartial >= PARTIAL_INTERVAL_MS) {
       this.lastPartial = this.now();
-      const text = this.correct(this.engine.decode(concat(this.speech)));
+      const text = unfinished(this.correct(this.engine.decode(concat(this.speech))));
       if (meaningful(text)) this.say({ type: "partial", text: this.joined(text) });
     }
   }

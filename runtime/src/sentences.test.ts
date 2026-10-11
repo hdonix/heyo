@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { between, type Engine, PARTIAL_INTERVAL_MS, SAMPLE_RATE, type Said, Session, VAD_WINDOW } from "./sentences";
+import { between, type Engine, PARTIAL_INTERVAL_MS, SAMPLE_RATE, type Said, Session, unfinished, VAD_WINDOW } from "./sentences";
 
 /// A recognizer and a detector for tests. Audio is words: a word is a
 /// stretch of samples of one loudness, which names it. The recognizer
@@ -84,7 +84,8 @@ describe("a recording", () => {
     const { texts, text } = record(engine(WORDS), [audio([1, 2, 3, 4, 5])]);
     // Nothing before there is enough to recognize; then every 300 ms, also
     // through the pause in which the sentence might still go on.
-    expect([...new Set(texts("partial"))]).toEqual(["the weather is.", "the weather is nice.", "the weather is nice today."]);
+    // What is in progress has no full stop yet: each is the last and more.
+    expect([...new Set(texts("partial"))]).toEqual(["the weather is", "the weather is nice", "the weather is nice today"]);
     expect(texts("segment")).toEqual(["the weather is nice today."]);
     expect(text).toBe("the weather is nice today.");
   });
@@ -120,7 +121,7 @@ describe("a recording", () => {
 
   it("writes the user's words their way, in progress and finished", () => {
     const { texts } = record(engine(WORDS), [audio([1, 2, 3, 4])], (text) => text.replace("weather", "Wetter"));
-    expect(texts("partial")[0]).toBe("the Wetter is.");
+    expect(texts("partial")[0]).toBe("the Wetter is");
     expect(texts("segment")).toEqual(["the Wetter is nice."]);
   });
 
@@ -173,5 +174,28 @@ describe("between two sentences", () => {
     expect(between("One.\n", "Two.")).toBe("");
     expect(between("One.", " Two.")).toBe("");
     expect(between("One.", "")).toBe("");
+  });
+});
+
+describe("a sentence still being spoken", () => {
+  it("is said without the mark the recognizer ends it with", () => {
+    expect(unfinished("The weather is.")).toBe("The weather is");
+    expect(unfinished("The weather is nice today, so.")).toBe("The weather is nice today, so");
+    expect(unfinished("today-. ")).toBe("today");
+    expect(unfinished("今天天气。")).toBe("今天天气");
+    expect(unfinished("今天天气很好，")).toBe("今天天气很好");
+    expect(unfinished("Really?!")).toBe("Really");
+    expect(unfinished("I will bring 42")).toBe("I will bring 42");
+  });
+
+  it("keeps the marks inside it", () => {
+    expect(unfinished("Well, yes. And no.")).toBe("Well, yes. And no");
+    expect(unfinished("3.5.")).toBe("3.5");
+  });
+
+  it("is left alone when it is nothing but marks", () => {
+    expect(unfinished("...")).toBe("...");
+    expect(unfinished("。")).toBe("。");
+    expect(unfinished("")).toBe("");
   });
 });
