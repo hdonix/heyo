@@ -686,37 +686,13 @@ fn provider(ai: &Value) -> AiProvider {
     }
 }
 
-/// Pastes text into the window in front (the palette has hidden), then puts
-/// back the text that was on the clipboard. Where the paste has to be asked
-/// about first (several lines into a terminal) the clipboard is left as it
-/// is: the paste happens when the user answers.
+/// Pastes text into the window in front (the palette has hidden) and puts
+/// back the text that was on the clipboard (`pasting`).
 fn paste_and_restore(app: &AppHandle, text: String, html: Option<String>) -> Result<(), ExtError> {
-    use platform::clipboard_watch::{read_text, write_text};
     if supported().paste == Support::None {
         return Err(ExtError::unsupported(platform::unsupported("Pasting")));
     }
-    let before = read_text().filter(|before| !before.is_empty());
-    // Plumbing, not something the user copied.
-    clipboard::skip_next();
-    match html {
-        Some(html) => platform::clipboard_watch::write_html(&html, &text)?,
-        None => write_text(&text)?,
-    }
-    // Wait for the focus to return to the window being pasted into.
-    std::thread::sleep(Duration::from_millis(150));
-    let asks = app.state::<crate::SettingsState>().0.read().unwrap().confirm_terminal_paste;
-    if crate::pasting::needs_asking(&text, platform::input::terminal_focused(), asks) {
-        crate::pasting::paste_clipboard(app);
-        return Ok(());
-    }
-    platform::input::paste_as_is(Duration::ZERO);
-    if let Some(before) = before {
-        // Let the paste read the clipboard first.
-        std::thread::sleep(Duration::from_millis(500));
-        clipboard::skip_next();
-        write_text(&before)?;
-    }
-    Ok(())
+    Ok(crate::pasting::paste_and_give_back(app, &text, html.as_deref())?)
 }
 
 #[cfg(test)]

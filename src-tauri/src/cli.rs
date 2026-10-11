@@ -16,18 +16,7 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
         root::KEEP_AWAKE_ID => toggle_keep_awake(app),
         root::PASTE_PLAIN_ID => {
             let _ = main_window(app).hide();
-            match crate::platform::clipboard_watch::read_text().ok_or(()) {
-                Ok(text) if !text.is_empty() => {
-                    // Writing only text drops every richer format the source offered.
-                    match crate::platform::clipboard_watch::write_text(&text) {
-                        Ok(()) => {
-                            std::thread::spawn(|| paste_keystroke(std::time::Duration::from_millis(150)));
-                        }
-                        Err(e) => notify("Could not paste", &e.to_string()),
-                    }
-                }
-                _ => notify("Nothing to paste", "The clipboard has no text."),
-            }
+            pasting::paste_plain();
         }
         root::CLIPBOARD_PAUSE_ID => {
             let _ = main_window(app).hide();

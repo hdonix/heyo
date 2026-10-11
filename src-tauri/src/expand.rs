@@ -41,7 +41,7 @@
 //! # Replacing it
 //!
 //! The keyword is erased with Backspaces and the text pasted from the
-//! clipboard, which gets its old text back afterwards (`replace`). That is
+//! clipboard, which is borrowed for it (`replace`, `pasting`). That is
 //! not done in the windows of password managers and of the applications
 //! the user excluded, in Heyo's own, or while an input method may be
 //! composing; into a terminal the text goes on one line. Placeholders are
@@ -62,8 +62,8 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::library::Snippet;
 use crate::platform::typed::{self, Typed};
-use crate::platform::{clipboard_watch, input, windows};
-use crate::SettingsState;
+use crate::platform::{input, windows};
+use crate::{pasting, SettingsState};
 
 /// The longest keyword that expands, in characters.
 pub const MAX_KEYWORD: usize = 32;
@@ -303,10 +303,6 @@ impl Drop for Busy {
         BUSY.store(false, Ordering::SeqCst);
     }
 }
-/// What was on the clipboard before an expansion used it, until it is put back.
-static SAVED: Mutex<Option<String>> = Mutex::new(None);
-/// Counts the pastes, so that only the last of several in a row puts it back.
-static PASTED: AtomicU64 = AtomicU64::new(0);
 /// The palette's webview is filling in a snippet's placeholders: which
 /// request, and where the answer goes.
 static FILLING: Mutex<Option<(u64, Sender<String>)>> = Mutex::new(None);
@@ -453,76 +449,48 @@ fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), S
     if text.is_empty() || expansion.erase > HELD {
         return Err("nothing to insert".into());
     }
-    // Into a terminal the text goes on one line (`platform::input`).
+    // There is nowhere to ask: into a terminal the text goes on one line.
     let terminal = input::terminal_focused();
-    if terminal && input::runs_as_commands(&text) {
-        text = input::on_one_line(&text);
-    }
+    let text = pasting::unasked(text, terminal);
 
-    {
-        let mut saved = SAVED.lock().unwrap();
-        if saved.is_none() {
-            *saved = Some(clipboard_watch::read_text().unwrap_or_default());
+    // Given back when this returns, however it went.
+    let clipboard = pasting::borrow();
+    let since = Instant::now();
+    // What the clipboard was last given.
+    let mut written: Option<String> = None;
+    loop {
+        if since.elapsed() > PATIENCE {
+            return Err("typing went on, or a modifier key stayed down".to_owned());
         }
-    }
-    let done = (|| {
-        let since = Instant::now();
-        // What the clipboard was last given.
-        let mut written: Option<String> = None;
-        loop {
-            if since.elapsed() > PATIENCE {
-                return Err("typing went on, or a modifier key stayed down".to_owned());
-            }
-            // The clipboard gets the text and what was typed since, and a
-            // moment to have it: the paste must not find the old contents.
-            let whole = format!("{text}{}", meanwhile()?);
-            if written.as_deref() != Some(&whole) {
-                // Plumbing, not something the user copied.
-                crate::clipboard::skip_next();
-                clipboard_watch::write_text(&whole).map_err(|e| format!("the clipboard could not be written: {e}"))?;
-                written = Some(whole);
-                std::thread::sleep(SETTLE);
+        // The clipboard gets the text and what was typed since, and a
+        // moment to have it: the paste must not find the old contents.
+        let whole = format!("{text}{}", meanwhile()?);
+        if written.as_deref() != Some(&whole) {
+            clipboard.put(&whole, None).map_err(|e| format!("the clipboard could not be written: {e}"))?;
+            written = Some(whole);
+            std::thread::sleep(SETTLE);
+            continue;
+        }
+        // The last character may have needed Shift or AltGr, which would
+        // make the Backspaces something else. It is let go in a moment,
+        // usually.
+        if typed::modifiers_held() {
+            std::thread::sleep(Duration::from_millis(10));
+            continue;
+        }
+        // Unless one more key came just now, this is it: from here on
+        // nothing is carried over, and nothing turns back.
+        let carried = {
+            let mut meanwhile = MEANWHILE.lock().unwrap();
+            let carried = meanwhile.carried()?;
+            if !whole.ends_with(&carried) || whole.len() != text.len() + carried.len() {
                 continue;
             }
-            // The last character may have needed Shift or AltGr, which
-            // would make the Backspaces something else. It is let go in a
-            // moment, usually.
-            if typed::modifiers_held() {
-                std::thread::sleep(Duration::from_millis(10));
-                continue;
-            }
-            // Unless one more key came just now, this is it: from here on
-            // nothing is carried over, and nothing turns back.
-            let carried = {
-                let mut meanwhile = MEANWHILE.lock().unwrap();
-                let carried = meanwhile.carried()?;
-                if !whole.ends_with(&carried) || whole.len() != text.len() + carried.len() {
-                    continue;
-                }
-                meanwhile.forget();
-                carried.chars().count()
-            };
-            return typed::replace(expansion.erase + carried, terminal);
-        }
-    })();
-    restore_clipboard();
-    done
-}
-
-/// Puts back what was on the clipboard, once the paste has read it.
-fn restore_clipboard() {
-    let paste = PASTED.fetch_add(1, Ordering::SeqCst) + 1;
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(500));
-        // Another expansion came after: it puts the clipboard back.
-        if PASTED.load(Ordering::SeqCst) != paste {
-            return;
-        }
-        let Some(saved) = SAVED.lock().unwrap().take().filter(|saved| !saved.is_empty()) else { return };
-        // What comes back may be a secret the history skipped the first time.
-        crate::clipboard::skip_next();
-        let _ = clipboard_watch::write_text(&saved);
-    });
+            meanwhile.forget();
+            carried.chars().count()
+        };
+        return typed::replace(expansion.erase + carried, terminal);
+    }
 }
 
 /// The snippet's text with its placeholders filled in. The palette's

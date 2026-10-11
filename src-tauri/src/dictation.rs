@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 use crate::helper::{self, Helper};
-use crate::SettingsState;
+use crate::{pasting, SettingsState};
 
 pub const WINDOW: &str = "dictation";
 const EVENT: &str = crate::wire::event::DICTATION;
@@ -38,8 +38,8 @@ struct State {
     session: u64,
     /// Whether the transcript is polished (and so pasted only at the end).
     polishing: bool,
-    /// Clipboard text from before dictation started, restored afterwards.
-    saved_clipboard: Option<String>,
+    /// The clipboard while the recording has it, given back afterwards.
+    clipboard: Option<pasting::Loan>,
     installing: bool,
     /// Who is given the text of this recording instead of the focused
     /// window: an extension that asked to listen.
@@ -175,35 +175,17 @@ fn send(state: &mut State, message: &Value) -> Result<(), String> {
     })
 }
 
-/// Pastes into the focused window through the clipboard.
+/// Pastes into the focused window. The clipboard is borrowed for the whole
+/// recording: sentences follow each other faster than it could come back.
 fn paste(app: &AppHandle, text: &str) {
-    {
-        let state = app.state::<Dictation>();
-        let mut state = state.0.lock().unwrap();
-        if state.saved_clipboard.is_none() {
-            state.saved_clipboard = Some(crate::platform::clipboard_watch::read_text().unwrap_or_default());
-        }
+    let borrowed = app.state::<Dictation>().0.lock().unwrap().clipboard.take();
+    let clipboard = borrowed.unwrap_or_else(pasting::borrow);
+    // There is nowhere to ask: into a terminal the text goes on one line.
+    let pasted = clipboard.put(text, None).and_then(|()| pasting::press(pasting::SETTLE, pasting::Lines::Joined));
+    if let Err(e) = pasted {
+        eprintln!("heyo: dictation could not paste: {e}");
     }
-    // Plumbing, not something the user copied.
-    crate::clipboard::skip_next();
-    if let Err(e) = crate::platform::clipboard_watch::write_text(text) {
-        eprintln!("heyo: dictation could not copy text: {e}");
-        return;
-    }
-    crate::paste_keystroke(Duration::from_millis(60));
-}
-
-/// Puts back what was on the clipboard before dictation used it.
-fn restore_clipboard(app: &AppHandle) {
-    let saved = app.state::<Dictation>().0.lock().unwrap().saved_clipboard.take();
-    let Some(saved) = saved.filter(|s| !s.is_empty()) else { return };
-    std::thread::spawn(move || {
-        // Let the last paste read the clipboard first.
-        std::thread::sleep(Duration::from_millis(500));
-        // What comes back may be a secret the history skipped the first time.
-        crate::clipboard::skip_next();
-        let _ = crate::platform::clipboard_watch::write_text(&saved);
-    });
+    app.state::<Dictation>().0.lock().unwrap().clipboard = Some(clipboard);
 }
 
 /// What an event from the helper calls for.
@@ -257,8 +239,15 @@ fn handle(app: &AppHandle, event: Value) {
         match effect {
             Effect::Paste(text) => paste(app, &text),
             Effect::Over(linger) => {
-                app.state::<Dictation>().0.lock().unwrap().recording = false;
-                restore_clipboard(app);
+                let clipboard = {
+                    let state = app.state::<Dictation>();
+                    let mut state = state.0.lock().unwrap();
+                    state.recording = false;
+                    state.clipboard.take()
+                };
+                // The loan ends: the clipboard comes back once the last
+                // sentence has been read from it.
+                drop(clipboard);
                 hide_window_after(app, linger);
             }
         }

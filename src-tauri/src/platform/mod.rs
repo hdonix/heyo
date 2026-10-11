@@ -242,7 +242,7 @@ mod tests {
             assert_eq!(windows::active_external(), Some(3));
             // The window one came from goes last.
             assert_eq!(windows::list(Some(3)).unwrap().iter().map(|w| w.id).collect::<Vec<_>>(), [1, 2, 3]);
-            input::paste_keystroke(std::time::Duration::ZERO);
+            input::press_paste(input::terminal_focused()).unwrap();
             assert!(item_available("cmd:@heyo:switch-windows"));
             // The clipboard is the desktop's, with no application to ask.
             assert_eq!(clipboard_watch::read_text(), None);
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(fake.asked(), ["activate 3", "paste", "copy copied", "copy bold as <b>bold</b>"]);
         // A terminal in front gets the terminal's paste.
         let fake = desktop::fake::Fake::with_windows(&[(1, "org.gnome.Ptyxis")]);
-        fake.during(|| input::paste_keystroke(std::time::Duration::ZERO));
+        fake.during(|| input::press_paste(input::terminal_focused())).unwrap();
         assert_eq!(fake.asked(), ["paste terminal"]);
     }
 }
