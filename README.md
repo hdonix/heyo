@@ -70,6 +70,36 @@ copied in. Search it by words, by when (`yesterday`, `上周三`), by where
 from (`from firefox`) or by kind (`images`). It is kept on your computer,
 and what a password manager marks as secret is never recorded.
 
+### Dictation
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dictation-dark.png">
+    <img src="docs/images/dictation-light.png" width="830" alt="A note in a text editor while it is dictated into: “We can have lunch by the lake.” is written, and behind it, at the cursor, “I will bring sandwiches and coffee for” is underlined, still being composed; over the empty end of the page is Heyo's dictation window, a dark pill with the microphone's level as bars and an × to cancel">
+  </picture>
+</p>
+
+Hold a key and speak, or start and finish with a hotkey: the words appear
+in the application you are working in while you are still speaking.
+Speech is recognized on your computer (Mandarin, Cantonese, English,
+Japanese, Korean), and the audio never leaves it. A small window shows
+the microphone's level meanwhile.
+
+Where the application takes an input method, Heyo is that input method
+for as long as you speak: the sentence in progress is composed at the
+cursor, underlined, as Chinese is while it is typed, and becomes the
+application's text when it is finished. Nothing is pasted and nothing is
+erased, so your clipboard is left alone, and your own input method
+(Pinyin, say) is back when you finish.
+
+When you finish, an AI model (Claude, or one on your own computer) can
+clean up what you said or translate it into English; it is sent the text,
+never the audio. Words from a vocabulary of your own (names, terms) are
+written the way you list them. Composing takes an X11 session with IBus
+running, which GNOME starts by itself; elsewhere the words are pasted (on
+GNOME on Wayland a sentence at a time), and on Windows dictation does not
+work yet. [docs/usage.md](docs/usage.md#dictation) has the rest.
+
 ### What is in progress
 
 <p align="center">
@@ -90,10 +120,6 @@ you when it ends.
 - **Screenshots**: select an area or a window, annotate, blur, then copy,
   save or pin it on screen; or copy the text in it, recognized on your
   computer.
-- **Dictation**: hold a key and speak; the words appear where you are
-  working as you say them, through the input method where there is one.
-  Recognized on your computer (Mandarin, Cantonese, English, Japanese,
-  Korean).
 - **Quicklinks and snippets**, with placeholders; snippets can expand as
   you type their keyword.
 - **AI**, if you set it up: ask a question from the search with `Tab`,
