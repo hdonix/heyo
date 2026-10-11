@@ -52,6 +52,7 @@ Two things to know:
 | Command | What it runs |
 |---|---|
 | `cargo test` in `src-tauri/` | the host's tests; also writes `shared/bindings/` |
+| `cargo test -- --ignored with_an_ibus_daemon` in `src-tauri/` | Heyo as an input method, against an `ibus-daemon` the test starts for itself, with directories of its own |
 | `pnpm test` | Vitest: the web view (`src/`), the runtime (`runtime/src/`), `shared/` and the compatibility tool (`scripts/compat/`) |
 | `pnpm exec tsc --noEmit` | type-checks the web view |
 | `pnpm exec tsc --noEmit -p runtime` | type-checks the runtime |
@@ -104,7 +105,9 @@ It needs `Xvfb`, `xdotool`, `xwininfo`, `dbus-daemon`, `xfwm4` (or
 `gnome-shell` for a real compositor) and Python with Pillow; the scripts
 that dictate also need the speech engine installed for your own Heyo
 (they read it, and write nothing there), and `dictate-live.sh` needs Flite
-(`libflite1`) to speak. Build first:
+(`libflite1`) to speak and, for the half of it that goes through the
+input method, `gnome-shell`, IBus with `ibus-libpinyin`, `gnome-terminal`
+and `gsd-media-keys`. Build first:
 
 ```sh
 pnpm install && pnpm build:runtime
@@ -139,7 +142,7 @@ The parts they are made of:
 |---|---|---|
 | `HEYO_TEST_DIR` | `/tmp/heyo-gui-test` | where the sandbox keeps its home directories, logs (`app.log`, `vite.log`, `shell.log`) and pictures (`shots/`) |
 | `HEYO_TEST_DISPLAY` | `:99` | the X display; two sandboxes at once need one each, and a directory each |
-| `HEYO_TEST_BUILD` | `debug` | `release` runs `src-tauri/target/release/heyo`, which carries its own interface (build it with `pnpm tauri build --no-bundle`), and starts no dev server |
+| `HEYO_TEST_BUILD` | `debug` | another directory under `src-tauri/target` whose `heyo` carries its own interface, for which no dev server is started: `release` (build it with `pnpm tauri build --no-bundle`), or a link to a debug build made with `--features tauri/custom-protocol` into a target directory of its own |
 | `HEYO_TEST_FRONTEND` | | `built` serves a production build of the interface to the debug binary, for measuring; `none` starts no server |
 | `SCREEN` | `1920x1080` | the size of the screen |
 
@@ -150,7 +153,7 @@ The scripts, by what they try:
 | `look.sh`, `compact.sh`, `settings.sh`, `select.sh` | pictures of the interface: the themes, compact mode, every settings page, the selection moving |
 | `open.sh`, `arguments.sh`, `views.sh` | opening commands, arguments typed in the search bar, what an extension's views do (forms, the file picker, typing into a slow extension) |
 | `regress.sh`, `clipboard.sh`, `snap.sh`, `expand.sh`, `dictate.sh` | the platform layer on X11: pasting, layouts, the clipboard history, the screenshot overlay, snippets expanding, dictation |
-| `dictate-live.sh` | dictated words going into another application as they are spoken: spoken sentences (`say.py` makes the audio) are dictated into a text field that is read back all the while, with the setting off and on, a key typed in between, the dictation window clicked, cancelling, and a stub model polishing |
+| `dictate-live.sh` | dictated words going into another application as they are spoken: spoken sentences (`say.py` makes the audio) are dictated into a text field that is read back all the while (its text, and what is being composed in it), with the setting off and on, a key typed in between, the dictation window clicked, cancelling, and a stub model polishing. Once by pasting, in a session without an input method; and once through the input method, under GNOME Shell with IBus and Pinyin chosen, where it also dictates into a terminal and into a field that takes no input method, starts and finishes with the hotkey, kills Heyo in the middle of a sentence, and checks that the clipboard was never touched and that Pinyin is the session's again each time |
 | `heyo-api.sh`, `windows-api.sh`, `activities.sh` | `@heyo/api` as an extension sees it, the permission question, live activities |
 | `ai-chat.sh` | Ask AI and AI Chat against `llm-stub.py`, a server that answers with canned text |
 | `dev.sh` | `heyo dev` against a running Heyo |

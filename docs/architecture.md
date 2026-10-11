@@ -274,15 +274,26 @@ and keeps the list of applications current. The rest, by what it is for:
 - `screenshot.rs`, `ocr.rs` and `dictation.rs` are those features: the
   capture and the overlay's outcome, the text-recognition helper, the
   dictation helper with its progress window.
-- `dictation/onscreen.rs` says how a recording is written into the
-  application: the words as they are spoken, corrected where they stand
-  ("type as you speak"), or each sentence when it is finished, or the
-  polished text at the end. It is told what was heard and answers with
-  steps (erase so many characters and write this; paste that), and it is
-  where the rule lives that Heyo erases only what it wrote itself: its
-  module header has the cases. `dictation.rs` carries the steps out on a
-  thread of the recording's own and reports back the ones that could not
-  be, so the module is tested with a text field made of a string.
+- A recording's words reach the application one of two ways, which
+  `dictation.rs` chooses when the recording starts (`Way`, with a thread
+  of the recording's own to go it). Each has a module that is told what
+  was heard and answers with what to do, and touches nothing, so that it
+  is tested with a text field made of a string:
+  - `dictation/composed.rs`, where the window in front takes the
+    session's input method: the sentence in progress is shown there as
+    text being composed ("type as you speak"), a finished one is
+    committed, and with polishing the whole recording is composed until
+    the polished text is committed in its place. It also says what
+    becomes of the text being composed when the user presses a key,
+    clicks, or goes to another window. `platform::composing` is what it
+    is said to.
+  - `dictation/onscreen.rs`, everywhere else: the words pasted as they
+    are spoken and corrected where they stand, or each sentence when it
+    is finished, or the polished text at the end. It answers with steps
+    (erase so many characters and write this; paste that), and it is
+    where the rule lives that Heyo erases only what it wrote itself: its
+    module header has the cases. A recording that can no longer be
+    composed goes on here, from what the application holds by then.
 - `expand.rs` expands a snippet's keyword as it is typed in another
   application. The keyboard is only listened to, never grabbed, and what
   is typed is neither stored nor logged; the module header says exactly
@@ -311,17 +322,18 @@ Its modules of plain functions are what the rest of Heyo uses: `windows`
 (listing, switching, layouts), `input` (the paste keystroke, the selected
 text), `clipboard_watch`, `capture`, `overlay`, `keys` (hold to talk),
 `typed` (what is typed elsewhere, and replacing it there: for snippets,
-and for dictated words that are corrected as they come), `hotkeys`, `focus`,
-`system` (locking, the volume, the trash, audio devices, processes) and
-`common` (notifications, keeping awake). They hold what is the same
-everywhere and ask the session's adapter for the rest.
+and for dictated words that are corrected as they come), `composing` (text
+composed in another application as an input method does: for dictated
+words), `hotkeys`, `focus`, `system` (locking, the volume, the trash, audio
+devices, processes) and `common` (notifications, keeping awake). They hold
+what is the same everywhere and ask the session's adapter for the rest.
 
 The seam is one trait, `desktop::Desktop`: everything Heyo asks of a
 desktop. Each session has one adapter, chosen once:
 
 | Adapter | Session | Through |
 |---|---|---|
-| `x11::X11` | X11 | EWMH for windows, XFixes for the clipboard, XInput for the keys it listens to, direct screen reads, `xdotool` for the paste keystroke, XTEST for replacing text |
+| `x11::X11` | X11 | EWMH for windows, XFixes for the clipboard, XInput for the keys it listens to, direct screen reads, `xdotool` for the paste keystroke, XTEST for replacing text, IBus for composing it |
 | `gnome::Gnome` | GNOME on Wayland, when Heyo's Shell extension answers | D-Bus calls to the extension |
 | `win::Windows` | Windows | the Win32 API |
 | `desktop::Generic` | anything else | generic tools, where there are any: `wtype` or `ydotool`, a polled clipboard, `gnome-screenshot` |
@@ -360,6 +372,45 @@ Both have a test against a real X server (`cargo test -- --ignored
 on_an_x_server`, on a server of one's own), with a small application in
 it to write into (`x11/field.rs`).
 
+### Composing text in another application
+
+Dictated words are better composed than pasted: text being composed is
+shown in the application without being its text yet, may be replaced as
+often as it changes, and becomes the application's when it is committed.
+Nothing is erased, the clipboard is not borrowed, and no key is pressed.
+That is what an input method does, so for the length of a recording Heyo
+is one (`platform::composing`, and `platform/ibus.rs` for IBus, which is
+what GNOME runs):
+
+- Heyo connects to IBus's own bus, registers a component with one engine
+  over that connection (nothing is installed, and nothing is left when
+  the connection ends), and answers the daemon's calls to the engine
+  itself, one at a time in the order they arrive (`ibus/engine.rs`): a
+  key the user presses is answered after what it made the engine say.
+- A session has one engine at a time. Heyo notes the user's in a file,
+  makes its own the session's, and gives the user's back when the
+  recording is over. The order of giving back is forced by the daemon:
+  when a component registered this way leaves, it takes the engine away
+  from the field that has the focus, whichever engine that is. So Heyo
+  leaves first and then sets the user's engine, over a second connection
+  that offers nothing. A Heyo that is killed while it composes leaves the
+  session without an engine, and the file: the next one to start reads it
+  (`composing::recover`). GNOME Shell follows the engine without acting on
+  it; if the user chooses another input source meanwhile, composing ends
+  and that source stays.
+- Text being composed is dropped, not kept, when its field lets go of it
+  (it loses the focus, the user clicks in it): a field kept a
+  half-recognized sentence otherwise every time a hotkey took the focus
+  for a moment, with the finished sentence written after it. What the
+  user's own key interrupts is committed ahead of the key instead.
+- Composing is refused, and the words pasted, where the window in front
+  has no field for an input method, the field is a password's, the
+  session's framework is another (Fcitx), or IBus is older than 1.5.27
+  and does not say whose field has the focus.
+
+`cargo test -- --ignored with_an_ibus_daemon` starts an ibus-daemon of its
+own, with directories of its own, and plays the application to it.
+
 ### GNOME on Wayland
 
 On Wayland an application cannot see other windows, type into them, follow
@@ -376,10 +427,12 @@ With it, window switching and layouts, pasting, the selected text,
 clipboard history and screenshots work as on X11, and the hold-to-talk
 key works with the modifier keys. Snippets do not expand as they are
 typed: that would put a listener for every key into the Shell, and has
-deliberately not been done. For the same reason dictated words do not go
-in as they are spoken: without hearing the user's own keys Heyo could not
-know that what it erases is its own, so each sentence is pasted when it
-is finished. Without the extension, or on another Wayland desktop, the
+deliberately not been done. For the same reason dictated words are not
+pasted and corrected as they are spoken: without hearing the user's own
+keys Heyo could not know that what it erases is its own, so each sentence
+is pasted when it is finished. (Composing them through IBus, which the
+Shell runs here too, needs none of that, and has not been tried on
+Wayland yet.) Without the extension, or on another Wayland desktop, the
 `Generic` adapter is what is left.
 
 [wayland.md](wayland.md) has the details: what Heyo needs of a compositor,
@@ -528,7 +581,9 @@ when it starts.
 | The log, captures, an extension's `Cache` | `~/.cache/heyo/` |
 
 On Windows the first two are `%APPDATA%\heyo` and the last is
-`%LOCALAPPDATA%\heyo`.
+`%LOCALAPPDATA%\heyo`. While it composes dictated words, Heyo also keeps
+the name of the input method it set aside in
+`$XDG_RUNTIME_DIR/heyo-input-method`.
 
 ## Where tests stand in
 

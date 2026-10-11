@@ -174,20 +174,84 @@ Click it to finish; its × cancels.
   and the result is what stays.
 - A vocabulary of your own words (names, jargon) is applied to what was
   recognized: Settings → Dictation.
-- Text goes in through the clipboard, which is restored afterwards;
-  terminals get `Ctrl+Shift+V`.
+- Text goes in through the input method where the window takes it, and
+  otherwise through the clipboard, which is restored afterwards (terminals
+  get `Ctrl+Shift+V`): see below.
 - `heyo --dictate` starts or finishes dictation, for binding your own
   shortcut.
 
 ### Type as you speak
 
-On X11 the words go into the application while you are still speaking:
-each appears a moment after it is recognized, and when a later word makes
-the recognizer change an earlier one, the text is corrected where it
-stands. A finished sentence is what the recognizer decided in the end.
-With polishing, what you said is there as it was heard until you finish,
-and the polished text then takes its place. This is **Type as You Speak**
-in Settings → Dictation, and it is on unless you turn it off.
+The words go into the application while you are still speaking, and a
+finished sentence is what the recognizer decided in the end. This is
+**Type as You Speak** in Settings → Dictation, and it is on unless you turn
+it off. Settings says which of the two ways below your session has.
+
+#### Through the input method
+
+On X11, where IBus is running (GNOME starts it with every session) and
+the window you dictate into takes it, Heyo is the session's input method
+for the length of a recording. Applications take it where the session is
+set up for IBus: GNOME sets its applications up so, and other desktops do
+through `GTK_IM_MODULE`, `QT_IM_MODULE` and `XMODIFIERS`. GTK 3 and Qt
+applications, LibreOffice, Electron applications such as VS Code, and
+terminals built on VTE do; GTK 4 applications only where IBus's module
+for GTK 4 is installed (`ibus-gtk4`).
+
+- The sentence you are speaking is shown at the cursor as text being
+  composed, underlined, as when you type Chinese or Japanese. It follows
+  the recognizer as it changes its mind, and is not the application's text
+  yet. When the sentence is finished, it is committed, and is.
+- With polishing, the whole recording stays in composition until you
+  finish, and the polished text is committed in its place. A text field
+  wraps a composition of several sentences like any text; a terminal
+  shows it on one line and cuts it off at the edge of its window, though
+  all of it is committed.
+- Nothing is pasted and nothing erased: the clipboard is not touched, and
+  no key is pressed for you. That goes for terminals too, where text of
+  several lines is still committed on one line, so that nothing in it
+  runs as a command.
+- **Your own input method is set aside while you dictate.** Keys you press
+  during a recording go in as plain keys, not through Pinyin. It is yours
+  again when the recording ends, however it ends; as after choosing
+  another input source and coming back, it starts afresh.
+- When you press a key in the middle of a sentence, what is composed by
+  then is committed first, the key goes in behind it, and the rest of the
+  sentence behind the key. What was committed that way stays as it was
+  heard at that moment, whatever the recognizer makes of it later, and
+  polished text can then no longer take the place of the whole: the rest
+  follows as it was heard, and the dictation window says so. Shift, Ctrl
+  and the like by themselves, and the key held to talk, are not such keys.
+- When you click in the field, the text being composed moves with the
+  cursor. When you go to another window, it leaves the field without a
+  trace and appears in the one you went to; sentences that were finished
+  stay where they were committed. While no field has the focus, which
+  includes the time you hold the dictation hotkey down (the desktop has
+  the keyboard then), the dictation window shows the words, and they go in
+  when a field has the focus again.
+- Cancelling removes what is being composed. Sentences that were committed
+  stay, and the dictation window says that they did.
+- With **Type as You Speak** off, nothing is shown before a sentence is
+  finished; each sentence is committed whole, still without the clipboard.
+- If you choose another input source while dictating, that one is the
+  session's from then on, and the rest of the recording is pasted.
+- If Heyo is killed in the middle of a recording, the sentence that was
+  being composed is gone, and the session is left without an input method
+  (your keys still type; Pinyin does not come up) until Heyo is started
+  again, which gives it back, or until you choose an input source.
+
+#### By pasting
+
+Everywhere else the words are pasted: where no IBus is running (or one
+older than 1.5.27, or the session's input method is Fcitx), in a window
+that takes no input method, in a password field, on GNOME on Wayland and
+on Windows.
+
+On X11 they are still pasted as you speak: each appears a moment after it
+is recognized, and when a later word makes the recognizer change an
+earlier one, the text is corrected where it stands. With polishing, what
+you said is there as it was heard until you finish, and the polished text
+then takes its place.
 
 Correcting means erasing, and Heyo erases only what it wrote itself in the
 recording under way. To be sure of that it follows the keyboard and the
@@ -217,8 +281,9 @@ mouse while you dictate (it listens and keeps nothing), and holds to this:
 In some places each sentence is pasted when you pause after it, and
 polished text once at the end, as with the setting off:
 
-- terminals (a shell would cope with being corrected, an editor running
-  in the terminal might not), where several lines also go in as one;
+- terminals that take no input method (a shell would cope with being
+  corrected, an editor running in the terminal might not), where several
+  lines also go in as one;
 - password managers, the applications you excluded from snippet expansion,
   and Heyo's own windows;
 - editors with modes (gVim, Emacs), spreadsheets, and windows onto another
