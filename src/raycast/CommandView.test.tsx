@@ -302,6 +302,51 @@ test("Action.PickDate is reached from the list of actions too, and Esc goes back
   expect(rows().map((row) => row.querySelector(".action-title")!.textContent)).toEqual(["Open", "Due…"]);
 });
 
+test("the panel lists an extension's actions in their sections, and a submenu opens in place", () => {
+  const open = node("Action", { title: "Open", onAction: fn });
+  const red = node("Action", { title: "Red", shortcut: { modifiers: ["cmd"], key: "r" }, onAction: fn });
+  const blue = node("Action", { title: "Blue", onAction: fn });
+  const colour = node("ActionPanel.Submenu", { title: "Colour" }, red, blue);
+  const remove = node("Action", { title: "Delete", style: "destructive", onAction: fn });
+  const panel = node("ActionPanel", { title: "Task" }, colour, open, node("ActionPanel.Section", { title: "Danger" }, remove));
+  show(node("List", {}, node("List.Item", { title: "Task" }, slot("actions", panel))));
+  const rows = () => [...host.querySelectorAll<HTMLElement>(".action-panel .action-row")];
+  const titles = () => rows().map((row) => row.querySelector(".action-title")!.textContent);
+  const filter = () => $<HTMLInputElement>(".action-search");
+
+  // Enter is the first action that can run, which a submenu cannot.
+  press(search(), "Enter");
+  expect(dispatched()).toEqual([[open.id, "onAction"]]);
+  expect($(".footer-button").textContent).toContain("Open");
+
+  press(search(), "k", { ctrlKey: true, code: "KeyK" });
+  expect($(".action-panel-title").textContent).toBe("Task");
+  expect(titles()).toEqual(["Colour", "Open", "Delete"]);
+  expect([...host.querySelectorAll(".action-panel .section-title")].map((e) => e.textContent)).toEqual(["Danger"]);
+  expect(rows().map((row) => !!row.querySelector(".chevron"))).toEqual([true, false, false]);
+  expect(rows().map((row) => row.classList.contains("destructive"))).toEqual([false, false, true]);
+  type(filter(), "del");
+  expect(titles()).toEqual(["Delete"]);
+  type(filter(), "");
+
+  // Into the submenu, back out with Esc, and in again to choose.
+  press(filter(), "Enter");
+  expect($(".action-panel-title").textContent).toBe("Colour");
+  expect(titles()).toEqual(["Red", "Blue"]);
+  press(filter(), "Escape");
+  expect(titles()).toEqual(["Colour", "Open", "Delete"]);
+  act(() => rows()[0].click());
+  invoke.mockClear();
+  act(() => rows()[1].click());
+  expect(dispatched()).toEqual([[blue.id, "onAction"]]);
+  expect(host.querySelector(".action-panel")).toBeNull();
+
+  // An action in a submenu is reached by its shortcut without opening anything.
+  invoke.mockClear();
+  press(search(), "r", { ctrlKey: true, code: "KeyR" });
+  expect(dispatched()).toEqual([[red.id, "onAction"]]);
+});
+
 test("Quick Look is given the selected item's file", () => {
   const look = (id: number) => ({ id, type: "Action", props: { title: "Quick Look", preview: true, shortcut: { modifiers: ["cmd"], key: "y" }, onAction: fn }, children: [] });
   const item = (title: string, path: string) => {
