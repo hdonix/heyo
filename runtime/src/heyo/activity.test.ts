@@ -1,11 +1,9 @@
 // `LiveActivity` as the runtime provides it: what each call asks of the
 // host, with dates as milliseconds and a sequence number that only grows;
 // in whose name a handle acts; and how events reach a listening command.
-import { beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 
-import { answers, event, extension, provideModules, requests, reset, sleep, until } from "../testing";
-
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
+import { answers, event, extension, requests, reset, runtime, sleep, until } from "../testing";
 
 import { ended, runAs, type Current } from "../context";
 import { LiveActivity, sequence, wireContent, type Event } from "./activity";
@@ -15,7 +13,7 @@ const as = (name: string, launchType = "userInitiated"): Current => ({ extension
 const last = () => requests.at(-1)!;
 const sent = (method: string) => requests.filter((r) => r.method === method);
 
-beforeAll(provideModules);
+beforeAll(() => runtime());
 
 beforeEach(() => {
   reset();
@@ -120,8 +118,8 @@ test("a listening command hears its activities' events until it ends", async () 
   const stop = await runAs(ci, () => LiveActivity.onEvent((e) => heard.push([e, (api.environment as { extensionName: string }).extensionName])));
   expect(last()).toMatchObject({ method: "ext.activity.onEvent", extension: "ci" });
   const pause: Event = { kind: "action", id: "build", event: "pause", data: { end: 5 } };
-  expect(event(11, pause)).toBe(true);
-  expect(event(11, { kind: "elapsed", id: "build", at: 9 })).toBe(true);
+  event(11, pause);
+  event(11, { kind: "elapsed", id: "build", at: 9 });
   await sleep(5);
   // Delivered as the command: what the listener does is its own.
   expect(heard).toEqual([
@@ -131,7 +129,8 @@ test("a listening command hears its activities' events until it ends", async () 
   stop();
   await until(() => sent("ext.unsubscribe").length === 1, "the subscription to end");
   expect(last()).toMatchObject({ method: "ext.unsubscribe", extension: "ci", params: { subscription: 11 } });
-  expect(event(11, { kind: "dismissed", id: "build" })).toBe(false);
+  event(11, { kind: "dismissed", id: "build" });
+  expect(heard).toHaveLength(2);
 
   // Or with the command.
   const dl = as("dl");

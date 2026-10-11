@@ -1,10 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 
 import { extension } from "../testing";
-
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
 
 import { cachePath, readJson, runAs, writeJson, type Current } from "../context";
 import { Cache } from "./system";

@@ -7,12 +7,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { reset, sent, sleep, until } from "../testing";
+import { reset, runtime, sent, sleep, until } from "../testing";
 
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
-
-import { readManifest, scopedReact } from "../context";
-import { activeSession, close, launch, provide, relaunch } from "../session";
+import { readManifest } from "../context";
+import { activeSession, close, launch, relaunch } from "../session";
 import { build, checkOut, copyStatic, esbuildOptions, ManifestError, prepare } from "./build";
 import { format, refresh, teeConsole } from "./console";
 import { follow } from "./develop";
@@ -22,10 +20,7 @@ const sample = path.join(__dirname, "fixtures/sample");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-build-test-"));
 afterAll(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-beforeAll(async () => {
-  const { default: api } = await import("../api");
-  provide({ "@raycast/api": api, "@heyo/api": api, react: scopedReact, "react/jsx-runtime": require("react/jsx-runtime") });
-});
+beforeAll(() => runtime());
 
 beforeEach(async () => {
   close();

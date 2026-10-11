@@ -5,17 +5,15 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import v8 from "node:v8";
 import vm from "node:vm";
-import { beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 
-import { answers, extension, provideModules, requests, reset, sent, sleep, supportDir, until } from "./testing";
-
-vi.mock("./protocol", async () => (await import("./testing")).protocol);
+import { answers, extension, requests, reset, runtime, sent, sleep, supportDir, until } from "./testing";
 
 import { activeSession, close, launch, loadModule } from "./session";
 
 const world = globalThis as any;
 
-beforeAll(provideModules);
+beforeAll(() => runtime());
 
 beforeEach(async () => {
   close();

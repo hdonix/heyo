@@ -6,9 +6,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import ts from "typescript";
-import { afterAll, expect, test, vi } from "vitest";
-
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
+import { afterAll, expect, test } from "vitest";
 
 import raycastProvided from "../api";
 import provided from "./index";

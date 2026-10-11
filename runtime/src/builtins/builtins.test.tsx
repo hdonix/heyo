@@ -2,11 +2,9 @@
 // host and in whose name, and that it shows what it did when it asked the
 // host directly.
 import { createElement, type ReactNode } from "react";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 
 import { answers, extension, requests, reset, sent, sleep, until } from "../testing";
-
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
 
 import { Navigator } from "../api/navigation";
 import { foreground, runAs, scoped, type Current } from "../context";
@@ -419,7 +417,7 @@ test("Clipboard History says so when the history cannot be read, or is not kept"
   const failed = await show("clipboard-history", createElement(ClipboardHistory));
   expect(failed.titles()).toEqual([]);
   expect(failed.top().props.isLoading).toBe(false);
-  expect(sent.find((m) => m.type === "toast")).toMatchObject({ toast: { title: "Could not load clipboard history", message: "Error: the history is locked" } });
+  expect(sent.find((m) => m.type === "toast")).toMatchObject({ toast: { title: "Could not load clipboard history", message: "HeyoError: the history is locked" } });
 });
 
 test("Selection Actions reads the selection the way Raycast's API does", async () => {

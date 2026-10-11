@@ -3,11 +3,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 
-import { answers, event, extension, provideModules, requests, reset, sleep, until } from "../testing";
-
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
+import { answers, event, extension, requests, reset, runtime, sleep, until } from "../testing";
 
 import raycast from "../api";
 import { ended, runAs, type Current } from "../context";
@@ -22,7 +20,7 @@ const world = globalThis as any;
 const as = (name: string): Current => ({ extension: extension(name, {}), command: "main", launchType: "userInitiated" });
 const last = () => requests.at(-1)!;
 
-beforeAll(provideModules);
+beforeAll(() => runtime());
 
 beforeEach(async () => {
   close();
@@ -231,9 +229,9 @@ test("listening hands over each sentence and then all that was said", async () =
   expect(last()).toMatchObject({ method: "ext.dictation.stop", params: { subscription: 3 }, extension: "scribe" });
   event(3, { kind: "result", text: "Hello. World." });
   await expect(listening.result).resolves.toBe("Hello. World.");
+  // It is over: what still comes is not heard, and nothing is left to end.
+  event(3, { kind: "segment", text: "late" });
   expect(segments).toEqual(["Hello.", "World."]);
-  // It is over: nobody hears the subscription, and nothing is left to end.
-  expect(event(3, { kind: "segment", text: "late" })).toBe(false);
   listening.stop();
   ended(command);
   await sleep(5);
@@ -291,12 +289,17 @@ test("what a command subscribed to ends with the command", async () => {
   launch(scribe, "listen");
   await until(() => requests.some((r) => r.method === "ext.dictation.listen"), "the command to listen");
   await sleep(10);
-  expect(event(6, { kind: "segment", text: "Hello." })).toBe(true);
+  event(6, { kind: "segment", text: "Hello." });
   // The user leaves the command.
   close();
   await until(() => last().method === "ext.unsubscribe", "the subscription to be ended");
   expect(last()).toMatchObject({ params: { subscription: 6 }, extension: "scribe", dir: scribe.dir });
-  expect(event(6, { kind: "result", text: "Hello." })).toBe(false);
+  // What still comes for it is not heard.
+  let heard = false;
+  world.listening.result.then(() => (heard = true));
+  event(6, { kind: "result", text: "Hello." });
+  await sleep(5);
+  expect(heard).toBe(false);
 });
 
 test("a capture is the command's for as long as it runs", async () => {

@@ -1,13 +1,10 @@
 // The built-in timer, run as the host runs it: from the palette with the
 // duration typed in the search bar, then in the background process for
 // each event of its activity, under Heyo's own name throughout.
-import { beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 
-import { answers, receive, requests, reset, sent, until } from "../testing";
+import { answers, receive, requests, reset, runtime, sent, until } from "../testing";
 
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
-
-import { startBackground } from "../background";
 import { foreground, runAs, type Current } from "../context";
 import { builtinExtension } from "./index";
 import { content, describe, parseDuration, Timer } from "./timer";
@@ -17,7 +14,7 @@ const MINUTE = 60_000;
 let nextRun = 0;
 
 /// The host runs the handler in the background with an event (`activities.rs`).
-function deliver(event: unknown, launchType = "userInitiated") {
+function deliver(event: unknown, launchType: "userInitiated" | "background" = "userInitiated") {
   const id = ++nextRun;
   receive({ type: "background-run", id, extension: "@heyo", command: "timer", launchType, action: null, launchContext: { activity: event } });
   return until(() => sent.find((m) => m.type === "background-done" && m.id === id), "the handler to be done");
@@ -26,7 +23,7 @@ function deliver(event: unknown, launchType = "userInitiated") {
 const of = (method: string) => requests.filter((r) => r.method === method);
 const titles = (actions: { title: string }[]) => actions.map((a) => a.title);
 
-beforeAll(() => startBackground());
+beforeAll(() => runtime({ background: true }));
 
 beforeEach(() => {
   reset();

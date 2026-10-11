@@ -5,11 +5,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 
-import { answers, provideModules, requests, reset, sleep, until } from "../testing";
-
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
+import { answers, requests, reset, runtime, sleep, until } from "../testing";
 
 import { readManifest } from "../context";
 import { close, launch } from "../session";
@@ -21,7 +19,7 @@ process.env.HEYO_PROBE_OUT = path.join(out, "probe.json");
 
 const item = { id: "clipboard:2", source: "clipboard", kind: "text", text: "probe text", at: 5, pinned: false };
 
-beforeAll(provideModules);
+beforeAll(() => runtime());
 
 beforeEach(async () => {
   close();

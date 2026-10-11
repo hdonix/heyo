@@ -1,13 +1,19 @@
-//! What the runtime's tests share: a stand-in for the protocol (the real one
-//! takes over stdout when loaded), Heyo's directories in a temporary place,
+//! What the runtime's tests share: Heyo's directories in a temporary place,
+//! a host on the other end of the runtime's conversation (`testhost.ts`),
 //! and small extensions written there, which run as real ones do.
 //!
-//! Imports nothing of the runtime itself, so a test that imports this first
-//! has the directories set before `context.ts` reads them.
+//! A test imports this before anything of the runtime: the directories are
+//! set here before `context.ts` reads them, which is why the runtime's own
+//! modules are loaded from here only once that is done.
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+import type { Incoming } from "../../shared/wire";
+import type { Identity } from "./runtime";
+import { testHost } from "./testhost";
+import { pair } from "./transport";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-runtime-test-"));
 process.env.HEYO_DATA_DIR = path.join(root, "data");
@@ -16,57 +22,31 @@ process.env.HEYO_CONFIG_DIR = path.join(root, "config");
 process.env.HEYO_EXTENSIONS_DIR = path.join(root, "data", "extensions");
 process.on("exit", () => fs.rmSync(root, { recursive: true, force: true }));
 
-export const supportDir = (extension: string) => path.join(root, "data", "support", extension);
+export const dataDir = process.env.HEYO_DATA_DIR;
+export const supportDir = (extension: string) => path.join(dataDir, "support", extension);
+
+// The conversation is the runtime's own; only what carries it is replaced.
+const [ours, theirs] = pair();
+const host = testHost(theirs);
+void (await import("./protocol")).connect(ours);
 
 /// What the runtime sent, the requests it made and how they are answered.
 /// A request of an extension's (`ext.*`) is kept with whose it was.
-export const sent: any[] = [];
-export const requests: { method: string; params?: any; extension?: string; dir?: string; via?: string }[] = [];
-export const answers: Record<string, (params: any) => unknown> = {};
-const handlers = new Map<string, (message: any) => void>();
-const hearing = new Map<number, (data: unknown) => void>();
-
-/// Makes an extension's request as the real protocol does: in the name of
-/// the command that is running.
-async function ask(via: string | undefined, method: string, params?: unknown) {
-  const [{ current }, { envelope }, { HeyoError }] = await Promise.all([import("./context"), import("./heyo/caller"), import("./heyo/error")]);
-  const whose = envelope(current.value, via as "raycast" | undefined);
-  if (!whose) throw new HeyoError("invalid", `${method} was asked for outside any command.`);
-  requests.push({ method, params, ...whose });
-  return answers[method]?.(params);
-}
-
-/// The module to mock `./protocol` with.
-export const protocol = {
-  send: (message: unknown) => void sent.push(message),
-  on: (type: string, handler: (message: any) => void) => void handlers.set(type, handler),
-  request: async (method: string, params?: unknown) => {
-    requests.push({ method, params });
-    return answers[method]?.(params);
-  },
-  ask: (method: string, params?: unknown) => ask(undefined, method, params),
-  askThroughRaycast: (method: string, params?: unknown) => ask("raycast", method, params),
-  hear: (subscription: number, listener: (data: unknown) => void) => {
-    hearing.set(subscription, listener);
-    return () => void hearing.delete(subscription);
-  },
-};
-
-/// An event from the host, for whoever subscribed. False if nobody hears it.
-export function event(subscription: number, data: unknown) {
-  hearing.get(subscription)?.(data);
-  return hearing.has(subscription);
-}
+export const { sent, requests, answers, reset } = host;
 
 /// A message from the host.
-export function receive(message: { type: string } & Record<string, unknown>) {
-  handlers.get(message.type)?.(message);
+export const receive: (message: Incoming) => void = host.tell;
+
+/// An event from the host, for whoever subscribed.
+export function event(subscription: number, data: unknown) {
+  host.tell({ type: "event", subscription, data });
 }
 
-export function reset() {
-  sent.length = 0;
-  requests.length = 0;
-  for (const method of Object.keys(answers)) delete answers[method];
+/// Starts the runtime with this host as `main.ts` does with Heyo: from
+/// then on extensions are handed the API and React, and the host's
+/// messages do what they do in Heyo.
+export async function runtime(identity: Identity = { background: false }) {
+  void (await import("./runtime")).start(ours, identity);
 }
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -98,10 +78,4 @@ export function extension(name: string, commands: Record<string, { mode: "view" 
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(manifest));
   for (const [command, { source }] of Object.entries(commands)) fs.writeFileSync(path.join(dir, `${command}.js`), source);
   return { dir, manifest };
-}
-
-/// Hands extensions the API and React the way `main.ts` does.
-export async function provideModules() {
-  const [{ default: api }, { provide }, { scopedReact }] = await Promise.all([import("./heyo"), import("./session"), import("./context")]);
-  provide({ "@raycast/api": api, "@heyo/api": api, react: scopedReact });
 }

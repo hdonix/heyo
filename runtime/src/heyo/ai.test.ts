@@ -2,8 +2,6 @@
 // text to work on; how the answer comes while it is written; how it fails.
 import { afterEach, expect, test, vi } from "vitest";
 
-vi.mock("../protocol", async () => (await import("../testing")).protocol);
-
 // The model: records what it was asked, and answers when the test says so.
 const model = vi.hoisted(() => ({
   calls: [] as { options: any; finish(answer: string): void; fail(error: unknown): void }[],
@@ -17,8 +15,9 @@ vi.mock("../ai", async () => ({
     }),
 }));
 
-import { runAs, type Current } from "../context";
 import { answers, extension, requests } from "../testing";
+
+import { runAs, type Current } from "../context";
 import { AI, type Message } from "./ai";
 import { HeyoError } from "./error";
 

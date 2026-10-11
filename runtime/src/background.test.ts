@@ -3,13 +3,11 @@
 // loaded and rendered as the runtime does it.
 import fs from "node:fs";
 import path from "node:path";
-import { beforeAll, beforeEach, expect, test, vi } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 
-import { answers, extension, provideModules, receive, requests, reset, sent, sleep, supportDir, until } from "./testing";
+import { answers, extension, receive, requests, reset, runtime, sent, sleep, supportDir, until } from "./testing";
 
-vi.mock("./protocol", async () => (await import("./testing")).protocol);
-
-import { limits, mountedKeys, startBackground, unmountAll } from "./background";
+import { limits, mountedKeys, unmountAll } from "./background";
 
 const defaults = { ...limits };
 const world = globalThis as any;
@@ -81,10 +79,7 @@ const menu = (who: string) => `
   };
 `;
 
-beforeAll(async () => {
-  await provideModules();
-  startBackground();
-});
+beforeAll(() => runtime({ background: true }));
 
 beforeEach(async () => {
   // Let what the test before left behind (unmounts, late timers) run out.
