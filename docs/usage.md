@@ -155,29 +155,77 @@ of about 340 MB in Settings → Screenshots).
 ## Dictation
 
 Hold the dictation hotkey while you speak and let go, or tap it, speak,
-and tap it again: the text is pasted into the window you are working in.
+and tap it again: the text goes into the window you are working in.
 
 A single key can do the same: choose a **Hold-to-Talk Key** (Right Alt,
 Left Alt, Right Ctrl, …) in Settings → Dictation, hold it and speak, let
 go to finish. The key keeps its normal meaning: a quick tap does nothing,
 and so does using it in a shortcut such as Alt+Tab. A small window at the
-bottom of the screen shows the microphone level and the words as they are
-recognized.
+bottom of the screen shows the microphone level, and the words as they are
+recognized whenever they are not appearing in your application already.
+Click it to finish; its × cancels.
 
 - Speech is recognized on your computer with
   [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) (Mandarin,
   Cantonese, English, Japanese, Korean; mixed Chinese and English works).
   Set it up once in Settings → Dictation; the download is about 270 MB.
-- By default each sentence is pasted when you pause. With **Polish with
-  AI** set to *Clean Up* or *Translate to English*, the transcript (not
-  the audio) is sent to the model when you finish and the result is pasted
-  once.
+- With **Polish with AI** set to *Clean Up* or *Translate to English*,
+  the transcript (not the audio) is sent to the model when you finish,
+  and the result is what stays.
 - A vocabulary of your own words (names, jargon) is applied to what was
   recognized: Settings → Dictation.
-- Text is pasted through the clipboard, which is restored afterwards;
+- Text goes in through the clipboard, which is restored afterwards;
   terminals get `Ctrl+Shift+V`.
 - `heyo --dictate` starts or finishes dictation, for binding your own
   shortcut.
+
+### Type as you speak
+
+On X11 the words go into the application while you are still speaking:
+each appears a moment after it is recognized, and when a later word makes
+the recognizer change an earlier one, the text is corrected where it
+stands. A finished sentence is what the recognizer decided in the end.
+With polishing, what you said is there as it was heard until you finish,
+and the polished text then takes its place. This is **Type as You Speak**
+in Settings → Dictation, and it is on unless you turn it off.
+
+Correcting means erasing, and Heyo erases only what it wrote itself in the
+recording under way. To be sure of that it follows the keyboard and the
+mouse while you dictate (it listens and keeps nothing), and holds to this:
+
+- Once you press a key or click during a recording, nothing more is
+  erased. What is in the application stays as it is, and each sentence you
+  finish from then on is pasted at the cursor. Polished text that can no
+  longer take the place of what was heard is left out, and the dictation
+  window says so. Not counted as a key of yours: the key held to talk,
+  Shift, Ctrl and the like by themselves, the dictation hotkey set in
+  Heyo's settings, the mouse wheel, and a click on the dictation window.
+  A shortcut for `heyo --dictate` that you bound elsewhere is a key like
+  any other.
+- Cancelling takes the recording's words out again, if nothing else has
+  touched the text since; otherwise they stay, and the window says that
+  they did.
+- While you hold the dictation hotkey down, the desktop has the keyboard
+  to itself: the dictation window shows the words meanwhile, and they go
+  into the application when you let go.
+- Text is corrected only while it is made of characters every
+  application erases one at a time (letters, digits, punctuation, Chinese,
+  Japanese and Korean writing, simple emoji). A sentence with a combining
+  accent or an emoji put together from several is written once, and from
+  then on sentences are added without correcting.
+
+In some places each sentence is pasted when you pause after it, and
+polished text once at the end, as with the setting off:
+
+- terminals (a shell would cope with being corrected, an editor running
+  in the terminal might not), where several lines also go in as one;
+- password managers, the applications you excluded from snippet expansion,
+  and Heyo's own windows;
+- editors with modes (gVim, Emacs), spreadsheets, and windows onto another
+  computer (remote desktops, virtual machines), where Backspace and paste
+  do not simply erase and insert at a cursor;
+- GNOME on Wayland and Windows, where Heyo cannot hear whether you typed
+  in between and so must not erase.
 
 ## AI
 

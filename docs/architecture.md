@@ -255,7 +255,10 @@ and keeps the list of applications current. The rest, by what it is for:
   itself: it puts the text on the clipboard and presses the application's
   paste shortcut. Text the user did not copy goes onto a clipboard on loan
   (`Loan`) and what was there comes back afterwards; several lines bound
-  for a terminal are asked about first, or go in on one line.
+  for a terminal are asked about first, or go in on one line. Text that
+  takes the place of what stands before the cursor (a snippet's keyword,
+  dictated words being corrected) is on loan too: Backspaces and a paste,
+  pressed by `platform::typed`.
 - `clipboard.rs` and `clipboard/` are the clipboard history: what is
   recorded and what is not (`sources.rs`), where it is kept (one SQLite
   file with two full-text indexes, `store.rs`), how a query is read
@@ -270,7 +273,16 @@ and keeps the list of applications current. The rest, by what it is for:
   tested without a window.
 - `screenshot.rs`, `ocr.rs` and `dictation.rs` are those features: the
   capture and the overlay's outcome, the text-recognition helper, the
-  dictation helper with its progress window and its pasting.
+  dictation helper with its progress window.
+- `dictation/onscreen.rs` says how a recording is written into the
+  application: the words as they are spoken, corrected where they stand
+  ("type as you speak"), or each sentence when it is finished, or the
+  polished text at the end. It is told what was heard and answers with
+  steps (erase so many characters and write this; paste that), and it is
+  where the rule lives that Heyo erases only what it wrote itself: its
+  module header has the cases. `dictation.rs` carries the steps out on a
+  thread of the recording's own and reports back the ones that could not
+  be, so the module is tested with a text field made of a string.
 - `expand.rs` expands a snippet's keyword as it is typed in another
   application. The keyboard is only listened to, never grabbed, and what
   is typed is neither stored nor logged; the module header says exactly
@@ -298,7 +310,8 @@ Anything that touches the desktop goes through it.
 Its modules of plain functions are what the rest of Heyo uses: `windows`
 (listing, switching, layouts), `input` (the paste keystroke, the selected
 text), `clipboard_watch`, `capture`, `overlay`, `keys` (hold to talk),
-`typed` (what is typed elsewhere, for snippets), `hotkeys`, `focus`,
+`typed` (what is typed elsewhere, and replacing it there: for snippets,
+and for dictated words that are corrected as they come), `hotkeys`, `focus`,
 `system` (locking, the volume, the trash, audio devices, processes) and
 `common` (notifications, keeping awake). They hold what is the same
 everywhere and ask the session's adapter for the rest.
@@ -308,7 +321,7 @@ desktop. Each session has one adapter, chosen once:
 
 | Adapter | Session | Through |
 |---|---|---|
-| `x11::X11` | X11 | EWMH for windows, XFixes for the clipboard, XInput for the keys it listens to, direct screen reads, `xdotool` for the paste keystroke |
+| `x11::X11` | X11 | EWMH for windows, XFixes for the clipboard, XInput for the keys it listens to, direct screen reads, `xdotool` for the paste keystroke, XTEST for replacing text |
 | `gnome::Gnome` | GNOME on Wayland, when Heyo's Shell extension answers | D-Bus calls to the extension |
 | `win::Windows` | Windows | the Win32 API |
 | `desktop::Generic` | anything else | generic tools, where there are any: `wtype` or `ydotool`, a polled clipboard, `gnome-screenshot` |
@@ -320,6 +333,32 @@ commands that cannot work are left out of the search and the settings say
 why. Supporting another desktop is one more adapter; a capability new to
 all of them is one more method, and the compiler finds nothing else to
 change. Tests put `desktop::fake::Fake` in the adapter's place.
+
+### Replacing text in another application
+
+Two features erase in someone else's text field and write something in
+its place: a snippet's keyword becomes its text, and dictated words are
+corrected while the sentence is still being spoken. Both go through
+`platform::typed`, and only X11 has an adapter for it (`x11/typed.rs`,
+`x11/writing.rs`, `x11/offer.rs`). What it holds to:
+
+- The keyboard is listened to and never grabbed, and the keys of one
+  replacement (Backspaces, then the paste shortcut) reach the X server
+  pressed and released in a single write: whatever becomes of Heyo, no key
+  stays down and nothing stays held.
+- The text is on the clipboard with Heyo itself as the clipboard's owner,
+  so the application's asking for it is seen: a replacement is over when
+  the application in front has taken the text, and one that was not seen
+  to be taken is said to be lost. Nothing has to wait and hope.
+- Writing piece after piece (`Writing`, for dictation) stops for good at
+  the first sign that anything else touched the text: a key of the
+  user's, a click, the focus leaving the window. It listens on the same
+  connection it presses keys through, so the last look comes just ahead
+  of the keys. `x11/writing.rs` says what counts and what does not.
+
+Both have a test against a real X server (`cargo test -- --ignored
+on_an_x_server`, on a server of one's own), with a small application in
+it to write into (`x11/field.rs`).
 
 ### GNOME on Wayland
 
@@ -337,8 +376,11 @@ With it, window switching and layouts, pasting, the selected text,
 clipboard history and screenshots work as on X11, and the hold-to-talk
 key works with the modifier keys. Snippets do not expand as they are
 typed: that would put a listener for every key into the Shell, and has
-deliberately not been done. Without the extension, or on another Wayland
-desktop, the `Generic` adapter is what is left.
+deliberately not been done. For the same reason dictated words do not go
+in as they are spoken: without hearing the user's own keys Heyo could not
+know that what it erases is its own, so each sentence is pasted when it
+is finished. Without the extension, or on another Wayland desktop, the
+`Generic` adapter is what is left.
 
 [wayland.md](wayland.md) has the details: what Heyo needs of a compositor,
 how each version of GNOME differs, and what KDE and the wlroots
@@ -418,8 +460,11 @@ Windows it registers them itself.
   started by `heyo build`, `dev`, `migrate` and `ext check`
   ([developing-extensions.md](developing-extensions.md)).
 - `dictation.ts`, `ocr.ts` and `embed.ts` are the helpers, each a program
-  of its own. `install.ts` fetches their engines and models: exact
-  revisions, checked against hashes written in the source.
+  of its own. `sentences.ts` is one recording as the dictation helper
+  hears it (the sentence in progress, each finished sentence), apart from
+  the program so that a test can play the recognizer. `install.ts`
+  fetches the helpers' engines and models: exact revisions, checked
+  against hashes written in the source.
 - `compat.ts` helps extensions written with only macOS in mind, where
   something can be done, and says so clearly where not.
 

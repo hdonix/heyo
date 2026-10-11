@@ -101,7 +101,10 @@ directories of its own, driven with `xdotool` and photographed. Nothing of
 the desktop you work on is touched, and your own Heyo can stay running.
 
 It needs `Xvfb`, `xdotool`, `xwininfo`, `dbus-daemon`, `xfwm4` (or
-`gnome-shell` for a real compositor) and Python with Pillow. Build first:
+`gnome-shell` for a real compositor) and Python with Pillow; the scripts
+that dictate also need the speech engine installed for your own Heyo
+(they read it, and write nothing there), and `dictate-live.sh` needs Flite
+(`libflite1`) to speak. Build first:
 
 ```sh
 pnpm install && pnpm build:runtime
@@ -147,6 +150,7 @@ The scripts, by what they try:
 | `look.sh`, `compact.sh`, `settings.sh`, `select.sh` | pictures of the interface: the themes, compact mode, every settings page, the selection moving |
 | `open.sh`, `arguments.sh`, `views.sh` | opening commands, arguments typed in the search bar, what an extension's views do (forms, the file picker, typing into a slow extension) |
 | `regress.sh`, `clipboard.sh`, `snap.sh`, `expand.sh`, `dictate.sh` | the platform layer on X11: pasting, layouts, the clipboard history, the screenshot overlay, snippets expanding, dictation |
+| `dictate-live.sh` | dictated words going into another application as they are spoken: spoken sentences (`say.py` makes the audio) are dictated into a text field that is read back all the while, with the setting off and on, a key typed in between, the dictation window clicked, cancelling, and a stub model polishing |
 | `heyo-api.sh`, `windows-api.sh`, `activities.sh` | `@heyo/api` as an extension sees it, the permission question, live activities |
 | `ai-chat.sh` | Ask AI and AI Chat against `llm-stub.py`, a server that answers with canned text |
 | `dev.sh` | `heyo dev` against a running Heyo |
