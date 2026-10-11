@@ -4,7 +4,6 @@
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
-use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::wire::HostRequest;
 use crate::*;
@@ -35,11 +34,11 @@ pub(crate) fn host_call(app: &AppHandle, request: HostRequest) -> Result<Value, 
                 clipboard::skip_next();
             }
             match html {
-                Some(html) => app.clipboard().write_html(html, Some(text)).map_err(|e| e.to_string())?,
-                None => crate::platform::clipboard_watch::write_text(app, &text)?,
+                Some(html) => crate::platform::clipboard_watch::write_html(&html, &text)?,
+                None => crate::platform::clipboard_watch::write_text(&text)?,
             }
         }
-        ClipboardRead => return Ok(crate::platform::clipboard_watch::read_text(app).unwrap_or_default().into()),
+        ClipboardRead => return Ok(crate::platform::clipboard_watch::read_text().unwrap_or_default().into()),
         Reload => reload_commands(app),
         Applications => {
             let index = app.state::<IndexState>();

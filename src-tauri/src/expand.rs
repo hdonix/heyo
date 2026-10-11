@@ -462,7 +462,7 @@ fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), S
     {
         let mut saved = SAVED.lock().unwrap();
         if saved.is_none() {
-            *saved = Some(clipboard_watch::read_text(app).unwrap_or_default());
+            *saved = Some(clipboard_watch::read_text().unwrap_or_default());
         }
     }
     let done = (|| {
@@ -479,7 +479,7 @@ fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), S
             if written.as_deref() != Some(&whole) {
                 // Plumbing, not something the user copied.
                 crate::clipboard::skip_next();
-                clipboard_watch::write_text(app, &whole).map_err(|e| format!("the clipboard could not be written: {e}"))?;
+                clipboard_watch::write_text(&whole).map_err(|e| format!("the clipboard could not be written: {e}"))?;
                 written = Some(whole);
                 std::thread::sleep(SETTLE);
                 continue;
@@ -505,14 +505,13 @@ fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), S
             return typed::replace(expansion.erase + carried, terminal);
         }
     })();
-    restore_clipboard(app);
+    restore_clipboard();
     done
 }
 
 /// Puts back what was on the clipboard, once the paste has read it.
-fn restore_clipboard(app: &AppHandle) {
+fn restore_clipboard() {
     let paste = PASTED.fetch_add(1, Ordering::SeqCst) + 1;
-    let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(500));
         // Another expansion came after: it puts the clipboard back.
@@ -522,7 +521,7 @@ fn restore_clipboard(app: &AppHandle) {
         let Some(saved) = SAVED.lock().unwrap().take().filter(|saved| !saved.is_empty()) else { return };
         // What comes back may be a secret the history skipped the first time.
         crate::clipboard::skip_next();
-        let _ = clipboard_watch::write_text(&app, &saved);
+        let _ = clipboard_watch::write_text(&saved);
     });
 }
 

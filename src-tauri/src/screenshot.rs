@@ -424,7 +424,7 @@ pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
                 return Err("No text was found in the selection.".into());
             }
             close_overlay(&app);
-            crate::platform::clipboard_watch::write_text(&app, &text)?;
+            crate::platform::clipboard_watch::write_text(&text)?;
             let preview: String = text.chars().take(80).collect();
             notify("Text copied", &preview);
             Ok(text)

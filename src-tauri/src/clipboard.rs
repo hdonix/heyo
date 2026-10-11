@@ -315,7 +315,7 @@ pub fn copy_entry(app: &AppHandle, entry: &Entry) -> Result<(), String> {
         let image = tauri::image::Image::new_owned(image.into_raw(), width, height);
         app.clipboard().write_image(&image).map_err(|e| e.to_string())
     } else {
-        crate::platform::clipboard_watch::write_text(app, entry.text.as_deref().unwrap_or_default())
+        crate::platform::clipboard_watch::write_text(entry.text.as_deref().unwrap_or_default())
     }
 }
 
@@ -463,7 +463,7 @@ fn capture(app: &AppHandle, prefer_image: bool, source: Option<String>) {
             return;
         }
     }
-    if let Some(text) = crate::platform::clipboard_watch::read_text(app) {
+    if let Some(text) = crate::platform::clipboard_watch::read_text() {
         history.record_text(text, source, retention);
     }
 }

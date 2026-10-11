@@ -1036,7 +1036,7 @@ fn perform_one(app: &tauri::AppHandle, effect: Effect) -> Result<(), String> {
         }
         Effect::Event { source, event, user } => deliver(app, &source, event, user),
         Effect::Open(target) => crate::platform::common::open(&target)?,
-        Effect::Copy(text) => crate::platform::clipboard_watch::write_text(app, &text)?,
+        Effect::Copy(text) => crate::platform::clipboard_watch::write_text(&text)?,
         // As the root search would open it: in the palette, which comes up
         // for it, unless it lives in the menu bar.
         Effect::Launch { location, launch } => crate::menubar::launch_command(app, &location, &launch.command, false, launch.arguments, launch.context, None)?,

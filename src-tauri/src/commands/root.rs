@@ -85,8 +85,8 @@ pub(crate) fn reset_ranking(id: String, usage: State<UsageStore>, app: AppHandle
 }
 
 #[tauri::command(async)]
-pub(crate) fn read_clipboard(app: AppHandle) -> String {
-    crate::platform::clipboard_watch::read_text(&app).unwrap_or_default()
+pub(crate) fn read_clipboard() -> String {
+    crate::platform::clipboard_watch::read_text().unwrap_or_default()
 }
 
 /// Copies text and hides the palette; with `paste`, also pastes it into the
@@ -97,7 +97,7 @@ pub(crate) fn copy_text(text: String, paste: bool, app: AppHandle) -> Result<(),
     if paste {
         return pasting::copy_and_paste(&app, text);
     }
-    crate::platform::clipboard_watch::write_text(&app, &text)?;
+    crate::platform::clipboard_watch::write_text(&text)?;
     let _ = main_window(&app).hide();
     Ok(())
 }

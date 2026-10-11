@@ -293,7 +293,7 @@ pub(crate) fn open_extensions_folder() -> Result<(), String> {
 /// a bug report: versions, the session, the end of the log, secrets removed.
 #[tauri::command(async)]
 pub(crate) fn copy_diagnostics(app: AppHandle) -> Result<(), String> {
-    crate::platform::clipboard_watch::write_text(&app, &diagnostics::report(&app))
+    crate::platform::clipboard_watch::write_text(&diagnostics::report(&app))
 }
 
 #[cfg(test)]

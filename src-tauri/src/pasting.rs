@@ -87,14 +87,14 @@ pub(crate) fn copy_and_paste(app: &AppHandle, text: String) -> Result<(), String
     if runs_as_commands(&text) && needs_asking(&text, target_is_terminal(app), asks(app)) {
         let asking = app.clone();
         confirm::ask(app, question(&text), move |answer| {
-            on_answer(asking, answer, |app| match clipboard_watch::write_text(app, &text) {
+            on_answer(asking, answer, |app| match clipboard_watch::write_text(&text) {
                 Ok(()) => hide_and_paste(app),
                 Err(e) => notify("Could not paste", &e),
             });
         });
         return Ok(());
     }
-    clipboard_watch::write_text(app, &text)?;
+    clipboard_watch::write_text(&text)?;
     hide_and_paste(app);
     Ok(())
 }
@@ -105,7 +105,7 @@ pub(crate) fn copy_and_paste(app: &AppHandle, text: String) -> Result<(), String
 pub(crate) fn paste_clipboard(app: &AppHandle) {
     // Wait for the focus to return to the window being pasted into.
     std::thread::sleep(Duration::from_millis(150));
-    let text = terminal_focused().then(|| clipboard_watch::read_text(app)).flatten().unwrap_or_default();
+    let text = terminal_focused().then(clipboard_watch::read_text).flatten().unwrap_or_default();
     if !needs_asking(&text, true, asks(app)) {
         return paste_as_is(Duration::ZERO);
     }

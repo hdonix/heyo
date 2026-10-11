@@ -16,10 +16,10 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
         root::KEEP_AWAKE_ID => toggle_keep_awake(app),
         root::PASTE_PLAIN_ID => {
             let _ = main_window(app).hide();
-            match crate::platform::clipboard_watch::read_text(app).ok_or(()) {
+            match crate::platform::clipboard_watch::read_text().ok_or(()) {
                 Ok(text) if !text.is_empty() => {
                     // Writing only text drops every richer format the source offered.
-                    match crate::platform::clipboard_watch::write_text(app, &text) {
+                    match crate::platform::clipboard_watch::write_text(&text) {
                         Ok(()) => {
                             std::thread::spawn(|| paste_keystroke(std::time::Duration::from_millis(150)));
                         }

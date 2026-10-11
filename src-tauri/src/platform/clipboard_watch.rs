@@ -1,5 +1,11 @@
 //! The clipboard: noticing when something is copied, and reading and
-//! writing its text where the toolkit's way needs Heyo to be in front.
+//! writing its text.
+//!
+//! The session's adapter does it (`Desktop`), since the toolkit's way needs
+//! Heyo to be in front on Wayland. The toolkit's way is what an adapter
+//! without one of its own is left with, and what GNOME falls back to.
+
+use std::sync::OnceLock;
 
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -16,35 +22,52 @@ pub struct Change {
     pub source: Option<String>,
 }
 
-/// The clipboard's text, where the session lets it be read without the
-/// asking application being in front (on Wayland an ordinary read fails
-/// then). `None` means: read it the ordinary way.
-pub fn text() -> Option<String> {
-    desktop().clipboard_text()
+/// The toolkit's clipboard lives in the application.
+static TOOLKIT: OnceLock<AppHandle> = OnceLock::new();
+
+/// Tells this module the application once it exists. Until then (and in
+/// tests, which bring a clipboard of their own) the toolkit has none.
+pub(crate) fn attach(app: &AppHandle) {
+    let _ = TOOLKIT.set(app.clone());
 }
 
-/// The clipboard's image as RGBA; see `text`.
+fn toolkit() -> Result<&'static AppHandle, String> {
+    TOOLKIT.get().ok_or_else(|| "the clipboard is not there yet".to_owned())
+}
+
+pub(super) fn toolkit_text() -> Option<String> {
+    toolkit().ok()?.clipboard().read_text().ok()
+}
+
+pub(super) fn toolkit_set_text(text: &str) -> Result<(), String> {
+    toolkit()?.clipboard().write_text(text).map_err(|e| e.to_string())
+}
+
+pub(super) fn toolkit_set_html(html: &str, text: &str) -> Result<(), String> {
+    toolkit()?.clipboard().write_html(html, Some(text)).map_err(|e| e.to_string())
+}
+
+/// The clipboard's image as RGBA, where the session lets it be read without
+/// the asking application being in front (on Wayland an ordinary read fails
+/// then). `None` means: read it the ordinary way.
 pub fn image() -> Option<image::RgbaImage> {
     desktop().clipboard_image()
 }
 
-/// Puts text on the clipboard where the ordinary way needs the focus.
-/// False means: set it the ordinary way.
-pub fn set_text(text: &str) -> bool {
-    desktop().set_clipboard_text(text)
-}
-
 /// The text on the clipboard.
-pub fn read_text(app: &AppHandle) -> Option<String> {
-    text().or_else(|| app.clipboard().read_text().ok())
+pub fn read_text() -> Option<String> {
+    desktop().clipboard_text()
 }
 
 /// Puts text on the clipboard.
-pub fn write_text(app: &AppHandle, text: &str) -> Result<(), String> {
-    if set_text(text) {
-        return Ok(());
-    }
-    app.clipboard().write_text(text).map_err(|e| e.to_string())
+pub fn write_text(text: &str) -> Result<(), String> {
+    desktop().set_clipboard_text(text)
+}
+
+/// Puts rich text on the clipboard, with `text` for the applications that
+/// take none.
+pub fn write_html(html: &str, text: &str) -> Result<(), String> {
+    desktop().set_clipboard_html(html, text)
 }
 
 /// Calls `on_change` for every clipboard change, for as long as the session

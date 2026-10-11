@@ -248,7 +248,7 @@ pub fn run() {
             let _ = app.asset_protocol_scope().allow_directory(screenshot::asset_dir(), true);
             #[cfg(windows)]
             let _ = app.asset_protocol_scope().allow_directory(apps::icon_dir(), true);
-            platform::input::attach(app.handle());
+            platform::clipboard_watch::attach(app.handle());
             clipboard::watch(app.handle().clone());
             links::register();
             hotkeys::start(app.handle());

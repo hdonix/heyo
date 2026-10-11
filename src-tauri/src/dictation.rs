@@ -181,12 +181,12 @@ fn paste(app: &AppHandle, text: &str) {
         let state = app.state::<Dictation>();
         let mut state = state.0.lock().unwrap();
         if state.saved_clipboard.is_none() {
-            state.saved_clipboard = Some(crate::platform::clipboard_watch::read_text(app).unwrap_or_default());
+            state.saved_clipboard = Some(crate::platform::clipboard_watch::read_text().unwrap_or_default());
         }
     }
     // Plumbing, not something the user copied.
     crate::clipboard::skip_next();
-    if let Err(e) = crate::platform::clipboard_watch::write_text(app, text) {
+    if let Err(e) = crate::platform::clipboard_watch::write_text(text) {
         eprintln!("heyo: dictation could not copy text: {e}");
         return;
     }
@@ -197,13 +197,12 @@ fn paste(app: &AppHandle, text: &str) {
 fn restore_clipboard(app: &AppHandle) {
     let saved = app.state::<Dictation>().0.lock().unwrap().saved_clipboard.take();
     let Some(saved) = saved.filter(|s| !s.is_empty()) else { return };
-    let app = app.clone();
     std::thread::spawn(move || {
         // Let the last paste read the clipboard first.
         std::thread::sleep(Duration::from_millis(500));
         // What comes back may be a secret the history skipped the first time.
         crate::clipboard::skip_next();
-        let _ = crate::platform::clipboard_watch::write_text(&app, &saved);
+        let _ = crate::platform::clipboard_watch::write_text(&saved);
     });
 }
 

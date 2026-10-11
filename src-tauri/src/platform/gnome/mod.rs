@@ -494,16 +494,17 @@ impl crate::platform::desktop::Desktop for Gnome {
         selection()
     }
 
+    /// Through the Shell, which may read the clipboard whoever is in front.
     fn clipboard_text(&self) -> Option<String> {
-        clipboard_text()
+        clipboard_text().or_else(crate::platform::clipboard_watch::toolkit_text)
     }
 
     fn clipboard_image(&self) -> Option<image::RgbaImage> {
         clipboard_image()
     }
 
-    fn set_clipboard_text(&self, text: &str) -> bool {
-        set_clipboard_text(text).is_ok()
+    fn set_clipboard_text(&self, text: &str) -> Result<(), String> {
+        set_clipboard_text(text).or_else(|_| crate::platform::clipboard_watch::toolkit_set_text(text))
     }
 
     fn watch_clipboard(&self, on_change: &mut dyn FnMut(Change)) -> Result<(), String> {

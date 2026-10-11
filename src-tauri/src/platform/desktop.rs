@@ -123,21 +123,27 @@ pub trait Desktop: Send + Sync {
 
     // --- The clipboard ------------------------------------------------------------
 
-    /// The clipboard's text where it can be read without Heyo being in
-    /// front. `None`: read it the ordinary way.
+    /// The clipboard's text, or `None` if it has none. The default is the
+    /// toolkit's way, which on Wayland fails unless Heyo is in front.
     fn clipboard_text(&self) -> Option<String> {
-        None
+        super::clipboard_watch::toolkit_text()
     }
 
-    /// The clipboard's image as RGBA; see `clipboard_text`.
+    /// The clipboard's image as RGBA where it can be read without Heyo
+    /// being in front. `None`: read it the toolkit's way.
     fn clipboard_image(&self) -> Option<image::RgbaImage> {
         None
     }
 
-    /// Sets the clipboard's text where the ordinary way needs the focus.
-    /// False: set it the ordinary way.
-    fn set_clipboard_text(&self, _text: &str) -> bool {
-        false
+    /// Puts text on the clipboard.
+    fn set_clipboard_text(&self, text: &str) -> Result<(), String> {
+        super::clipboard_watch::toolkit_set_text(text)
+    }
+
+    /// Puts rich text on the clipboard, with `text` for the applications
+    /// that take none.
+    fn set_clipboard_html(&self, html: &str, text: &str) -> Result<(), String> {
+        super::clipboard_watch::toolkit_set_html(html, text)
     }
 
     /// Reports every clipboard change for as long as the session lasts, or
@@ -372,6 +378,10 @@ pub mod fake {
         /// "activate 3", "paste terminal", … in the order asked.
         pub asked: Mutex<Vec<String>>,
         pub selection: Mutex<String>,
+        /// The text on the clipboard.
+        pub clipboard: Mutex<Option<String>>,
+        /// Why the paste shortcut cannot be pressed, if it cannot.
+        pub paste_fails: Mutex<Option<String>>,
     }
 
     impl Fake {
@@ -450,11 +460,27 @@ pub mod fake {
 
         fn paste(&self, terminal: bool) -> Result<(), String> {
             self.note(if terminal { "paste terminal".into() } else { "paste".into() });
-            Ok(())
+            self.paste_fails.lock().unwrap().clone().map_or(Ok(()), Err)
         }
 
         fn selected_text(&self) -> String {
             self.selection.lock().unwrap().clone()
+        }
+
+        fn clipboard_text(&self) -> Option<String> {
+            self.clipboard.lock().unwrap().clone()
+        }
+
+        fn set_clipboard_text(&self, text: &str) -> Result<(), String> {
+            self.note(format!("copy {text}"));
+            *self.clipboard.lock().unwrap() = Some(text.to_owned());
+            Ok(())
+        }
+
+        fn set_clipboard_html(&self, html: &str, text: &str) -> Result<(), String> {
+            self.note(format!("copy {text} as {html}"));
+            *self.clipboard.lock().unwrap() = Some(text.to_owned());
+            Ok(())
         }
 
         fn system(&self, action: crate::platform::system::Action) -> Result<Option<String>, String> {

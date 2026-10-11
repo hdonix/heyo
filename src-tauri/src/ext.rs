@@ -21,7 +21,6 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
-use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::activities;
 use crate::clipboard::sources::Shown;
@@ -696,12 +695,12 @@ fn paste_and_restore(app: &AppHandle, text: String, html: Option<String>) -> Res
     if supported().paste == Support::None {
         return Err(ExtError::unsupported(platform::unsupported("Pasting")));
     }
-    let before = read_text(app).filter(|before| !before.is_empty());
+    let before = read_text().filter(|before| !before.is_empty());
     // Plumbing, not something the user copied.
     clipboard::skip_next();
     match html {
-        Some(html) => app.clipboard().write_html(html, Some(text.clone())).map_err(|e| e.to_string())?,
-        None => write_text(app, &text)?,
+        Some(html) => platform::clipboard_watch::write_html(&html, &text)?,
+        None => write_text(&text)?,
     }
     // Wait for the focus to return to the window being pasted into.
     std::thread::sleep(Duration::from_millis(150));
@@ -715,7 +714,7 @@ fn paste_and_restore(app: &AppHandle, text: String, html: Option<String>) -> Res
         // Let the paste read the clipboard first.
         std::thread::sleep(Duration::from_millis(500));
         clipboard::skip_next();
-        write_text(app, &before)?;
+        write_text(&before)?;
     }
     Ok(())
 }

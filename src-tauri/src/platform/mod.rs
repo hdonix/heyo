@@ -244,8 +244,14 @@ mod tests {
             assert_eq!(windows::list(Some(3)).unwrap().iter().map(|w| w.id).collect::<Vec<_>>(), [1, 2, 3]);
             input::paste_keystroke(std::time::Duration::ZERO);
             assert!(item_available("cmd:@heyo:switch-windows"));
+            // The clipboard is the desktop's, with no application to ask.
+            assert_eq!(clipboard_watch::read_text(), None);
+            clipboard_watch::write_text("copied").unwrap();
+            assert_eq!(clipboard_watch::read_text().as_deref(), Some("copied"));
+            clipboard_watch::write_html("<b>bold</b>", "bold").unwrap();
+            assert_eq!(clipboard_watch::read_text().as_deref(), Some("bold"));
         });
-        assert_eq!(fake.asked(), ["activate 3", "paste"]);
+        assert_eq!(fake.asked(), ["activate 3", "paste", "copy copied", "copy bold as <b>bold</b>"]);
         // A terminal in front gets the terminal's paste.
         let fake = desktop::fake::Fake::with_windows(&[(1, "org.gnome.Ptyxis")]);
         fake.during(|| input::paste_keystroke(std::time::Duration::ZERO));

@@ -6,10 +6,7 @@
 //! ([`paste_keystroke`]: dictation, which has nowhere to ask) it goes in as
 //! one line.
 
-use std::sync::OnceLock;
 use std::time::Duration;
-
-use tauri::AppHandle;
 
 use super::desktop::desktop;
 use super::windows;
@@ -40,22 +37,12 @@ pub(crate) fn on_one_line(text: &str) -> String {
     text.split(['\n', '\r']).map(str::trim).filter(|line| !line.is_empty()).collect::<Vec<_>>().join(" ")
 }
 
-/// The application, for reaching the clipboard as the rest of Heyo does.
-static APP: OnceLock<AppHandle> = OnceLock::new();
-
-/// Tells this module the application once it exists. Until then (and in
-/// tests) the clipboard is left as it is.
-pub(crate) fn attach(app: &AppHandle) {
-    let _ = APP.set(app.clone());
-}
-
 /// Rewrites the clipboard's text onto one line if a terminal would run it.
 fn keep_on_one_line() {
-    let Some(app) = APP.get() else { return };
-    let Some(text) = super::clipboard_watch::read_text(app).filter(|text| runs_as_commands(text)) else { return };
+    let Some(text) = super::clipboard_watch::read_text().filter(|text| runs_as_commands(text)) else { return };
     // Plumbing, not something the user copied.
     crate::clipboard::skip_next();
-    match super::clipboard_watch::write_text(app, &on_one_line(&text)) {
+    match super::clipboard_watch::write_text(&on_one_line(&text)) {
         // Let the new contents be the clipboard's before they are asked for.
         Ok(()) => std::thread::sleep(Duration::from_millis(40)),
         Err(e) => eprintln!("heyo: could not put the text on one line: {e}"),
