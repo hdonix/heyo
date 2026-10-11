@@ -3,4 +3,4 @@
 /**
  * A part of the API, to ask whether this session supports it.
  */
-export type Module = "windows" | "screen" | "dictation" | "memory" | "clipboardHistory" | "files" | "system" | "ai" | "activity";
+export type Module = "windows" | "screen" | "dictation" | "memory" | "clipboardHistory" | "files" | "system" | "activity";

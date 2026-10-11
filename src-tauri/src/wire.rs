@@ -379,7 +379,6 @@ pub enum Module {
     ClipboardHistory,
     Files,
     System,
-    Ai,
     Activity,
 }
 

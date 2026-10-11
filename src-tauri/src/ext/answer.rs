@@ -215,7 +215,7 @@ fn support(module: Module, supported: Abilities) -> Support {
             Support::Full => Support::Full,
             _ => Support::Limited,
         },
-        Module::Files | Module::System | Module::Ai => Support::Full,
+        Module::Files | Module::System => Support::Full,
         // The palette's section; the status bar is not drawn yet.
         Module::Activity => Support::Limited,
     }
@@ -1154,7 +1154,7 @@ mod tests {
         assert_eq!((support("windows"), support("screen")), (json!("full"), json!("none")));
         // The history is kept either way; without a watcher it is polled.
         assert_eq!((support("clipboardHistory"), support("memory")), (json!("limited"), json!("limited")));
-        assert_eq!((support("files"), support("system"), support("ai")), (json!("full"), json!("full"), json!("full")));
+        assert_eq!((support("files"), support("system")), (json!("full"), json!("full")));
         assert_eq!(support("dictation"), if cfg!(target_os = "linux") { "full" } else { "none" });
         assert_eq!(support("activity"), "limited");
 
