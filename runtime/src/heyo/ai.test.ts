@@ -18,8 +18,9 @@ vi.mock("../ai", async () => ({
 import { answers, extension, requests } from "../testing";
 
 import { runAs, type Current } from "../context";
-import { AI, type Message } from "./ai";
+import { AI, type AskOptions, type Message } from "./ai";
 import { HeyoError } from "./error";
+import { gained } from "./members";
 
 const as: Current = { extension: extension("notes", {}), command: "main", launchType: "userInitiated" };
 const asked = () => requests.filter((r) => r.method === "ext.ai.provider").length;
@@ -47,6 +48,24 @@ test("asked as Raycast's API is asked, the model gets the prompt and nothing of 
   expect(last().options.system).toMatch(/helpful assistant/);
   last().finish("Because.");
   expect(await answer).toBe("Because.");
+});
+
+test("each option Heyo adds has the host asked whether the extension may use it", async () => {
+  answers["ext.ai.provider"] = () => ({ kind: "local", model: "qwen3", local: true });
+  const samples: Record<string, AskOptions> = {
+    system: { system: "Be brief." },
+    images: { images: ["/tmp/shot.png"] },
+    messages: { messages: [] },
+    material: { material: true },
+  };
+  // The options the declaration says make it Heyo's, which the developer
+  // tools go by (`heyoGainsUsed` in dev/check.ts).
+  expect(Object.keys(samples)).toEqual(gained.AI.ask.given);
+  for (const options of Object.values(samples)) {
+    requests.length = 0;
+    runAs(as, () => AI.ask("Why?", options)).catch(() => {});
+    await vi.waitFor(() => expect(asked()).toBe(1));
+  }
 });
 
 test("a conversation goes to the model in order, after the system prompt, and the prompt is its next message", async () => {

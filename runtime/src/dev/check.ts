@@ -17,7 +17,7 @@ import path from "node:path";
 
 import apiGaps from "../api/conformance.gaps.json";
 import propGaps from "../api/props.gaps.json";
-import { modules, permissionsOf, type ModuleName } from "../heyo/members";
+import { gained, members, modules, permissionsOf, type ModuleName } from "../heyo/members";
 import { existsIn, readPackage, sourceFiles } from "./files";
 import { lex, withoutComments, type Token } from "./lex";
 import { API_MODULES, validateManifest } from "./manifest";
@@ -61,7 +61,7 @@ export const RULES = {
   "api-missing": "Part of the Raycast API that Heyo does not have",
   "api-unsupported": "Part of the Raycast API that Heyo has but cannot do",
   "prop-ignored": "A component property Heyo accepts and ignores",
-  "permission-missing": "Uses a Heyo module whose permission the manifest does not declare",
+  "permission-missing": "Uses something of Heyo's whose permission the manifest does not declare",
   platforms: "The manifest's `platforms` do not include one Heyo runs on",
   "ai-tools": "AI tools, which Heyo does not run",
 } as const;
@@ -317,6 +317,45 @@ export function heyoModulesUsed(source: string): ModuleName[] {
   return [...used].sort();
 }
 
+/// What is between the parentheses of the call at `index` or just after
+/// it (a bundler writes `(0, api.AI.ask)(…)`); empty where nothing is called.
+function argumentsAt(code: string, index: number): string {
+  const LIMIT = 4000;
+  let open = index;
+  while (/[\s)]/.test(code[open] ?? "")) open++;
+  if (code[open] !== "(") return "";
+  let depth = 0;
+  for (let i = open; i < Math.min(code.length, open + LIMIT); i++) {
+    if (code[i] === "(") depth++;
+    else if (code[i] === ")" && --depth === 0) return code.slice(open + 1, i);
+  }
+  return code.slice(open + 1, open + LIMIT);
+}
+
+/// What a source uses of what Heyo adds to modules of Raycast's, each as
+/// the finding names it. A function of Raycast's own counts only where it
+/// is called with one of the options Heyo gives it, and is named with it.
+export function heyoGainsUsed(source: string): { uses: string; permission: string }[] {
+  const code = withoutComments(source);
+  const imports = apiImports(code);
+  const used = new Map<string, string>();
+  for (const { module, member, permission, given } of members) {
+    if (!(module in gained) || !permission) continue;
+    for (const pattern of reaching(imports, member)) {
+      for (const match of code.matchAll(pattern)) {
+        if (!given) {
+          used.set(member, permission);
+          continue;
+        }
+        const passed = argumentsAt(code, match.index + match[0].length);
+        const option = given.find((name) => new RegExp(`(?<![\\w$.])${escape(name)}\\s*[:,}]`).test(passed));
+        if (option) used.set(`${member} with ${option}`, permission);
+      }
+    }
+  }
+  return [...used].map(([uses, permission]) => ({ uses, permission })).sort((a, b) => a.uses.localeCompare(b.uses));
+}
+
 /// What the manifest itself says that will not do. `exists` answers for a
 /// path relative to the extension's directory.
 export function checkManifest(manifest: unknown, exists: (file: string) => boolean): Finding[] {
@@ -462,8 +501,10 @@ export function checkExtension(dir: string): Report {
     } catch {
       continue;
     }
-    findings.push(...checkSource(file, built ? ownCode(source) : source));
+    const own = built ? ownCode(source) : source;
+    findings.push(...checkSource(file, own));
     for (const module of heyoModulesUsed(source)) used.set(module, permissionsOf(module));
+    for (const { uses, permission } of heyoGainsUsed(own)) used.set(uses, [permission]);
   }
 
   const declared: unknown[] = Array.isArray(manifest?.heyo?.permissions) ? manifest.heyo.permissions : [];

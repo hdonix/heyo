@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { modules } from "../heyo/members";
-import { checkExtension, checkManifest, checkSource, formatReport, heyoModulesUsed, knownGaps, ownCode, RULES } from "./check";
+import { checkExtension, checkManifest, checkSource, formatReport, heyoGainsUsed, heyoModulesUsed, knownGaps, ownCode, RULES } from "./check";
 
 const rules = (source: string) => checkSource("src/x.ts", source).map((f) => f.rule);
 const found = (source: string) => checkSource("src/x.ts", source).map((f) => `${f.rule}@${f.line}`);
@@ -124,6 +124,26 @@ export default () => (
     // Every module that is declared (`heyo/members.ts`), the newest too.
     expect(heyoModulesUsed(`import { ${Object.keys(modules).join(", ")} } from "@heyo/api";`)).toEqual(Object.keys(modules).sort());
     expect(heyoModulesUsed('const heyo = require("@heyo/api");\nheyo.LiveActivity.start(a, b);')).toEqual(["LiveActivity"]);
+  });
+
+  it("what a source uses of what Raycast's modules gain", () => {
+    const uses = (source: string) => heyoGainsUsed(source).map((used) => `${used.uses}: ${used.permission}`);
+    // A function Raycast's module does not have.
+    expect(uses('import { AI } from "@heyo/api";\nconst { local } = await AI.provider();')).toEqual(["AI.provider: ai"]);
+    // One it has is Raycast's until it is given what Heyo adds.
+    expect(uses('import { AI, Clipboard } from "@heyo/api";\nawait AI.ask(prompt, { creativity: "low" });\nawait Clipboard.paste(text);')).toEqual([]);
+    expect(uses('import { AI } from "@raycast/api";\nawait AI.ask(prompt, {\n  system: "Be brief.",\n  messages,\n});')).toEqual(["AI.ask with system: ai"]);
+    expect(uses('import { AI } from "@heyo/api";\nconst system = "x";\nAI.ask(prompt, { material, signal });\nAI.ask(other, { system });')).toEqual([
+      "AI.ask with material: ai",
+      "AI.ask with system: ai",
+    ]);
+    expect(uses('import { Clipboard as C } from "@heyo/api";\nawait C.paste(text, { restoreClipboard: true });')).toEqual(["Clipboard.paste with restoreClipboard: input.paste"]);
+    // As a bundler writes the call; and the same word elsewhere is not it.
+    expect(uses('var import_api = require("@heyo/api");\nawait (0, import_api.Clipboard.paste)(text, { restoreClipboard: true });')).toEqual([
+      "Clipboard.paste with restoreClipboard: input.paste",
+    ]);
+    expect(uses('import { Clipboard } from "@heyo/api";\nconst restoreClipboard = true;\nawait Clipboard.paste(text);\nawait Clipboard.copy(a, { system: 1 });')).toEqual([]);
+    expect(uses('import { AI } from "./ai";\nAI.provider();')).toEqual([]);
   });
 });
 
@@ -256,6 +276,11 @@ describe("a whole extension", () => {
     const both = 'import { Memory, Screen } from "@heyo/api";\nexport default () => Memory.search();\n';
     expect(missing(["screen.text", "memory.write"], both)).toEqual(['uses Memory, which needs the "memory.read" permission; add it to "heyo.permissions"']);
     expect(missing([], both)[1]).toContain('uses Screen, which needs the "screen.capture" or "screen.text" permission');
+    // What Raycast's modules gain, function by function.
+    const gains = 'import { AI, Clipboard } from "@heyo/api";\nexport default async () => Clipboard.paste((await AI.provider()).model, { restoreClipboard: true });\n';
+    expect(missing(["ai"], gains)).toEqual(['uses Clipboard.paste with restoreClipboard, which needs the "input.paste" permission; add it to "heyo.permissions"']);
+    expect(missing(["input.paste"], gains)).toEqual(['uses AI.provider, which needs the "ai" permission; add it to "heyo.permissions"']);
+    expect(missing(["ai", "input.paste"], gains)).toEqual([]);
     fs.rmSync(copy, { recursive: true, force: true });
   });
 
