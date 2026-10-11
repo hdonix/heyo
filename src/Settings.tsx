@@ -544,7 +544,7 @@ const DICTATION_LANGUAGES = [
 ];
 
 const POLISH_MODES = [
-  { value: "off", title: "Off", description: "Text is pasted as recognized, sentence by sentence while you speak." },
+  { value: "off", title: "Off", description: "The text is left as it was recognized." },
   {
     value: "clean",
     title: "Clean Up",
