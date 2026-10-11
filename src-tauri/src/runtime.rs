@@ -162,39 +162,58 @@ pub(crate) fn reply_to(app: &AppHandle, background: bool, message: &Value) {
     });
 }
 
-fn handle(app: &AppHandle, message: Value, background: bool) {
-    let method = message["method"].as_str().unwrap_or_default().to_owned();
-    // What an extension asks through `@heyo/api`: answered with care for
-    // who asks, and off this thread (`ext.rs`).
-    if message["type"] == "request" && method.starts_with("ext.") {
-        return crate::ext::handle(app, message, background);
+/// Where a message of a runtime process goes.
+#[derive(Debug, PartialEq)]
+enum Route {
+    /// What an extension asks through `@heyo/api`: answered with care for
+    /// who asks, and off this thread (`ext.rs`).
+    Extension,
+    /// A request of the runtime's own (`host.rs`).
+    Host(HostRequest),
+    /// A request that is answered as it stands.
+    Answered(Result<Value, String>),
+    /// The runtime saying it is up; nothing waits for it.
+    Ready,
+    /// Anything else of the palette's process is for the palette.
+    Webview,
+    /// And of the other process, for the menu bar.
+    MenuBar,
+}
+
+fn route(message: &Value, background: bool) -> Route {
+    let method = message["method"].as_str().unwrap_or_default();
+    let request = message["type"] == "request";
+    if request && method.starts_with("ext.") {
+        return Route::Extension;
     }
-    if message["type"] != "request" || !method.starts_with("host.") {
-        // The runtime saying it is up; nothing waits for it.
-        if message["type"] == "ready" {
-            return;
-        }
-        if !background {
-            let _ = app.emit(event::RUNTIME, message);
-        } else if message["type"] == "request" {
-            // Nobody is there to answer a dialog (`ui.confirm`): decline it.
-            let declined = reply(message["id"].clone(), Ok::<_, String>(false.into()));
-            runtime_of(app, true, |runtime| drop(runtime.reply(&declined)));
-        } else {
-            crate::menubar::handle(app, &message);
-        }
-        return;
-    }
-    let id = message["id"].clone();
-    let answer = serde_json::from_value::<HostRequest>(message)
-        .map_err(|e| format!("the host cannot answer {method}: {e}"))
-        .and_then(|request| match request {
+    if request && method.starts_with("host.") {
+        return match serde_json::from_value::<HostRequest>(message.clone()) {
             // The palette is the user's and the command's in it: a background
             // command neither hides nor shows it.
-            request if background && request.moves_palette() => Ok(Value::Null),
-            request => crate::host_call(app, request),
-        });
-    reply_to(app, background, &reply(id, answer));
+            Ok(request) if background && request.moves_palette() => Route::Answered(Ok(Value::Null)),
+            Ok(request) => Route::Host(request),
+            Err(e) => Route::Answered(Err(format!("the host cannot answer {method}: {e}"))),
+        };
+    }
+    match () {
+        _ if message["type"] == "ready" => Route::Ready,
+        _ if !background => Route::Webview,
+        // Nobody is there to answer a dialog (`ui.confirm`): decline it.
+        _ if request => Route::Answered(Ok(false.into())),
+        _ => Route::MenuBar,
+    }
+}
+
+fn handle(app: &AppHandle, message: Value, background: bool) {
+    let answer = match route(&message, background) {
+        Route::Extension => return crate::ext::handle(app, message, background),
+        Route::Host(request) => crate::host_call(app, request),
+        Route::Answered(answer) => answer,
+        Route::Ready => return,
+        Route::Webview => return drop(app.emit(event::RUNTIME, message)),
+        Route::MenuBar => return crate::menubar::handle(app, &message),
+    };
+    reply_to(app, background, &reply(message["id"].clone(), answer));
 }
 
 #[cfg(test)]
@@ -211,5 +230,40 @@ mod tests {
             reply(json!(41), Err(ExtError::new(ErrorCode::Denied, "Window access was not allowed."))),
             json!({ "type": "reply", "id": 41, "error": { "code": "denied", "message": "Window access was not allowed." } })
         );
+    }
+
+    fn request(method: &str, params: Value) -> Value {
+        json!({ "type": "request", "id": 3, "method": method, "params": params })
+    }
+
+    #[test]
+    fn a_request_goes_to_whoever_answers_its_kind() {
+        for background in [false, true] {
+            assert_eq!(route(&request("ext.windows.list", Value::Null), background), Route::Extension);
+            // One nobody knows too: it is refused there, with a code.
+            assert_eq!(route(&request("ext.teleport", Value::Null), background), Route::Extension);
+            assert_eq!(route(&request("host.hud", json!({ "text": "Done" })), background), Route::Host(HostRequest::Hud { text: "Done".into() }));
+            let unknown = route(&request("host.format-disk", Value::Null), background);
+            assert!(matches!(&unknown, Route::Answered(Err(why)) if why.starts_with("the host cannot answer host.format-disk")), "{unknown:?}");
+            assert_eq!(route(&json!({ "type": "ready" }), background), Route::Ready);
+        }
+        // What the interface is asked (`ui.confirm`) and told (`render`) is the palette's.
+        assert_eq!(route(&request("ui.confirm", json!({ "title": "Sure?" })), false), Route::Webview);
+        assert_eq!(route(&json!({ "type": "render", "tree": {} }), false), Route::Webview);
+        // A message that only looks like a request of the host's is no request.
+        assert_eq!(route(&json!({ "type": "event", "method": "host.hide" }), false), Route::Webview);
+    }
+
+    #[test]
+    fn a_background_command_has_no_palette_and_nobody_to_ask() {
+        // The palette is neither hidden nor shown for it, and it is not told No.
+        for method in ["host.hide", "host.show"] {
+            assert_eq!(route(&request(method, Value::Null), true), Route::Answered(Ok(Value::Null)));
+        }
+        assert_eq!(route(&request("host.hide", Value::Null), false), Route::Host(HostRequest::Hide));
+        assert_eq!(route(&request("host.show", Value::Null), false), Route::Host(HostRequest::Show));
+        // A dialog is declined; what it draws is for the menu bar.
+        assert_eq!(route(&request("ui.confirm", json!({ "title": "Sure?" })), true), Route::Answered(Ok(Value::Bool(false))));
+        assert_eq!(route(&json!({ "type": "menubar", "items": [] }), true), Route::MenuBar);
     }
 }
