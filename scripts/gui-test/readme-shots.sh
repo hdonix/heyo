@@ -3,75 +3,14 @@
 #
 #   readme-shots.sh [light|dark]     both when not given
 #
-# Each theme gets a sandbox of its own, started from nothing: a home
-# directory with nothing personal in it, a short list of applications, a
-# backdrop drawn for the purpose (readme-backdrop.py) and a little sample
-# data, so that the pictures show Heyo and not the machine they were taken
-# on. The session runs at twice the size (a 3840x2160 screen, GDK_SCALE=2),
-# for pictures that stay sharp on a dense display; the README shows them at
-# half their width.
+# Each theme gets a sandbox of its own, started from nothing (readme-env.sh
+# says how, and how a picture is cut out of its screen), and a little
+# sample data.
 #
 # It needs the network (the Raycast Store, from which one extension is
 # installed, and the exchange rates) and takes about three minutes a theme.
-# The sandbox is in $HEYO_TEST_DIR (by default heyo-readme-shots in the
-# temporary directory); what an earlier run left there is removed. KEEP=1
-# leaves the last sandbox running, to look around in.
-export HEYO_TEST_DIR="${HEYO_TEST_DIR:-${TMPDIR:-/tmp}/heyo-readme-shots}"
-. "$(dirname "$0")/env.sh"
-python3 "$HERE/down.py" > /dev/null; w 1
-OUT="$REPO/docs/images"
-mkdir -p "$OUT"
-
-# Twice the size.
-export SCREEN=3840x2160 GDK_SCALE=2
-# The backdrop kept around a window, in pixels of the picture, and the
-# radius the picture's corners are rounded to.
-MARGIN=16
-RADIUS=28
-
-# A home with nothing in it: no path of whoever runs this can show.
-export HOME="$T/home/user"
-rm -rf "$HOME"; mkdir -p "$HOME"
-
-# The applications in the pictures: a few that most GNOME desktops have,
-# instead of everything installed here. The sandbox is given a data
-# directory that is the system's with `applications` replaced. (Heyo adds
-# the Snap and Flatpak directories itself, which is where Firefox is.)
-APPS="org.gnome.Nautilus org.gnome.Terminal org.gnome.TextEditor org.gnome.Calculator
-  org.gnome.Calendar org.gnome.Settings org.gnome.SystemMonitor org.gnome.Evince
-  org.gnome.eog org.gnome.Rhythmbox3 org.gnome.Totem org.gnome.Characters
-  org.gnome.font-viewer org.gnome.DiskUtility org.gnome.Logs org.gnome.baobab
-  org.gnome.FileRoller org.gnome.Contacts org.gnome.Shotwell simple-scan
-  libreoffice-writer libreoffice-calc libreoffice-impress transmission-gtk"
-SHARE="$T/share"
-rm -rf "$SHARE"; mkdir -p "$SHARE/applications"
-for entry in /usr/share/*; do
-  [ "$(basename "$entry")" = applications ] || ln -s "$entry" "$SHARE/"
-done
-for app in $APPS; do
-  [ -f "/usr/share/applications/$app.desktop" ] && ln -s "/usr/share/applications/$app.desktop" "$SHARE/applications/"
-done
-export XDG_DATA_DIRS="$SHARE"
-
-# The session's own settings, written before it starts (there is no bus to
-# ask yet): the backdrop, and the icons every Ubuntu has rather than this
-# machine's.
-session() { # light|dark
-  python3 "$HERE/readme-backdrop.py" "$1" 3840 2160 "$T/backdrop-$1.png"
-  mkdir -p "$T/dconf.d" "$XDG_CONFIG_HOME/dconf"
-  cat > "$T/dconf.d/readme" <<EOF
-[org/gnome/desktop/background]
-picture-uri='file://$T/backdrop-$1.png'
-picture-uri-dark='file://$T/backdrop-$1.png'
-picture-options='stretched'
-
-[org/gnome/desktop/interface]
-icon-theme='Yaru'
-color-scheme='$([ "$1" = dark ] && echo prefer-dark || echo default)'
-enable-animations=false
-EOF
-  dconf compile "$XDG_CONFIG_HOME/dconf/user" "$T/dconf.d"
-}
+# KEEP=1 leaves the last sandbox running, to look around in.
+. "$(dirname "$0")/readme-env.sh"
 
 # Heyo's settings and what it has learnt: the favourites, and what has been
 # opened how often (the Suggestions of the empty search).
@@ -162,38 +101,9 @@ clear() { xdotool key ctrl+a BackSpace; w 0.6; }
 first_key() { type "x"; w 0.6; clear; }
 # Out of whatever is open, to nothing on the screen.
 away() { xdotool key Escape; w 0.4; xdotool key Escape; w 0.4; xdotool key ctrl+a BackSpace Escape; w 1; }
-# size WINDOW TITLE: the width and height of the window, if it is there.
-size() {
-  id=$(xdotool search --onlyvisible --name "$1" | tail -1)
-  [ -n "$id" ] && xwininfo -id "$id" | awk '/Width/{w=$2} /Height/{h=$2} END{print w, h}'
-}
-# shot NAME [WINDOW TITLE]: the window (the palette unless another is named)
-# in the middle of the screen, with MARGIN of the backdrop around it and the
-# corners of the picture rounded.
-shot() {
-  id=$(xdotool search --onlyvisible --name "${2:-^Heyo$}" | tail -1)
-  if [ -z "$id" ]; then echo "$1: no window to take a picture of" >&2; return; fi
-  set -- "$1" "$id" $(size "${2:-^Heyo$}")
-  x=$(((3840 - $3) / 2)); y=$(((2160 - $4) / 2))
-  xdotool windowmove "$2" "$x" "$y"; w 0.8
-  python3 - "$OUT/$1-$THEME.png" $((x - MARGIN)) $((y - MARGIN)) $((x + $3 + MARGIN)) $((y + $4 + MARGIN)) "$RADIUS" <<'PY'
-import os, sys
-from PIL import Image, ImageDraw, ImageGrab
-path, box, radius = sys.argv[1], tuple(map(int, sys.argv[2:6])), int(sys.argv[6])
-image = ImageGrab.grab(xdisplay=os.environ["HEYO_TEST_DISPLAY"]).crop(box).convert("RGBA")
-# The corners are cut at four times the size and brought down, for an edge
-# that is smooth.
-mask = Image.new("L", (image.width * 4, image.height * 4), 0)
-ImageDraw.Draw(mask).rounded_rectangle((0, 0, mask.width - 1, mask.height - 1), radius * 4, fill=255)
-image.putalpha(mask.resize(image.size, Image.Resampling.LANCZOS))
-image.save(path, optimize=True)
-print(f"{os.path.basename(path)}: {image.width}x{image.height}, {os.path.getsize(path) // 1024} KB")
-PY
-}
 
 for THEME in ${*:-light dark}; do
-  rm -rf "$T/home/config" "$T/home/data" "$T/home/cache"
-  mkdir -p "$T/home/data" "$T/home/config/heyo" "$T/home/cache"
+  home
   session "$THEME"
   heyo_state "$THEME"
   "$HERE/up.sh" gnome
