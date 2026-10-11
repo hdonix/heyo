@@ -805,6 +805,42 @@ mod catalogue {
     }
 
     #[test]
+    fn a_manifests_preferences_reach_the_settings_as_declared() {
+        let manifest = serde_json::json!({
+            "preferences": [
+                { "name": "token", "type": "password", "title": "API Token", "description": "From your account page.", "required": true, "placeholder": "tok_…" },
+                { "name": "unit", "type": "dropdown", "required": false, "default": "c", "data": [{ "title": "Celsius", "value": "c" }, { "title": "Fahrenheit", "value": "f" }] },
+                { "name": "notify", "type": "checkbox", "label": "Notify me", "default": true },
+                { "title": "No name" },
+                "not a preference",
+            ],
+        });
+        let read = preferences(&manifest);
+        // One that is not well formed is left out; the rest stay.
+        let [token, unit, notify] = &read[..] else { panic!("three preferences: {read:?}") };
+        assert!(token.required && token.kind == "password" && token.title.as_deref() == Some("API Token") && token.placeholder.as_deref() == Some("tok_…"));
+        assert!(!unit.required && unit.data[1].value == "f" && unit.default == Some("c".into()));
+        assert!(notify.label.as_deref() == Some("Notify me") && notify.default == Some(true.into()));
+        // As the window is sent them: under the manifest's own names, without what was left out.
+        assert_eq!(serde_json::to_value(notify).unwrap(), serde_json::json!({ "name": "notify", "type": "checkbox", "label": "Notify me", "required": false, "default": true }));
+        assert!(preferences(&serde_json::json!({ "name": "none" })).is_empty());
+        assert!(preferences(&serde_json::json!({ "preferences": "many" })).is_empty());
+    }
+
+    #[test]
+    fn the_values_set_are_kept_as_the_runtime_stores_them() {
+        let stored = serde_json::json!({ "extension": { "token": "tok_1" }, "commands": { "now": { "unit": "f" } } });
+        let values: PreferenceValues = serde_json::from_value(stored.clone()).unwrap();
+        assert_eq!(values.commands["now"]["unit"], "f");
+        assert_eq!(serde_json::to_value(&values).unwrap(), stored);
+        // Nothing set yet, or only some of it.
+        let none: PreferenceValues = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(serde_json::to_value(none).unwrap(), serde_json::json!({ "extension": {}, "commands": {} }));
+        let some: PreferenceValues = serde_json::from_value(serde_json::json!({ "extension": { "a": 1 } })).unwrap();
+        assert!(some.commands.is_empty() && some.extension["a"] == 1);
+    }
+
+    #[test]
     fn the_development_list_survives_what_it_cannot_read() {
         let text = r#"{ "extensions": [
             { "name": "a", "source": "/src/a", "dir": "/data/development/a" },

@@ -458,6 +458,18 @@ mod tests {
     }
 
     #[test]
+    fn what_the_overlay_decided_is_read_as_it_sends_it() {
+        let sent = serde_json::json!({ "action": "pin", "png": "iVBOR", "x": 12.5, "y": 40.0, "width": 300.0, "height": 200.0, "originX": 1920, "originY": -8, "scale": 2.0 });
+        let pin: Finish = serde_json::from_value(sent).unwrap();
+        assert_eq!((pin.action.as_str(), pin.png.as_str(), pin.x, pin.y, pin.width, pin.height), ("pin", "iVBOR", 12.5, 40.0, 300.0, 200.0));
+        assert_eq!((pin.origin_x, pin.origin_y, pin.scale), (1920, -8, 2.0));
+        // Cancelling needs nothing else, even from a page that lost its capture.
+        let cancel: Finish = serde_json::from_value(serde_json::json!({ "action": "cancel" })).unwrap();
+        assert_eq!((cancel.action.as_str(), cancel.png.as_str(), cancel.origin_x, cancel.scale), ("cancel", "", 0, 1.0));
+        assert!(serde_json::from_value::<Finish>(serde_json::json!({ "png": "" })).is_err());
+    }
+
+    #[test]
     fn a_selection_for_an_extension_is_saved_where_it_asked() {
         let dir = std::env::temp_dir().join(format!("heyo-pick-test-{}", std::process::id()));
         let path = dir.join("captures").join("capture-1.png");
