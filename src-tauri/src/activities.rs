@@ -951,8 +951,15 @@ pub(crate) fn enabled(settings: &crate::settings::Settings, extension: &str) -> 
     settings.live_activities && !settings.activities_off.iter().any(|off| off == extension)
 }
 
-/// Changes the table and carries out what the change calls for: the
-/// effects, the palette told, the tick started if it was not.
+impl Activities {
+    /// The table, for one who changes it to carry out what the change
+    /// calls for (`carry_out`).
+    pub(crate) fn table(&self) -> &Mutex<Table> {
+        &self.table
+    }
+}
+
+/// Changes the table and carries out what the change calls for.
 pub(crate) fn change<T>(app: &tauri::AppHandle, f: impl FnOnce(&mut Table, Millis) -> Result<(T, Vec<Effect>), ExtError>) -> Result<T, ExtError> {
     use tauri::Manager;
     let state = app.state::<Activities>();
@@ -960,9 +967,15 @@ pub(crate) fn change<T>(app: &tauri::AppHandle, f: impl FnOnce(&mut Table, Milli
         let mut table = state.table.lock().unwrap_or_else(|e| e.into_inner());
         f(&mut table, now())?
     };
+    carry_out(app, effects);
+    Ok(result)
+}
+
+/// What a change to the table calls for: its effects, the palette told,
+/// the tick started if it was not.
+pub(crate) fn carry_out(app: &tauri::AppHandle, effects: Vec<Effect>) {
     perform(app, effects);
     changed(app);
-    Ok(result)
 }
 
 /// Reads the table.

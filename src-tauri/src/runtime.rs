@@ -117,7 +117,7 @@ fn spawn(app: &AppHandle, generation: u64, background: bool) -> Result<Process, 
         move || {
             runtime_of(&ended, background, |runtime| runtime.exited(generation));
             // Whatever its commands subscribed to has nobody to tell.
-            crate::ext::runtime_exited(background);
+            crate::ext::runtime_exited(&ended, background);
             if background {
                 crate::menubar::runtime_exited(&ended);
             } else {

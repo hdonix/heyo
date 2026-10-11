@@ -174,6 +174,12 @@ impl ClipboardHistory {
         ClipboardHistory { store: Mutex::new(store), meaning: meaning::Meaning::default() }
     }
 
+    /// A history that is kept nowhere.
+    #[cfg(test)]
+    pub(crate) fn in_memory() -> Self {
+        ClipboardHistory { store: Mutex::new(store::Store::in_memory()), meaning: meaning::Meaning::default() }
+    }
+
     /// Entries are gone, their vectors with them; none are new.
     fn deleted(&self, count: usize) {
         if count > 0 {
@@ -349,34 +355,16 @@ fn wanted(app: &AppHandle, source: Option<&str>) -> Option<u32> {
     Some(retention)
 }
 
-/// What a search found, each entry with the application it came from, and
-/// how the query was read.
-pub struct Told {
-    pub entries: Vec<sources::Shown>,
-    pub query: query::Query,
-    pub relaxed: bool,
-}
-
 /// How long an answer waits for what a query means before making do with
 /// its words: the model takes a second or two to start, a few milliseconds
 /// after that.
 const MEANING_PATIENCE: Duration = Duration::from_secs(4);
 
-/// The entries a query finds (without one, the recent and the pinned). With
-/// `by_meaning`, also those that mean what it says, once that is known;
-/// where there is nothing to add to what the words found (finding by
-/// meaning is off, say), the words' answer it is.
-pub fn find(app: &AppHandle, query: &str, kind: Option<Kind>, by_meaning: bool) -> Told {
-    let meant = (by_meaning && !query.trim().is_empty()).then(|| meant(app, query, kind)).flatten();
-    let found = meant.unwrap_or_else(|| app.state::<ClipboardHistory>().search(query, kind));
-    let index = app.state::<crate::IndexState>();
-    let index = index.0.read().unwrap();
-    Told { entries: sources::shown(found.entries, &found.by_meaning, &index.apps), query: found.query, relaxed: found.relaxed }
-}
-
 /// What the words and the meaning of a query find together, waiting for the
-/// query's vector to be made.
-fn meant(app: &AppHandle, query: &str, kind: Option<Kind>) -> Option<store::Found> {
+/// query's vector to be made. Nothing where there is nothing to add to what
+/// the words find (`ClipboardHistory::search`): finding by meaning is off,
+/// say.
+pub(crate) fn meant(app: &AppHandle, query: &str, kind: Option<Kind>) -> Option<store::Found> {
     let asked = std::time::Instant::now();
     loop {
         match meaning::search(app, query, kind, SHOWN) {
@@ -386,14 +374,6 @@ fn meant(app: &AppHandle, query: &str, kind: Option<Kind>) -> Option<store::Foun
             meaning::Answer::Coming => std::thread::sleep(Duration::from_millis(40)),
         }
     }
-}
-
-/// One entry, with the application it came from.
-pub fn one(app: &AppHandle, id: u64) -> Option<sources::Shown> {
-    let entry = app.state::<ClipboardHistory>().get(id)?;
-    let index = app.state::<crate::IndexState>();
-    let index = index.0.read().unwrap();
-    sources::shown(vec![entry], &[], &index.apps).pop()
 }
 
 /// How the keeping of the history stands, for Heyo's own view of it.

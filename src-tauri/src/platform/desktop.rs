@@ -382,6 +382,11 @@ pub mod fake {
         pub clipboard: Mutex<Option<String>>,
         /// Why the paste shortcut cannot be pressed, if it cannot.
         pub paste_fails: Mutex<Option<String>>,
+        /// What it supports, for a test of a desktop that cannot do what
+        /// this one usually can (windows, pasting, the selection).
+        pub supported: Mutex<Option<Supported>>,
+        /// A window of Heyo's own is in front, so none of these is active.
+        pub heyo_in_front: Mutex<bool>,
     }
 
     impl Fake {
@@ -412,10 +417,13 @@ pub mod fake {
 
     impl Desktop for Fake {
         fn supported(&self) -> Supported {
-            Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, ..Supported::NOTHING }
+            self.supported.lock().unwrap().unwrap_or(Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, ..Supported::NOTHING })
         }
 
         fn active_window(&self) -> Option<Window> {
+            if *self.heyo_in_front.lock().unwrap() {
+                return None;
+            }
             self.windows.lock().unwrap().first().map(|w| w.id)
         }
 
