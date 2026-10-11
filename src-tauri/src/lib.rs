@@ -248,6 +248,9 @@ pub fn run() {
             clipboard::watch(app.handle().clone());
             links::register();
             hotkeys::start(app.handle());
+            // A Heyo that was killed while dictating left the session
+            // without its input method.
+            std::thread::spawn(platform::composing::recover);
             dictation::watch_hold_key(app.handle());
             menubar::start(app.handle());
             updates::start(app.handle());

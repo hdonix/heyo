@@ -13,6 +13,7 @@ use std::sync::OnceLock;
 pub mod capture;
 pub mod clipboard_watch;
 pub mod common;
+pub mod composing;
 pub mod desktop;
 pub mod focus;
 pub mod hotkeys;
@@ -24,6 +25,8 @@ pub mod typed;
 pub mod windows;
 #[cfg(target_os = "linux")]
 mod gnome;
+#[cfg(target_os = "linux")]
+mod ibus;
 #[cfg(windows)]
 pub(crate) mod win;
 #[cfg(any(windows, test))]
@@ -218,6 +221,9 @@ mod tests {
         // X11 has it.
         assert_eq!(x11.rewriting, Support::Full);
         assert_eq!((gnome.rewriting, generic.rewriting), (Support::None, Support::None));
+        // Composing through the input method has been tried on X11 only.
+        assert_eq!(x11.composing, Support::Full);
+        assert_eq!((gnome.composing, generic.composing), (Support::None, Support::None));
     }
 
     /// What an adapter does not do says so, and reaches for nothing else.

@@ -22,6 +22,33 @@ pub const KEYS: &[(&str, &str)] = &[
     ("f13", "F13"),
 ];
 
+/// The X keysyms that count as each key. On many layouts Right Alt is
+/// "AltGr", ISO_Level3_Shift.
+#[cfg(target_os = "linux")]
+const KEYSYMS: &[(&str, &[u32])] = &[
+    ("alt_r", &[0xffea, 0xfe03]),
+    ("alt_l", &[0xffe9]),
+    ("control_r", &[0xffe4]),
+    ("control_l", &[0xffe3]),
+    ("shift_r", &[0xffe2]),
+    ("super_r", &[0xffec]),
+    ("menu", &[0xff67]),
+    ("caps_lock", &[0xffe5]),
+    ("f13", &[0xffca]),
+];
+
+/// The symbols a key (a setting's value) goes by where keys are known by
+/// their X keysyms; none for no key.
+pub fn symbols(key: &str) -> &'static [u32] {
+    #[cfg(target_os = "linux")]
+    return KEYSYMS.iter().find(|(value, _)| *value == key).map_or(&[], |(_, symbols)| symbols);
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = key;
+        &[]
+    }
+}
+
 /// The keys this session can watch.
 pub fn available() -> Vec<(&'static str, &'static str)> {
     let offered = desktop().hold_keys();

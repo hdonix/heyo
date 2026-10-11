@@ -445,6 +445,9 @@ impl crate::platform::desktop::Desktop for Gnome {
             // Nor could it be known that nobody else touched the text: the
             // extension pastes, and erases nothing.
             rewriting: Support::None,
+            // IBus is here too, with the Shell as its one client. Composing
+            // through it has not been tried on Wayland.
+            composing: Support::None,
         }
     }
 

@@ -35,6 +35,7 @@ impl Desktop for X11 {
             overlay: Support::Full,
             typing: Support::Full,
             rewriting: Support::Full,
+            composing: Support::Full,
         }
     }
 
@@ -129,5 +130,17 @@ impl Desktop for X11 {
 
     fn typing(&self) -> Option<&dyn super::typed::Typing> {
         Some(&typed::Keyboard)
+    }
+
+    fn can_compose(&self) -> bool {
+        super::ibus::running()
+    }
+
+    fn compose(&self, own_keys: &[u32], on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
+        super::ibus::compose(own_keys, on)
+    }
+
+    fn recover_input_method(&self) {
+        super::ibus::recover();
     }
 }

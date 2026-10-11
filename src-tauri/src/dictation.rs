@@ -6,16 +6,28 @@
 //! toggles), shows the progress window, and writes what is heard into the
 //! application the user is working in.
 //!
-//! How the words reach the application is a [`Way`], chosen when the
-//! recording starts. There is one so far: pasted (`Paster`, which does
-//! what `onscreen` decides): the words as they are spoken, corrected where
-//! they stand ("type as you speak", where the session and the window allow
-//! it), or each sentence when it is finished, or the polished text once at
-//! the end. A thread per recording (`write`) carries that out, so that a
-//! slow application holds up neither the helper nor the window, and of the
-//! sentence in progress only the newest state is ever written: what was
-//! heard meanwhile is skipped.
+//! The words reach the application one of two ways ([`Way`]), chosen when
+//! the recording starts, before a word is heard:
+//!
+//! - composed there through the session's input method (`Composer`,
+//!   which says what `composed` decides): the sentence in progress is on
+//!   screen as text being composed, a finished one is committed. This is
+//!   the way wherever the window in front takes an input method that Heyo
+//!   speaks to;
+//! - pasted (`Paster`, which does what `onscreen` decides): the words as
+//!   they are spoken, corrected where they stand by erasing and pasting
+//!   again, where the session and the window allow that, or else each
+//!   sentence when it is finished, or the polished text once at the end.
+//!
+//! A recording whose words can no longer be composed (the user chose
+//! another input method, no field has the focus when it ends) goes on by
+//! pasting, from what the application holds by then. A thread per
+//! recording (`write`) carries all of it out, so that a slow application
+//! holds up neither the helper nor the window, and of the sentence in
+//! progress only the newest state is ever written: what was heard
+//! meanwhile is skipped.
 
+mod composed;
 mod onscreen;
 
 use std::collections::VecDeque;
@@ -30,9 +42,11 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 use crate::helper::{self, Helper};
+use crate::platform::composing::{self, Composing, Stir};
 use crate::platform::typed::{self, Lost, Writing};
 use crate::{pasting, SettingsState};
-use onscreen::{OnScreen, Shortfall, Step};
+use composed::{Composed, Tell};
+use onscreen::{OnScreen, Shortfall, Standing, Step};
 
 pub const WINDOW: &str = "dictation";
 const EVENT: &str = crate::wire::event::DICTATION;
@@ -334,8 +348,10 @@ enum Spoken<'a> {
 
 /// A way for the words of one recording to reach the application.
 trait Way: Send {
-    /// Something was heard.
-    fn hear(&mut self, spoken: Spoken);
+    /// Something was heard. An error means this way has come to its end
+    /// without acting on that: the words go on another way, from what the
+    /// application holds of the recording.
+    fn hear(&mut self, spoken: Spoken) -> Result<(), Standing>;
 
     /// Whether the words are on screen in the application as they are
     /// spoken, once that is decided: what the dictation window need not
@@ -344,6 +360,106 @@ trait Way: Send {
 
     /// What could not be done at the end, once the recording is over.
     fn shortfall(&self) -> Option<Shortfall>;
+}
+
+/// How long a recording that ends waits for a field to have the focus
+/// again before its last words are pasted instead. Finishing with a
+/// hotkey takes the focus away for as long as the key is down.
+const FIELD_BACK: Duration = Duration::from_millis(if cfg!(test) { 20 } else { 600 });
+
+/// The words composed in the application through the input method: says
+/// what `Composed` decides, for the recording and for what the user does
+/// in the field meanwhile.
+struct Composer {
+    /// Shared with the input method's own thread, which hears of the field.
+    composed: Arc<(Mutex<Composed>, Condvar)>,
+    /// For as long as it lives, the session's input method is Heyo's.
+    field: Box<dyn Composing>,
+}
+
+/// Says to the input method what `Composed` answered.
+fn tell(field: &mut dyn Composing, tells: Vec<Tell>) -> Result<(), String> {
+    for tell in tells {
+        match tell {
+            Tell::Show(text) => field.show(&text)?,
+            Tell::Commit(text) => {
+                // Like pasted text, committed text must not press Enter in
+                // a terminal: there it goes in on one line.
+                let terminal = text.contains(['\n', '\r']) && crate::platform::input::terminal_focused();
+                field.commit(&pasting::unasked(text, terminal))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+impl Composer {
+    /// Begins composing in the window in front, or says why not. `live`:
+    /// the sentence in progress is shown while it is spoken. `own_keys`:
+    /// the keys that are pressed for Heyo, and are not typing.
+    fn begin(live: bool, polishing: bool, own_keys: &[u32]) -> Result<Composer, String> {
+        let composed = Arc::new((Mutex::new(Composed::new(live, polishing)), Condvar::new()));
+        let heard = composed.clone();
+        let field = composing::compose(
+            own_keys,
+            Box::new(move |stir, field| {
+                let (composed, changed) = &*heard;
+                let mut composed = composed.lock().unwrap();
+                let tells = composed.on(match stir {
+                    Stir::Key => composed::Event::Key,
+                    Stir::Reset => composed::Event::Reset,
+                    Stir::Left => composed::Event::Left,
+                    Stir::Entered => composed::Event::Entered,
+                    Stir::Gone => composed::Event::Gone,
+                });
+                if let Err(e) = tell(field, tells) {
+                    eprintln!("heyo: dictation: the input method stopped taking words ({e})");
+                    composed.on(composed::Event::Gone);
+                }
+                changed.notify_all();
+            }),
+        )?;
+        Ok(Composer { composed, field })
+    }
+}
+
+impl Way for Composer {
+    fn hear(&mut self, spoken: Spoken) -> Result<(), Standing> {
+        let (composed, changed) = &*self.composed;
+        let mut composed = composed.lock().unwrap();
+        let event = match spoken {
+            Spoken::Partial(text) => composed::Event::Partial(text),
+            Spoken::Sentence(text) => composed::Event::Sentence(text),
+            Spoken::Result { text, polished } => composed::Event::Result { text, polished },
+            Spoken::Cancelled => composed::Event::Cancelled,
+            Spoken::Failed => composed::Event::Failed,
+        };
+        if matches!(spoken, Spoken::Result { .. }) {
+            composed = changed.wait_timeout_while(composed, FIELD_BACK, |composed| composed.between_fields()).unwrap().0;
+        }
+        if let Some(standing) = composed.standing() {
+            return Err(standing);
+        }
+        let before = composed.clone();
+        let tells = composed.on(event);
+        if let Some(standing) = composed.standing() {
+            return Err(standing);
+        }
+        tell(self.field.as_mut(), tells).map_err(|e| {
+            eprintln!("heyo: dictation: the input method stopped taking words ({e})");
+            // What was to be said is not taken to have been.
+            *composed = before;
+            composed.given_up()
+        })
+    }
+
+    fn live(&self) -> Option<bool> {
+        Some(self.composed.0.lock().unwrap().live())
+    }
+
+    fn shortfall(&self) -> Option<Shortfall> {
+        self.composed.0.lock().unwrap().shortfall()
+    }
 }
 
 /// The words pasted into the application: carries out what `OnScreen`
@@ -360,6 +476,9 @@ struct Paster {
     /// Borrowed for the whole recording: pieces follow each other faster
     /// than it could come back.
     clipboard: pasting::Loan,
+    /// What the application holds of the recording already, where its
+    /// words were composed there until now.
+    standing: Option<Standing>,
     screen: Option<OnScreen>,
     /// What corrects the text where it stands, for as long as that is safe.
     hand: Option<Box<dyn Writing>>,
@@ -372,7 +491,7 @@ struct Paster {
 
 impl Paster {
     fn new(live: bool, polishing: bool, clipboard: pasting::Loan, own_presses: Arc<AtomicU32>, here: Box<dyn Fn() -> Result<Vec<String>, &'static str> + Send>) -> Paster {
-        Paster { live, polishing, here, clipboard, screen: None, hand: None, own_presses, put_off: false }
+        Paster { live, polishing, here, clipboard, standing: None, screen: None, hand: None, own_presses, put_off: false }
     }
 
     /// Decides, at the first words, how this recording is written.
@@ -388,11 +507,14 @@ impl Paster {
 
     /// Something was heard, or became of the last step.
     fn on(&mut self, event: onscreen::Event) {
-        let mut screen = match self.screen.take() {
-            Some(screen) => screen,
+        let mut screen = match (self.screen.take(), self.standing.take()) {
+            (Some(screen), _) => screen,
+            // What was composed there is the application's: nothing of it
+            // is erased, and the rest is pasted after it.
+            (None, Some(standing)) => OnScreen::resuming(standing, self.polishing),
             // With nothing said there is nothing to decide.
-            None if !matches!(event, onscreen::Event::Partial(_) | onscreen::Event::Sentence(_)) => OnScreen::new(false, self.polishing),
-            None => self.begin(),
+            (None, None) if !matches!(event, onscreen::Event::Partial(_) | onscreen::Event::Sentence(_)) => OnScreen::new(false, self.polishing),
+            (None, None) => self.begin(),
         };
         let mut steps: VecDeque<Step> = screen.on(event).into();
         while let Some(step) = steps.pop_front() {
@@ -428,7 +550,7 @@ impl Paster {
 }
 
 impl Way for Paster {
-    fn hear(&mut self, spoken: Spoken) {
+    fn hear(&mut self, spoken: Spoken) -> Result<(), Standing> {
         match spoken {
             Spoken::Partial(text) => self.on(onscreen::Event::Partial(text)),
             Spoken::Sentence(text) => self.on(onscreen::Event::Sentence(text)),
@@ -437,6 +559,7 @@ impl Way for Paster {
             // Not another word is written.
             Spoken::Failed => {}
         }
+        Ok(())
     }
 
     fn live(&self) -> Option<bool> {
@@ -448,19 +571,32 @@ impl Way for Paster {
     }
 }
 
-/// Writes one recording into the application.
+/// Writes one recording into the application, one way or the other.
 struct Writer {
     way: Box<dyn Way>,
+    /// Takes over where the words can no longer be composed.
+    spare: Option<Paster>,
 }
 
 impl Writer {
-    fn new(paster: Paster) -> Writer {
-        Writer { way: Box::new(paster) }
+    /// The words are composed if a `composer` could begin, else pasted.
+    fn new(composer: Option<Composer>, paster: Paster) -> Writer {
+        match composer {
+            Some(composer) => Writer { way: Box::new(composer), spare: Some(paster) },
+            None => Writer { way: Box::new(paster), spare: None },
+        }
     }
 
     /// Something was heard.
     fn hear(&mut self, spoken: Spoken) {
-        self.way.hear(spoken);
+        let Err(standing) = self.way.hear(spoken) else { return };
+        // Pasting does not come to an end.
+        let Some(mut paster) = self.spare.take() else { return };
+        eprintln!("heyo: dictation: the words are no longer composed in the application; the rest is pasted");
+        paster.standing = Some(standing);
+        // Before anything is pasted, the input method is the user's again.
+        self.way = Box::new(paster);
+        let _ = self.way.hear(spoken);
     }
 
     /// Whether the words are going in as they are spoken, once that is
@@ -516,13 +652,37 @@ fn here(app: &AppHandle) -> Result<Vec<String>, &'static str> {
     }
 }
 
-/// Starts the thread that writes a recording into the application: what
-/// is heard reaches it through `mailbox`, and it ends with the recording.
-fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool) -> std::io::Result<()> {
+/// Begins composing the words of recording number `session` in the window
+/// in front, if they can be composed there.
+fn composer(app: &AppHandle, live: bool, polishing: bool, session: u64) -> Option<Composer> {
+    if !composing::supported() {
+        return None;
+    }
+    // While the hotkey that started the recording is down, the desktop has
+    // the keyboard and no field has the focus: which field the words are
+    // for shows when the key is let go.
+    let held = || {
+        let state = app.state::<Dictation>();
+        let state = state.0.lock().unwrap();
+        state.holding && state.recording && state.session == session
+    };
+    while held() {
+        std::thread::sleep(Duration::from_millis(15));
+    }
+    let hold_key = app.state::<SettingsState>().0.read().unwrap().dictation_hold_key.clone();
+    // Says why not, never what was said.
+    Composer::begin(live, polishing, crate::platform::keys::symbols(&hold_key)).map_err(|why| eprintln!("heyo: dictation: the words are not composed in the application ({why})")).ok()
+}
+
+/// Starts the thread that writes recording number `session` into the
+/// application: what is heard reaches it through `mailbox`, and it ends
+/// with the recording. `live`: the words are wanted as they are spoken.
+fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool, session: u64) -> std::io::Result<()> {
     let app = app.clone();
     let spawned = std::thread::Builder::new().name("dictation-writing".into()).spawn(move || {
         let asking = app.clone();
-        let mut writer = Writer::new(Paster::new(live, polishing, pasting::borrow(), mailbox.own_presses.clone(), Box::new(move || here(&asking))));
+        let paster = Paster::new(live && typed::rewriting(), polishing, pasting::borrow(), mailbox.own_presses.clone(), Box::new(move || here(&asking)));
+        let mut writer = Writer::new(composer(&app, live, polishing, session), paster);
         let mut told = None;
         let last = loop {
             let last = match mailbox.next() {
@@ -550,8 +710,8 @@ fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool) ->
             state.recording = false;
             state.writing = None;
         }
-        // The loan ends: the clipboard comes back once the last piece has
-        // been read from it.
+        // The session's input method is the user's again; a loan ends, and
+        // the clipboard comes back once the last piece has been read from it.
         drop(writer);
         hide_window_after(&app, linger(&last));
         emit(&app, last);
@@ -712,12 +872,12 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     match started {
         Ok(()) => {
             state.recording = true;
+            state.session += 1;
             let mailbox = Arc::new(Mailbox::default());
-            match write(app, mailbox.clone(), live && typed::rewriting(), polish != "off") {
+            match write(app, mailbox.clone(), live, polish != "off", state.session) {
                 Ok(()) => state.writing = Some(mailbox),
                 Err(e) => eprintln!("heyo: dictation has nothing to write with: {e}"),
             }
-            state.session += 1;
             // The hotkey that started this is usually still down.
             let held = crate::windows::keys_down().filter(|keys| watch_hotkey && keys.iter().any(|b| *b != 0));
             state.holding = held.is_some();
@@ -896,7 +1056,7 @@ mod tests {
     /// A writer for the window in front of a desk (`pasting::scripted`),
     /// which takes words as they are spoken.
     fn writer(pasting: &'static pasting::Pasting, live: bool, polishing: bool) -> Writer {
-        Writer::new(Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()]))))
+        Writer::new(None, Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()]))))
     }
 
     /// What the helper said, line by line: `~text` is the sentence in
@@ -923,6 +1083,234 @@ mod tests {
     /// history that go with every piece.
     fn asked(desktop: &Fake) -> Vec<String> {
         happened(desktop).into_iter().filter(|what| what != "unrecorded").collect()
+    }
+
+    /// The key held to talk, which is Heyo's and not typing.
+    const MENU: u32 = 0xff67;
+
+    /// A writer for the window in front of a desk whose session has an
+    /// input method: the words are composed there, if anything can be.
+    fn composer(desktop: &'static Fake, pasting: &'static pasting::Pasting, live: bool, polishing: bool) -> Writer {
+        *desktop.input_method.lock().unwrap() = true;
+        assert!(composing::supported());
+        let paster = Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()])));
+        Writer::new(Composer::begin(live, polishing, &[MENU]).ok(), paster)
+    }
+
+    #[test]
+    fn a_recording_is_composed_in_the_application_and_nothing_else_is_touched() {
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            desktop.user_types("Dear Ada, ");
+            // The input method is Heyo's before a word is heard.
+            let mut writer = composer(desktop, pasting, true, false);
+            assert_eq!((writer.writing_live(), asked(desktop)), (Some(true), vec!["composing begins 0xff67".to_owned()]));
+            hear(&mut writer, &["~The weather", "~The whether is nise", "~The weather is nice today", "The weather is nice today.", "~ See who", " See you at 3:30."]);
+            let last = end(&mut writer, "The weather is nice today. See you at 3:30.", "The weather is nice today. See you at 3:30.");
+            // The sentence in progress is composed, whole each time; the
+            // finished one is committed. Nothing is erased, nothing pasted.
+            assert_eq!(
+                asked(desktop),
+                ["compose The weather", "compose The whether is nise", "compose The weather is nice today", "commit The weather is nice today.", "compose ", "compose  See who", "commit  See you at 3:30.", "compose "]
+            );
+            assert_eq!(desktop.field(), "Dear Ada, The weather is nice today. See you at 3:30.");
+            assert_eq!((&last["warning"], &last["kept"]), (&Value::Null, &Value::Null));
+            // With the recording, composing ends: the input method is the user's again.
+            drop(writer);
+            world.pass(SECOND);
+            assert_eq!(happened(desktop), ["composing ends"]);
+            assert_eq!(clipboard(desktop).as_deref(), Some("the user's"));
+        });
+    }
+
+    #[test]
+    fn a_key_of_the_users_goes_in_behind_what_was_composed_and_the_rest_behind_the_key() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, false);
+            hear(&mut writer, &["~The weather is"]);
+            desktop.user_presses("!");
+            hear(&mut writer, &["~The weather is nice", "The weather is nice today.", "~ See", " See you."]);
+            end(&mut writer, "The weather is nice today. See you.", "The weather is nice today. See you.");
+            assert_eq!(
+                asked(desktop),
+                ["composing begins 0xff67", "compose The weather is", "commit The weather is", "compose ", "compose  nice", "commit  nice today.", "compose ", "compose  See", "commit  See you.", "compose "]
+            );
+            assert_eq!(desktop.field(), "The weather is! nice today. See you.");
+        });
+    }
+
+    #[test]
+    fn the_polished_text_is_what_is_committed_and_the_recording_is_composed_until_then() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            desktop.user_types("> ");
+            let mut writer = composer(desktop, pasting, true, true);
+            hear(&mut writer, &["~um so the meeting", "um so the meeting is on thursday.", "~ uh at ten", " uh at ten."]);
+            assert_eq!((desktop.field().as_str(), desktop.composing.lock().unwrap().as_str()), ("> ", "um so the meeting is on thursday. uh at ten."));
+            asked(desktop);
+            let last = end(&mut writer, "The meeting is on Thursday at ten.", "um so the meeting is on thursday. uh at ten.");
+            assert_eq!(asked(desktop), ["commit The meeting is on Thursday at ten.", "compose "]);
+            assert_eq!(desktop.field(), "> The meeting is on Thursday at ten.");
+            assert_eq!((&last["text"], &last["warning"]), (&json!("The meeting is on Thursday at ten."), &Value::Null));
+        });
+        // A key during the recording made part of it the application's as
+        // it was heard: the rest follows as heard, and the window says so.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, true);
+            hear(&mut writer, &["~um hello"]);
+            desktop.user_presses(",");
+            hear(&mut writer, &["um hello there."]);
+            let last = end(&mut writer, "Hello there.", "um hello there.");
+            assert_eq!(desktop.field(), "um hello, there.");
+            assert_eq!(last["text"], "um hello there.");
+            assert!(last["warning"].as_str().unwrap().contains("as it was heard"));
+        });
+    }
+
+    #[test]
+    fn polished_text_of_several_lines_is_committed_into_a_terminal_on_one() {
+        let (desktop, _, pasting) = desk("org.gnome.Ptyxis", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, true);
+            hear(&mut writer, &["list the files and then build."]);
+            end(&mut writer, "ls -la\nmake\n", "list the files and then build.");
+            assert_eq!(desktop.field(), "ls -la make");
+        });
+    }
+
+    #[test]
+    fn a_cancelled_recording_is_no_longer_composed() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            desktop.user_types("Dear Ada, ");
+            let mut writer = composer(desktop, pasting, true, false);
+            hear(&mut writer, &["One.", "~ Two th"]);
+            asked(desktop);
+            let last = cancel(&mut writer);
+            assert_eq!(asked(desktop), ["compose "]);
+            // The finished sentence is the application's: it stays, and the window says so.
+            assert_eq!((desktop.field().as_str(), &last["kept"]), ("Dear Ada, One.", &json!(true)));
+        });
+        // With polishing nothing was committed, and nothing is left.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, true);
+            hear(&mut writer, &["One.", "~ Two th"]);
+            let last = cancel(&mut writer);
+            assert_eq!((desktop.field().as_str(), desktop.composing.lock().unwrap().as_str(), &last["kept"]), ("", "", &Value::Null));
+        });
+    }
+
+    #[test]
+    fn a_recording_that_breaks_off_leaves_what_was_being_composed() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, false);
+            hear(&mut writer, &["One.", "~ Two th"]);
+            let error = json!({ "type": "error", "message": "Dictation stopped unexpectedly" });
+            assert_eq!(writer.end(error.clone()), error);
+            assert_eq!((desktop.field().as_str(), desktop.composing.lock().unwrap().as_str()), ("One. Two th", ""));
+        });
+    }
+
+    #[test]
+    fn words_spoken_while_no_field_has_the_focus_go_in_when_one_has() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, false);
+            hear(&mut writer, &["~The wea"]);
+            // A hotkey is pressed, or another window comes to the front.
+            desktop.stirs(Stir::Left);
+            assert_eq!((desktop.field(), writer.writing_live()), (String::new(), Some(false)));
+            hear(&mut writer, &["~The weather is", "The weather is nice.", "~ See"]);
+            asked(desktop);
+            desktop.stirs(Stir::Entered);
+            assert_eq!(asked(desktop), ["commit The weather is nice.", "compose  See"]);
+            assert_eq!(writer.writing_live(), Some(true));
+            hear(&mut writer, &[" See you."]);
+            end(&mut writer, "The weather is nice. See you.", "The weather is nice. See you.");
+            assert_eq!(desktop.field(), "The weather is nice. See you.");
+        });
+    }
+
+    #[test]
+    fn where_the_words_can_no_longer_be_composed_the_rest_is_pasted() {
+        // The user chooses another input method in the middle of a sentence.
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, false);
+            hear(&mut writer, &["One.", "~ Two th"]);
+            desktop.stirs(Stir::Gone);
+            assert_eq!(writer.writing_live(), Some(false));
+            asked(desktop);
+            hear(&mut writer, &["~ Two three", " Two three.", "~ Fou", " Four."]);
+            // Composing is given up before a key is pressed for pasting.
+            assert_eq!(asked(desktop), ["composing ends", "copy  Two three.", "wait 60", "paste", "copy  Four.", "wait 60", "paste"]);
+            let last = end(&mut writer, "One. Two three. Four.", "One. Two three. Four.");
+            assert_eq!(desktop.field(), "One. Two three. Four.");
+            assert_eq!(last["warning"], Value::Null);
+            drop(writer);
+            world.pass(SECOND);
+            assert_eq!(clipboard(desktop).as_deref(), Some("the user's"));
+        });
+        // The recording ends with no field to commit the last sentence in.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, false);
+            hear(&mut writer, &["One.", "~ Two th"]);
+            desktop.stirs(Stir::Left);
+            hear(&mut writer, &[" Two three."]);
+            asked(desktop);
+            end(&mut writer, "One. Two three.", "One. Two three.");
+            assert_eq!(asked(desktop), ["composing ends", "copy  Two three.", "wait 60", "paste"]);
+            assert_eq!(desktop.field(), "One. Two three.");
+        });
+        // With polishing and nothing committed, the polished text is pasted.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, true);
+            hear(&mut writer, &["um one.", "~ um two"]);
+            desktop.stirs(Stir::Gone);
+            asked(desktop);
+            hear(&mut writer, &[" um two."]);
+            let last = end(&mut writer, "One. Two.", "um one. um two.");
+            assert_eq!(asked(desktop), ["composing ends", "copy One. Two.", "wait 60", "paste"]);
+            assert_eq!((desktop.field().as_str(), &last["warning"]), ("One. Two.", &Value::Null));
+        });
+    }
+
+    #[test]
+    fn where_nothing_can_be_composed_the_words_are_pasted_from_the_start() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        *desktop.no_field.lock().unwrap() = Some("the window in front takes no input method".into());
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, true, false);
+            assert_eq!((writer.writing_live(), asked(desktop)), (None, Vec::new()));
+            hear(&mut writer, &["~Hel", "~Hello wor", "Hello world."]);
+            assert_eq!(asked(desktop), ["write <Control><Alt>d", "rewrite 0 with Hel", "rewrite 0 with lo wor", "rewrite 0 with ld."]);
+            assert_eq!(desktop.field(), "Hello world.");
+        });
+        // A session without an input method that Heyo speaks to is not asked.
+        let (desktop, _, _) = desk("firefox", None);
+        desktop.during(|| {
+            assert!(!composing::supported());
+            assert!(composing::compose(&[], Box::new(|_, _| {})).is_err());
+            assert_eq!(asked(desktop), Vec::<String>::new());
+        });
+    }
+
+    #[test]
+    fn without_live_words_sentences_are_committed_and_nothing_is_shown_meanwhile() {
+        let (desktop, _, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            let mut writer = composer(desktop, pasting, false, false);
+            hear(&mut writer, &["~Hel", "Hello.", "~ Wor", " World."]);
+            end(&mut writer, "Hello. World.", "Hello. World.");
+            assert_eq!(asked(desktop), ["composing begins 0xff67", "commit Hello.", "commit  World."]);
+            assert_eq!((desktop.field().as_str(), writer.writing_live()), ("Hello. World.", Some(false)));
+        });
     }
 
     #[test]
@@ -1019,7 +1407,7 @@ mod tests {
         let (desktop, _, pasting) = desk("org.gnome.Ptyxis", None);
         desktop.during(|| {
             let here = || not_here(crate::windows::active_class().as_deref(), false, |_| false).map_or(Ok(Vec::new()), Err);
-            let mut writer = Writer::new(Paster::new(true, false, pasting.borrow(), Arc::default(), Box::new(here)));
+            let mut writer = Writer::new(None, Paster::new(true, false, pasting.borrow(), Arc::default(), Box::new(here)));
             hear(&mut writer, &["~ls", "ls minus la.", "~ And", " And then\nmake."]);
             assert_eq!(asked(desktop), ["copy ls minus la.", "wait 60", "paste terminal", "copy  And then\nmake.", "wait 60", "copy And then make.", "wait 60", "paste terminal"]);
             assert_eq!(writer.writing_live(), Some(false));
@@ -1129,7 +1517,7 @@ mod tests {
         let (desktop, _, pasting) = desk("firefox", None);
         desktop.during(|| {
             let mailbox = Mailbox::default();
-            let mut writer = Writer::new(Paster::new(true, false, pasting.borrow(), mailbox.own_presses.clone(), Box::new(|| Ok(Vec::new()))));
+            let mut writer = Writer::new(None, Paster::new(true, false, pasting.borrow(), mailbox.own_presses.clone(), Box::new(|| Ok(Vec::new()))));
             writer.hear(Spoken::Partial("One"));
             // The window's own button is pressed, to finish.
             mailbox.own_presses.fetch_add(1, Ordering::SeqCst);

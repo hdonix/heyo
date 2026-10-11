@@ -11,21 +11,7 @@ use x11rb::protocol::xproto::ConnectionExt as _;
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
-use crate::platform::keys::{Hold, HOLD, REGRET};
-
-/// The X keysyms that count as each key (`keys::KEYS`). On many layouts
-/// Right Alt is "AltGr", ISO_Level3_Shift.
-const KEYSYMS: &[(&str, &[u32])] = &[
-    ("alt_r", &[0xffea, 0xfe03]),
-    ("alt_l", &[0xffe9]),
-    ("control_r", &[0xffe4]),
-    ("control_l", &[0xffe3]),
-    ("shift_r", &[0xffe2]),
-    ("super_r", &[0xffec]),
-    ("menu", &[0xff67]),
-    ("caps_lock", &[0xffe5]),
-    ("f13", &[0xffca]),
-];
+use crate::platform::keys::{symbols, Hold, HOLD, REGRET};
 
 /// The keycodes that produce any of `keysyms` on this keyboard.
 fn keycodes(conn: &RustConnection, keysyms: &[u32]) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -99,8 +85,7 @@ pub fn watch(key: impl Fn() -> String, on: impl Fn(Hold)) -> Result<(), Box<dyn 
         // The setting can change at any time; the keyboard layout rarely.
         let setting = key();
         if setting != configured {
-            let keysyms = KEYSYMS.iter().find(|(id, _)| *id == setting).map_or(&[][..], |(_, keysyms)| keysyms);
-            codes = keycodes(&conn, keysyms)?;
+            codes = keycodes(&conn, symbols(&setting))?;
             if !setting.is_empty() && codes.is_empty() {
                 eprintln!("heyo: this keyboard layout has no {setting} key for push-to-talk");
             }

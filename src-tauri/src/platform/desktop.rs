@@ -40,8 +40,12 @@ pub struct Supported {
     /// expand as their keyword is typed.
     pub typing: Support,
     /// Writing text into another application piece by piece and correcting
-    /// it where it stands, for dictated words that go in as they are spoken.
+    /// it where it stands by erasing and pasting: for dictated words that go
+    /// in as they are spoken, where they cannot be composed.
     pub rewriting: Support,
+    /// Composing text in another application as an input method does: for
+    /// dictated words that go in as they are spoken.
+    pub composing: Support,
 }
 
 impl Supported {
@@ -55,6 +59,7 @@ impl Supported {
         overlay: Support::None,
         typing: Support::None,
         rewriting: Support::None,
+        composing: Support::None,
     };
 }
 
@@ -286,6 +291,22 @@ pub trait Desktop: Send + Sync {
     fn typing(&self) -> Option<&dyn super::typed::Typing> {
         None
     }
+
+    // --- Composing text -------------------------------------------------------------
+
+    /// Whether the session's input method is one Heyo composes through,
+    /// and is running.
+    fn can_compose(&self) -> bool {
+        false
+    }
+
+    /// See [`super::composing::compose`].
+    fn compose(&self, _own_keys: &[u32], _on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
+        Err(unsupported("Composing text in another application"))
+    }
+
+    /// See [`super::composing::recover`].
+    fn recover_input_method(&self) {}
 }
 
 /// Global hotkeys: each runs Heyo with some arguments.
@@ -368,6 +389,7 @@ pub mod fake {
     use std::cell::Cell;
     use std::sync::Mutex;
 
+    use super::super::composing::{Composing, Hearing, Stir};
     use super::super::typed::{Lost, Typed, Typing, Writing};
     use super::*;
 
@@ -403,6 +425,15 @@ pub mod fake {
         /// What becomes of the pieces written next instead of their going
         /// in, the first first.
         pub losing: Mutex<std::collections::VecDeque<Lost>>,
+        /// The session has an input method to compose through,
+        pub input_method: Mutex<bool>,
+        /// and why nothing can be composed in the window in front, if not.
+        pub no_field: Mutex<Option<String>>,
+        /// What is shown in the window in front as being composed, after
+        /// its text.
+        pub composing: Mutex<String>,
+        /// Who hears what happens in the field that is composed in.
+        hearing: Mutex<Option<Hearing>>,
     }
 
     impl Fake {
@@ -448,6 +479,59 @@ pub mod fake {
                 field.pop();
             }
             field.push_str(text);
+        }
+
+        /// Something happens in the field that is composed in, as its
+        /// input method would hear of it. Whoever composes there hears it
+        /// first, as with a real one.
+        pub fn stirs(&'static self, stir: Stir) {
+            // The field lets go of what was being composed.
+            if matches!(stir, Stir::Reset | Stir::Left | Stir::Gone) {
+                self.composing.lock().unwrap().clear();
+            }
+            let hearing = self.hearing.lock().unwrap().take();
+            if let Some(mut hearing) = hearing {
+                hearing(stir, &mut Pen { fake: self, ends: false });
+                *self.hearing.lock().unwrap() = Some(hearing);
+            }
+        }
+
+        /// The user presses a key in the field that is composed in, which
+        /// types `text`.
+        pub fn user_presses(&'static self, text: &str) {
+            self.stirs(Stir::Key);
+            assert_eq!(*self.composing.lock().unwrap(), "", "a key reached the field while text was being composed");
+            self.user_types(text);
+        }
+    }
+
+    /// Composes in the fake's window in front.
+    struct Pen {
+        fake: &'static Fake,
+        /// Composing ends with this one.
+        ends: bool,
+    }
+
+    impl Composing for Pen {
+        fn show(&mut self, text: &str) -> Result<(), String> {
+            self.fake.note(format!("compose {text}"));
+            text.clone_into(&mut self.fake.composing.lock().unwrap());
+            Ok(())
+        }
+
+        fn commit(&mut self, text: &str) -> Result<(), String> {
+            self.fake.note(format!("commit {text}"));
+            self.fake.field.lock().unwrap().push_str(text);
+            Ok(())
+        }
+    }
+
+    impl Drop for Pen {
+        fn drop(&mut self) {
+            if self.ends {
+                self.fake.note("composing ends".into());
+                *self.fake.hearing.lock().unwrap() = None;
+            }
         }
     }
 
@@ -514,7 +598,22 @@ pub mod fake {
 
     impl Desktop for Fake {
         fn supported(&self) -> Supported {
-            self.supported.lock().unwrap().unwrap_or(Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, rewriting: Support::Full, ..Supported::NOTHING })
+            let composing = if *self.input_method.lock().unwrap() { Support::Full } else { Support::None };
+            self.supported.lock().unwrap().unwrap_or(Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, rewriting: Support::Full, composing, ..Supported::NOTHING })
+        }
+
+        fn can_compose(&self) -> bool {
+            *self.input_method.lock().unwrap()
+        }
+
+        fn compose(&self, own_keys: &[u32], on: Hearing) -> Result<Box<dyn Composing>, String> {
+            let fake = CURRENT.with(|current| current.get()).ok_or("no desktop")?;
+            if let Some(why) = fake.no_field.lock().unwrap().clone() {
+                return Err(why);
+            }
+            fake.note(format!("composing begins{}", own_keys.iter().map(|key| format!(" {key:#x}")).collect::<String>()));
+            *fake.hearing.lock().unwrap() = Some(on);
+            Ok(Box::new(Pen { fake, ends: true }))
         }
 
         fn active_window(&self) -> Option<Window> {

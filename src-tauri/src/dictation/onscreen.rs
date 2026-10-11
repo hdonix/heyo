@@ -1,4 +1,6 @@
-//! What a recording has put into the application, and what goes there next.
+//! What a recording has put into the application, and what goes there next,
+//! where its words are pasted (where they are composed instead, see
+//! `composed`).
 //!
 //! With "type as you speak", the sentence being spoken is in the
 //! application while it is still being recognized, and is corrected where
@@ -39,7 +41,10 @@
 //!
 //! Where the words do not go in as they are spoken (the setting, the
 //! session, a terminal) the same module says what was always done: each
-//! finished sentence is pasted, or the polished text once at the end.
+//! finished sentence is pasted, or the polished text once at the end. So
+//! it does for the rest of a recording whose words were composed in the
+//! application up to then (`composed`) and can be no longer
+//! ([`OnScreen::resuming`]).
 
 /// The most characters erased at the end, for the polished text or a
 /// cancelled recording. A GTK text view takes two thousand Backspaces in a
@@ -103,6 +108,18 @@ enum Ending {
     AsHeard,
     Polished,
     Cancelled,
+}
+
+/// What an application holds of a recording whose words reached it another
+/// way so far (`composed`), for the rest to be pasted after it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Standing {
+    /// The finished sentences so far, as heard.
+    pub(crate) said: String,
+    /// How much of `said` is in the application (bytes),
+    pub(crate) put: usize,
+    /// and what stands there of the text after that.
+    pub(crate) there: String,
 }
 
 /// The last replacement, in case it is reported lost.
@@ -171,7 +188,7 @@ fn common(a: &str, b: &str) -> usize {
 /// is owed whole: after "watch" that should have been "walk", "walk" reads
 /// better than "lk". (In writing without spaces between words they part
 /// where they part.)
-fn held(there: &str, owed: &str) -> usize {
+pub(super) fn held(there: &str, owed: &str) -> usize {
     let same = common(there, owed);
     let of_a_word = |c: char| c.is_alphanumeric() && u32::from(c) < 0x2e80;
     let parted_in_a_word = same < there.len() && owed[same..].starts_with(of_a_word) && owed[..same].ends_with(of_a_word);
@@ -191,6 +208,15 @@ impl OnScreen {
             (false, true) => How::AtTheEnd,
         };
         OnScreen { how, said: String::new(), screen: String::new(), put: 0, stale: String::new(), undo: None, ending: None, shortfall: None }
+    }
+
+    /// Goes on with a recording of which the application holds `standing`:
+    /// nothing of that is erased, and what is said and not there yet is
+    /// pasted, or the polished text once at the end if nothing is there.
+    pub(crate) fn resuming(standing: Standing, polishing: bool) -> OnScreen {
+        let untouched = standing.put == 0 && standing.there.is_empty();
+        let how = if polishing && untouched { How::AtTheEnd } else { How::Appending };
+        OnScreen { how, said: standing.said, put: standing.put, stale: standing.there, ..OnScreen::new(false, polishing) }
     }
 
     /// Whether the words are (still) going in as they are spoken.
@@ -817,6 +843,38 @@ mod tests {
         let mut field = Field::new(false, true);
         field.sentence("um hello.").hear(Event::Cancelled);
         assert_eq!((field.text.as_str(), field.screen.shortfall()), ("", None));
+    }
+
+    #[test]
+    fn a_recording_that_was_composed_until_now_goes_on_by_pasting() {
+        let resumed = |said: &str, put: usize, there: &str, polishing: bool| {
+            let screen = OnScreen::resuming(Standing { said: said.into(), put, there: there.into() }, polishing);
+            Field { text: format!("{}{there}", &said[..put]), screen, ..Field::new(false, polishing) }
+        };
+        // A sentence was committed, and a key made part of the next one
+        // the application's: what is said and not there yet is pasted.
+        let mut field = resumed("One.", 4, " Two th", false);
+        field.partial(" Two three").sentence(" Two three.").sentence(" Four.").ends();
+        assert_eq!(field.did(), ["\"ree.\"", "\" Four.\""]);
+        assert_eq!(field.text, "One. Two three. Four.");
+        assert!(!field.screen.live());
+        // The recording ended with a sentence still owed.
+        let mut field = resumed("One. Two.", 4, "", false);
+        field.ends();
+        assert_eq!((field.did(), field.text.as_str()), (vec!["\" Two.\"".to_owned()], "One. Two."));
+        // What is there is never erased: polished text is left out,
+        let mut field = resumed("um one.", 7, "", true);
+        field.sentence(" um two.").polished("One. Two.");
+        assert_eq!(field.text, "um one. um two.");
+        assert_eq!(field.screen.shortfall(), Some(Shortfall::NotPolished(UNSAFE)));
+        // unless nothing of the recording is there yet.
+        let mut field = resumed("um one.", 0, "", true);
+        field.sentence(" um two.").polished("One. Two.");
+        assert_eq!((field.did(), field.screen.shortfall()), (vec!["\"One. Two.\"".to_owned()], None));
+        // And a cancelled one leaves what is there, and says so.
+        let mut field = resumed("One.", 4, "", false);
+        field.hear(Event::Cancelled);
+        assert_eq!((field.text.as_str(), field.screen.shortfall()), ("One.", Some(Shortfall::NotTakenBack)));
     }
 
     #[test]

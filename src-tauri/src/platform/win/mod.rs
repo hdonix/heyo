@@ -403,6 +403,8 @@ impl crate::platform::desktop::Desktop for Windows {
             typing: Support::None,
             // It needs the user's own keys heard: see `platform::typed`.
             rewriting: Support::None,
+            // Not written: Windows has its own framework for it (TSF).
+            composing: Support::None,
         }
     }
 

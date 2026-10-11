@@ -37,6 +37,15 @@ pub fn runtime_dir() -> PathBuf {
     env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(env::temp_dir)
 }
 
+/// The input method Heyo set aside to compose text itself, noted for as
+/// long as it does: read at the next start if Heyo did not live to give it
+/// back. It means something only while the session lasts, as this
+/// directory does.
+#[cfg(target_os = "linux")]
+pub fn input_method_set_aside() -> PathBuf {
+    runtime_dir().join("heyo-input-method")
+}
+
 /// Heyo's data: extensions, clipboard history, quicklinks, usage, engines.
 pub fn data() -> PathBuf {
     data_home().join("heyo")
