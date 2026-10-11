@@ -17,7 +17,7 @@ import type { Item } from "../shared/bindings/Item";
 import { expand, needsArgument } from "../shared/placeholders";
 import { afterAlias, argumentsOf, filled, missing, type Argument } from "./arguments";
 import type { Calculation } from "./calculator";
-import { call } from "./host";
+import { call, ignored, reported } from "./host";
 import type { ActionSection, PanelAction } from "./raycast/actions";
 
 const SETTINGS_ID = "heyo:settings";
@@ -168,7 +168,7 @@ function ofActivity(activity: ActivityView, palette: Palette): Own {
 }
 
 function ofCalculation(calc: Calculation): Own {
-  const copy = (text: string, paste: boolean) => void call("copy_text", { text, paste });
+  const copy = (text: string, paste: boolean) => void call("copy_text", { text, paste }).catch(reported("Could not copy"));
   return {
     title: "Calculator",
     groups: [
@@ -239,7 +239,8 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
     const empty = missing(fields, values);
     if (empty.length) return palette.fillIn(id, fields.findIndex((field) => field.name === empty[0]));
     if (fields.length) palette.argumentsSent();
-    void call("record_usage", { id });
+    // Only the ranking would be the poorer for it.
+    void call("record_usage", { id }).catch(ignored);
     void open(item, palette, fields.length ? values : undefined);
   };
 
@@ -264,7 +265,7 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
       title: "Copy Link",
       icon: "copy-clipboard-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "c" },
-      run: () => void call("copy_text", { text: item.link ?? "", paste: false }),
+      run: () => void call("copy_text", { text: item.link ?? "", paste: false }).catch(reported("Could not copy")),
     });
   }
 
@@ -273,7 +274,7 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
       title: item.favorite ? "Remove from Favorites" : "Add to Favorites",
       icon: item.favorite ? "star-disabled-16" : "star-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "f" },
-      run: () => void call("set_favorite", { id, favorite: !item.favorite }),
+      run: () => void call("set_favorite", { id, favorite: !item.favorite }).catch(reported("Could not change favorites")),
     },
   ];
   if (item.favorite && item.section === "Favorites") {
@@ -282,13 +283,13 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
         title: "Move Up in Favorites",
         icon: "arrow-up-16",
         shortcut: { modifiers: ["ctrl", "alt"], key: "arrowUp" },
-        run: () => void call("move_favorite", { id, offset: -1 }),
+        run: () => void call("move_favorite", { id, offset: -1 }).catch(reported("Could not change favorites")),
       },
       {
         title: "Move Down in Favorites",
         icon: "arrow-down-16",
         shortcut: { modifiers: ["ctrl", "alt"], key: "arrowDown" },
-        run: () => void call("move_favorite", { id, offset: 1 }),
+        run: () => void call("move_favorite", { id, offset: 1 }).catch(reported("Could not change favorites")),
       },
     );
   }
@@ -317,10 +318,10 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
   manage.push({
     title: "Reset Ranking",
     icon: "arrow-counter-clockwise-16",
-    run: () => {
-      void call("reset_ranking", { id });
-      palette.showSuccess(`Reset ranking of ${item.title}`);
-    },
+    run: () =>
+      void call("reset_ranking", { id })
+        .then(() => palette.showSuccess(`Reset ranking of ${item.title}`))
+        .catch(reported("Could not reset ranking")),
   });
   if (item.kind === "Command" || item.kind === "Quicklink" || item.kind === "Snippet") {
     manage.push({ title: "Open Settings", icon: "cog-16", shortcut: { modifiers: ["ctrl"], key: "," }, run: palette.openSettings });

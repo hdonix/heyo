@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 import type { ActivityView } from "../shared/bindings/ActivityView";
 import type { Item } from "../shared/bindings/Item";
 import type { Calculation } from "./calculator";
-import type { Command } from "./host";
+import { reportFailuresIn, type Command } from "./host";
 import { fakeHost } from "./host.fake";
 import { askAi, describe, open, rowsFor, type Context, type Description, type Found, type Palette, type Row } from "./rows";
 
@@ -64,6 +64,8 @@ function palette(play: { answers?: Parameters<typeof fakeHost>[0]; failing?: Com
   const asked = host.calls as unknown[][];
   const replies = [...(play.replies ?? [])];
   const note = (what: string) => (...with_: unknown[]) => void asked.push([what, ...with_.filter((w) => w !== undefined)]);
+  // What the window would show of a failure it was only told to report.
+  reportFailuresIn(({ title, message }) => void asked.push(["failure", title, message]));
   const fake: Palette = {
     showError: note("showError"),
     showSuccess: note("showSuccess"),
@@ -396,4 +398,21 @@ test("what could not be opened is said so, also when its argument came from the 
     await open(found, fake);
     expect((await settled(asked)).pop()).toEqual(["showError", `Could not open ${found.title}`, `${command} failed`]);
   }
+});
+
+test("a failure nothing else depends on is shown, and success is not claimed before the host agrees", async () => {
+  const failing = (command: Command) => ({ play: { failing: [command] } });
+  expect((await doing(rows("", { calc: sum })[0], failing("copy_text"))).pop()).toEqual(["failure", "Could not copy", "copy_text failed"]);
+  expect((await doing(rowOf(docs), { title: "Copy Link", ...failing("copy_text") })).pop()).toEqual(["failure", "Could not copy", "copy_text failed"]);
+  expect((await doing(rowOf(files), { title: "Add to Favorites", ...failing("set_favorite") })).pop()).toEqual([
+    "failure",
+    "Could not change favorites",
+    "set_favorite failed",
+  ]);
+  expect(await doing(rowOf(files), { title: "Reset Ranking", ...failing("reset_ranking") })).toEqual([
+    ["reset_ranking", { id: "app:files" }],
+    ["failure", "Could not reset ranking", "reset_ranking failed"],
+  ]);
+  // Not being able to count a use is nobody's concern.
+  expect(await doing(rowOf(files), failing("record_usage"))).toEqual([["record_usage", { id: "app:files" }], ["launch", { id: "app:files", arguments: undefined }]]);
 });
