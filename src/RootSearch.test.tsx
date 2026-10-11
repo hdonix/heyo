@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // The root search with the host played by a table of answers: arguments in
-// the search bar, and the selection through a refresh.
+// the search bar, the selection through a refresh, and which row a key or a
+// click is for. What each kind of row then does is in rows.test.ts.
 import { act, createRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -20,7 +21,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 vi.mock("./calculator", () => ({ calculate: () => host.calc, loadRates: async () => null }));
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
-import { activityMatches, RootSearch } from "./RootSearch";
+import { RootSearch } from "./RootSearch";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -173,13 +174,6 @@ test("Enter while an input method composes does not launch", async () => {
   expect(launches()).toHaveLength(1);
 });
 
-test("a command without arguments launches as before", async () => {
-  await show([item("cmd:/ext:notes")]);
-  await press("Enter");
-  await settle();
-  expect(launches()).toEqual([{ id: "cmd:/ext:notes", arguments: undefined }]);
-});
-
 test("a quicklink's query is such a field, filled by what follows its alias", async () => {
   await show([github]);
   expect(fields().map((f) => f.getAttribute("placeholder"))).toEqual(["Query"]);
@@ -310,7 +304,7 @@ const activity = (key: string, rest: Partial<ActivityView> = {}): ActivityView =
 const acted = () => host.calls.filter(([command]) => command === "activity_action").map(([, args]) => args);
 const fetched = () => host.calls.filter(([command]) => command === "activities").length;
 
-test("what is in progress comes first, and Enter does what its first button does", async () => {
+test("what is in progress comes first, and Enter is for the row it is on", async () => {
   const build = activity("ci/build", { name: "Build", title: "Building", extensionTitle: "CI", compact: "3/9", hasAction: true, buttons: [] });
   await show([item("a"), item("b")], [activity("@heyo/timer-1"), build]);
   expect(fetched()).toBeGreaterThan(0);
@@ -322,36 +316,23 @@ test("what is in progress comes first, and Enter does what its first button does
   await press("Enter");
   await settle();
   expect(acted()).toEqual([{ key: "@heyo/timer-1", button: 0 }]);
-  // An activity with an action of its own: Enter does that.
-  await press("ArrowDown");
-  await press("Enter");
-  await settle();
-  expect(acted()[acted().length - 1]).toEqual({ key: "ci/build", button: null });
   // The timer's text is asked for again once a second while it is in view.
   const before = fetched();
   await act(() => new Promise<void>((resolve) => setTimeout(resolve, 1100)));
   expect(fetched()).toBeGreaterThan(before);
 });
 
-test("the action panel of an activity lists its buttons and ending it", async () => {
+test("the action panel is the selected row's, and runs what is chosen in it", async () => {
   await show([item("a")], [activity("@heyo/timer-1")]);
   await press("k", { ctrlKey: true, code: "KeyK" });
   await settle();
-  for (const title of ["Pause", "+1 min", "End Activity"]) expect(container.textContent).toContain(title);
-  await press("Escape");
-  await settle();
-  await show([item("a")], [activity("@heyo/timer-1", { dismissible: false })]);
-  await press("k", { ctrlKey: true, code: "KeyK" });
-  await settle();
-  expect(container.textContent).toContain("Pause");
-  expect(container.textContent).not.toContain("End Activity");
-});
+  expect(container.querySelector(".action-panel-title")?.textContent).toBe("25 min");
+  const actions = () => [...container.querySelectorAll<HTMLElement>(".action-panel .action-row")];
+  expect(actions().map((row) => row.querySelector(".action-title")?.textContent)).toEqual(["Pause", "+1 min", "End Activity"]);
 
-test("with a query, an activity stays if the query names it", () => {
-  const timer = activity("@heyo/timer-1");
-  expect(activityMatches(timer, "")).toBe(true);
-  expect(activityMatches(timer, "25")).toBe(true);
-  expect(activityMatches(timer, "TIMER")).toBe(true);
-  expect(activityMatches(timer, "heyo")).toBe(true);
-  expect(activityMatches(timer, "weather")).toBe(false);
+  await act(async () => actions()[2].click());
+  await settle();
+  expect(host.calls.filter(([command]) => command === "activity_dismiss").map(([, args]) => args)).toEqual([{ key: "@heyo/timer-1" }]);
+  expect(container.querySelector(".action-panel")).toBeNull();
+  expect(document.activeElement).toBe(inputRef.current);
 });
