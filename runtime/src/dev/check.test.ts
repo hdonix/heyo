@@ -230,6 +230,12 @@ describe("a whole extension", () => {
     expect(report.findings[2].message).toContain('command "off" has no source');
   });
 
+  it("finds nothing in one written for Heyo that lists what it uses", () => {
+    const report = checkExtension(path.join(__dirname, "fixtures/progress"));
+    expect(report.findings).toEqual([]);
+    expect(formatReport(report)).toContain("Nothing found that would not work on Heyo.");
+  });
+
   it("says so when there is nothing", () => {
     const clean = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-check-clean-"));
     fs.mkdirSync(path.join(clean, "src"));

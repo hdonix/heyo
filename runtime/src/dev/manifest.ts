@@ -25,6 +25,7 @@ export const PERMISSIONS = [
   "input.paste",
   "ai",
   "search.provider",
+  "activity",
 ];
 
 export interface Problem {

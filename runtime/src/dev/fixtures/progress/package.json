@@ -1,0 +1,15 @@
+{
+  "name": "progress",
+  "title": "Progress",
+  "description": "A small extension written for Heyo, which shows what it is doing while it is away.",
+  "icon": "icon.png",
+  "author": "heyo",
+  "license": "MIT",
+  "commands": [
+    { "name": "build", "title": "Watch a Build", "description": "Shows a build in progress", "mode": "no-view" }
+  ],
+  "heyo": {
+    "apiVersion": 1,
+    "permissions": ["activity"]
+  }
+}

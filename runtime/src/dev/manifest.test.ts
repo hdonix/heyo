@@ -88,7 +88,7 @@ describe("a manifest", () => {
   });
 
   it("has its heyo field checked", () => {
-    expect(validateManifest({ ...good, heyo: { apiVersion: 1, permissions: ["windows", "ai"] } }, present).problems).toEqual([]);
+    expect(validateManifest({ ...good, heyo: { apiVersion: 1, permissions: ["windows", "ai", "activity"] } }, present).problems).toEqual([]);
     expect(errors({ ...good, heyo: { apiVersion: 2 } }, present)).toEqual(['"heyo.apiVersion" is 2, but this Heyo provides version 1']);
     expect(errors({ ...good, heyo: { apiVersion: "1" } }, present)[0]).toContain("whole number");
     expect(errors({ ...good, heyo: { apiVersion: 1, permissions: "windows" } }, present)).toEqual(['"heyo.permissions" must be a list']);
