@@ -3,8 +3,10 @@
 
   window.py TITLE APP_ID        a window with a text box, which has the focus
 
-Its text can be read back from /tmp/window-APP_ID.txt, rewritten on every change.
+Its text can be read back from /tmp/window-APP_ID.txt, rewritten on every change
+(put in place whole, so that a reader never finds half of it).
 """
+import os
 import sys
 import gi
 gi.require_version("Gtk", "3.0")
@@ -21,8 +23,10 @@ if len(sys.argv) > 3:
 
 def save(*_):
     start, end = buffer.get_bounds()
-    with open(f"/tmp/window-{app_id}.txt", "w") as f:
+    path = f"/tmp/window-{app_id}.txt"
+    with open(path + ".new", "w") as f:
         f.write(buffer.get_text(start, end, True))
+    os.replace(path + ".new", path)
 
 buffer.connect("changed", save)
 save()
