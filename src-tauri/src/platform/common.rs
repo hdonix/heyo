@@ -3,8 +3,6 @@
 
 use tauri::{AppHandle, Manager};
 
-use crate::*;
-
 /// A command that runs without a console window of its own. (On Windows a
 /// console program started by a windowed one would otherwise flash one up.)
 pub(crate) fn quiet(program: impl AsRef<std::ffi::OsStr>) -> std::process::Command {
@@ -68,7 +66,6 @@ pub(crate) struct KeepAwake(std::sync::Mutex<Option<std::process::Child>>);
 pub(crate) fn toggle_keep_awake(app: &AppHandle) {
     let state = app.state::<KeepAwake>();
     let mut inhibitor = state.0.lock().unwrap();
-    let _ = main_window(app).hide();
     if let Some(mut child) = inhibitor.take() {
         let _ = child.kill();
         let _ = child.wait();

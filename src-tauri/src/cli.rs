@@ -13,7 +13,10 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
         }
         root::SCREENSHOT_ID => screenshot::start(app, "capture"),
         root::SCREENSHOT_TEXT_ID => screenshot::start(app, "text"),
-        root::KEEP_AWAKE_ID => toggle_keep_awake(app),
+        root::KEEP_AWAKE_ID => {
+            let _ = main_window(app).hide();
+            toggle_keep_awake(app);
+        }
         root::PASTE_PLAIN_ID => {
             let _ = main_window(app).hide();
             pasting::paste_plain();
