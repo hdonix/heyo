@@ -1,15 +1,13 @@
 // @vitest-environment happy-dom
 //
 // A command's view, drawn from the trees the runtime would send and driven
-// by the events a person would cause. What goes to the runtime is what
-// `invoke("runtime_send")` was called with.
+// by the events a person would cause. What goes to the runtime is what the
+// host, played here, was called with as `runtime_send`.
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 
-const invoke = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => undefined));
-vi.mock("@tauri-apps/api/core", () => ({ invoke, convertFileSrc: (path: string) => `asset://${path}` }));
-
+import { fakeHost, type FakeHost } from "../host.fake";
 import { CommandView, type CommandState } from "./CommandView";
 import type { Node, View } from "./model";
 
@@ -24,12 +22,13 @@ const withProps = (original: Node, props: Record<string, unknown>): Node => ({ .
 
 let root: Root;
 let host: HTMLElement;
+let heyo: FakeHost;
 
 beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  invoke.mockClear();
+  heyo = fakeHost();
 });
 
 afterEach(() => {
@@ -67,11 +66,7 @@ function composition(target: Element, phase: "compositionstart" | "compositionen
 }
 
 /// What was dispatched to the runtime, as [node, prop, ...args].
-const dispatched = () =>
-  invoke.mock.calls
-    .map(([, payload]) => (payload as { message: { type: string; node: number; prop: string; args: unknown[] } }).message)
-    .filter((m) => m.type === "dispatch")
-    .map((m) => [m.node, m.prop, ...m.args]);
+const dispatched = () => heyo.callsOf("runtime_send").flatMap(({ message: m }) => (m.type === "dispatch" ? [[m.node, m.prop, ...m.args]] : []));
 
 test("the search bar shows what is typed at once, and takes from the extension only what is new", () => {
   const list = node("List", { searchText: "", onSearchTextChange: fn, ack: 0 });
@@ -202,7 +197,7 @@ test("a form's text fields are typed into locally, and submitted as shown", () =
   show(form([withProps(name, { value: "Hi", ack: 2 }), notes]));
   expect(input().value).toBe("Hi");
 
-  invoke.mockClear();
+  heyo.forget();
   press(input(), "Enter");
   expect(dispatched()).toEqual([[submit.id, "onSubmit", { name: "Hi", notes: "kept" }]]);
 });
@@ -236,16 +231,16 @@ test("a file picker asks the runtime to browse, and shows what was chosen there"
 
   // The browser is pushed over the form, something is chosen, and the form is back.
   show(node("List", {}), 1);
-  invoke.mockClear();
+  heyo.forget();
   show({ ...form, children: [withProps(picker, { picked: { seq: 1, paths: ["/home/me/a.txt", "/home/me/dir/"] } }), actions] }, 0);
   expect([...host.querySelectorAll(".tag.file .file-name")].map((e) => e.textContent)).toEqual(["a.txt", "dir"]);
   expect(dispatched()).toEqual([[picker.id, "onChange", ["/home/me/a.txt", "/home/me/dir/"]]]);
 
   // One is taken out again; Enter on the button presses it rather than submitting.
-  invoke.mockClear();
+  heyo.forget();
   act(() => $<HTMLButtonElement>(".file-remove").click());
   expect(dispatched()).toEqual([[picker.id, "onChange", ["/home/me/dir/"]]]);
-  invoke.mockClear();
+  heyo.forget();
   press(button(), "Enter");
   expect(dispatched()).toEqual([]);
   press(button(), "Enter", { ctrlKey: true });
@@ -270,17 +265,17 @@ test("Action.PickDate asks for the date in the action panel", () => {
   expect(host.querySelector(".date-panel")).toBeNull();
 
   // Again, taking "No Date".
-  invoke.mockClear();
+  heyo.forget();
   press(search(), "Enter");
   act(() => [...host.querySelectorAll<HTMLButtonElement>(".date-choice")].pop()!.click());
   expect(dispatched()).toEqual([[pick.id, "onChange", null]]);
 
   // Esc leaves without a date.
-  invoke.mockClear();
+  heyo.forget();
   press(search(), "Enter");
   press(field(), "Escape");
   expect(host.querySelector(".date-panel")).toBeNull();
-  expect(invoke).not.toHaveBeenCalled();
+  expect(heyo.calls).toEqual([]);
 });
 
 test("Action.PickDate is reached from the list of actions too, and Esc goes back to it", () => {
