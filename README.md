@@ -1,3 +1,5 @@
+<img src="src-tauri/icons/128x128@2x.png" width="96" alt="" align="right">
+
 # Heyo
 
 [![CI](https://github.com/hdonix/heyo/actions/workflows/ci.yml/badge.svg)](https://github.com/hdonix/heyo/actions/workflows/ci.yml)
@@ -382,6 +384,8 @@ src-tauri/src/
   usage.rs        usage counts for ranking
   library.rs      quicklinks and snippets
   search.rs       fuzzy matching (nucleo)
+src-tauri/icons/  the application's icons, made by scripts/app-icon.py from
+                  the picture in source/ (where the mark alone is kept too)
 ```
 
 ### Settings
