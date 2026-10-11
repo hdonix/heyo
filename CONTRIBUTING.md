@@ -1,10 +1,31 @@
 # Contributing to Heyo
 
-Building, running and the tests are in the [README](README.md#development).
+- [docs/architecture.md](docs/architecture.md) says how Heyo is built and
+  where things are; read it before the code.
+- [docs/development.md](docs/development.md) says how to build, run and
+  test it, and how to try a change in a window without touching your own
+  desktop.
+
+## Before the first release, nothing is kept for compatibility
 
 Heyo has not had a release yet. Until it has, nothing is kept working for
 the sake of what an earlier commit did: names, formats and interfaces
 change in place, without code that reads the old ones.
+
+(Compatibility with Raycast's API, which extensions are written against,
+is another matter: it is what Heyo is for.)
+
+## Before you send a change
+
+What CI checks, you can check first
+([docs/development.md](docs/development.md#tests)):
+
+    pnpm build && pnpm test
+    (cd src-tauri && cargo test)
+    git diff --exit-code -- shared/bindings
+
+`cargo test` writes `shared/bindings/` again from the host's types; what
+it changes there is part of your commit.
 
 ## Commit messages
 
