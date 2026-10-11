@@ -146,7 +146,7 @@
 - [x] **P1 输入** 扩展控制的搜索框和表单值改成本地优先（现在每个字都等运行时回传，会丢字、打断输入法）；从子视图返回时恢复搜索词和选中项；根搜索刷新时保持选中项
 - [x] **地基** 拆 `lib.rs`（1082 → 260 行）；桌面相关代码收进 `platform/`，X11 实现在 `platform/x11/`，带会话检测和能力表
 - [x] **地基（2026-10-10 架构评审的 8 项）** 设置只声明一次；平台后端只选一次（`Desktop` 特征）；三层消息只定义一次（`wire.rs` → `shared/bindings/`）；路径集中（`paths.rs`）；子进程行协议（`helper.rs`）；系统命令归主机；列表选中逻辑（`selection.ts`）；内置命令目录一份、按 id 打开一条路径（`open.rs`）、排序测试。Rust 测试 84 个，前端与运行时测试 11 个（vitest）
-- [x] **第二轮架构评审（2026-10-11）的 7 项** 扩展请求的应答不需要运行中的应用（`ext/answer.rs`，28 个测试穿过入口）；`@heyo/api` 的成员只声明一次（`runtime/src/heyo/members.ts`，名单和表都由它派生）；界面调主机的命令有一张带类型的表（`commands/bindings.rs` → `shared/bindings/commands.ts`，`src/host.ts`，测试用同一个假主机）；借用剪贴板粘贴只有一处（`pasting.rs`，剪贴板读写进了 `Desktop`）；根搜索的一行在一处说清（`src/rows.ts`）；设置变更的后果是一张可测的清单（`settings::consequences`）；运行时与主机之间的测试接缝移到传输层（`transport.ts`、`testhost.ts`）。Rust 测试 370 个，前端与运行时 544 个
+- [x] **第二轮架构评审（2026-10-11）的 8 项** 扩展请求的应答不需要运行中的应用（`ext/answer.rs`，28 个测试穿过入口）；`@heyo/api` 的成员只声明一次（`runtime/src/heyo/members.ts`，名单和表都由它派生）；界面调主机的命令有一张带类型的表（`commands/bindings.rs` → `shared/bindings/commands.ts`，`src/host.ts`，测试用同一个假主机）；借用剪贴板粘贴只有一处（`pasting.rs`，剪贴板读写进了 `Desktop`）；根搜索的一行在一处说清（`src/rows.ts`）；设置变更的后果是一张可测的清单（`settings::consequences`）；运行时与主机之间的测试接缝移到传输层（`transport.ts`、`testhost.ts`）；面板窗口只在 `palette.rs` 里被操作（第 8 项，不引入接缝）。Rust 测试 372 个，前端与运行时 544 个
 - [ ] **第二轮评审没有列成候选的** `Settings.tsx` 里"带进度的安装"写了三遍、页面逻辑只有 4 个测试；`App.tsx` 的会话与确认框不变量只在监听闭包里；`Screenshot.tsx` 的几何与拖拽状态机没有测试；`builtins/store.tsx` 的安装会删除并替换扩展目录，没有测试；`dictation.rs` 的录音状态机；`lib.rs` 的启动顺序约束；扩展清单被解析三种方式
 - [ ] **P2 这一轮看到没改的** 归还剪贴板是盲的（长时间听写期间用户复制的内容会被旧内容覆盖），而且只归还文字；`settingsChanged` 事件的载荷类型没有区分缺省的两个路径；没有动作、没有按钮但可结束的活动，回车会直接结束它；`ExtReplies` 是运行时一侧手写的，主机的回复还不是生成的类型；`host.*` 的 7 处回复类型仍是手写断言
 - [x] 崩溃钩子、Heyo 自己的日志文件、「复制诊断信息」
