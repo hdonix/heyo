@@ -62,7 +62,9 @@
 HALF=${1:-both}
 PORT=18112
 SPOKEN="$T/spoken.wav"
-HOTKEY="ctrl+alt+d"
+# A key no desktop gives a meaning of its own (Ubuntu's GNOME takes
+# Ctrl+Alt+D to show the desktop, and the hotkey would not be granted).
+HOTKEY="ctrl+alt+shift+F9"
 mkdir -p "$XDG_DATA_HOME/heyo"
 ln -sfn "$HOME/.local/share/heyo/dictation" "$XDG_DATA_HOME/heyo/dictation"
 LENGTH=$(/usr/bin/python3 "$HERE/say.py" "$SPOKEN" \
@@ -243,8 +245,9 @@ session() {
   gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$K']"
   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K name 'Heyo Dictation'
   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K command "$REPO/src-tauri/target/$BUILD/heyo --dictate"
-  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K binding '<Control><Alt>d'
-  (/usr/libexec/gsd-media-keys > "$T/media-keys.log" 2>&1 &); w 3
+  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K binding '<Control><Alt><Shift>F9'
+  # It takes its shortcuts a while after it starts, longer on a busy machine.
+  (/usr/libexec/gsd-media-keys > "$T/media-keys.log" 2>&1 &); w 8
   /usr/bin/python3 "$HERE/clip.py" "the user's own"; w 1.5
   (/usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Other org.test.Other >/dev/null 2>&1 &); w 2
   notes
@@ -452,7 +455,9 @@ check("Pinyin again", engines[2] == "libpinyin")
 
 if there("composed-tapped"):
     ended, states, tapped, engines = recording("composed-tapped")
-    was = [c for t, _, c in states if t < ended and c][-1]
+    # Nothing composed at all: the hotkey did not start a recording.
+    was = ([c for t, _, c in states if t < ended and c] or [""])[-1]
+    check("the hotkey started a recording", bool(was))
     print(f"tapped: begun with the hotkey and finished with it at {ended} s, when [{was}] was being composed; it ends as\n  [{tapped}]")
     check("the words were composed, though the hotkey that began it had taken the focus", engines[1] == "heyo" and len(composing(states)) > 5)
     check("the hotkey came in the middle of a sentence", not was.rstrip().endswith("."))
