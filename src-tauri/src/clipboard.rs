@@ -87,6 +87,8 @@ fn dir() -> PathBuf {
 
 /// Until when (milliseconds since the epoch) clipboard changes are not recorded.
 static SKIP_UNTIL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// How often that was asked for, for where changes are only noticed later.
+static SKIPS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Keeps the clipboard change Heyo is about to make out of the history.
 /// For writes that are plumbing rather than something the user copied
@@ -95,6 +97,7 @@ static SKIP_UNTIL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::
 /// for what an extension marks as concealed.
 pub fn skip_next() {
     SKIP_UNTIL.store(now() + 800, std::sync::atomic::Ordering::SeqCst);
+    SKIPS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 }
 
 fn skipping() -> bool {
@@ -493,16 +496,65 @@ pub fn watch(app: AppHandle) {
     });
 }
 
+/// What looking at the clipboard now and then makes of it. A change is
+/// noticed up to a whole look after it was made, when `skipping` may have
+/// forgotten that Heyo made it: so a change is Heyo's own if a skip was
+/// asked for at any time since the last look.
+#[derive(Default)]
+struct Looks {
+    last: Option<String>,
+    skips: u64,
+}
+
+impl Looks {
+    /// Whether `text`, found on the clipboard now, is something the user
+    /// copied since the last look. `skips`: how often a skip was asked for
+    /// so far; `skipping`: whether one is in force.
+    fn copied(&mut self, text: Option<String>, skips: u64, skipping: bool) -> bool {
+        let own = skipping || skips != self.skips;
+        self.skips = skips;
+        if text.is_none() || text == self.last {
+            return false;
+        }
+        self.last = text;
+        !own
+    }
+}
+
 fn poll(app: &AppHandle) {
-    let mut last = app.clipboard().read_text().ok();
+    let mut looks = Looks { last: app.clipboard().read_text().ok(), skips: SKIPS.load(std::sync::atomic::Ordering::SeqCst) };
     loop {
         std::thread::sleep(Duration::from_millis(1000));
-        let text = app.clipboard().read_text().ok();
-        if text.is_some() && text != last {
-            if !skipping() {
-                capture(app, false, None);
-            }
-            last = text;
+        if looks.copied(app.clipboard().read_text().ok(), SKIPS.load(std::sync::atomic::Ordering::SeqCst), skipping()) {
+            capture(app, false, None);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_change_noticed_late_is_still_known_to_be_heyos_own() {
+        let text = |text: &str| Some(text.to_owned());
+        let mut looks = Looks { last: text("old"), skips: 0 };
+        // Nothing new, nothing copied; something new is a copy.
+        assert!(!looks.copied(text("old"), 0, false));
+        assert!(!looks.copied(None, 0, false));
+        assert!(looks.copied(text("copied"), 0, false));
+        assert!(!looks.copied(text("copied"), 0, false));
+        // Dictation puts a sentence there; this look comes while the skip is in force.
+        assert!(!looks.copied(text("A sentence."), 1, true));
+        // The next sentence is noticed a second after it was put there,
+        // when the skip is no longer in force.
+        assert!(!looks.copied(text("Another."), 2, false));
+        // So is the user's text coming back, which may be a secret.
+        assert!(!looks.copied(text("copied"), 3, false));
+        // After that, what changes is the user's doing again.
+        assert!(looks.copied(text("copied next"), 3, false));
+        // A skip asked for with nothing changing does not hide a later copy.
+        assert!(!looks.copied(text("copied next"), 4, false));
+        assert!(looks.copied(text("and another"), 4, false));
     }
 }
