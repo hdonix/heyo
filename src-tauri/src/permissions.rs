@@ -453,21 +453,13 @@ const PATIENCE: Duration = Duration::from_secs(300);
 /// Puts a question up in the palette, bringing it forward for as long as
 /// the question takes if it was away, and waits for the answer.
 pub(crate) fn ask(app: &AppHandle, consent: Consent) -> bool {
-    let window = crate::main_window(app);
-    let away = !window.is_visible().unwrap_or(true);
-    if away {
-        let _ = window.show();
-        crate::focus(&window);
-    }
-    let (answered, answer) = mpsc::channel();
-    confirm::ask_consent(app, consent, move |yes| {
-        let _ = answered.send(yes);
-    });
-    let yes = answer.recv_timeout(PATIENCE).unwrap_or(false);
-    if away {
-        let _ = window.hide();
-    }
-    yes
+    crate::palette::up_during(app, || {
+        let (answered, answer) = mpsc::channel();
+        confirm::ask_consent(app, consent, move |yes| {
+            let _ = answered.send(yes);
+        });
+        answer.recv_timeout(PATIENCE).unwrap_or(false)
+    })
 }
 
 impl Granted {

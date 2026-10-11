@@ -66,6 +66,22 @@ pub(crate) fn away_during<T>(app: &AppHandle, f: impl FnOnce() -> T) -> T {
     result
 }
 
+/// Runs `f` with the palette up, bringing it forward for as long as `f`
+/// takes if it was away: a command in the background has something to ask.
+pub(crate) fn up_during<T>(app: &AppHandle, f: impl FnOnce() -> T) -> T {
+    let window = main_window(app);
+    let away = matches!(window.is_visible(), Ok(false));
+    if away {
+        let _ = window.show();
+        focus(&window);
+    }
+    let result = f();
+    if away {
+        let _ = window.hide();
+    }
+    result
+}
+
 /// `heyo --clipboard`: shows the palette with Clipboard History open.
 pub(crate) fn open_clipboard_history(app: &AppHandle) {
     show(app);
