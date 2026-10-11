@@ -401,6 +401,8 @@ impl crate::platform::desktop::Desktop for Windows {
             overlay: Support::Limited,
             // Not written: see `platform::typed`.
             typing: Support::None,
+            // It needs the user's own keys heard: see `platform::typed`.
+            rewriting: Support::None,
         }
     }
 

@@ -246,7 +246,7 @@ fn gsettings_items() -> HashMap<String, String> {
 
 /// Accelerators compare equal regardless of modifier order and spelling.
 #[cfg(any(target_os = "linux", test))]
-fn normalize(accelerator: &str) -> (Vec<String>, String) {
+pub(super) fn normalize(accelerator: &str) -> (Vec<String>, String) {
     let mut mods: Vec<String> = Vec::new();
     let mut rest = accelerator;
     while let Some(start) = rest.strip_prefix('<') {

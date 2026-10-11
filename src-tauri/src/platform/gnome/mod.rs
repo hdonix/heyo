@@ -442,6 +442,9 @@ impl crate::platform::desktop::Desktop for Gnome {
             overlay: Support::Limited,
             // The Shell does not show applications what is typed elsewhere.
             typing: Support::None,
+            // Nor could it be known that nobody else touched the text: the
+            // extension pastes, and erases nothing.
+            rewriting: Support::None,
         }
     }
 

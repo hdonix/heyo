@@ -11,6 +11,7 @@ mod offer;
 pub mod overlay;
 pub mod typed;
 pub mod windows;
+mod writing;
 
 use super::capture::{Area, Shot};
 use super::clipboard_watch::Change;
@@ -33,6 +34,7 @@ impl Desktop for X11 {
             capture: Support::Full,
             overlay: Support::Full,
             typing: Support::Full,
+            rewriting: Support::Full,
         }
     }
 

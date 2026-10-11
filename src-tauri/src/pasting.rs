@@ -4,8 +4,8 @@
 //! the application's paste shortcut. Every paste goes through here, whether
 //! it comes from dictation, a snippet, an extension or the palette, so that
 //! two things hold for all of them. So does text that takes the place of
-//! what stands before the cursor (a snippet's keyword): Backspaces and a
-//! paste, pressed by `platform::typed`.
+//! what stands before the cursor (a snippet's keyword, dictated words being
+//! corrected): Backspaces and a paste, pressed by `platform::typed`.
 //!
 //! # The clipboard is only borrowed
 //!
@@ -40,7 +40,7 @@ use tauri::{AppHandle, Manager};
 use crate::confirm::{self, Answer, Question};
 use crate::platform::clipboard_watch::{read_text, write_html, write_text};
 use crate::platform::input::{is_terminal, press_paste, terminal_focused};
-use crate::platform::typed;
+use crate::platform::typed::{self, Lost, Writing};
 use crate::*;
 
 /// How long an application gets to read what was pasted before the
@@ -269,12 +269,28 @@ impl Loan {
         }
     }
 
+    /// Puts text on the borrowed clipboard and pastes it into the window
+    /// that has the focus.
+    pub(crate) fn paste(&self, text: &str, lines: Lines) -> Result<(), String> {
+        self.put(text, None)?;
+        self.of.press(SETTLE, lines)
+    }
+
     /// Replaces the `erase` characters before the cursor of the window in
     /// front with `text`, which goes by way of the borrowed clipboard
     /// (`typed::replace`).
     pub(crate) fn replace(&self, erase: usize, text: &str, terminal: bool) -> Result<(), String> {
         drop(self.of.lending());
         typed::replace(erase, text, terminal)
+    }
+
+    /// The same for one piece of what `hand` is writing.
+    pub(crate) fn rewrite(&self, hand: &mut dyn Writing, erase: usize, text: &str) -> Result<(), Lost> {
+        // Erasing alone needs no clipboard.
+        if !text.is_empty() {
+            drop(self.of.lending());
+        }
+        hand.replace(erase, text)
     }
 
     /// Ends the loan and returns when the clipboard is the user's again,
@@ -750,6 +766,28 @@ mod tests {
             drop(loan);
             world.pass(READ);
             assert_eq!(happened(desktop), ["unrecorded", "copy the user's"]);
+        });
+    }
+
+    #[test]
+    fn pieces_written_one_after_the_other_borrow_the_clipboard_once() {
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            let loan = pasting.borrow();
+            let mut hand = typed::write(&[], Default::default()).unwrap();
+            loan.rewrite(hand.as_mut(), 0, "Helo").unwrap();
+            loan.rewrite(hand.as_mut(), 1, "lo").unwrap();
+            // Erasing alone puts nothing on the clipboard.
+            loan.rewrite(hand.as_mut(), 2, "").unwrap();
+            assert_eq!(happened(desktop), ["write", "unrecorded", "rewrite 0 with Helo", "unrecorded", "rewrite 1 with lo", "rewrite 2 with "]);
+            assert_eq!(desktop.field(), "Hel");
+            // A sentence pasted the ordinary way, on the same loan.
+            loan.paste("lo.", Lines::Joined).unwrap();
+            assert_eq!(happened(desktop), ["unrecorded", "copy lo.", "wait 60", "paste"]);
+            assert_eq!(desktop.field(), "Hello.");
+            drop(loan);
+            world.pass(READ);
+            assert_eq!(clipboard(desktop).as_deref(), Some("the user's"));
         });
     }
 }

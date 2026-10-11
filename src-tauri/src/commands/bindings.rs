@@ -56,6 +56,7 @@ commands! {
     dictation_install();
     dictation_toggle();
     dictation_cancel();
+    dictation_pressed();
     show_window();
     get_item(id: String) -> Option<Item>;
     list_applications() -> Vec<Item>;

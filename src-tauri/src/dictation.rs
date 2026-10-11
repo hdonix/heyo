@@ -1,15 +1,26 @@
-//! Voice dictation: speak, and the text is pasted into the focused window.
+//! Voice dictation: speak, and the text goes into the focused window.
 //!
 //! The work happens in a Node helper (`runtime/src/dictation.ts`) that
 //! records the microphone, recognizes speech locally and optionally polishes
 //! it with Claude. This module starts and stops it (`heyo --dictate`
-//! toggles), shows the progress window, and pastes the results: sentence by
-//! sentence when the text is used as recognized, or once at the end when it
-//! is polished first.
+//! toggles), shows the progress window, and writes what is heard into the
+//! application the user is working in.
+//!
+//! How it is written is `onscreen`'s to say: the words as they are spoken,
+//! corrected where they stand ("type as you speak", where the session and
+//! the window allow it), or each sentence when it is finished, or the
+//! polished text once at the end. A thread per recording (`write`) carries
+//! that out, so that a slow application holds up neither the helper nor
+//! the window, and of the sentence in progress only the newest state is
+//! ever written: what was heard meanwhile is skipped.
 
+mod onscreen;
+
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -17,7 +28,9 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 use crate::helper::{self, Helper};
+use crate::platform::typed::{self, Lost, Writing};
 use crate::{pasting, SettingsState};
+use onscreen::{OnScreen, Shortfall, Step};
 
 pub const WINDOW: &str = "dictation";
 const EVENT: &str = crate::wire::event::DICTATION;
@@ -36,10 +49,9 @@ struct State {
     holding: bool,
     /// Counts recordings, so a hold watcher can tell its own has ended.
     session: u64,
-    /// Whether the transcript is polished (and so pasted only at the end).
-    polishing: bool,
-    /// The clipboard while the recording has it, given back afterwards.
-    clipboard: Option<pasting::Loan>,
+    /// Where what is heard goes to be written into the application: the
+    /// recording's own thread takes it from there.
+    writing: Option<Arc<Mailbox>>,
     installing: bool,
     /// Who is given the text of this recording instead of the focused
     /// window: an extension that asked to listen.
@@ -124,6 +136,10 @@ pub(crate) enum Told {
     Partial { text: String },
     /// A finished sentence: the text so far is these, one after the other.
     Segment { text: String },
+    /// Whether the words are going into the application as they are spoken
+    /// (`live`): then the window need not show them too. Said when that is
+    /// decided, at the first words, and again if it stops being so.
+    Writing { live: bool },
     Polishing,
     /// The recording is over: `text` is what is pasted, `raw` what was heard.
     Result {
@@ -136,6 +152,11 @@ pub(crate) enum Told {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         cancelled: Option<bool>,
+        /// What a cancelled recording had written is still in the
+        /// application: it could not be taken back.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        kept: Option<bool>,
     },
     Error { message: String },
 }
@@ -193,17 +214,22 @@ fn start_helper(app: &AppHandle) -> Result<Helper, String> {
             let state = ended.state::<Dictation>();
             let mut state = state.0.lock().unwrap();
             state.helper = None;
-            // A recording that ends this way borrowed the clipboard too.
-            let _clipboard = state.clipboard.take();
-            if std::mem::take(&mut state.recording) {
-                let listener = state.listener.take();
-                drop(state);
-                if let Some(listener) = listener {
-                    listener(Heard::Failed("Dictation stopped unexpectedly".into()));
-                }
-                emit(&ended, json!({ "type": "error", "message": "Dictation stopped unexpectedly" }));
-                hide_window_after(&ended, Duration::from_secs(3));
+            if !state.recording {
+                return;
             }
+            let stopped = json!({ "type": "error", "message": "Dictation stopped unexpectedly" });
+            // What the recording wrote is finished off by its own thread.
+            if let Some(writing) = state.writing.clone() {
+                return writing.post(Said::Ended(stopped));
+            }
+            state.recording = false;
+            let listener = state.listener.take();
+            drop(state);
+            if let Some(listener) = listener {
+                listener(Heard::Failed("Dictation stopped unexpectedly".into()));
+            }
+            emit(&ended, stopped);
+            hide_window_after(&ended, Duration::from_secs(3));
         },
     )
     .map_err(|e| format!("failed to start dictation: {e}"))
@@ -217,49 +243,254 @@ fn send(state: &mut State, message: &Value) -> Result<(), String> {
     })
 }
 
-/// Pastes into the focused window. The clipboard is borrowed for the whole
-/// recording: sentences follow each other faster than it could come back.
-fn paste(app: &AppHandle, text: &str) {
-    let borrowed = app.state::<Dictation>().0.lock().unwrap().clipboard.take();
-    let clipboard = borrowed.unwrap_or_else(pasting::borrow);
-    // There is nowhere to ask: into a terminal the text goes on one line.
-    let pasted = clipboard.put(text, None).and_then(|()| pasting::press(pasting::SETTLE, pasting::Lines::Joined));
-    if let Err(e) = pasted {
-        eprintln!("heyo: dictation could not paste: {e}");
-    }
-    let state = app.state::<Dictation>();
-    let mut state = state.0.lock().unwrap();
-    // Kept for the next sentence, unless the recording ended meanwhile.
-    if state.recording {
-        state.clipboard = Some(clipboard);
-    }
+/// What the thread that writes is told, in the order it was heard.
+enum Said {
+    /// The sentence in progress.
+    Partial(String),
+    /// A finished sentence.
+    Sentence(String),
+    /// The helper's last word on the recording: its result, or an error.
+    Ended(Value),
 }
 
-/// What an event from the helper calls for.
-#[derive(Debug, PartialEq)]
-enum Effect {
-    Paste(String),
-    /// The recording is over: the clipboard goes back, and the window
-    /// leaves after the time given.
-    Over(Duration),
+/// Between the helper, which says what it hears as it hears it, and the
+/// thread that writes, which may take longer over a piece than the next
+/// one takes to come.
+#[derive(Default)]
+struct Mailbox {
+    waiting: Mutex<VecDeque<Said>>,
+    arrived: Condvar,
+    /// Presses of a mouse button on the dictation window, which whoever
+    /// corrects the text holds against the presses it hears of.
+    own_presses: Arc<AtomicU32>,
 }
 
-/// Reads an event from the helper. Text used as recognized goes in as each
-/// sentence is finished; polished text only once, at the end.
-fn effects(polishing: bool, event: &Value) -> Vec<Effect> {
-    let text = event["text"].as_str().unwrap_or_default();
-    match event["type"].as_str().unwrap_or_default() {
-        "segment" if !polishing => vec![Effect::Paste(text.to_owned())],
-        "result" => {
-            // Polished text, or recognized text when polishing failed.
-            let paste = (polishing && !text.is_empty()).then(|| Effect::Paste(text.to_owned()));
-            // A warning, or having heard nothing, stays up to be read.
-            let lingers = event["warning"].is_string() || event["raw"].as_str().is_some_and(str::is_empty);
-            paste.into_iter().chain([Effect::Over(Duration::from_millis(if lingers { 2500 } else { 300 }))]).collect()
+impl Mailbox {
+    fn post(&self, said: Said) {
+        let mut waiting = self.waiting.lock().unwrap();
+        // Of the sentence in progress only the newest matters: a state of
+        // it nobody got round to writing is dropped.
+        if matches!(waiting.back(), Some(Said::Partial(_))) {
+            waiting.pop_back();
         }
-        "error" => vec![Effect::Over(Duration::from_secs(4))],
-        _ => Vec::new(),
+        waiting.push_back(said);
+        self.arrived.notify_one();
     }
+
+    fn next(&self) -> Said {
+        let mut waiting = self.waiting.lock().unwrap();
+        loop {
+            match waiting.pop_front() {
+                Some(said) => return said,
+                None => waiting = self.arrived.wait(waiting).unwrap(),
+            }
+        }
+    }
+}
+
+/// Window classes of applications where Backspace and the paste shortcut do
+/// not simply erase and insert text at a cursor: editors with modes,
+/// spreadsheets (a cell that is not being edited is replaced whole), and
+/// windows onto another computer, which fetch the clipboard on their own
+/// and paste it when they get to it.
+const NOT_TEXT_FIELDS: &[&str] = &["gvim", "emacs", "libreoffice-calc", "gnumeric", "remmina", "vnc", "rdesktop", "freerdp", "virt-manager", "virt-viewer", "virtualbox", "vmware", "qemu", "rustdesk", "anydesk", "teamviewer", "nomachine"];
+
+/// Why words are not written as they are spoken into a window of that
+/// class: `None` means they are. It is not done where a snippet's keyword
+/// is left alone either (`expand::refusal`: Heyo's own windows, password
+/// managers, the applications the user excluded), nor in a terminal, where
+/// a shell would cope with Backspaces but an editor running in it may not.
+fn not_here(class: Option<&str>, own: bool, excluded: impl FnOnce(&str) -> bool) -> Option<&'static str> {
+    if let Some(why) = crate::expand::refusal(class, own, excluded) {
+        return Some(why);
+    }
+    let class = class?.to_lowercase();
+    if crate::platform::input::is_terminal(&class) {
+        Some("a terminal")
+    } else if NOT_TEXT_FIELDS.iter().any(|name| class.contains(name)) {
+        Some("an application where erasing and pasting do not edit text at a cursor")
+    } else {
+        None
+    }
+}
+
+/// Writes one recording into the application: carries out what `OnScreen`
+/// says, and tells it when a step could not be carried out.
+struct Writer {
+    /// The words are wanted as they are spoken (the setting, the session).
+    live: bool,
+    /// The text is polished when the recording ends.
+    polishing: bool,
+    /// Asked at the first words: Heyo's shortcuts for dictation (pressing
+    /// one is not typing) if the words can go in as they are spoken in the
+    /// window in front, or why they cannot.
+    here: Box<dyn Fn() -> Result<Vec<String>, &'static str> + Send>,
+    /// Borrowed for the whole recording: pieces follow each other faster
+    /// than it could come back.
+    clipboard: pasting::Loan,
+    screen: Option<OnScreen>,
+    /// What corrects the text where it stands, for as long as that is safe.
+    hand: Option<Box<dyn Writing>>,
+    /// Counts the presses of a mouse button on the dictation window.
+    own_presses: Arc<AtomicU32>,
+    /// The last piece could not be written for the moment: the words are
+    /// not reaching the application just now.
+    put_off: bool,
+}
+
+impl Writer {
+    fn new(live: bool, polishing: bool, clipboard: pasting::Loan, own_presses: Arc<AtomicU32>, here: Box<dyn Fn() -> Result<Vec<String>, &'static str> + Send>) -> Writer {
+        Writer { live, polishing, here, clipboard, screen: None, hand: None, own_presses, put_off: false }
+    }
+
+    /// Whether the words are going in as they are spoken, once that is
+    /// decided: what the window need not show too.
+    fn writing_live(&self) -> Option<bool> {
+        self.screen.as_ref().map(|screen| screen.live() && !self.put_off)
+    }
+
+    fn shortfall(&self) -> Option<Shortfall> {
+        self.screen.as_ref().and_then(OnScreen::shortfall)
+    }
+
+    /// Decides, at the first words, how this recording is written.
+    fn begin(&mut self) -> OnScreen {
+        // Says why not, never what was said.
+        let hand = self.live.then(|| (self.here)().map_err(str::to_owned).and_then(|hotkeys| typed::write(&hotkeys, self.own_presses.clone())));
+        if let Some(Err(why)) = &hand {
+            eprintln!("heyo: dictation: not writing the words as they are spoken ({why})");
+        }
+        self.hand = hand.and_then(Result::ok);
+        OnScreen::new(self.hand.is_some(), self.polishing)
+    }
+
+    /// Something was heard.
+    fn hear(&mut self, event: onscreen::Event) {
+        let mut screen = match self.screen.take() {
+            Some(screen) => screen,
+            // With nothing said there is nothing to decide.
+            None if !matches!(event, onscreen::Event::Partial(_) | onscreen::Event::Sentence(_)) => OnScreen::new(false, self.polishing),
+            None => self.begin(),
+        };
+        let mut steps: VecDeque<Step> = screen.on(event).into();
+        while let Some(step) = steps.pop_front() {
+            match step {
+                Step::Replace { erase, insert } => {
+                    let replaced = match self.hand.as_deref_mut() {
+                        Some(hand) => self.clipboard.rewrite(hand, erase, &insert),
+                        None => Err(Lost::untouched("nothing is correcting the text any more")),
+                    };
+                    self.put_off = replaced.as_ref().is_err_and(|lost| lost.later);
+                    match replaced {
+                        Ok(()) => {}
+                        // It cannot be written just now (another program
+                        // has the keyboard): what is heard next is tried again.
+                        Err(_) if self.put_off => steps.extend(screen.on(onscreen::Event::PutOff)),
+                        Err(lost) => {
+                            eprintln!("heyo: dictation: no longer correcting the text where it stands ({})", lost.why);
+                            self.hand = None;
+                            steps.extend(screen.on(onscreen::Event::Lost { erased: lost.erased, put: lost.put }));
+                        }
+                    }
+                }
+                Step::Paste(text) => {
+                    // There is nowhere to ask: into a terminal the text goes on one line.
+                    if let Err(e) = self.clipboard.paste(&text, pasting::Lines::Joined) {
+                        eprintln!("heyo: dictation could not paste: {e}");
+                    }
+                }
+            }
+        }
+        self.screen = Some(screen);
+    }
+
+    /// The helper's last word on the recording, as the window is to be
+    /// told it: with what could not be done added.
+    fn end(&mut self, mut event: Value) -> Value {
+        if event["type"] != "result" {
+            return event;
+        }
+        let text = event["text"].as_str().unwrap_or_default().to_owned();
+        let heard = match event["cancelled"] == true {
+            true => onscreen::Event::Cancelled,
+            false => onscreen::Event::Result { text: &text, polished: event["polished"] == true },
+        };
+        self.hear(heard);
+        match self.shortfall() {
+            // The text in the application is what was heard.
+            Some(Shortfall::NotPolished(why)) => {
+                event["warning"] = json!(why);
+                event["text"] = event["raw"].clone();
+            }
+            Some(Shortfall::NotTakenBack) => event["kept"] = json!(true),
+            None => {}
+        }
+        event
+    }
+}
+
+/// How long the window stays once the recording is over: longer where
+/// there is something to read.
+fn linger(last: &Value) -> Duration {
+    if last["type"] != "result" {
+        return Duration::from_secs(4);
+    }
+    // A warning, having heard nothing, or how a cancelled recording ended.
+    let to_read = last["warning"].is_string() || last["raw"].as_str().is_some_and(str::is_empty);
+    Duration::from_millis(if to_read { 2500 } else { 300 })
+}
+
+/// Why the words cannot go in as they are spoken in the window in front,
+/// or Heyo's shortcuts for dictation if they can.
+fn here(app: &AppHandle) -> Result<Vec<String>, &'static str> {
+    let own = app.webview_windows().values().any(|window| window.is_focused().unwrap_or(false));
+    match not_here(crate::windows::active_class().as_deref(), own, |class| crate::expand::excluded(app, class)) {
+        Some(why) => Err(why),
+        None => Ok(crate::platform::hotkeys::get(&crate::platform::hotkeys::Target::dictation()).into_iter().collect()),
+    }
+}
+
+/// Starts the thread that writes a recording into the application: what
+/// is heard reaches it through `mailbox`, and it ends with the recording.
+fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool) -> std::io::Result<()> {
+    let app = app.clone();
+    let spawned = std::thread::Builder::new().name("dictation-writing".into()).spawn(move || {
+        let asking = app.clone();
+        let mut writer = Writer::new(live, polishing, pasting::borrow(), mailbox.own_presses.clone(), Box::new(move || here(&asking)));
+        let mut told = None;
+        let last = loop {
+            let last = match mailbox.next() {
+                Said::Partial(text) => {
+                    writer.hear(onscreen::Event::Partial(&text));
+                    None
+                }
+                Said::Sentence(text) => {
+                    writer.hear(onscreen::Event::Sentence(&text));
+                    None
+                }
+                Said::Ended(event) => Some(writer.end(event)),
+            };
+            if let Some(live) = writer.writing_live().filter(|live| told != Some(*live)) {
+                told = Some(live);
+                emit(&app, json!({ "type": "writing", "live": live }));
+            }
+            if let Some(last) = last {
+                break last;
+            }
+        };
+        {
+            let state = app.state::<Dictation>();
+            let mut state = state.0.lock().unwrap();
+            state.recording = false;
+            state.writing = None;
+        }
+        // The loan ends: the clipboard comes back once the last piece has
+        // been read from it.
+        drop(writer);
+        hide_window_after(&app, linger(&last));
+        emit(&app, last);
+    });
+    spawned.map(|_| ())
 }
 
 /// Handles one event from the helper.
@@ -281,25 +512,30 @@ fn handle(app: &AppHandle, event: Value) {
         }
         return emit(app, event);
     }
-    let polishing = app.state::<Dictation>().0.lock().unwrap().polishing;
-    for effect in effects(polishing, &event) {
-        match effect {
-            Effect::Paste(text) => paste(app, &text),
-            Effect::Over(linger) => {
-                let clipboard = {
-                    let state = app.state::<Dictation>();
-                    let mut state = state.0.lock().unwrap();
-                    state.recording = false;
-                    state.clipboard.take()
-                };
-                // The loan ends: the clipboard comes back once the last
-                // sentence has been read from it.
-                drop(clipboard);
-                hide_window_after(app, linger);
-            }
+    let writing = app.state::<Dictation>().0.lock().unwrap().writing.clone();
+    let text = || event["text"].as_str().unwrap_or_default().to_owned();
+    match (event["type"].as_str().unwrap_or_default(), writing) {
+        ("partial", Some(writing)) => writing.post(Said::Partial(text())),
+        ("segment", Some(writing)) => writing.post(Said::Sentence(text())),
+        // The window hears of the end once all of it is written.
+        ("result" | "error", Some(writing)) => return writing.post(Said::Ended(event)),
+        // Nothing is writing: the recording ends as it is.
+        ("result" | "error", None) => {
+            app.state::<Dictation>().0.lock().unwrap().recording = false;
+            hide_window_after(app, linger(&event));
         }
+        _ => {}
     }
     emit(app, event);
+}
+
+/// A mouse button went down on the dictation window. That moves no cursor
+/// in the application being written into, and must not be taken for the
+/// user's doing something there.
+pub fn pressed(app: &AppHandle) {
+    if let Some(writing) = &app.state::<Dictation>().0.lock().unwrap().writing {
+        writing.own_presses.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 fn fail(app: &AppHandle, message: String) {
@@ -367,11 +603,14 @@ pub fn finish(app: &AppHandle) {
     // An extension is given what was said, as it was said.
     let polish = if state.listener.is_some() { "off".to_owned() } else { polish };
     if let Err(e) = send(&mut state, &json!({ "cmd": "stop", "polish": polish, "apiKey": api_key, "ai": ai })) {
+        eprintln!("heyo: {e}");
+        // What the recording wrote is finished off by its own thread.
+        if let Some(writing) = state.writing.clone() {
+            return writing.post(Said::Ended(json!({ "type": "error", "message": e })));
+        }
         state.recording = false;
         let listener = state.listener.take();
-        let clipboard = state.clipboard.take();
         drop(state);
-        drop(clipboard);
         if let Some(listener) = listener {
             listener(Heard::Failed(e.clone()));
         }
@@ -392,10 +631,10 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
         drop(state);
         return fail(app, "Dictation is not set up yet. Open Heyo Settings → Dictation to download it.".into());
     }
-    let (language, source, polish, vocabulary) = {
+    let (language, source, polish, vocabulary, live) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone())
+        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live)
     };
     let started = (|| {
         if state.helper.is_none() {
@@ -407,7 +646,11 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     match started {
         Ok(()) => {
             state.recording = true;
-            state.polishing = polish != "off";
+            let mailbox = Arc::new(Mailbox::default());
+            match write(app, mailbox.clone(), live && typed::rewriting(), polish != "off") {
+                Ok(()) => state.writing = Some(mailbox),
+                Err(e) => eprintln!("heyo: dictation has nothing to write with: {e}"),
+            }
             state.session += 1;
             // The hotkey that started this is usually still down.
             let held = crate::windows::keys_down().filter(|keys| watch_hotkey && keys.iter().any(|b| *b != 0));
@@ -456,7 +699,6 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
     })();
     started.map_err(NotListening::Failed)?;
     state.recording = true;
-    state.polishing = false;
     state.holding = false;
     state.session += 1;
     state.listener = Some(std::sync::Arc::new(listener));
@@ -577,35 +819,331 @@ pub fn install(app: &AppHandle) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    const SOON: Effect = Effect::Over(Duration::from_millis(300));
-    const LATER: Effect = Effect::Over(Duration::from_millis(2500));
+    use crate::pasting::scripted::{clipboard, desk, happened};
+    use crate::platform::desktop::fake::Fake;
+    use crate::platform::desktop::Supported;
+    use crate::platform::Support;
+    use onscreen::Event;
 
-    fn paste(text: &str) -> Effect {
-        Effect::Paste(text.into())
+    const HOTKEY: &str = "<Control><Alt>d";
+    const SECOND: Duration = Duration::from_secs(1);
+
+    /// A writer for the window in front of a desk (`pasting::scripted`),
+    /// which takes words as they are spoken.
+    fn writer(pasting: &'static pasting::Pasting, live: bool, polishing: bool) -> Writer {
+        Writer::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()])))
+    }
+
+    /// What the helper said, line by line: `~text` is the sentence in
+    /// progress, anything else a finished one.
+    fn hear(writer: &mut Writer, said: &[&str]) {
+        for line in said {
+            match line.strip_prefix('~') {
+                Some(partial) => writer.hear(Event::Partial(partial)),
+                None => writer.hear(Event::Sentence(line)),
+            }
+        }
+    }
+
+    /// The recording ends; what the window is told of it.
+    fn end(writer: &mut Writer, text: &str, raw: &str) -> Value {
+        writer.end(json!({ "type": "result", "text": text, "raw": raw, "polished": text != raw }))
+    }
+
+    fn cancel(writer: &mut Writer) -> Value {
+        writer.end(json!({ "type": "result", "text": "", "raw": "", "polished": false, "cancelled": true }))
+    }
+
+    /// What was asked of the desktop, without the notes to the clipboard
+    /// history that go with every piece.
+    fn asked(desktop: &Fake) -> Vec<String> {
+        happened(desktop).into_iter().filter(|what| what != "unrecorded").collect()
     }
 
     #[test]
-    fn text_used_as_recognized_goes_in_sentence_by_sentence() {
-        assert_eq!(effects(false, &json!({ "type": "segment", "text": "Hello." })), [paste("Hello.")]);
-        // All of it is in already when the result comes.
-        assert_eq!(effects(false, &json!({ "type": "result", "text": "Hello. World.", "raw": "Hello. World." })), [SOON]);
+    fn a_recording_goes_into_the_application_as_it_is_spoken() {
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            desktop.user_types("Dear Ada, ");
+            let mut writer = writer(pasting, true, false);
+            // Nothing is decided, and nothing touched, before the first words.
+            assert_eq!((writer.writing_live(), asked(desktop)), (None, Vec::new()));
+            hear(&mut writer, &["~The weather", "~The weather is nise", "~The weather is nice today", "The weather is nice today.", "~ See who", " See you at 3:30."]);
+            let last = end(&mut writer, "The weather is nice today. See you at 3:30.", "The weather is nice today. See you at 3:30.");
+            // Each piece erases what turned out wrong, and no more, and
+            // writes what is new.
+            assert_eq!(
+                asked(desktop),
+                [
+                    "write <Control><Alt>d",
+                    "rewrite 0 with The weather",
+                    "rewrite 0 with  is nise",
+                    "rewrite 2 with ce today",
+                    "rewrite 0 with .",
+                    "rewrite 0 with  See who",
+                    "rewrite 3 with you at 3:30."
+                ]
+            );
+            assert_eq!(desktop.field(), "Dear Ada, The weather is nice today. See you at 3:30.");
+            assert_eq!(writer.writing_live(), Some(true));
+            assert_eq!((&last["warning"], &last["kept"]), (&Value::Null, &Value::Null));
+            // The clipboard was borrowed once, and comes back as it was.
+            assert_eq!(clipboard(desktop).as_deref(), Some("you at 3:30."));
+            drop(writer);
+            world.pass(SECOND);
+            assert_eq!(happened(desktop), ["unrecorded", "copy the user's"]);
+        });
     }
 
     #[test]
-    fn polished_text_goes_in_once_at_the_end() {
-        assert_eq!(effects(true, &json!({ "type": "segment", "text": "um hello" })), []);
-        assert_eq!(effects(true, &json!({ "type": "result", "text": "Hello.", "raw": "um hello" })), [paste("Hello."), SOON]);
+    fn once_the_user_types_the_rest_is_pasted_and_nothing_of_theirs_erased() {
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            let mut writer = writer(pasting, true, false);
+            hear(&mut writer, &["~The weather is"]);
+            desktop.user_types("!");
+            hear(&mut writer, &["~The weather was nice", "The weather is nice today.", "~ See", " See you."]);
+            end(&mut writer, "The weather is nice today. See you.", "The weather is nice today. See you.");
+            // Not one Backspace after the user's key: what was not there
+            // yet is pasted, sentence by sentence, at the cursor.
+            assert_eq!(asked(desktop), ["write <Control><Alt>d", "rewrite 0 with The weather is", "copy  nice today.", "wait 60", "paste", "copy  See you.", "wait 60", "paste"]);
+            assert_eq!(desktop.field(), "The weather is! nice today. See you.");
+            assert_eq!(writer.writing_live(), Some(false));
+            drop(writer);
+            world.pass(SECOND);
+            assert_eq!(clipboard(desktop).as_deref(), Some("the user's"));
+        });
+    }
+
+    #[test]
+    fn a_piece_the_application_was_not_seen_to_take_is_the_last_one_corrected() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            desktop.losing.lock().unwrap().push_back(Lost { erased: 0, put: true, later: false, why: "the application was not seen to take the text".into() });
+            let mut writer = writer(pasting, true, false);
+            hear(&mut writer, &["~Hello", "~Hello world", "Hello world."]);
+            // It is taken to be there, and never erased.
+            assert_eq!(asked(desktop), ["write <Control><Alt>d", "rewrite 0 with Hello", "copy  world.", "wait 60", "paste"]);
+            assert_eq!(desktop.field(), "Hello world.");
+        });
+    }
+
+    #[test]
+    fn pieces_put_off_while_a_hotkey_is_held_go_in_when_it_is_let_go() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let held = || desktop.losing.lock().unwrap().push_back(Lost::put_off("another program has the keyboard to itself"));
+            let mut writer = writer(pasting, true, false);
+            held();
+            hear(&mut writer, &["~The weather"]);
+            held();
+            hear(&mut writer, &["The weather is nice."]);
+            assert_eq!(desktop.field(), "");
+            // The words are not in the application yet: the window shows them.
+            assert_eq!(writer.writing_live(), Some(false));
+            hear(&mut writer, &["~ See who", " See you."]);
+            assert_eq!(writer.writing_live(), Some(true));
+            assert_eq!(asked(desktop), ["write <Control><Alt>d", "rewrite 0 with nothing", "rewrite 0 with nothing", "rewrite 0 with The weather is nice. See who", "rewrite 3 with you."]);
+            assert_eq!(desktop.field(), "The weather is nice. See you.");
+        });
+    }
+
+    #[test]
+    fn where_words_cannot_go_in_as_they_are_spoken_sentences_are_pasted() {
+        // A terminal: on one line, with the terminal's shortcut.
+        let (desktop, _, pasting) = desk("org.gnome.Ptyxis", None);
+        desktop.during(|| {
+            let here = || not_here(crate::windows::active_class().as_deref(), false, |_| false).map_or(Ok(Vec::new()), Err);
+            let mut writer = Writer::new(true, false, pasting.borrow(), Arc::default(), Box::new(here));
+            hear(&mut writer, &["~ls", "ls minus la.", "~ And", " And then\nmake."]);
+            assert_eq!(asked(desktop), ["copy ls minus la.", "wait 60", "paste terminal", "copy  And then\nmake.", "wait 60", "copy And then make.", "wait 60", "paste terminal"]);
+            assert_eq!(writer.writing_live(), Some(false));
+        });
+        // The setting is off.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = writer(pasting, false, false);
+            hear(&mut writer, &["~Hel", "Hello.", "~ Wor", " World."]);
+            assert_eq!(asked(desktop), ["copy Hello.", "wait 60", "paste", "copy  World.", "wait 60", "paste"]);
+            assert_eq!(desktop.field(), "Hello. World.");
+        });
+        // The session cannot correct text in another window.
+        let (desktop, _, pasting) = desk("firefox", None);
+        *desktop.supported.lock().unwrap() = Some(Supported { paste: Support::Full, ..Supported::NOTHING });
+        desktop.during(|| {
+            assert!(!typed::rewriting());
+            let mut writer = writer(pasting, true, false);
+            hear(&mut writer, &["~Hel", "Hello."]);
+            assert_eq!(asked(desktop), ["copy Hello.", "wait 60", "paste"]);
+        });
+    }
+
+    #[test]
+    fn polished_text_takes_the_place_of_what_was_written() {
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            desktop.user_types("> ");
+            let mut writer = writer(pasting, true, true);
+            hear(&mut writer, &["~um so the meeting", "um so the meeting is on thursday."]);
+            assert_eq!(desktop.field(), "> um so the meeting is on thursday.");
+            asked(desktop);
+            let last = end(&mut writer, "The meeting is on Thursday.", "um so the meeting is on thursday.");
+            assert_eq!(asked(desktop), ["rewrite 33 with The meeting is on Thursday."]);
+            assert_eq!(desktop.field(), "> The meeting is on Thursday.");
+            assert_eq!((&last["text"], &last["warning"]), (&json!("The meeting is on Thursday."), &Value::Null));
+            drop(writer);
+            world.pass(SECOND);
+            assert_eq!(clipboard(desktop).as_deref(), Some("the user's"));
+        });
+    }
+
+    #[test]
+    fn polished_text_is_left_out_where_it_cannot_safely_go_in_and_the_window_says_so() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = writer(pasting, true, true);
+            hear(&mut writer, &["um hello there."]);
+            // The user goes on typing while the text is being polished.
+            desktop.user_types(" ok");
+            asked(desktop);
+            let last = end(&mut writer, "Hello there.", "um hello there.");
+            assert_eq!(asked(desktop), Vec::<String>::new());
+            assert_eq!(desktop.field(), "um hello there. ok");
+            // What the window shows is what is in the application.
+            assert_eq!(last["text"], "um hello there.");
+            assert!(last["warning"].as_str().unwrap().contains("left as it was heard"));
+            assert_eq!(linger(&last), Duration::from_millis(2500));
+        });
+        // Without live words, polished text is pasted at the end as before.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = writer(pasting, false, true);
+            hear(&mut writer, &["~um hel", "um hello there."]);
+            assert_eq!(asked(desktop), Vec::<String>::new());
+            let last = end(&mut writer, "Hello there.", "um hello there.");
+            assert_eq!(asked(desktop), ["copy Hello there.", "wait 60", "paste"]);
+            assert_eq!(last["warning"], Value::Null);
+            assert_eq!(linger(&last), Duration::from_millis(300));
+        });
+    }
+
+    #[test]
+    fn a_cancelled_recording_takes_its_words_back_if_it_can() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            desktop.user_types("Dear Ada, ");
+            let mut writer = writer(pasting, true, false);
+            hear(&mut writer, &["One.", "~ Two th"]);
+            asked(desktop);
+            let last = cancel(&mut writer);
+            assert_eq!(asked(desktop), ["rewrite 11 with "]);
+            assert_eq!(desktop.field(), "Dear Ada, ");
+            assert_eq!(last["kept"], Value::Null);
+        });
+        // The user typed: the words stay, and the window says that they do.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = writer(pasting, true, false);
+            hear(&mut writer, &["One."]);
+            desktop.user_types("!");
+            let last = cancel(&mut writer);
+            assert_eq!(desktop.field(), "One.!");
+            assert_eq!(last["kept"], true);
+        });
+        // Nothing was said: nothing is decided, written or kept.
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = writer(pasting, true, true);
+            let last = cancel(&mut writer);
+            assert_eq!((asked(desktop), &last["kept"]), (Vec::new(), &Value::Null));
+        });
+    }
+
+    #[test]
+    fn presses_on_the_dictation_window_are_counted_where_the_writing_reads_them() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mailbox = Mailbox::default();
+            let mut writer = Writer::new(true, false, pasting.borrow(), mailbox.own_presses.clone(), Box::new(|| Ok(Vec::new())));
+            writer.hear(Event::Partial("One"));
+            // The window's own button is pressed, to finish.
+            mailbox.own_presses.fetch_add(1, Ordering::SeqCst);
+            writer.hear(Event::Sentence("One two."));
+            assert_eq!(asked(desktop), ["write", "rewrite 0 with One", "own presses 1", "rewrite 0 with  two."]);
+        });
+    }
+
+    #[test]
+    fn words_are_not_written_as_they_are_spoken_where_that_is_not_safe() {
+        let never = |_: &str| false;
+        for class in ["firefox", "Code", "org.gnome.TextEditor", "Slack", "libreoffice-writer"] {
+            assert_eq!(not_here(Some(class), false, never), None, "{class}");
+        }
+        for class in ["org.gnome.Ptyxis", "kitty", "Gnome-terminal", "Gvim", "Emacs", "libreoffice-calc", "org.remmina.Remmina", "VirtualBox Machine", "KeePassXC", "Heyo"] {
+            assert!(not_here(Some(class), false, |class| class == "KeePassXC").is_some(), "{class}");
+        }
+        // One of Heyo's own windows, an unknown one, an excluded application.
+        assert!(not_here(Some("firefox"), true, never).is_some());
+        assert!(not_here(None, false, never).is_some());
+        assert!(not_here(Some("Signal"), false, |class| class == "Signal").is_some());
+    }
+
+    #[test]
+    fn only_the_newest_state_of_a_sentence_waits_to_be_written() {
+        let mailbox = Mailbox::default();
+        let waiting = |mailbox: &Mailbox| {
+            let mut all = Vec::new();
+            while !mailbox.waiting.lock().unwrap().is_empty() {
+                all.push(match mailbox.next() {
+                    Said::Partial(text) => format!("~{text}"),
+                    Said::Sentence(text) => text,
+                    Said::Ended(event) => event["type"].as_str().unwrap().to_owned(),
+                });
+            }
+            all
+        };
+        // The writer is busy with a slow application meanwhile.
+        for partial in ["The", "The weather", "The weather is"] {
+            mailbox.post(Said::Partial(partial.into()));
+        }
+        assert_eq!(waiting(&mailbox), ["~The weather is"]);
+        // A sentence that finished makes what was heard of it in progress moot,
+        mailbox.post(Said::Partial("The weather is nice".into()));
+        mailbox.post(Said::Sentence("The weather is nice.".into()));
+        mailbox.post(Said::Partial(" And".into()));
+        mailbox.post(Said::Partial(" And so".into()));
+        // but no sentence and no ending is ever dropped.
+        mailbox.post(Said::Sentence(" And so on.".into()));
+        mailbox.post(Said::Sentence(" Third.".into()));
+        mailbox.post(Said::Partial(" Fou".into()));
+        mailbox.post(Said::Ended(json!({ "type": "result" })));
+        assert_eq!(waiting(&mailbox), ["The weather is nice.", " And so on.", " Third.", "result"]);
     }
 
     #[test]
     fn what_needs_reading_stays_up() {
-        // Polishing failed: the recognized text is used, with a warning.
-        let warned = json!({ "type": "result", "text": "um hello", "raw": "um hello", "warning": "no API key" });
-        assert_eq!(effects(true, &warned), [paste("um hello"), LATER]);
-        // Nothing was heard.
-        assert_eq!(effects(false, &json!({ "type": "result", "text": "", "raw": "" })), [LATER]);
-        assert_eq!(effects(true, &json!({ "type": "result", "text": "", "raw": "" })), [LATER]);
-        assert_eq!(effects(true, &json!({ "type": "error", "message": "no microphone" })), [Effect::Over(Duration::from_secs(4))]);
+        let soon = Duration::from_millis(300);
+        let later = Duration::from_millis(2500);
+        assert_eq!(linger(&json!({ "type": "result", "text": "Hello.", "raw": "Hello." })), soon);
+        // Polishing failed, nothing was heard, or the recording was cancelled.
+        assert_eq!(linger(&json!({ "type": "result", "text": "um hello", "raw": "um hello", "warning": "no API key" })), later);
+        assert_eq!(linger(&json!({ "type": "result", "text": "", "raw": "" })), later);
+        assert_eq!(linger(&json!({ "type": "result", "text": "", "raw": "", "cancelled": true, "kept": true })), later);
+        assert_eq!(linger(&json!({ "type": "error", "message": "no microphone" })), Duration::from_secs(4));
+    }
+
+    #[test]
+    fn an_error_ends_a_recording_without_another_word_written() {
+        let (desktop, _, pasting) = desk("firefox", None);
+        desktop.during(|| {
+            let mut writer = writer(pasting, true, false);
+            hear(&mut writer, &["~Hello"]);
+            asked(desktop);
+            let error = json!({ "type": "error", "message": "Dictation stopped unexpectedly" });
+            assert_eq!(writer.end(error.clone()), error);
+            assert_eq!(asked(desktop), Vec::<String>::new());
+            assert_eq!(desktop.field(), "Hello");
+        });
     }
 
     #[test]
@@ -639,12 +1177,6 @@ mod tests {
         assert!(!listening(&state, 4));
     }
 
-    #[test]
-    fn progress_changes_nothing() {
-        assert_eq!(effects(false, &json!({ "type": "partial", "text": "Hel" })), []);
-        assert_eq!(effects(true, &json!({ "type": "level", "value": 0.4 })), []);
-    }
-
     /// Everything `runtime/src/dictation.ts` writes while recording, and what
     /// the host says itself, is something the window is told.
     #[test]
@@ -656,9 +1188,11 @@ mod tests {
             json!({ "type": "level", "value": 0.4 }),
             json!({ "type": "partial", "text": "Hel" }),
             json!({ "type": "segment", "text": "Hello." }),
+            json!({ "type": "writing", "live": true }),
             json!({ "type": "polishing" }),
             json!({ "type": "result", "text": "um hello", "raw": "um hello", "warning": "no API key" }),
             json!({ "type": "result", "text": "", "raw": "", "cancelled": true }),
+            json!({ "type": "result", "text": "", "raw": "", "cancelled": true, "kept": true }),
             json!({ "type": "error", "message": "no microphone" }),
         ] {
             // As it was said, nothing added and nothing lost.
@@ -666,7 +1200,7 @@ mod tests {
         }
         // What the window does not read stays behind; a level that could not be measured is none.
         let result = told(json!({ "type": "result", "text": "Hello.", "raw": "um hello", "polished": true })).unwrap();
-        assert_eq!(result, Told::Result { text: "Hello.".into(), raw: "um hello".into(), warning: None, cancelled: None });
+        assert_eq!(result, Told::Result { text: "Hello.".into(), raw: "um hello".into(), warning: None, cancelled: None, kept: None });
         assert_eq!(told(json!({ "type": "level", "value": null })).unwrap(), Told::Level { value: None });
         // An installer's progress, or anything else, is not for this window.
         assert!(told(json!({ "type": "progress", "step": "Speech engine" })).is_err());

@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use x11rb::connection::Connection;
-use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, CreateWindowAux, EventMask, InputFocus, WindowClass};
+use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, CreateWindowAux, EventMask, InputFocus, Window, WindowClass};
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
@@ -21,6 +21,7 @@ pub(super) const BACKSPACE: u8 = 22;
 pub(super) struct Field {
     text: Arc<Mutex<String>>,
     running: Arc<AtomicBool>,
+    pub(super) window: Window,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -63,7 +64,7 @@ impl Field {
                 }
             }
         });
-        Field { text, running, thread: Some(thread) }
+        Field { text, running, window, thread: Some(thread) }
     }
 
     /// What it holds, once whatever is on its way has arrived.

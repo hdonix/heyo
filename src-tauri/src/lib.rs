@@ -209,6 +209,7 @@ pub fn run() {
             dictation_install,
             dictation_toggle,
             dictation_cancel,
+            dictation_pressed,
             show_window,
             get_item,
             list_applications,

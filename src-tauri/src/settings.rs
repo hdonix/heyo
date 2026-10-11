@@ -63,6 +63,11 @@ pub struct Settings {
     pub dictation_polish: String,
     /// A key that dictates while it is held (`talkkey::KEYS`); empty for none.
     pub dictation_hold_key: String,
+    /// Type as you speak: dictated words go into the application as they
+    /// are recognized and are corrected where they stand, where the session
+    /// can do that (`platform::typed::rewriting`). Off, or elsewhere, each
+    /// sentence is pasted when it is finished.
+    pub dictation_live: bool,
     /// Claude API key for polishing; empty uses the environment's credentials.
     pub anthropic_api_key: String,
     /// Which model Heyo's AI features use: `claude` or `local`.
@@ -142,6 +147,7 @@ impl Default for Settings {
             dictation_source: String::new(),
             dictation_polish: "off".into(),
             dictation_hold_key: String::new(),
+            dictation_live: true,
             anthropic_api_key: String::new(),
             ai_provider: "claude".into(),
             local_model_url: "http://127.0.0.1:8000/v1".into(),

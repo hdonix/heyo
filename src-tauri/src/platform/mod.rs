@@ -108,6 +108,9 @@ pub struct Capabilities {
     pub overlay: Support,
     /// Expanding snippets as their keyword is typed in other applications.
     pub snippet_expansion: Support,
+    /// Writing dictated words into the application as they are spoken, and
+    /// correcting them where they stand.
+    pub live_dictation: Support,
     /// The keys offered for hold-to-talk.
     pub hold_keys: Vec<HoldKey>,
     /// Heyo's GNOME Shell extension: "none" where it has no use, else
@@ -146,6 +149,7 @@ pub fn capabilities() -> Capabilities {
         capture: supported.capture,
         overlay: supported.overlay,
         snippet_expansion: if typed::supported() { supported.typing } else { Support::None },
+        live_dictation: if typed::rewriting() { supported.rewriting } else { Support::None },
         hold_keys: offered.into_iter().map(|(value, title)| HoldKey { value, title }).collect(),
         #[cfg(target_os = "linux")]
         extension: gnome::extension::state().name(),
@@ -210,6 +214,10 @@ mod tests {
         assert_eq!(gnome.typing, Support::None);
         assert!(gnome::Gnome.typing().is_none());
         assert!(desktop::Generic.typing().is_none());
+        // Correcting text in another window needs the same, and more: only
+        // X11 has it.
+        assert_eq!(x11.rewriting, Support::Full);
+        assert_eq!((gnome.rewriting, generic.rewriting), (Support::None, Support::None));
     }
 
     /// What an adapter does not do says so, and reaches for nothing else.

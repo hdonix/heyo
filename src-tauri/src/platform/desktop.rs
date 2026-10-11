@@ -39,6 +39,9 @@ pub struct Supported {
     /// Following what is typed in other applications, for snippets that
     /// expand as their keyword is typed.
     pub typing: Support,
+    /// Writing text into another application piece by piece and correcting
+    /// it where it stands, for dictated words that go in as they are spoken.
+    pub rewriting: Support,
 }
 
 impl Supported {
@@ -51,6 +54,7 @@ impl Supported {
         capture: Support::None,
         overlay: Support::None,
         typing: Support::None,
+        rewriting: Support::None,
     };
 }
 
@@ -364,7 +368,7 @@ pub mod fake {
     use std::cell::Cell;
     use std::sync::Mutex;
 
-    use super::super::typed::{Typed, Typing};
+    use super::super::typed::{Lost, Typed, Typing, Writing};
     use super::*;
 
     thread_local!(static CURRENT: Cell<Option<&'static Fake>> = const { Cell::new(None) });
@@ -390,8 +394,15 @@ pub mod fake {
         /// A window of Heyo's own is in front, so none of these is active.
         pub heyo_in_front: Mutex<bool>,
         /// The text before the cursor in the window in front: what was
-        /// pasted there, and what the test's user typed.
+        /// pasted there and written piece by piece, and what the test's
+        /// user typed.
         pub field: Mutex<String>,
+        /// The user has touched the window in front (typed, clicked) since
+        /// writing into it began.
+        pub touched: Mutex<bool>,
+        /// What becomes of the pieces written next instead of their going
+        /// in, the first first.
+        pub losing: Mutex<std::collections::VecDeque<Lost>>,
     }
 
     impl Fake {
@@ -422,6 +433,7 @@ pub mod fake {
         /// The user types into the window in front.
         pub fn user_types(&self, text: &str) {
             self.field.lock().unwrap().push_str(text);
+            *self.touched.lock().unwrap() = true;
         }
 
         /// What the window in front holds before its cursor.
@@ -451,14 +463,58 @@ pub mod fake {
             Ok(())
         }
 
+        fn write(&self, hotkeys: &[String], own_presses: std::sync::Arc<std::sync::atomic::AtomicU32>) -> Result<Box<dyn Writing>, String> {
+            let fake = CURRENT.with(|current| current.get()).ok_or("no desktop")?;
+            fake.note(format!("write{}", hotkeys.iter().map(|hotkey| format!(" {hotkey}")).collect::<String>()));
+            *fake.touched.lock().unwrap() = false;
+            Ok(Box::new(Hand { fake, own_presses, known: 0 }))
+        }
+
         fn composing(&self) -> bool {
             false
         }
     }
 
+    /// Writes into the fake's window in front, until its user touches it.
+    struct Hand {
+        fake: &'static Fake,
+        /// Presses on Heyo's own windows, and how many of them were noted.
+        own_presses: std::sync::Arc<std::sync::atomic::AtomicU32>,
+        known: u32,
+    }
+
+    impl Writing for Hand {
+        fn replace(&mut self, erase: usize, text: &str) -> Result<(), Lost> {
+            let own = self.own_presses.load(std::sync::atomic::Ordering::SeqCst);
+            if own != self.known {
+                self.known = own;
+                self.fake.note(format!("own presses {own}"));
+            }
+            if *self.fake.touched.lock().unwrap() {
+                return Err(Lost::untouched("a key was pressed"));
+            }
+            let lost = self.fake.losing.lock().unwrap().pop_front();
+            let (erased, put) = lost.as_ref().map_or((erase, true), |lost| (lost.erased, lost.put));
+            self.fake.note(format!("rewrite {erased} with {}", if put { text } else { "nothing" }));
+            if put && !text.is_empty() {
+                *self.fake.clipboard.lock().unwrap() = Some(text.to_owned());
+            }
+            self.fake.edit(erased, if put { text } else { "" });
+            match lost {
+                Some(lost) => {
+                    // Whatever went wrong, nothing more is written: unless
+                    // the piece was only put off.
+                    *self.fake.touched.lock().unwrap() = !lost.later;
+                    Err(lost)
+                }
+                None => Ok(()),
+            }
+        }
+    }
+
     impl Desktop for Fake {
         fn supported(&self) -> Supported {
-            self.supported.lock().unwrap().unwrap_or(Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, ..Supported::NOTHING })
+            self.supported.lock().unwrap().unwrap_or(Supported { windows: Support::Full, paste: Support::Full, selection: Support::Full, rewriting: Support::Full, ..Supported::NOTHING })
         }
 
         fn active_window(&self) -> Option<Window> {

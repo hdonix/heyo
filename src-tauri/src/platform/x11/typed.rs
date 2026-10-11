@@ -1,7 +1,7 @@
 //! Following what is typed, through the X Input extension's raw key events
 //! (as `hold_key` does for one key), and replacing it: Backspaces and the
 //! paste shortcut pressed with XTEST, the text offered on the clipboard
-//! (`offer`).
+//! (`offer`). Writing piece after piece into one window is `writing`.
 //!
 //! Raw events are a copy of what the keyboard does, sent to whoever asks.
 //! Nothing is grabbed and no key is held back or changed: if this code
@@ -34,7 +34,7 @@ use x11rb::rust_connection::RustConnection;
 use xkbcommon::xkb as xkbc;
 
 use super::offer::{self, Client};
-use crate::platform::typed::{Typed, Typing};
+use crate::platform::typed::{Typed, Typing, Writing};
 
 /// The keyboard of the X session.
 pub struct Keyboard;
@@ -48,6 +48,10 @@ impl Typing for Keyboard {
         replace(erase, text, terminal).map_err(|e| e.to_string())
     }
 
+    fn write(&self, hotkeys: &[String], own_presses: std::sync::Arc<std::sync::atomic::AtomicU32>) -> Result<Box<dyn Writing>, String> {
+        super::writing::Hand::begin(hotkeys, own_presses).map(|hand| Box::new(hand) as Box<dyn Writing>).map_err(|e| e.to_string())
+    }
+
     fn composing(&self) -> bool {
         super::input_method::composing()
     }
@@ -57,7 +61,7 @@ impl Typing for Keyboard {
     }
 }
 
-const BACKSPACE: u32 = 0xff08;
+pub(super) const BACKSPACE: u32 = 0xff08;
 const MULTI_KEY: u32 = 0xff20;
 
 /// What a key press amounts to.
@@ -73,7 +77,7 @@ pub(super) enum Key {
 }
 
 /// Keysyms of keys that only change what other keys do.
-fn is_modifier(sym: u32) -> bool {
+pub(super) fn is_modifier(sym: u32) -> bool {
     // Shift_L … Hyper_R; ISO_Lock … ISO_Level5_Lock; Mode_switch, Num_Lock, Scroll_Lock.
     matches!(sym, 0xffe1..=0xffee | 0xfe01..=0xfe13 | 0xff7e | 0xff7f | 0xff14)
 }
@@ -180,7 +184,7 @@ impl Layout {
 }
 
 /// Waits until the server has sent something, or for `timeout`. Whether it has.
-fn readable(conn: &RustConnection, timeout: Duration) -> bool {
+pub(super) fn readable(conn: &RustConnection, timeout: Duration) -> bool {
     let mut fd = libc::pollfd { fd: conn.stream().as_raw_fd(), events: libc::POLLIN, revents: 0 };
     // An error (a signal, say) is as good as "look again".
     unsafe { libc::poll(&mut fd, 1, timeout.as_millis() as libc::c_int) != 0 }
@@ -304,27 +308,27 @@ fn keycode(mapping: &x11rb::protocol::xproto::GetKeyboardMappingReply, min: u8, 
 /// The most Backspaces handed over in one piece: with the paste shortcut
 /// after them they are a few kilobytes, which reach the server in a single
 /// write. Either all of it is pressed and let go, or none of it.
-const MOST_AT_ONCE: usize = 64;
+pub(super) const MOST_AT_ONCE: usize = 64;
 
 /// How long the application in front is given to take the text, once the
 /// keys are pressed: it comes to the paste shortcut after the Backspaces.
-fn patience(erased: usize) -> Duration {
+pub(super) fn patience(erased: usize) -> Duration {
     Duration::from_millis(1000 + 3 * erased as u64)
 }
 
 /// A key going down (`true`) or coming up.
-type Stroke = (u8, bool);
+pub(super) type Stroke = (u8, bool);
 
 /// The keys Heyo presses, as this keyboard has them.
-struct Keys {
-    backspace: u8,
-    control: u8,
-    shift: u8,
-    v: u8,
+pub(super) struct Keys {
+    pub backspace: u8,
+    pub control: u8,
+    pub shift: u8,
+    pub v: u8,
 }
 
 impl Keys {
-    fn of(mapping: &x11rb::protocol::xproto::GetKeyboardMappingReply, min: u8) -> Result<Keys, String> {
+    pub(super) fn of(mapping: &x11rb::protocol::xproto::GetKeyboardMappingReply, min: u8) -> Result<Keys, String> {
         const CONTROL_L: u32 = 0xffe3;
         const SHIFT_L: u32 = 0xffe1;
         const V: u32 = 0x76;
@@ -332,19 +336,21 @@ impl Keys {
         Ok(Keys { backspace: key(BACKSPACE, "Backspace")?, control: key(CONTROL_L, "Ctrl")?, shift: key(SHIFT_L, "Shift")?, v: key(V, "V")? })
     }
 
-    /// Backspace `erase` times, and then the paste shortcut (a terminal's,
-    /// if `terminal`).
-    fn replacing(&self, erase: usize, terminal: bool) -> Vec<Stroke> {
+    /// Backspace `erase` times, and then the paste shortcut if `paste`
+    /// (a terminal's, if `terminal`).
+    pub(super) fn replacing(&self, erase: usize, paste: bool, terminal: bool) -> Vec<Stroke> {
         let mut strokes: Vec<Stroke> = (0..erase).flat_map(|_| [(self.backspace, true), (self.backspace, false)]).collect();
-        let shortcut: &[u8] = if terminal { &[self.control, self.shift, self.v] } else { &[self.control, self.v] };
-        strokes.extend(shortcut.iter().map(|code| (*code, true)));
-        strokes.extend(shortcut.iter().rev().map(|code| (*code, false)));
+        if paste {
+            let shortcut: &[u8] = if terminal { &[self.control, self.shift, self.v] } else { &[self.control, self.v] };
+            strokes.extend(shortcut.iter().map(|code| (*code, true)));
+            strokes.extend(shortcut.iter().rev().map(|code| (*code, false)));
+        }
         strokes
     }
 }
 
 /// The keyboard as the server maps it, for finding keys by what is on them.
-fn mapping(conn: &RustConnection) -> Result<(x11rb::protocol::xproto::GetKeyboardMappingReply, u8), Box<dyn Error>> {
+pub(super) fn mapping(conn: &RustConnection) -> Result<(x11rb::protocol::xproto::GetKeyboardMappingReply, u8), Box<dyn Error>> {
     let (min, max) = (conn.setup().min_keycode, conn.setup().max_keycode);
     Ok((conn.get_keyboard_mapping(min, max - min + 1)?.reply()?, min))
 }
@@ -359,7 +365,7 @@ fn mapping(conn: &RustConnection) -> Result<(x11rb::protocol::xproto::GetKeyboar
 /// two of these requests; that leaves microseconds, not hundredths of a
 /// second. And should Heyo stop while this runs, the server has either all
 /// of it or none: no key is left down.
-fn press(conn: &RustConnection, root: Window, strokes: &[Stroke]) -> Result<(), Box<dyn Error>> {
+pub(super) fn press(conn: &RustConnection, root: Window, strokes: &[Stroke]) -> Result<(), Box<dyn Error>> {
     for (code, down) in strokes {
         conn.xtest_fake_input(if *down { KEY_PRESS_EVENT } else { KEY_RELEASE_EVENT }, *code, x11rb::CURRENT_TIME, root, 0, 0, 0)?;
     }
@@ -386,7 +392,7 @@ fn replace(erase: usize, text: &str, terminal: bool) -> Result<(), Box<dyn Error
     if held(&conn, root)? {
         return Err("a modifier key is down".into());
     }
-    press(&conn, root, &keys.replacing(erase, terminal))?;
+    press(&conn, root, &keys.replacing(erase, true, terminal))?;
     if !offer.taken_by(application, patience(erase)) {
         return Err("the keys were pressed, but the application was not seen to take the text".into());
     }

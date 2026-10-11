@@ -30,6 +30,7 @@ const settings: SettingsView = {
   dictationSource: "",
   dictationPolish: "off",
   dictationHoldKey: "",
+  dictationLive: true,
   anthropicApiKey: "",
   aiProvider: "claude",
   localModelUrl: "http://127.0.0.1:8000/v1",
@@ -65,6 +66,7 @@ const capabilities: Capabilities = {
   capture: "full",
   overlay: "full",
   snippetExpansion: "full",
+  liveDictation: "full",
   holdKeys: [],
   extension: "none",
 };

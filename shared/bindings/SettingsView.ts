@@ -69,6 +69,13 @@ dictationPolish: string,
  */
 dictationHoldKey: string, 
 /**
+ * Type as you speak: dictated words go into the application as they
+ * are recognized and are corrected where they stand, where the session
+ * can do that (`platform::typed::rewriting`). Off, or elsewhere, each
+ * sentence is pasted when it is finished.
+ */
+dictationLive: boolean, 
+/**
  * Claude API key for polishing; empty uses the environment's credentials.
  */
 anthropicApiKey: string, 

@@ -93,6 +93,7 @@ const TABLE: &[(&str, &[Caller])] = &[
     ("revoke_extension_permission", &[Settings]),
     ("dictation_toggle", &[Dictation]),
     ("dictation_cancel", &[Dictation]),
+    ("dictation_pressed", &[Dictation]),
     ("screenshot_finish", &[Screenshot]),
 ];
 

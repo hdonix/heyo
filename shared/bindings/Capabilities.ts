@@ -45,6 +45,11 @@ overlay: Support,
  */
 snippetExpansion: Support, 
 /**
+ * Writing dictated words into the application as they are spoken, and
+ * correcting them where they stand.
+ */
+liveDictation: Support, 
+/**
  * The keys offered for hold-to-talk.
  */
 holdKeys: Array<HoldKey>, 

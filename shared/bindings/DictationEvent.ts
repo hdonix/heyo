@@ -4,8 +4,13 @@
  * What the dictation window is told of a recording: the helper's account
  * of it, and the host's own of one starting or failing.
  */
-export type DictationEvent = { "type": "start", polish: string, } | { "type": "ready" } | { "type": "level", value: number | null, } | { "type": "partial", text: string, } | { "type": "segment", text: string, } | { "type": "polishing" } | { "type": "result", text: string, raw: string, 
+export type DictationEvent = { "type": "start", polish: string, } | { "type": "ready" } | { "type": "level", value: number | null, } | { "type": "partial", text: string, } | { "type": "segment", text: string, } | { "type": "writing", live: boolean, } | { "type": "polishing" } | { "type": "result", text: string, raw: string, 
 /**
  * Why the text was not polished.
  */
-warning?: string, cancelled?: boolean, } | { "type": "error", message: string, };
+warning?: string, cancelled?: boolean, 
+/**
+ * What a cancelled recording had written is still in the
+ * application: it could not be taken back.
+ */
+kept?: boolean, } | { "type": "error", message: string, };

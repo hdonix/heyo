@@ -62,6 +62,8 @@ export type Commands = {
   dictation_install: { args: null; result: null };
   dictation_toggle: { args: null; result: null };
   dictation_cancel: { args: null; result: null };
+  /** A mouse button went down on the dictation window. */
+  dictation_pressed: { args: null; result: null };
   show_window: { args: null; result: null };
   get_item: { args: { id: string }; result: Item | null };
   list_applications: { args: null; result: Array<Item> };
@@ -146,6 +148,7 @@ export const answersNothing = [
   "dictation_install",
   "dictation_toggle",
   "dictation_cancel",
+  "dictation_pressed",
   "show_window",
   "record_usage",
   "set_favorite",
