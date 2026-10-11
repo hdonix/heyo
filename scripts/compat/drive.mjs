@@ -6,12 +6,24 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { createInterface } from "node:readline";
 
 import { createHost } from "./host.mjs";
 import { createObserver, hasContent, readStack } from "./observe.mjs";
 import { dummyArguments, dummyPreferences } from "./preferences.mjs";
 import { bwrapArgs, environment, layout, writeAccount } from "./sandbox.mjs";
+
+/// Hands over each line a stream carries. A line ends at a line feed and
+/// nowhere else: `readline` also ends one at U+2028 and U+2029, which a
+/// render with text in it may hold.
+function lines(stream, each) {
+  stream.setEncoding("utf8");
+  let held = "";
+  stream.on("data", (text) => {
+    const parts = (held + text).split("\n");
+    held = parts.pop();
+    parts.forEach(each);
+  });
+}
 
 /// What is typed into an empty list that searches as you type.
 export const SEARCH_TEXT = "test";
@@ -187,7 +199,7 @@ export function launchCommand({ runtimeFile, extensionDir, manifest, command, sc
     timers.push(setTimeout(() => !ready && finish("never-ready"), 10_000));
     timers.push(setTimeout(() => finish("deadline"), timeoutMs + 2_000));
 
-    createInterface({ input: child.stdout }).on("line", (line) => {
+    lines(child.stdout, (line) => {
       let message;
       try {
         message = JSON.parse(line);

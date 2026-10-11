@@ -21,12 +21,12 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { createInterface } from "node:readline";
 
 import Anthropic from "@anthropic-ai/sdk";
 
 import { download, installPackages, type PinnedFile } from "./install";
 import { type AiSettings, LocalModelError, streamLocal } from "./llm";
+import { streams } from "./transport";
 import { type Corrector, corrector, parseVocabulary, type Vocabulary, vocabularyPrompt } from "./vocabulary";
 import engineLock from "./locks/dictation.json";
 
@@ -429,8 +429,9 @@ function serve() {
     },
   };
 
-  createInterface({ input: process.stdin })
-    .on("line", (line) => {
+  // Text to polish may hold any character: lines end where `streams` says.
+  streams(process.stdin, () => {}).receive(
+    (line) => {
       Promise.resolve()
         .then(() => {
           const message = JSON.parse(line);
@@ -440,8 +441,9 @@ function serve() {
           end();
           send({ type: "error", message: e instanceof Error ? e.message : String(e) });
         });
-    })
-    .on("close", () => process.exit(0));
+    },
+    () => process.exit(0),
+  );
 }
 
 if (!DIR) {
