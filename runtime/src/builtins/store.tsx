@@ -224,7 +224,7 @@ export function Store() {
         } catch (e) {
           if (controller.signal.aborted) return;
           setLoading(false);
-          showToast({ style: Toast.Style.Failure, title: "Could not reach the Raycast Store", message: String(e) });
+          showToast({ style: Toast.Style.Failure, title: "Could not reach the Raycast Store", message: e instanceof Error ? e.message : String(e) });
         }
       },
       query ? 250 : 0,
