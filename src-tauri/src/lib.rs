@@ -165,11 +165,7 @@ pub fn run() {
             // Off whatever thread the desktop called on: opening an item
             // may wait on other programs.
             let app = app.clone();
-            std::thread::spawn(move || {
-                if !handle_args(&app, &args) {
-                    palette::toggle(&app);
-                }
-            });
+            std::thread::spawn(move || run_again(&app, &args));
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(IndexState::default())

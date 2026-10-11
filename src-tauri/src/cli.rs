@@ -197,6 +197,15 @@ pub(crate) fn at_start(args: &[String]) -> AtStart {
     }
 }
 
+/// Heyo was run again while it is running, which a hotkey also comes to:
+/// does what the arguments ask for, and with nothing asked for shows or
+/// hides the palette.
+pub(crate) fn run_again(app: &AppHandle, args: &[String]) {
+    if !handle_args(app, args) {
+        palette::toggle(app);
+    }
+}
+
 /// Handles command-line arguments, from this process or a second instance.
 /// Returns whether they asked for something other than toggling the window.
 pub(crate) fn handle_args(app: &AppHandle, args: &[String]) -> bool {

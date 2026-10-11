@@ -152,11 +152,7 @@ fn start(app: AppHandle) {
                 // As if Heyo had been run again with these arguments.
                 let args: Vec<String> = std::iter::once("heyo".to_owned()).chain(args.iter().cloned()).collect();
                 let app = app.clone();
-                let _ = app.clone().run_on_main_thread(move || {
-                    if !crate::handle_args(&app, &args) {
-                        crate::palette::toggle(&app);
-                    }
-                });
+                let _ = app.clone().run_on_main_thread(move || crate::run_again(&app, &args));
             }
         }
     });
