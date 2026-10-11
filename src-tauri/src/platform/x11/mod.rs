@@ -3,8 +3,11 @@
 
 pub mod capture;
 pub mod clipboard;
+#[cfg(test)]
+mod field;
 pub mod hold_key;
 pub mod input_method;
+mod offer;
 pub mod overlay;
 pub mod typed;
 pub mod windows;

@@ -41,7 +41,7 @@
 //! # Replacing it
 //!
 //! The keyword is erased with Backspaces and the text pasted from the
-//! clipboard, which is borrowed for it (`replace`, `pasting`). That is
+//! clipboard, which is borrowed for it (`replace`, `pasting::Loan`). That is
 //! not done in the windows of password managers and of the applications
 //! the user excluded, in Heyo's own, or while an input method may be
 //! composing; into a terminal the text goes on one line. Placeholders are
@@ -79,10 +79,7 @@ const APART: Duration = Duration::from_millis(100);
 /// went wrong, Heyo does not type on and on.
 const BURST: usize = 10;
 const WINDOW: Duration = Duration::from_secs(10);
-/// How long the clipboard is given to have the text before it is pasted,
-const SETTLE: Duration = Duration::from_millis(30);
-/// and how long a keyword waits for a pause in the typing, or for Shift to
-/// be let go, before it is left alone.
+/// How long a keyword waits for Shift to be let go before it is left alone.
 const PATIENCE: Duration = Duration::from_millis(900);
 
 /// What was typed in one place of the buffer.
@@ -402,7 +399,7 @@ pub fn start(app: &AppHandle) {
 }
 
 /// Why a keyword that was typed is left as it is. `None`: go ahead.
-fn refusal(class: Option<&str>, own: bool, excluded: impl FnOnce(&str) -> bool) -> Option<&'static str> {
+pub(crate) fn refusal(class: Option<&str>, own: bool, excluded: impl FnOnce(&str) -> bool) -> Option<&'static str> {
     match class {
         _ if own => Some("one of Heyo's own windows"),
         // The exclusions go by the window's class.
@@ -415,7 +412,7 @@ fn refusal(class: Option<&str>, own: bool, excluded: impl FnOnce(&str) -> bool) 
 
 /// Whether snippets are never expanded in a window of that class: password
 /// managers, and what the user listed.
-fn excluded(app: &AppHandle, class: &str) -> bool {
+pub(crate) fn excluded(app: &AppHandle, class: &str) -> bool {
     if crate::clipboard::ignored_app(Some(class)) {
         return true;
     }
@@ -431,10 +428,10 @@ fn excluded(app: &AppHandle, class: &str) -> bool {
 /// Replaces the keyword just typed with `text`: erases it and pastes.
 /// Anything in doubt before the first Backspace means nothing is touched.
 ///
-/// The Backspaces and the paste go out as one (`Typing::replace`). After
-/// that the application fetches the clipboard, and a key pressed before it
-/// has done so lands before the text; nothing can be done about that from
-/// outside the application.
+/// The Backspaces and the paste go out as one, with the text on the
+/// clipboard (`Typing::replace`). After that the application fetches the
+/// clipboard, and a key pressed before it has done so lands before the
+/// text; nothing can be done about that from outside the application.
 fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), String> {
     let meanwhile = || MEANWHILE.lock().unwrap().carried();
     let own = app.webview_windows().values().any(|window| window.is_focused().unwrap_or(false));
@@ -455,42 +452,26 @@ fn replace(app: &AppHandle, text: String, expansion: &Expansion) -> Result<(), S
 
     // Given back when this returns, however it went.
     let clipboard = pasting::borrow();
+    clipboard.ready();
     let since = Instant::now();
-    // What the clipboard was last given.
-    let mut written: Option<String> = None;
-    loop {
+    // The last character may have needed Shift or AltGr, which would make
+    // the Backspaces something else. It is let go in a moment, usually.
+    while typed::modifiers_held() {
+        meanwhile()?;
         if since.elapsed() > PATIENCE {
-            return Err("typing went on, or a modifier key stayed down".to_owned());
+            return Err("a modifier key stayed down".to_owned());
         }
-        // The clipboard gets the text and what was typed since, and a
-        // moment to have it: the paste must not find the old contents.
-        let whole = format!("{text}{}", meanwhile()?);
-        if written.as_deref() != Some(&whole) {
-            clipboard.put(&whole, None).map_err(|e| format!("the clipboard could not be written: {e}"))?;
-            written = Some(whole);
-            std::thread::sleep(SETTLE);
-            continue;
-        }
-        // The last character may have needed Shift or AltGr, which would
-        // make the Backspaces something else. It is let go in a moment,
-        // usually.
-        if typed::modifiers_held() {
-            std::thread::sleep(Duration::from_millis(10));
-            continue;
-        }
-        // Unless one more key came just now, this is it: from here on
-        // nothing is carried over, and nothing turns back.
-        let carried = {
-            let mut meanwhile = MEANWHILE.lock().unwrap();
-            let carried = meanwhile.carried()?;
-            if !whole.ends_with(&carried) || whole.len() != text.len() + carried.len() {
-                continue;
-            }
-            meanwhile.forget();
-            carried.chars().count()
-        };
-        return typed::replace(expansion.erase + carried, terminal);
+        std::thread::sleep(Duration::from_millis(10));
     }
+    // This is it: what was typed since goes after the text, and from here
+    // on nothing is carried over and nothing turns back.
+    let carried = {
+        let mut meanwhile = MEANWHILE.lock().unwrap();
+        let carried = meanwhile.carried()?;
+        meanwhile.forget();
+        carried
+    };
+    clipboard.replace(expansion.erase + carried.chars().count(), &format!("{text}{carried}"), terminal)
 }
 
 /// What `EXPAND_SNIPPET` carries: a snippet's text for the palette to fill

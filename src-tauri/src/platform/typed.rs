@@ -1,10 +1,15 @@
-//! What is typed into other applications, for snippets that expand as
-//! their keyword is typed (`crate::expand`).
+//! What is typed into other applications, and replacing it there, for
+//! snippets that expand as their keyword is typed (`crate::expand`).
 //!
 //! The keyboard is only ever listened to: an adapter gets a copy of what
 //! the keys do and never grabs, holds back or changes one, so whatever
 //! happens to Heyo the keyboard works as before. What it hears it passes on
 //! one key at a time and keeps nowhere.
+//!
+//! Text is replaced by erasing with Backspace and pasting what takes its
+//! place: the keys of one replacement are handed over in one piece, each
+//! press with its release, so that none is left down should Heyo stop in
+//! the middle.
 //!
 //! Only X11 has an adapter. On Wayland an application is not shown what is
 //! typed in others; GNOME's Shell could be made to tell (Heyo's extension
@@ -55,12 +60,16 @@ pub trait Typing: Send + Sync {
     /// programs, Heyo's own among them, are not reported.
     fn watch(&self, wanted: &dyn Fn() -> bool, on: &mut dyn FnMut(Typed)) -> Result<(), String>;
 
-    /// Presses Backspace `erase` times in the focused window and then its
-    /// paste shortcut (a terminal's, if it is one), with nothing in between:
-    /// a key the user presses meanwhile must not land among them, least of
-    /// all while the shortcut's Ctrl is down. Does nothing, and says so, if
-    /// a modifier is held at that moment.
-    fn replace(&self, erase: usize, terminal: bool) -> Result<(), String>;
+    /// Replaces the `erase` characters before the cursor of the focused
+    /// window with `text`: presses Backspace that many times and then the
+    /// window's paste shortcut (a terminal's, if it is one), with nothing
+    /// in between, the clipboard having been given `text`. A key the user
+    /// presses meanwhile must not land among them, least of all while the
+    /// shortcut's Ctrl is down. Returns once the application has taken the
+    /// text. Does nothing, and says so, if a modifier is held at that moment.
+    ///
+    /// The clipboard is the caller's to have borrowed (`pasting::Loan`).
+    fn replace(&self, erase: usize, text: &str, terminal: bool) -> Result<(), String>;
 
     /// Whether an input method may be turning keys into other text at
     /// present (Chinese, Japanese, …): then the keys are not what is typed.
@@ -82,7 +91,7 @@ pub fn supported() -> bool {
 }
 
 fn typing() -> Result<&'static dyn Typing, String> {
-    desktop().typing().ok_or_else(|| super::unsupported("Expanding snippets as you type"))
+    desktop().typing().ok_or_else(|| super::unsupported("Replacing what is typed"))
 }
 
 /// See [`Typing::watch`].
@@ -91,8 +100,8 @@ pub fn watch(wanted: &dyn Fn() -> bool, on: &mut dyn FnMut(Typed)) -> Result<(),
 }
 
 /// See [`Typing::replace`].
-pub fn replace(erase: usize, terminal: bool) -> Result<(), String> {
-    typing()?.replace(erase, terminal)
+pub fn replace(erase: usize, text: &str, terminal: bool) -> Result<(), String> {
+    typing()?.replace(erase, text, terminal)
 }
 
 /// See [`Typing::composing`]. Without an adapter nothing is known: yes.

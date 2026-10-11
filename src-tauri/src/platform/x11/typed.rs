@@ -1,5 +1,7 @@
 //! Following what is typed, through the X Input extension's raw key events
-//! (as `hold_key` does for one key), and replacing it with XTEST.
+//! (as `hold_key` does for one key), and replacing it: Backspaces and the
+//! paste shortcut pressed with XTEST, the text offered on the clipboard
+//! (`offer`).
 //!
 //! Raw events are a copy of what the keyboard does, sent to whoever asks.
 //! Nothing is grabbed and no key is held back or changed: if this code
@@ -31,6 +33,7 @@ use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 use xkbcommon::xkb as xkbc;
 
+use super::offer::{self, Client};
 use crate::platform::typed::{Typed, Typing};
 
 /// The keyboard of the X session.
@@ -41,8 +44,8 @@ impl Typing for Keyboard {
         watch(wanted, on).map_err(|e| e.to_string())
     }
 
-    fn replace(&self, erase: usize, terminal: bool) -> Result<(), String> {
-        replace(erase, terminal).map_err(|e| e.to_string())
+    fn replace(&self, erase: usize, text: &str, terminal: bool) -> Result<(), String> {
+        replace(erase, text, terminal).map_err(|e| e.to_string())
     }
 
     fn composing(&self) -> bool {
@@ -298,48 +301,95 @@ fn keycode(mapping: &x11rb::protocol::xproto::GetKeyboardMappingReply, min: u8, 
     key.and_then(|(index, _)| u8::try_from(usize::from(min) + index).ok())
 }
 
-/// Presses Backspace `erase` times and then the paste shortcut in the
-/// focused window, as a program's key presses (XTEST), which `watch` does
-/// not report.
+/// The most Backspaces handed over in one piece: with the paste shortcut
+/// after them they are a few kilobytes, which reach the server in a single
+/// write. Either all of it is pressed and let go, or none of it.
+const MOST_AT_ONCE: usize = 64;
+
+/// How long the application in front is given to take the text, once the
+/// keys are pressed: it comes to the paste shortcut after the Backspaces.
+fn patience(erased: usize) -> Duration {
+    Duration::from_millis(1000 + 3 * erased as u64)
+}
+
+/// A key going down (`true`) or coming up.
+type Stroke = (u8, bool);
+
+/// The keys Heyo presses, as this keyboard has them.
+struct Keys {
+    backspace: u8,
+    control: u8,
+    shift: u8,
+    v: u8,
+}
+
+impl Keys {
+    fn of(mapping: &x11rb::protocol::xproto::GetKeyboardMappingReply, min: u8) -> Result<Keys, String> {
+        const CONTROL_L: u32 = 0xffe3;
+        const SHIFT_L: u32 = 0xffe1;
+        const V: u32 = 0x76;
+        let key = |keysym: u32, name: &str| keycode(mapping, min, keysym).ok_or_else(|| format!("this keyboard layout has no {name} key"));
+        Ok(Keys { backspace: key(BACKSPACE, "Backspace")?, control: key(CONTROL_L, "Ctrl")?, shift: key(SHIFT_L, "Shift")?, v: key(V, "V")? })
+    }
+
+    /// Backspace `erase` times, and then the paste shortcut (a terminal's,
+    /// if `terminal`).
+    fn replacing(&self, erase: usize, terminal: bool) -> Vec<Stroke> {
+        let mut strokes: Vec<Stroke> = (0..erase).flat_map(|_| [(self.backspace, true), (self.backspace, false)]).collect();
+        let shortcut: &[u8] = if terminal { &[self.control, self.shift, self.v] } else { &[self.control, self.v] };
+        strokes.extend(shortcut.iter().map(|code| (*code, true)));
+        strokes.extend(shortcut.iter().rev().map(|code| (*code, false)));
+        strokes
+    }
+}
+
+/// The keyboard as the server maps it, for finding keys by what is on them.
+fn mapping(conn: &RustConnection) -> Result<(x11rb::protocol::xproto::GetKeyboardMappingReply, u8), Box<dyn Error>> {
+    let (min, max) = (conn.setup().min_keycode, conn.setup().max_keycode);
+    Ok((conn.get_keyboard_mapping(min, max - min + 1)?.reply()?, min))
+}
+
+/// Presses and lets go of keys in the focused window, as a program's key
+/// presses (XTEST).
 ///
 /// All of it goes to the server in one piece. Sent key by key with pauses
 /// (as xdotool does), a key the user presses meanwhile would land between
 /// the Backspaces and the paste, or be pressed "with Ctrl" and become a
 /// shortcut: Ctrl+W, say. The server may still look at the keyboard between
-/// two of these requests; that leaves microseconds, not hundredths of a second.
-fn replace(erase: usize, terminal: bool) -> Result<(), Box<dyn Error>> {
-    const CONTROL_L: u32 = 0xffe3;
-    const SHIFT_L: u32 = 0xffe1;
-    const V: u32 = 0x76;
-    if erase > 64 {
+/// two of these requests; that leaves microseconds, not hundredths of a
+/// second. And should Heyo stop while this runs, the server has either all
+/// of it or none: no key is left down.
+fn press(conn: &RustConnection, root: Window, strokes: &[Stroke]) -> Result<(), Box<dyn Error>> {
+    for (code, down) in strokes {
+        conn.xtest_fake_input(if *down { KEY_PRESS_EVENT } else { KEY_RELEASE_EVENT }, *code, x11rb::CURRENT_TIME, root, 0, 0, 0)?;
+    }
+    // Sends it all; an answer to anything means the server has taken it.
+    conn.get_input_focus()?.reply()?;
+    Ok(())
+}
+
+/// Replaces the `erase` characters before the cursor of the focused window
+/// with `text`: Backspaces and the paste shortcut, which `watch` does not
+/// report, with the text on the clipboard for the application to take.
+fn replace(erase: usize, text: &str, terminal: bool) -> Result<(), Box<dyn Error>> {
+    if erase > MOST_AT_ONCE {
         return Err("too much to erase".into());
     }
     let (conn, screen) = RustConnection::connect(None)?;
-    let setup = conn.setup();
-    let root = setup.roots[screen].root;
+    let root = conn.setup().roots[screen].root;
     conn.xtest_get_version(2, 2)?.reply()?;
-    let (min, max) = (setup.min_keycode, setup.max_keycode);
-    let mapping = conn.get_keyboard_mapping(min, max - min + 1)?.reply()?;
-    let key = |keysym: u32, name: &str| keycode(&mapping, min, keysym).ok_or_else(|| format!("this keyboard layout has no {name} key"));
-    let (backspace, control, shift, v) = (key(BACKSPACE, "Backspace")?, key(CONTROL_L, "Ctrl")?, key(SHIFT_L, "Shift")?, key(V, "V")?);
+    let (mapping, min) = mapping(&conn)?;
+    let keys = Keys::of(&mapping, min)?;
+    let application = Client::of(&conn, conn.get_input_focus()?.reply()?.focus);
+    let offer = offer::put(text)?;
     // The last look before anything is pressed.
     if held(&conn, root)? {
         return Err("a modifier key is down".into());
     }
-    let press = |code: u8, down: bool| conn.xtest_fake_input(if down { KEY_PRESS_EVENT } else { KEY_RELEASE_EVENT }, code, x11rb::CURRENT_TIME, root, 0, 0, 0).map(|_| ());
-    for _ in 0..erase {
-        press(backspace, true)?;
-        press(backspace, false)?;
+    press(&conn, root, &keys.replacing(erase, terminal))?;
+    if !offer.taken_by(application, patience(erase)) {
+        return Err("the keys were pressed, but the application was not seen to take the text".into());
     }
-    let shortcut: &[u8] = if terminal { &[control, shift, v] } else { &[control, v] };
-    for code in shortcut {
-        press(*code, true)?;
-    }
-    for code in shortcut.iter().rev() {
-        press(*code, false)?;
-    }
-    // Sends it all; an answer to anything means the server has taken it.
-    conn.get_input_focus()?.reply()?;
     Ok(())
 }
 
@@ -540,13 +590,18 @@ mod tests {
         let xdotool = |args: &[&str]| assert!(std::process::Command::new("xdotool").args(args).status().unwrap().success());
         let chars = |text: &str| text.chars().map(Typed::Char).collect::<Vec<_>>();
 
+        // An application to replace text in.
+        let field = super::super::field::Field::open();
+
         // What programs press is not typing.
         std::env::remove_var("HEYO_TYPED_SYNTHETIC");
         let heard = listen(|| {
-            xdotool(&["key", "a", "b"]);
-            replace(2, false).unwrap();
+            xdotool(&["key", "a", "a", "a"]);
+            replace(2, "今天😀", false).unwrap();
         });
         assert_eq!(heard, []);
+        // The application has erased, and taken the text.
+        assert_eq!(field.text(), "a今天😀");
 
         // Taken for real keys, it is what a keyboard would have typed.
         std::env::set_var("HEYO_TYPED_SYNTHETIC", "1");
@@ -555,9 +610,10 @@ mod tests {
         // Heyo's own keys arrive, in order: the Backspaces, as many as
         // asked for, then the paste shortcut, the terminals' too.
         let replaced = [Typed::Backspace, Typed::Backspace, Typed::Backspace, Typed::Break];
-        assert_eq!(listen(|| replace(3, false).unwrap()), replaced);
-        assert_eq!(listen(|| replace(3, true).unwrap()), replaced);
-        assert_eq!(listen(|| replace(0, false).unwrap()), [Typed::Break]);
+        assert_eq!(listen(|| replace(3, "bc", false).unwrap()), replaced);
+        assert_eq!(listen(|| replace(3, "bcd", true).unwrap()), replaced);
+        assert_eq!(listen(|| replace(0, "e", false).unwrap()), [Typed::Break]);
+        assert_eq!(field.text(), "bcde");
         // And leave no key down behind them.
         assert!(conn.query_keymap().unwrap().reply().unwrap().keys.iter().all(|keys| *keys == 0));
         assert_eq!(listen(|| xdotool(&["click", "1"])), [Typed::Break]);
@@ -586,10 +642,16 @@ mod tests {
         conn.get_input_focus().unwrap().reply().unwrap();
         assert!(modifiers_held().unwrap());
         // Then nothing is pressed at all.
-        assert!(replace(1, false).is_err());
+        assert!(replace(1, "f", false).is_err());
         conn.xtest_fake_input(KEY_RELEASE_EVENT, SHIFT, x11rb::CURRENT_TIME, root, 0, 0, 0).unwrap();
         conn.get_input_focus().unwrap().reply().unwrap();
         assert!(!modifiers_held().unwrap());
+        assert_eq!(field.text(), "bcde");
+
+        // An application that takes nothing at the paste shortcut: the keys
+        // are pressed, and that the text was not taken is said.
+        drop(field);
+        assert!(replace(0, "anyone?", false).unwrap_err().to_string().contains("not seen to take"));
     }
 
     #[test]

@@ -3,7 +3,9 @@
 //! Heyo types nothing itself: it puts the text on the clipboard and presses
 //! the application's paste shortcut. Every paste goes through here, whether
 //! it comes from dictation, a snippet, an extension or the palette, so that
-//! two things hold for all of them.
+//! two things hold for all of them. So does text that takes the place of
+//! what stands before the cursor (a snippet's keyword): Backspaces and a
+//! paste, pressed by `platform::typed`.
 //!
 //! # The clipboard is only borrowed
 //!
@@ -38,6 +40,7 @@ use tauri::{AppHandle, Manager};
 use crate::confirm::{self, Answer, Question};
 use crate::platform::clipboard_watch::{read_text, write_html, write_text};
 use crate::platform::input::{is_terminal, press_paste, terminal_focused};
+use crate::platform::typed;
 use crate::*;
 
 /// How long an application gets to read what was pasted before the
@@ -185,7 +188,9 @@ impl Pasting {
         Loan { of: self }
     }
 
-    fn put(&self, text: &str, html: Option<&str>) -> Result<(), String> {
+    /// Notes that the clipboard is about to be given text of Heyo's: what
+    /// the user had is remembered, and the history told not to listen.
+    fn lending(&self) -> MutexGuard<'_, Lent> {
         let mut lent = self.lent();
         // While Heyo's text is there, what the user had is known already.
         if lent.owed.is_none() {
@@ -193,6 +198,11 @@ impl Pasting {
         }
         lent.puts += 1;
         self.world.unrecorded();
+        lent
+    }
+
+    fn put(&self, text: &str, html: Option<&str>) -> Result<(), String> {
+        let _lent = self.lending();
         match html {
             Some(html) => write_html(html, text),
             None => write_text(text),
@@ -247,6 +257,24 @@ impl Loan {
     /// by the history. The first time, what was there is remembered.
     pub(crate) fn put(&self, text: &str, html: Option<&str>) -> Result<(), String> {
         self.of.put(text, html)
+    }
+
+    /// Remembers what the user has on the clipboard now, where that must
+    /// not take time later: reading it can, and `replace` is for the moment
+    /// between two keys.
+    pub(crate) fn ready(&self) {
+        let mut lent = self.of.lent();
+        if lent.owed.is_none() {
+            lent.owed = Some(read_text().unwrap_or_default());
+        }
+    }
+
+    /// Replaces the `erase` characters before the cursor of the window in
+    /// front with `text`, which goes by way of the borrowed clipboard
+    /// (`typed::replace`).
+    pub(crate) fn replace(&self, erase: usize, text: &str, terminal: bool) -> Result<(), String> {
+        drop(self.of.lending());
+        typed::replace(erase, text, terminal)
     }
 
     /// Ends the loan and returns when the clipboard is the user's again,
@@ -402,8 +430,9 @@ pub(crate) fn paste_plain() {
     }
 }
 
+/// For tests: time that passes when told to, and a clipboard of one's own.
 #[cfg(test)]
-mod tests {
+pub(crate) mod scripted {
     use super::*;
     use crate::platform::desktop::fake::Fake;
 
@@ -411,7 +440,7 @@ mod tests {
 
     /// Time that passes when told to. What is asked of it goes into the
     /// fake desktop's own record, so one list has all that happened in order.
-    struct Scripted {
+    pub(crate) struct Scripted {
         desktop: &'static Fake,
         now: Mutex<Duration>,
         put_off: Mutex<Vec<(Duration, Task)>>,
@@ -423,7 +452,7 @@ mod tests {
         }
 
         /// Lets time pass; what was put off until then happens, in order.
-        fn pass(&self, time: Duration) {
+        pub(crate) fn pass(&self, time: Duration) {
             let now = {
                 let mut now = self.now.lock().unwrap();
                 *now += time;
@@ -461,11 +490,8 @@ mod tests {
         }
     }
 
-    const MS: Duration = Duration::from_millis(1);
-    const NOTHING: [&str; 0] = [];
-
     /// A desktop with a window of `class` in front and `copied` on its clipboard.
-    fn desk(class: &str, copied: Option<&str>) -> (&'static Fake, &'static Scripted, &'static Pasting) {
+    pub(crate) fn desk(class: &str, copied: Option<&str>) -> (&'static Fake, &'static Scripted, &'static Pasting) {
         let desktop = Fake::with_windows(&[(1, class)]);
         *desktop.clipboard.lock().unwrap() = copied.map(str::to_owned);
         let world: &'static Scripted = Box::leak(Box::new(Scripted { desktop, now: Mutex::default(), put_off: Mutex::default() }));
@@ -473,13 +499,23 @@ mod tests {
     }
 
     /// What happened since this was last asked.
-    fn happened(desktop: &Fake) -> Vec<String> {
+    pub(crate) fn happened(desktop: &Fake) -> Vec<String> {
         std::mem::take(&mut *desktop.asked.lock().unwrap())
     }
 
-    fn clipboard(desktop: &Fake) -> Option<String> {
+    pub(crate) fn clipboard(desktop: &Fake) -> Option<String> {
         desktop.clipboard.lock().unwrap().clone()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scripted::{clipboard, desk, happened};
+    use super::*;
+    use crate::platform::desktop::fake::Fake;
+
+    const MS: Duration = Duration::from_millis(1);
+    const NOTHING: [&str; 0] = [];
 
     #[test]
     fn a_paste_on_loan_gives_the_clipboard_back_and_the_history_hears_neither_change() {
@@ -697,5 +733,23 @@ mod tests {
         let line = shown.lines().nth(2).unwrap();
         assert_eq!(line.chars().count(), 49);
         assert!(line.ends_with('…'));
+    }
+
+    #[test]
+    fn text_that_replaces_what_stands_there_is_on_loan_too() {
+        let (desktop, world, pasting) = desk("firefox", Some("the user's"));
+        desktop.during(|| {
+            desktop.user_types("Best, ;sig");
+            let loan = pasting.borrow();
+            // Reading the clipboard is done ahead of the moment that counts.
+            loan.ready();
+            assert_eq!(happened(desktop), NOTHING);
+            loan.replace(4, "Ada", false).unwrap();
+            assert_eq!(happened(desktop), ["unrecorded", "replace 4 with Ada"]);
+            assert_eq!(desktop.field(), "Best, Ada");
+            drop(loan);
+            world.pass(READ);
+            assert_eq!(happened(desktop), ["unrecorded", "copy the user's"]);
+        });
     }
 }

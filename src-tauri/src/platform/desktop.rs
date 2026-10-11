@@ -277,7 +277,8 @@ pub trait Desktop: Send + Sync {
 
     // --- What is typed --------------------------------------------------------------
 
-    /// What follows the typing in other applications here, if anything can.
+    /// What follows the typing in other applications here and replaces
+    /// what was typed, if anything can.
     fn typing(&self) -> Option<&dyn super::typed::Typing> {
         None
     }
@@ -363,6 +364,7 @@ pub mod fake {
     use std::cell::Cell;
     use std::sync::Mutex;
 
+    use super::super::typed::{Typed, Typing};
     use super::*;
 
     thread_local!(static CURRENT: Cell<Option<&'static Fake>> = const { Cell::new(None) });
@@ -387,6 +389,9 @@ pub mod fake {
         pub supported: Mutex<Option<Supported>>,
         /// A window of Heyo's own is in front, so none of these is active.
         pub heyo_in_front: Mutex<bool>,
+        /// The text before the cursor in the window in front: what was
+        /// pasted there, and what the test's user typed.
+        pub field: Mutex<String>,
     }
 
     impl Fake {
@@ -412,6 +417,42 @@ pub mod fake {
 
         fn note(&self, what: String) {
             self.asked.lock().unwrap().push(what);
+        }
+
+        /// The user types into the window in front.
+        pub fn user_types(&self, text: &str) {
+            self.field.lock().unwrap().push_str(text);
+        }
+
+        /// What the window in front holds before its cursor.
+        pub fn field(&self) -> String {
+            self.field.lock().unwrap().clone()
+        }
+
+        /// Erases and writes as an application does at Backspace and paste.
+        fn edit(&self, erase: usize, text: &str) {
+            let mut field = self.field.lock().unwrap();
+            for _ in 0..erase {
+                field.pop();
+            }
+            field.push_str(text);
+        }
+    }
+
+    impl Typing for Fake {
+        fn watch(&self, _wanted: &dyn Fn() -> bool, _on: &mut dyn FnMut(Typed)) -> Result<(), String> {
+            Err(unsupported("Following what is typed"))
+        }
+
+        fn replace(&self, erase: usize, text: &str, terminal: bool) -> Result<(), String> {
+            self.note(format!("replace {erase} with {text}{}", if terminal { " terminal" } else { "" }));
+            *self.clipboard.lock().unwrap() = Some(text.to_owned());
+            self.edit(erase, text);
+            Ok(())
+        }
+
+        fn composing(&self) -> bool {
+            false
         }
     }
 
@@ -466,9 +507,15 @@ pub mod fake {
             Ok(())
         }
 
+        /// What is on the clipboard goes into the window in front.
         fn paste(&self, terminal: bool) -> Result<(), String> {
             self.note(if terminal { "paste terminal".into() } else { "paste".into() });
-            self.paste_fails.lock().unwrap().clone().map_or(Ok(()), Err)
+            if let Some(why) = self.paste_fails.lock().unwrap().clone() {
+                return Err(why);
+            }
+            let pasted = self.clipboard.lock().unwrap().clone().unwrap_or_default();
+            self.edit(0, &pasted);
+            Ok(())
         }
 
         fn selected_text(&self) -> String {
@@ -508,6 +555,10 @@ pub mod fake {
 
         fn default_application(&self, _target: &str) -> Option<String> {
             None
+        }
+
+        fn typing(&self) -> Option<&dyn Typing> {
+            Some(self)
         }
 
         fn audio_devices(&self) -> Result<Vec<crate::platform::system::AudioDevice>, String> {
