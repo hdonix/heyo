@@ -22,6 +22,9 @@ export global Theme {
     // Whether focus was last moved by the keyboard: only then is a ring
     // drawn around a control that is not a field (`:focus-visible`).
     in-out property <bool> keyboard;
+    // How many rows a menu shows before it scrolls: half a row says that
+    // there are more.
+    out property <float> menu-rows: 10.5;
 }
 
 // --- Text, at the sizes of the scale ----------------------------------------
@@ -366,6 +369,8 @@ export component Check {
     in property <bool> checked;
     in property <bool> mixed;
     in property <string> label;
+    // Only drawn: the row it stands in is what is clicked and has the keys.
+    in property <bool> inert;
     callback toggled(on: bool);
     width: 16px;
     height: 16px;
@@ -415,6 +420,7 @@ export component Check {
         background: Tokens.on-accent;
     }
     TouchArea {
+        enabled: !root.inert;
         mouse-cursor: pointer;
         clicked => {
             Theme.keyboard = false;
@@ -423,6 +429,7 @@ export component Check {
     }
 
     scope := FocusScope {
+        enabled: !root.inert;
         focus-on-click: false;
         key-pressed(event) => {
             if (event.text == " ") {
@@ -636,6 +643,98 @@ export component TextArea {
     }
 }
 
+// --- A scrolling area with the thin bar of the web interface ----------------
+
+export component Scrollbar inherits Rectangle {
+    in property <length> content-y;
+    in property <length> content-height;
+    in property <length> visible-height;
+    callback scrolled(y: length);
+    property <bool> needed: content-height > visible-height + 1px;
+    property <length> thumb: max(28px, visible-height * visible-height / max(1px, content-height));
+    property <float> at: needed ? -content-y / (content-height - visible-height) : 0;
+    width: 10px;
+    opacity: needed && (track.has-hover || track.pressed) ? 1 : needed ? 0.55 : 0;
+    animate opacity {
+        duration: Tokens.duration-base;
+        easing: Tokens.ease-out;
+    }
+    Rectangle {
+        x: 3px;
+        y: 2px + root.at * (root.height - 4px - root.thumb);
+        width: track.has-hover || track.pressed ? 6px : 4px;
+        height: root.thumb;
+        border-radius: self.width / 2;
+        background: Tokens.fill-4;
+    }
+
+    track := TouchArea {
+        property <length> grabbed;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                self.grabbed = self.mouse-y - (2px + root.at * (root.height - 4px - root.thumb));
+            }
+        }
+        moved => {
+            if (self.pressed && root.needed) {
+                root.scrolled(-clamp((self.mouse-y - self.grabbed - 2px) / (root.height - 4px - root.thumb), 0, 1) * (root.content-height - root.visible-height));
+            }
+        }
+    }
+}
+
+// --- Menus ---------------------------------------------------------------------
+
+// The sheet of a menu: raised, with a shadow. Its rows are stacked, and
+// scroll when there are more than fit (the wheel, the bar, or the keys
+// through `reveal`).
+component MenuSheet inherits Rectangle {
+    out property <length> wanted-width: rows.preferred-width + 8px;
+    out property <length> wanted-height: rows.preferred-height + 8px;
+    // The most a menu takes of the window, whatever it lists.
+    out property <length> most: Theme.menu-rows * Tokens.height-md + 8px;
+    // Brings what lies from `top` to `bottom` of the rows into sight.
+    public function reveal(top: length, bottom: length) {
+        if (top + scroller.content-y < 0) {
+            scroller.content-y = -top;
+        } else if (bottom + scroller.content-y > scroller.height) {
+            scroller.content-y = scroller.height - bottom;
+        }
+    }
+    border-radius: Tokens.radius-lg;
+    background: Tokens.surface-raised;
+    border-width: 1px;
+    border-color: Tokens.border-strong;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: Tokens.shadow-far;
+    scroller := Flickable {
+        x: 4px;
+        y: 4px;
+        width: parent.width - 8px;
+        height: parent.height - 8px;
+        content-width: self.width;
+        content-height: rows.preferred-height;
+        // The wheel scrolls it; a press is for the row under it.
+        interactive: false;
+        rows := VerticalLayout {
+            @children
+        }
+    }
+
+    Scrollbar {
+        x: parent.width - 11px;
+        y: 4px;
+        height: parent.height - 8px;
+        content-y: scroller.content-y;
+        content-height: scroller.content-height;
+        visible-height: scroller.height;
+        scrolled(y) => {
+            scroller.content-y = y;
+        }
+    }
+}
+
 // --- Select ------------------------------------------------------------------
 
 export struct Choice {
@@ -648,6 +747,20 @@ export component Select {
     in property <string> value;
     in property <string> label;
     callback picked(value: string);
+    // Where the chosen one is among the choices, and which row of the open
+    // menu is lit: the pointer and the arrow keys move the same one.
+    property <int> chosen: -1;
+    property <int> at: -1;
+    function open() {
+        root.at = root.chosen < root.choices.length ? root.chosen : -1;
+        menu.show();
+    }
+    function choose() {
+        if (root.at >= 0 && root.at < root.choices.length) {
+            root.picked(root.choices[root.at].value);
+        }
+        menu.close();
+    }
     height: Tokens.height-lg;
     width: max(132px, widest.preferred-width + 10px + 28px);
     accessible-role: combobox;
@@ -655,10 +768,10 @@ export component Select {
     accessible-value: current.text;
     accessible-expandable: true;
     accessible-action-default => {
-        menu.show();
+        root.open();
     }
     accessible-action-expand => {
-        menu.show();
+        root.open();
     }
     // The field is as wide as its longest choice, as a `<select>` is.
     widest := VerticalLayout {
@@ -683,17 +796,19 @@ export component Select {
         text: root.shown;
     }
 
-    for choice in root.choices: Rectangle {
+    for choice[index] in root.choices: Rectangle {
         visible: false;
         property <bool> chosen: choice.value == root.value;
         init => {
             if (self.chosen) {
                 root.shown = choice.title;
+                root.chosen = index;
             }
         }
         changed chosen => {
             if (self.chosen) {
                 root.shown = choice.title;
+                root.chosen = index;
             }
         }
     }
@@ -712,7 +827,7 @@ export component Select {
         clicked => {
             Theme.keyboard = false;
             scope.focus();
-            menu.show();
+            root.open();
         }
     }
 
@@ -720,7 +835,7 @@ export component Select {
         focus-on-click: false;
         key-pressed(event) => {
             if (event.text == " " || event.text == Key.Return || event.text == Key.DownArrow || event.text == Key.UpArrow) {
-                menu.show();
+                root.open();
                 return accept;
             }
             return reject;
@@ -728,54 +843,81 @@ export component Select {
     }
 
     // The choices, over the field. The margin around the sheet is where its
-    // shadow falls.
+    // shadow falls. While it is open the keys are its own: the arrows move
+    // through the choices, Enter or Space takes the one that is lit, and
+    // Esc closes it and nothing else.
     menu := PopupWindow {
         property <length> margin: Theme.plain ? 0px : 24px;
         property <bool> arrived;
         x: -4px - self.margin;
         y: root.height + 4px - self.margin;
-        width: max(root.width + 8px, sheet-content.preferred-width) + 2 * self.margin;
-        height: sheet-content.preferred-height + 2 * self.margin;
+        width: max(root.width + 8px, sheet.wanted-width) + 2 * self.margin;
+        height: min(sheet.wanted-height, sheet.most) + 2 * self.margin;
         close-policy: close-on-click-outside;
+        forward-focus: menu-keys;
         init => {
             self.arrived = true;
         }
-        sheet := Rectangle {
-            x: menu.margin;
-            y: menu.margin;
-            width: parent.width - 2 * menu.margin;
-            height: parent.height - 2 * menu.margin;
-            border-radius: Tokens.radius-lg;
-            background: Tokens.surface-raised;
-            border-width: 1px;
-            border-color: Tokens.border-strong;
-            drop-shadow-blur: 24px;
-            drop-shadow-offset-y: 8px;
-            drop-shadow-color: Tokens.shadow-far;
-            opacity: menu.arrived ? 1 : 0;
-            transform-scale: menu.arrived ? 1 : 0.96;
-            transform-origin: {x: self.width / 2, y: 0};
-            animate opacity {
-                duration: Tokens.duration-fast;
-                easing: Tokens.ease-out;
+        menu-keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape || event.text == Key.Tab || event.text == Key.Backtab) {
+                    menu.close();
+                } else if (event.text == Key.Return || event.text == " ") {
+                    root.choose();
+                } else if (event.text == Key.DownArrow) {
+                    root.at = min(root.at + 1, root.choices.length - 1);
+                } else if (event.text == Key.UpArrow) {
+                    root.at = max(root.at - 1, 0);
+                } else if (event.text == Key.PageDown) {
+                    root.at = min(root.at + 9, root.choices.length - 1);
+                } else if (event.text == Key.PageUp) {
+                    root.at = max(root.at - 9, 0);
+                } else if (event.text == Key.Home) {
+                    root.at = 0;
+                } else if (event.text == Key.End) {
+                    root.at = root.choices.length - 1;
+                }
+                // Whatever it was, it was the menu's.
+                return accept;
             }
-            animate transform-scale {
-                duration: 280ms;
-                easing: spring(0.25);
-            }
-            sheet-content := VerticalLayout {
-                padding: 4px;
-                for choice in root.choices: Rectangle {
+            sheet := MenuSheet {
+                x: menu.margin;
+                y: menu.margin;
+                width: parent.width - 2 * menu.margin;
+                height: parent.height - 2 * menu.margin;
+                opacity: menu.arrived ? 1 : 0;
+                transform-scale: menu.arrived ? 1 : 0.96;
+                transform-origin: {x: self.width / 2, y: 0};
+                animate opacity {
+                    duration: Tokens.duration-fast;
+                    easing: Tokens.ease-out;
+                }
+                animate transform-scale {
+                    duration: 280ms;
+                    easing: spring(0.25);
+                }
+                for choice[index] in root.choices: Rectangle {
+                    property <bool> lit: index == root.at;
                     height: Tokens.height-md;
                     min-width: item-title.preferred-width + 44px;
                     border-radius: Tokens.radius-sm;
-                    background: item-touch.has-hover ? Tokens.accent : transparent;
+                    background: self.lit ? Tokens.accent : transparent;
                     accessible-role: list-item;
                     accessible-label: choice.title;
                     accessible-item-selected: choice.value == root.value;
                     accessible-action-default => {
-                        root.picked(choice.value);
-                        menu.close();
+                        root.at = index;
+                        root.choose();
+                    }
+                    init => {
+                        if (self.lit) {
+                            sheet.reveal(self.y, self.y + self.height);
+                        }
+                    }
+                    changed lit => {
+                        if (self.lit) {
+                            sheet.reveal(self.y, self.y + self.height);
+                        }
                     }
                     if choice.value == root.value: Path {
                         x: 9px;
@@ -783,7 +925,7 @@ export component Select {
                         width: 10px;
                         height: 8px;
                         commands: "M 0 4 L 3.5 7.5 L 10 0";
-                        stroke: item-touch.has-hover ? Tokens.on-accent : Tokens.text;
+                        stroke: parent.lit ? Tokens.on-accent : Tokens.text;
                         stroke-width: 1.5px;
                         fill: transparent;
                     }
@@ -792,13 +934,20 @@ export component Select {
                         width: parent.width - 36px;
                         horizontal-alignment: left;
                         text: choice.title;
-                        color: item-touch.has-hover ? Tokens.on-accent : Tokens.text;
+                        color: parent.lit ? Tokens.on-accent : Tokens.text;
                     }
 
-                    item-touch := TouchArea {
+                    // The pointer lights a row when it is moved, not when
+                    // the rows move under it.
+                    TouchArea {
+                        pointer-event(event) => {
+                            if (event.kind == PointerEventKind.move) {
+                                root.at = index;
+                            }
+                        }
                         clicked => {
-                            root.picked(choice.value);
-                            menu.close();
+                            root.at = index;
+                            root.choose();
                         }
                     }
                 }
@@ -976,46 +1125,6 @@ export component Hotkey inherits HorizontalLayout {
     }
 }
 
-// --- A scrolling area with the thin bar of the web interface ----------------
-
-export component Scrollbar inherits Rectangle {
-    in property <length> content-y;
-    in property <length> content-height;
-    in property <length> visible-height;
-    callback scrolled(y: length);
-    property <bool> needed: content-height > visible-height + 1px;
-    property <length> thumb: max(28px, visible-height * visible-height / max(1px, content-height));
-    property <float> at: needed ? -content-y / (content-height - visible-height) : 0;
-    width: 10px;
-    opacity: needed && (track.has-hover || track.pressed) ? 1 : needed ? 0.55 : 0;
-    animate opacity {
-        duration: Tokens.duration-base;
-        easing: Tokens.ease-out;
-    }
-    Rectangle {
-        x: 3px;
-        y: 2px + root.at * (root.height - 4px - root.thumb);
-        width: track.has-hover || track.pressed ? 6px : 4px;
-        height: root.thumb;
-        border-radius: self.width / 2;
-        background: Tokens.fill-4;
-    }
-
-    track := TouchArea {
-        property <length> grabbed;
-        pointer-event(event) => {
-            if (event.kind == PointerEventKind.down) {
-                self.grabbed = self.mouse-y - (2px + root.at * (root.height - 4px - root.thumb));
-            }
-        }
-        moved => {
-            if (self.pressed && root.needed) {
-                root.scrolled(-clamp((self.mouse-y - self.grabbed - 2px) / (root.height - 4px - root.thumb), 0, 1) * (root.content-height - root.visible-height));
-            }
-        }
-    }
-}
-
 // --- A menu of things to tick, behind a button ---------------------------------
 
 export struct Pick {
@@ -1031,14 +1140,38 @@ export component FilterMenu {
     in property <int> count;
     in property <[Pick]> picks;
     callback picked(id: string);
+    // The row of the open menu the keys are on: never a heading.
+    property <int> at: -1;
+    function open() {
+        root.at = -1;
+        menu.show();
+    }
+    // A heading is stepped over: two never follow each other, and the
+    // last row is never one.
+    function step(by: int) {
+        root.at = clamp(root.at + by, 0, root.picks.length - 1);
+        if (root.picks[root.at].heading) {
+            root.at = root.at + by >= 0 && root.at + by < root.picks.length ? root.at + by : root.at - by;
+        }
+    }
     height: Tokens.height-lg;
     width: content.preferred-width + 24px;
     horizontal-stretch: 0;
     accessible-role: button;
     accessible-label: root.title;
+    accessible-expandable: true;
     accessible-action-default => {
-        menu.show();
+        root.open();
     }
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        shown: scope.has-focus && Theme.keyboard;
+        radius: Tokens.radius-md;
+    }
+
     Rectangle {
         border-radius: Tokens.radius-md;
         background: touch.has-hover ? Tokens.fill-3 : Tokens.fill-2;
@@ -1084,37 +1217,66 @@ export component FilterMenu {
     touch := TouchArea {
         mouse-cursor: pointer;
         clicked => {
-            menu.show();
+            Theme.keyboard = false;
+            scope.focus();
+            root.open();
+        }
+    }
+
+    scope := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == " " || event.text == Key.Return || event.text == Key.DownArrow) {
+                root.open();
+                root.step(1);
+                return accept;
+            }
+            return reject;
         }
     }
 
     // It stays open while its boxes are ticked, and closes at a click
-    // beside it.
+    // beside it or at Esc. The arrows move through its rows, and Space or
+    // Enter ticks the one they are on.
     menu := PopupWindow {
         property <length> margin: Theme.plain ? 0px : 24px;
         x: root.width - self.width + self.margin;
         y: root.height + 4px - self.margin;
         width: 220px + 2 * self.margin;
-        height: items.preferred-height + 2 * self.margin;
+        height: min(sheet.wanted-height, sheet.most) + 2 * self.margin;
         close-policy: close-on-click-outside;
-        Rectangle {
-            x: menu.margin;
-            y: menu.margin;
-            width: parent.width - 2 * menu.margin;
-            height: parent.height - 2 * menu.margin;
-            border-radius: Tokens.radius-lg;
-            background: Tokens.surface-raised;
-            border-width: 1px;
-            border-color: Tokens.border-strong;
-            drop-shadow-blur: 24px;
-            drop-shadow-offset-y: 8px;
-            drop-shadow-color: Tokens.shadow-far;
-            items := VerticalLayout {
-                padding: 4px;
-                for pick in root.picks: Rectangle {
+        forward-focus: menu-keys;
+        menu-keys := FocusScope {
+            key-pressed(event) => {
+                if (event.text == Key.Escape || event.text == Key.Tab || event.text == Key.Backtab) {
+                    menu.close();
+                } else if (event.text == Key.Return || event.text == " ") {
+                    if (root.at >= 0 && root.at < root.picks.length) {
+                        root.picked(root.picks[root.at].id);
+                    }
+                } else if (event.text == Key.DownArrow) {
+                    root.step(1);
+                } else if (event.text == Key.UpArrow) {
+                    root.step(-1);
+                }
+                // Whatever it was, it was the menu's.
+                return accept;
+            }
+            sheet := MenuSheet {
+                x: menu.margin;
+                y: menu.margin;
+                width: parent.width - 2 * menu.margin;
+                height: parent.height - 2 * menu.margin;
+                for pick[index] in root.picks: Rectangle {
+                    property <bool> lit: !pick.heading && index == root.at;
                     height: pick.heading ? 26px : Tokens.height-md;
                     border-radius: Tokens.radius-sm;
-                    background: !pick.heading && item-touch.has-hover ? Tokens.fill-2 : transparent;
+                    background: self.lit ? Tokens.fill-2 : transparent;
+                    changed lit => {
+                        if (self.lit) {
+                            sheet.reveal(self.y, self.y + self.height);
+                        }
+                    }
                     if pick.heading: TextXs {
                         x: 8px;
                         width: parent.width - 16px;
@@ -1126,11 +1288,9 @@ export component FilterMenu {
                     if !pick.heading: Check {
                         x: 8px;
                         y: (parent.height - 16px) / 2;
+                        inert: true;
                         label: pick.title;
                         checked: pick.checked;
-                        toggled => {
-                            root.picked(pick.id);
-                        }
                     }
                     if !pick.heading: TextSm {
                         x: 32px;
@@ -1138,9 +1298,15 @@ export component FilterMenu {
                         horizontal-alignment: left;
                         text: pick.title;
                     }
-                    item-touch := TouchArea {
+                    TouchArea {
                         enabled: !pick.heading;
+                        pointer-event(event) => {
+                            if (event.kind == PointerEventKind.move) {
+                                root.at = index;
+                            }
+                        }
                         clicked => {
+                            root.at = index;
                             root.picked(pick.id);
                         }
                     }
