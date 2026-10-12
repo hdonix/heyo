@@ -123,6 +123,30 @@ fn with_context<T>(app: &AppHandle, f: impl FnOnce(&Index, &root::Context) -> T)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Has the C library give memory back to the system when a large piece of
+/// it is freed.
+///
+/// By itself glibc stops doing so for pieces of up to 32 MB once one such
+/// has been freed: it raises its "mmap threshold" to that size, and from
+/// then on keeps them in a heap of the thread that freed them, where
+/// nothing gives them back (`malloc_trim` leaves the end of such a heap
+/// alone). A 4K screen is 31.6 MB and a screenshot holds several, on
+/// several threads: after a few screenshots Heyo was 130 to 290 MB larger
+/// than before, for good. A threshold that has been set is not moved:
+/// every piece of 4 MB or more is then a mapping of its own, and is gone
+/// when it is freed.
+///
+/// The price is that such a piece is new memory each time, which the
+/// system hands out page by page: a screenshot of a 4K screen is up some
+/// 35 ms later for it.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn give_large_memory_back() {
+    // SAFETY: a setting of the allocator, made before any other thread runs.
+    unsafe {
+        libc::mallopt(libc::M_MMAP_THRESHOLD, 4 << 20);
+    }
+}
+
 pub fn run() {
     // Heyo keeps its things where the XDG directories say. Windows has no
     // such variables: there they are set, for Heyo and the helper programs
@@ -146,6 +170,8 @@ pub fn run() {
     if let Some(at) = args.iter().position(|arg| arg == "--clipboard-eval") {
         std::process::exit(clipboard::eval::run(&args[at + 1..]));
     }
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    give_large_memory_back();
     diagnostics::start();
     eprintln!("heyo: started");
     eprintln!("heyo: {}", renderer::chosen());
