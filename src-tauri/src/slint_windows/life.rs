@@ -350,13 +350,13 @@ pub(super) trait Lives: Sized + 'static {
 /// Where the one window of a kind is kept, on Slint's thread.
 pub(super) struct Slot<T> {
     kept: RefCell<Option<T>>,
-    /// It could not be made: said once, and not tried again.
-    failed: Cell<bool>,
+    /// Why it could not be made: said once, and not tried again.
+    failed: RefCell<Option<String>>,
 }
 
 impl<T: Lives> Slot<T> {
     pub(super) const fn new() -> Self {
-        Self { kept: RefCell::new(None), failed: Cell::new(false) }
+        Self { kept: RefCell::new(None), failed: RefCell::new(None) }
     }
 
     /// Does `work` with the window, making it first if this is the first
@@ -365,17 +365,22 @@ impl<T: Lives> Slot<T> {
     pub(super) fn with<R>(slot: &'static LocalKey<Self>, work: impl FnOnce(&mut T) -> R) -> Option<R> {
         slot.with(|slot| {
             let mut kept = slot.kept.try_borrow_mut().ok()?;
-            if kept.is_none() && !slot.failed.get() {
+            if kept.is_none() && slot.failed.borrow().is_none() {
                 match T::make() {
                     Ok(made) => *kept = Some(made),
                     Err(reason) => {
-                        slot.failed.set(true);
                         eprintln!("heyo: {} cannot be shown in this run: {reason}", T::NAME);
+                        *slot.failed.borrow_mut() = Some(reason);
                     }
                 }
             }
             kept.as_mut().map(work)
         })
+    }
+
+    /// Why there is no window, when it could not be made.
+    pub(super) fn why_not(slot: &'static LocalKey<Self>) -> Option<String> {
+        slot.with(|slot| slot.failed.borrow().clone())
     }
 
     /// Does `work` with the window if it has been made, and never makes
@@ -562,11 +567,14 @@ mod tests {
 
     #[test]
     fn a_window_that_cannot_be_made_is_not_tried_again() {
+        assert_eq!(Slot::why_not(&STAND), None);
         MAKEABLE.set(false);
         assert_eq!(Slot::with(&STAND, |_| ()), None);
         MAKEABLE.set(true);
         assert_eq!(Slot::with(&STAND, |_| ()), None);
         assert_eq!(MADE.get(), 1);
+        // And why is there for whoever asked for it.
+        assert_eq!(Slot::why_not(&STAND).as_deref(), Some("it is not makeable"));
     }
 
     #[test]

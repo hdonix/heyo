@@ -11,7 +11,7 @@
 //! model then says (`push`).
 
 use std::any::Any;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -27,7 +27,8 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 use super::keys::{self, Held};
 use super::model::{Ask, Line, Model, Then};
 use super::thread::{self, Job, Kind};
-use super::{area, guard, icons, pointer, reach, ui};
+use super::life::{self, Life, Lives, Slot};
+use super::{area, icons, reach, ui};
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
 /// frame took is written there when the window is closed, a line a frame:
@@ -199,7 +200,9 @@ impl slint::Model for Lines {
 
 /// The window while Slint runs.
 struct Live {
-    window: ui::SettingsWindow,
+    life: Life<ui::SettingsWindow>,
+    /// When it was last asked for, for saying how long it took to be up.
+    asked: Rc<Cell<Option<Instant>>>,
     asking: mpsc::Sender<Job>,
     model: Model,
     lines: Rc<Lines>,
@@ -215,18 +218,15 @@ struct Live {
 }
 
 thread_local! {
-    static LIVE: RefCell<Option<Live>> = const { RefCell::new(None) };
+    static LIVE: Slot<Live> = const { Slot::new() };
+    /// The host's events are listened to, once for the run.
+    static LISTENING: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Does `work` with the window, on Slint's thread.
+/// Does `work` with the window if there is one, on Slint's thread: only
+/// asking for it makes it (`reveal`).
 fn with<R>(work: impl FnOnce(&mut Live) -> R) -> Option<R> {
-    LIVE.with(|live| match live.try_borrow_mut() {
-        Ok(mut live) => live.as_mut().map(work),
-        Err(_) => {
-            eprintln!("heyo: the settings window was asked for something while it was doing another");
-            None
-        }
-    })
+    Slot::there(&LIVE, work)
 }
 
 impl Live {
@@ -262,7 +262,7 @@ impl Live {
 
     /// Shows what the model says.
     fn push(&mut self) {
-        let host = self.window.global::<ui::Host>();
+        let host = self.life.window().global::<ui::Host>();
         let (entries, pages) = self.model.nav();
         let selected = entries.iter().position(|entry| entry.id == self.model.page).map_or(-1, |at| at as i32);
         let nav: Vec<ui::NavItem> = entries
@@ -286,11 +286,11 @@ impl Live {
         host.set_filter_count(ticked as i32);
         host.set_filter_picks(ModelRc::new(VecModel::from(picks.into_iter().map(|(id, title, heading, checked)| ui::Pick { id: id.into(), title: title.into(), heading, checked }).collect::<Vec<_>>())));
         self.lines.show(self.model.lines());
-        self.window.set_appearance(self.model.settings.get("appearance").and_then(Value::as_str).unwrap_or("system").into());
+        self.life.window().set_appearance(self.model.settings.get("appearance").and_then(Value::as_str).unwrap_or("system").into());
     }
 
     fn push_recording(&mut self) {
-        let host = self.window.global::<ui::Host>();
+        let host = self.life.window().global::<ui::Host>();
         host.set_recording(self.recording.as_deref().unwrap_or_default().into());
         host.set_held(strings(&self.held.caps()));
     }
@@ -299,19 +299,6 @@ impl Live {
         if self.recording.take().is_some() {
             self.push_recording();
         }
-    }
-
-    /// Has the window drawn at the next turn of the loop, not at Slint's
-    /// next tick. Slint paces drawing with a timer that first fires a
-    /// frame's time after something changed (on X11 and Windows): a key or
-    /// a click would be seen a frame late. This is asked for when one came.
-    fn draw_soon(&self) {
-        let window = self.window.as_weak();
-        slint::Timer::single_shot(Duration::ZERO, move || {
-            if let Some(window) = window.upgrade() {
-                window.window().with_winit_window(|window| window.request_redraw());
-            }
-        });
     }
 
     /// What winit tells the window, before Slint has it. The keyboard above
@@ -324,7 +311,7 @@ impl Live {
                 EventResult::Propagate
             }
             WindowEvent::Moved(_) => {
-                self.window.set_moved(self.window.get_moved().wrapping_add(1));
+                self.life.window().set_moved(self.life.window().get_moved().wrapping_add(1));
                 EventResult::Propagate
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -358,11 +345,12 @@ impl Live {
                         self.ask(asks);
                     }
                 }
-                self.draw_soon();
+                self.life.draw();
                 EventResult::PreventDefault
             }
+            // What a key, a click or the wheel does is seen at once.
             WindowEvent::KeyboardInput { .. } | WindowEvent::MouseInput { .. } | WindowEvent::MouseWheel { .. } | WindowEvent::Ime(_) => {
-                self.draw_soon();
+                self.life.draw();
                 EventResult::Propagate
             }
             WindowEvent::Focused(false) => {
@@ -376,71 +364,33 @@ impl Live {
 
     fn hide(&mut self) {
         self.stop_recording();
-        let _ = self.window.hide();
+        self.life.off();
         frames::write();
     }
 
     /// Has the window take the pointer where its panel is, and not in the
     /// margin its shadow falls in (`reach`).
     fn reach(&self) {
-        let (margin, scale) = (self.window.get_margin(), self.window.window().scale_factor());
-        self.window.window().with_winit_window(|made| {
+        let (margin, scale) = (self.life.window().get_margin(), self.life.window().window().scale_factor());
+        self.life.window().window().with_winit_window(|made| {
             let size = made.inner_size();
             reach::limit(made, reach::panel((size.width, size.height), margin, scale));
         });
     }
 
-    /// Puts the window on screen, in the middle of the room the screen has
-    /// for it and no larger, in front, and reads again what may have
+    /// Puts the window on screen, in front, and reads again what may have
     /// changed while it was away. `then` hears whether winit made the
     /// window, which it does in its own time.
     fn reveal(&mut self, asked: Instant, then: impl FnOnce(Result<(), String>) + 'static) {
-        if let Err(e) = self.window.show() {
-            return then(Err(e.to_string()));
-        }
-        let window = self.window.as_weak();
-        let asking = self.asking.clone();
-        let waiting = slint::spawn_local(async move {
-            let Some(window) = window.upgrade() else { return then(Err("the settings window is gone".into())) };
-            // Held no longer than this: a window still referred to stays
-            // on screen when Slint hides it.
-            match window.window().winit_window().await {
-                Ok(made) => {
-                    guard::remember(&made);
-                    pointer::remember(&made);
-                    let monitor = made.current_monitor().or_else(|| made.primary_monitor()).or_else(|| made.available_monitors().next());
-                    let whole = monitor.map(|monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height));
-                    if let Some((x, y, width, height)) = area::work(whole) {
-                        let scale = made.scale_factor() as f32;
-                        window.set_room_width(width as f32 / scale);
-                        window.set_room_height(height as f32 / scale);
-                        // As large as it will be, which it may not be yet.
-                        let margin = 2.0 * window.get_margin();
-                        let (wide, high) = ((860.0_f32.min(width as f32 / scale) + margin) * scale, (640.0_f32.min(height as f32 / scale) + margin) * scale);
-                        made.set_outer_position(PhysicalPosition::new(x + ((width as f32 - wide) / 2.0) as i32, y + ((height as f32 - high) / 2.0) as i32));
-                    }
-                    reach::limit(&made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
-                    made.focus_window();
-                    // Which on Wayland a window may not do for itself: the
-                    // desktop is asked to.
-                    let title = made.title();
-                    let _ = asking.send(Box::new(move |host| host.forward(title)));
-                    eprintln!("heyo: settings up {} ms after they were asked for", asked.elapsed().as_millis());
-                    then(Ok(()));
-                }
-                Err(e) => then(Err(e.to_string())),
-            }
-        });
-        if let Err(e) = waiting {
-            eprintln!("heyo: slint could not wait for its window: {e}");
-        }
+        self.asked.set(Some(asked));
+        self.life.on(then);
         self.ask(self.model.opened());
         // Where Slint cannot tell whether the desktop is dark (it asks the
         // desktop's portal), the host's own answer stands in, as of now.
         let _ = self.asking.send(Box::new(|host| {
             let dark = host.system_dark();
             let _ = slint::invoke_from_event_loop(move || {
-                with(|live| live.window.set_system_dark(dark));
+                with(|live| live.life.window().set_system_dark(dark));
             });
         }));
     }
@@ -502,7 +452,7 @@ fn wire(window: &ui::SettingsWindow) {
     });
     host.on_drag(|| {
         with(|live| {
-            live.window.window().with_winit_window(|window| {
+            live.life.window().window().with_winit_window(|window| {
                 let _ = window.drag_window();
             });
         });
@@ -524,7 +474,7 @@ fn wire(window: &ui::SettingsWindow) {
 /// told now what it will not hear: the button is up, and the pointer is
 /// away until it is next heard of.
 fn let_go() {
-    let Some((window, at)) = with(|live| (live.window.as_weak(), live.pointer)) else { return };
+    let Some((window, at)) = with(|live| (live.life.window().as_weak(), live.pointer)) else { return };
     // Not while the window is being done something with here: what Slint
     // is told may come back as something a control did.
     let Some(window) = window.upgrade() else { return };
@@ -539,23 +489,52 @@ fn let_go() {
 fn window(shared: &thread::Shared, lines: &Rc<Lines>) -> Result<ui::SettingsWindow, String> {
     let window = thread::making(Kind::Settings, ui::SettingsWindow::new).map_err(|e| format!("Slint could not make the window: {e}"))?;
     window.global::<ui::Theme>().set_plain(shared.renderer == "software");
-    window.set_opaque(!thread::seen_through(&shared.renderer));
     let weak = window.as_weak();
-    thread::watch(window.window(), &shared.renderer, move |clear| {
-        // Not from inside the drawing it was learnt in.
-        let weak = weak.clone();
-        slint::Timer::single_shot(Duration::ZERO, move || {
-            if let Some(window) = weak.upgrade() {
-                window.set_opaque(!clear);
-            }
-        });
+    life::seen_through(window.window(), &shared.renderer, move |opaque| {
+        if let Some(window) = weak.upgrade() {
+            window.set_opaque(opaque);
+        }
     });
     window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));
     wire(&window);
     Ok(window)
 }
 
-/// Makes the window, on Slint's thread, the first time it is asked for.
+/// Where winit's window goes when it is about to be seen: in the middle
+/// of the room the screen has for it, and no larger; taking the pointer
+/// where its panel is; and in front.
+fn arrived(window: &ui::SettingsWindow, made: &slint::winit_030::winit::window::Window, asking: &mpsc::Sender<Job>, asked: Option<Instant>) {
+    let monitor = made.current_monitor().or_else(|| made.primary_monitor()).or_else(|| made.available_monitors().next());
+    let whole = monitor.map(|monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height));
+    if let Some((x, y, width, height)) = area::work(whole) {
+        let scale = made.scale_factor() as f32;
+        window.set_room_width(width as f32 / scale);
+        window.set_room_height(height as f32 / scale);
+        // As large as it will be, which it may not be yet.
+        let margin = 2.0 * window.get_margin();
+        let (wide, high) = ((860.0_f32.min(width as f32 / scale) + margin) * scale, (640.0_f32.min(height as f32 / scale) + margin) * scale);
+        made.set_outer_position(PhysicalPosition::new(x + ((width as f32 - wide) / 2.0) as i32, y + ((height as f32 - high) / 2.0) as i32));
+    }
+    reach::limit(made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
+    made.focus_window();
+    // Which on Wayland a window may not do for itself: the desktop is
+    // asked to.
+    let title = made.title();
+    let _ = asking.send(Box::new(move |host| host.forward(title)));
+    if let Some(asked) = asked {
+        eprintln!("heyo: settings up {} ms after they were asked for", asked.elapsed().as_millis());
+    }
+}
+
+impl Lives for Live {
+    const NAME: &'static str = "the settings window";
+
+    /// Makes the window, the first time it is asked for.
+    fn make() -> Result<Self, String> {
+        make()
+    }
+}
+
 fn make() -> Result<Live, String> {
     let shared = thread::shared().ok_or("Slint has not begun")?;
     let asking = thread::asker("heyo-slint-host", shared.host.clone())?;
@@ -580,19 +559,28 @@ fn make() -> Result<Live, String> {
     poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
         with(|live| live.ask(live.model.poll()));
     });
-    let mut live = Live { window, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: (0.0, 0.0), _poll: poll };
+    let asked = Rc::new(Cell::new(None));
+    // Left to Slint to show and hide: it is an ordinary window.
+    let life = Life::new(window, None, {
+        let (asking, asked) = (asking.clone(), asked.clone());
+        move |window, made, _| arrived(window, made, &asking, asked.take())
+    });
+    let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: (0.0, 0.0), _poll: poll };
     live.push();
 
-    shared.host.listen(Box::new(|event, told| {
-        let event = event.to_string();
-        thread::on(move || {
-            with(|live| {
-                let asks = live.model.heard(&event, &told);
-                live.ask(asks);
-                live.push();
+    // Whichever window there is hears them: it may be made again.
+    if !LISTENING.replace(true) {
+        shared.host.listen(Box::new(|event, told| {
+            let event = event.to_string();
+            life::ask(move || {
+                with(|live| {
+                    let asks = live.model.heard(&event, &told);
+                    live.ask(asks);
+                    live.push();
+                });
             });
-        });
-    }));
+        }));
+    }
     Ok(live)
 }
 
@@ -602,46 +590,28 @@ fn make() -> Result<Live, String> {
 /// the old window: how far a page was scrolled, and what was being typed
 /// into a field.
 pub(super) fn remake() {
-    let Some(shared) = thread::shared() else { return };
-    let shown = with(|live| {
-        let made = match window(&shared, &live.lines) {
-            Ok(made) => made,
-            Err(reason) => {
-                eprintln!("heyo: the settings window stays as it was made: {reason}");
-                return false;
-            }
-        };
-        let shown = live.window.window().is_visible();
-        live.stop_recording();
-        made.set_system_dark(live.window.get_system_dark());
-        let _ = live.window.hide();
-        live.window = made;
-        live.push();
-        shown
+    Slot::again(&LIVE, |old, new| {
+        new.life.window().set_system_dark(old.life.window().get_system_dark());
+        let shown = old.life.wanted();
+        new.model = old.model;
+        new.push();
+        if shown {
+            new.reveal(Instant::now(), |_| {});
+        }
     });
-    if shown == Some(true) {
-        with(|live| live.reveal(Instant::now(), |_| {}));
-    }
 }
 
 /// Shows the window, made first if this is the first time, and brings it
 /// forward. On Slint's thread; `then` hears whether it came up.
 pub(super) fn reveal(asked: Instant, then: impl FnOnce(Result<(), String>) + 'static) {
-    let there = LIVE.with(|slot| slot.try_borrow().map(|live| live.is_some()).unwrap_or(true));
-    if !there {
-        match make() {
-            Ok(live) => LIVE.with(|slot| *slot.borrow_mut() = Some(live)),
-            Err(reason) => return then(Err(reason)),
-        }
-    }
     let mut then = Some(then);
-    with(|live| {
+    Slot::with(&LIVE, |live| {
         if let Some(then) = then.take() {
             live.reveal(asked, then);
         }
     });
     if let Some(then) = then {
-        then(Err("the settings window was busy".into()));
+        then(Err(Slot::why_not(&LIVE).unwrap_or_else(|| "the settings window was busy".into())));
     }
 }
 
