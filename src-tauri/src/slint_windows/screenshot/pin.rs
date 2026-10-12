@@ -142,7 +142,10 @@ fn told(id: u64, event: &WindowEvent) -> EventResult {
             }
             WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => pin.pressed = None,
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => close(id),
-            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed && event.logical_key == Key::Named(NamedKey::Escape) => close(id),
+            // Not a key that was down already when the window was given the
+            // keyboard, which winit says as a press too: Escape that closed
+            // another window must not close this one as the focus comes to it.
+            WindowEvent::KeyboardInput { event, is_synthetic: false, .. } if event.state == ElementState::Pressed && event.logical_key == Key::Named(NamedKey::Escape) => close(id),
             _ => return EventResult::Propagate,
         }
         EventResult::PreventDefault
