@@ -3,8 +3,8 @@
 //! Every window loads the same page, and the palette draws what extensions
 //! hand it. So a window is held to the commands its own view calls: a
 //! palette that was talked into something still cannot change the settings,
-//! and the dictation pill cannot open anything. A command that is not in
-//! the table is refused to every window; a test keeps the table complete.
+//! and the screenshot overlay cannot open anything. A command that is not
+//! in the table is refused to every window; a test keeps the table complete.
 
 use tauri::ipc::Invoke;
 use tauri::Runtime;
@@ -14,7 +14,6 @@ use tauri::Runtime;
 pub(crate) enum Caller {
     /// `main`: the root search and the commands of extensions.
     Palette,
-    Dictation,
     /// The overlay a capture is selected on.
     Screenshot,
     /// `pin-N`: a capture kept on screen. It asks nothing of the host.
@@ -25,14 +24,13 @@ impl Caller {
     fn of(label: &str) -> Option<Caller> {
         match label {
             crate::palette::WINDOW => Some(Caller::Palette),
-            crate::dictation::WINDOW => Some(Caller::Dictation),
             crate::screenshot::WINDOW => Some(Caller::Screenshot),
             _ => label.strip_prefix("pin-").filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).map(|_| Caller::Pin),
         }
     }
 }
 
-use Caller::{Dictation, Palette, Screenshot};
+use Caller::{Palette, Screenshot};
 
 /// Each command and the windows whose view calls it (`call(` in `src/`).
 const TABLE: &[(&str, &[Caller])] = &[
@@ -63,9 +61,6 @@ const TABLE: &[(&str, &[Caller])] = &[
     ("get_settings", &[Palette]),
     ("set_item_hotkey", &[Palette]),
     // Changing things is the settings window's alone.
-    ("dictation_toggle", &[Dictation]),
-    ("dictation_cancel", &[Dictation]),
-    ("dictation_pressed", &[Dictation]),
     ("screenshot_finish", &[Screenshot]),
 ];
 
@@ -97,10 +92,9 @@ mod tests {
     #[test]
     fn a_window_is_known_by_its_label() {
         assert_eq!(Caller::of("main"), Some(Palette));
-        assert_eq!(Caller::of("dictation"), Some(Dictation));
         assert_eq!(Caller::of("screenshot"), Some(Screenshot));
         assert_eq!(Caller::of("pin-3"), Some(Caller::Pin));
-        for stranger in ["", "Main", "pin-", "pin-x", "pin-3-settings", "settings", "other"] {
+        for stranger in ["", "Main", "pin-", "pin-x", "pin-3-settings", "settings", "dictation", "other"] {
             assert_eq!(Caller::of(stranger), None, "{stranger}");
         }
     }
@@ -130,11 +124,6 @@ mod tests {
             ("main", "revoke_extension_permission", false),
             ("main", "extension_permissions", false),
             // The settings window runs nothing and pastes nothing.
-            ("dictation", "dictation_toggle", true),
-            ("dictation", "dictation_cancel", true),
-            ("dictation", "get_settings", false),
-            ("dictation", "launch", false),
-            ("dictation", "read_clipboard", false),
             ("screenshot", "screenshot_finish", true),
             ("screenshot", "launch", false),
             ("screenshot", "change_settings", false),

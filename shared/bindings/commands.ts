@@ -1,6 +1,5 @@
 // Generated from src-tauri/src/commands/bindings.rs by `cargo test`. Do not edit.
 import type { ActivityView } from "./ActivityView";
-import type { DictationEvent } from "./DictationEvent";
 import type { ExpandSnippet } from "./ExpandSnippet";
 import type { InstallProgress } from "./InstallProgress";
 import type { Item } from "./Item";
@@ -29,10 +28,6 @@ export type Commands = {
   /** Binds a global hotkey to a root search item; an empty accelerator removes it. */
   set_item_hotkey: { args: { id: string; title: string; accelerator: string }; result: null };
   screenshot_finish: { args: { request: ScreenshotFinish }; result: string };
-  dictation_toggle: { args: null; result: null };
-  dictation_cancel: { args: null; result: null };
-  /** A mouse button went down on the dictation window. */
-  dictation_pressed: { args: null; result: null };
   show_window: { args: null; result: null };
   get_item: { args: { id: string }; result: Item | null };
   /** Quicklinks, for offering the ones that take a query as fallbacks. */
@@ -74,9 +69,6 @@ export const answersNothing = [
   "hide",
   "open_settings",
   "set_item_hotkey",
-  "dictation_toggle",
-  "dictation_cancel",
-  "dictation_pressed",
   "show_window",
   "record_usage",
   "set_favorite",
@@ -97,7 +89,6 @@ export type Events = {
   settingsChanged: SettingsView;
   openItem: string;
   runtime: RuntimeMessage;
-  dictation: DictationEvent;
   dictationInstall: InstallProgress;
   ocrInstall: InstallProgress;
   screenshot: ScreenshotCapture;

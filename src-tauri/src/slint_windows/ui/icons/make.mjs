@@ -1,6 +1,6 @@
 // Writes the symbols the settings window draws: every Lucide icon the web
 // interface could draw for a Raycast icon name (lucide-react, ISC: see
-// LICENSE here), as two tables the host reads (src/slint_settings/icons.rs):
+// LICENSE here), as two tables the host reads (src/slint_windows/icons.rs):
 //
 //   lucide.tsv    name <tab> the shapes of its SVG
 //   raycast.tsv   a Raycast icon name <tab> the Lucide name it is drawn as,
@@ -10,7 +10,7 @@
 // Run from the repository after `pnpm install`, and again when lucide-react
 // or iconAliases.ts changes:
 //
-//   node src-tauri/src/slint_settings/ui/icons/make.mjs
+//   node src-tauri/src/slint_windows/ui/icons/make.mjs
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

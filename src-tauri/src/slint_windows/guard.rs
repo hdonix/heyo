@@ -186,7 +186,7 @@ pub(super) fn install() {
             before(panic);
             if std::thread::current().name() == Some(THREAD) {
                 gone_because("what draws it failed; Heyo's log has the details");
-                eprintln!("heyo: Slint's thread panicked. Its window is taken away; the settings cannot be shown again until Heyo is restarted");
+                eprintln!("heyo: Slint's thread panicked. Its windows are taken away; the settings and the dictation pill are not shown again until Heyo is restarted");
                 rest();
             }
         }));

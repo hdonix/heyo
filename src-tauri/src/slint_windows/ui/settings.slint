@@ -3,13 +3,15 @@
 // row of a table…) and it draws them, from the tokens of Heyo's interface
 // (`tokens.slint`, written by build.rs from src/styles/abstracts/_scales.scss);
 // what is done in it is said back to the host (`Host.act`) and decided
-// there (src/slint_settings/model.rs).
+// there (src/slint_windows/model.rs).
 
 import { ListView, Palette } from "std-widgets.slint";
 import { Tokens } from "tokens.slint";
 import { Theme, TextXs, TextSm, TextMd, TextRow, TextLg, TextXl, Text2xl, Icon, Row, Switch, Button, ConfirmButton, Badge, Check, Field, TextArea, Select, Choice, Hotkey, Scrollbar, FocusRing, FilterMenu, Pick } from "widgets.slint";
 
 export { Theme, Choice, Pick }
+// The other window Slint draws, compiled with this one.
+export { PillWindow } from "pill.slint";
 
 export struct NavItem {
     id: string,

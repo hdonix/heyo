@@ -31,6 +31,8 @@ pub(crate) trait Host: Send + Sync + 'static {
     /// Has the desktop bring Heyo's window of that title to the front,
     /// where a window cannot do so itself (Wayland). It does not wait.
     fn forward(&self, title: String);
+    /// Something was done to the dictation pill.
+    fn pill(&self, did: super::pill::Did);
 }
 
 /// The commands this window calls: each is answered in `call` below.
@@ -147,6 +149,15 @@ impl Host for Running {
         });
         #[cfg(not(target_os = "linux"))]
         let _ = title;
+    }
+
+    fn pill(&self, did: super::pill::Did) {
+        use super::pill::Did;
+        match did {
+            Did::Pressed => crate::dictation::pressed(&self.0),
+            Did::Finish => crate::dictation::toggle(&self.0),
+            Did::Cancel => crate::dictation::cancel(&self.0),
+        }
     }
 }
 

@@ -186,7 +186,7 @@ pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<Setti
 // Async: creating a window from a synchronous command can deadlock.
 #[tauri::command]
 pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
-    if crate::slint_settings::open(&app) {
+    if crate::slint_windows::open(&app) {
         palette::hide(&app);
         return Ok(());
     }
@@ -197,7 +197,7 @@ pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
     let restarting = app.clone();
     let consent = crate::confirm::Consent {
         title: "Settings need Heyo to be restarted".into(),
-        message: format!("The settings window stopped working ({}). Everything else goes on as it was.", crate::slint_settings::failure()),
+        message: format!("The settings window stopped working ({}). Everything else goes on as it was.", crate::slint_windows::failure()),
         yes: "Restart Heyo",
         no: "Not Now",
     };
@@ -327,7 +327,7 @@ mod tests {
         let whole = view.clone().for_window(SETTINGS_WINDOW);
         assert_eq!(whole.settings_path, "/home/ada/.config/heyo/settings.json");
         assert_eq!(whole.extensions_dir, "/home/ada/.local/share/heyo/extensions");
-        for label in ["main", "dictation", "screenshot", "pin-1", "*", ""] {
+        for label in ["main", "screenshot", "pin-1", "*", ""] {
             let seen = view.clone().for_window(label);
             assert_eq!((seen.settings_path.as_str(), seen.extensions_dir.as_str()), ("", ""), "{label}");
             // What the palette lays itself out by is still there.

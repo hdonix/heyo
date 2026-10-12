@@ -31,7 +31,7 @@ mod ext;
 mod permissions;
 mod expand;
 mod activities;
-mod slint_settings;
+mod slint_windows;
 
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -194,9 +194,6 @@ pub fn run() {
             open_settings,
             set_item_hotkey,
             screenshot_finish,
-            dictation_toggle,
-            dictation_cancel,
-            dictation_pressed,
             show_window,
             get_item,
             list_quicklinks,
@@ -230,6 +227,10 @@ pub fn run() {
             menubar::start(app.handle());
             updates::start(app.handle());
             expand::start(app.handle());
+            // Slint's thread, ahead of the first window it draws: the
+            // dictation pill is wanted at once when it is wanted. Started
+            // by the first recording instead it was 40 ms later, that once.
+            slint_windows::warm(app.handle());
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let index = Index::new(
@@ -268,20 +269,12 @@ pub fn run() {
             if let (WindowEvent::Destroyed, Some(n)) = (event, window.label().strip_prefix("pin-")) {
                 screenshot::unpinned(n);
             }
-            // The dictation window and the screenshot overlay live for as
-            // long as Heyo does, as the palette: closing one (Alt+F4) only
-            // hides it.
+            // The screenshot overlay lives for as long as Heyo does, as
+            // the palette: closing it (Alt+F4) only hides it.
             if let WindowEvent::CloseRequested { api, .. } = event {
-                match window.label() {
-                    dictation::WINDOW => {
-                        api.prevent_close();
-                        let _ = window.hide();
-                    }
-                    screenshot::WINDOW => {
-                        api.prevent_close();
-                        screenshot::cancel(window.app_handle());
-                    }
-                    _ => {}
+                if window.label() == screenshot::WINDOW {
+                    api.prevent_close();
+                    screenshot::cancel(window.app_handle());
                 }
             }
         })

@@ -25,21 +25,6 @@
         "center": true
       },
       {
-        "label": "dictation",
-        "title": "Heyo Dictation",
-        "width": 360,
-        "height": 44,
-        "decorations": false,
-        "transparent": true,
-        "resizable": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "visible": false,
-        "focus": false,
-        "focusable": false,
-        "shadow": false
-      },
-      {
         "label": "screenshot",
         "title": "Heyo Screenshot",
         "transparent": true,

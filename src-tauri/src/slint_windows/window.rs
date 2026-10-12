@@ -1,12 +1,9 @@
 //! The settings window itself: made on Slint's thread, filled from the
 //! model, and what is done in it carried to the host.
 //!
-//! Everything here runs on Slint's thread except what is asked of the host:
-//! a command may wait on other programs (`gsettings`, Node.js), and it runs
-//! the host's own code under the host's own locks, so it is called on a
-//! thread of its own (`asking`), and its answer is brought back to Slint's.
-//! Slint's thread therefore never holds anything of the host's, which is
-//! what lets it be given up on if it panics (`guard`).
+//! Everything here runs on Slint's thread (`thread`) except what is asked
+//! of the host, which is asked on a thread of its own (`asking`) and its
+//! answer brought back to Slint's.
 //!
 //! Nothing is decided here: a control that was used is handed to the model
 //! (`Model::acted`), which says what to ask of the host; the answer is
@@ -17,7 +14,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::{mpsc, Arc};
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -27,23 +24,17 @@ use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, VecModel};
 
-use super::host::Host;
 use super::keys::{self, Held};
 use super::model::{Ask, Line, Model, Then};
+use super::thread::{self, Job, Kind};
 use super::{area, guard, icons, ui};
-
-/// The renderer the window is drawn with unless `HEYO_SETTINGS_RENDERER`
-/// names another of Slint's: Skia, on the CPU.
-const RENDERER: &str = "skia-software";
-
-type Job = Box<dyn FnOnce(&dyn Host) + Send>;
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
 /// frame took is written there when the window is closed, a line a frame:
 /// when it began (the system's clock, in ms) and how long it took (ms), from
 /// winit asking for the window to be drawn to winit's loop having nothing
 /// more to do. Slint draws, and hands the frame to the display, in between.
-mod frames {
+pub(super) mod frames {
     use std::cell::{Cell, RefCell};
     use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -55,7 +46,7 @@ mod frames {
         static TAKEN: RefCell<Vec<(u128, f64)>> = const { RefCell::new(Vec::new()) };
     }
 
-    pub(super) fn wanted() -> Option<String> {
+    pub(in crate::slint_windows) fn wanted() -> Option<String> {
         std::env::var("HEYO_SETTINGS_FRAMES").ok().filter(|file| !file.is_empty())
     }
 
@@ -64,7 +55,7 @@ mod frames {
         BEGUN.set(Some((Instant::now(), SystemTime::now())));
     }
 
-    pub(super) struct Timing;
+    pub(in crate::slint_windows) struct Timing;
 
     impl CustomApplicationHandler for Timing {
         fn about_to_wait(&mut self, _: &ActiveEventLoop) -> EventResult {
@@ -497,150 +488,70 @@ fn wire(window: &ui::SettingsWindow) {
     window.window().on_winit_window_event(|_, event| with(|live| live.told(event)).unwrap_or(EventResult::Propagate));
 }
 
-/// Whether what is behind the window shows where the window draws nothing,
-/// which the margin its shadow falls in needs. Not on Wayland with a
-/// renderer on the CPU: what such a window is drawn into there has no
-/// transparency (softbuffer hands Wayland XRGB), and the margin would be
-/// black.
-fn seen_through(renderer: &str) -> bool {
-    !(wayland() && renderer.ends_with("software"))
-}
+/// Makes the window, on Slint's thread, the first time it is asked for.
+fn make() -> Result<Live, String> {
+    let shared = thread::shared().ok_or("Slint has not begun")?;
+    let asking = thread::asker("heyo-slint-host", shared.host.clone())?;
+    let window = thread::making(Kind::Settings, ui::SettingsWindow::new).map_err(|e| format!("Slint could not make the window: {e}"))?;
+    window.global::<ui::Theme>().set_plain(shared.renderer == "software");
+    window.set_opaque(!thread::seen_through(&shared.renderer));
+    let pictures = Rc::new(Pictures::default());
+    let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
+    window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));
+    wire(&window);
 
-/// Whether the window is a Wayland one, told as winit tells it.
-fn wayland() -> bool {
-    cfg!(target_os = "linux") && ["WAYLAND_DISPLAY", "WAYLAND_SOCKET"].iter().any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
-}
+    // What the first page shows is read before the window is: it comes
+    // up as it is, not empty and then filled.
+    let (first, read) = mpsc::channel();
+    let _ = asking.send(Box::new(move |host| {
+        let _ = first.send((host.call("get_settings", Value::Null), host.call("get_hotkeys", Value::Null), host.call("get_capabilities", Value::Null), host.system_dark()));
+    }));
+    let (settings, hotkeys, capabilities, dark) = read.recv().map_err(|_| "the host did not answer".to_string())?;
+    let mut model = Model::new();
+    model.answered(Then::Settings, Ok(settings?));
+    model.answered(Then::Hotkeys, Ok(hotkeys?));
+    model.answered(Then::Capabilities, Ok(capabilities?));
+    window.set_system_dark(dark);
 
-/// Which of Slint's renderers draws the window.
-fn renderer() -> String {
-    std::env::var("HEYO_SETTINGS_RENDERER").ok().filter(|name| !name.is_empty()).unwrap_or_else(|| RENDERER.to_string())
-}
-
-/// Runs Slint on this thread until Heyo ends: makes the window, shows it,
-/// and says through `started` whether that worked. It only returns if it
-/// did not.
-pub(super) fn run(host: Arc<dyn Host>, asked: Instant, started: mpsc::Sender<Result<(), String>>) {
-    let begin = || -> Result<(), String> {
-        guard::test_no_start()?;
-        let renderer = renderer();
-        let selector = slint::BackendSelector::new().backend_name("winit".into()).renderer_name(renderer.clone());
-        #[cfg(target_os = "linux")]
-        let selector = selector.with_winit_window_attributes_hook(|attributes| {
-            use slint::winit_030::winit::platform::wayland::WindowAttributesExtWayland;
-            use slint::winit_030::winit::platform::x11::WindowAttributesExtX11;
-            // As Heyo's other windows are named to the desktop: the class
-            // on X11, the application's id on Wayland.
-            WindowAttributesExtWayland::with_name(WindowAttributesExtX11::with_name(attributes, "Heyo", "heyo"), "heyo", "heyo")
-        });
-        let selector = if frames::wanted().is_some() { selector.with_winit_custom_application_handler(frames::Timing) } else { selector };
-        selector.select().map_err(|e| format!("Slint has no backend: {e}"))?;
-        // A Wayland window is made anew each time it is shown, and the
-        // second time Slint leaves out what the hook above gave the first:
-        // the window had no application to belong to, and the Shell did
-        // not know it for Heyo's. What Slint is told itself it gives every
-        // time. (Not on X11, where it would take the instance's name away
-        // and the window is named either way.)
-        if wayland() {
-            slint::set_xdg_app_id("heyo").map_err(|e| format!("Slint took no application id: {e}"))?;
-        }
-        let fonts = super::fonts::register();
-        eprintln!("heyo: settings drawn by Slint with {renderer}, in {}", if fonts.is_empty() { "the system's fonts".to_string() } else { fonts.join(" and ") });
-
-        // The host is asked on a thread of its own, in the order asked.
-        let (asking, jobs) = mpsc::channel::<Job>();
-        let answering = host.clone();
-        std::thread::Builder::new()
-            .name("heyo-slint-host".into())
-            .spawn(move || {
-                for job in jobs {
-                    job(answering.as_ref());
-                }
-            })
-            .map_err(|e| e.to_string())?;
-
-        let window = ui::SettingsWindow::new().map_err(|e| format!("Slint could not make the window: {e}"))?;
-        window.global::<ui::Theme>().set_plain(renderer == "software");
-        window.set_opaque(!seen_through(&renderer));
-        let pictures = Rc::new(Pictures::default());
-        let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
-        window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));
-        wire(&window);
-
-        // What the first page shows is read before the window is: it comes
-        // up as it is, not empty and then filled.
-        let (first, read) = mpsc::channel();
-        let _ = asking.send(Box::new(move |host| {
-            let _ = first.send((host.call("get_settings", Value::Null), host.call("get_hotkeys", Value::Null), host.call("get_capabilities", Value::Null), host.system_dark()));
-        }));
-        let (settings, hotkeys, capabilities, dark) = read.recv().map_err(|_| "the host did not answer".to_string())?;
-        let mut model = Model::new();
-        model.answered(Then::Settings, Ok(settings?));
-        model.answered(Then::Hotkeys, Ok(hotkeys?));
-        model.answered(Then::Capabilities, Ok(capabilities?));
-        window.set_system_dark(dark);
-
-        let poll = slint::Timer::default();
-        poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
-            with(|live| live.ask(live.model.poll()));
-        });
-        let mut live = Live { window, asking, model, lines, pictures, recording: None, held: Held::default(), _poll: poll };
-        live.push();
-        LIVE.with(|slot| *slot.borrow_mut() = Some(live));
-
-        host.listen(Box::new(|event, told| {
-            let event = event.to_string();
-            let _ = slint::invoke_from_event_loop(move || {
-                with(|live| {
-                    let asks = live.model.heard(&event, &told);
-                    live.ask(asks);
-                    live.push();
-                });
-            });
-        }));
-        Ok(())
-    };
-    if let Err(reason) = begin() {
-        let _ = started.send(Err(reason));
-        return;
-    }
-    // The window is shown from inside the loop, where winit has its
-    // windows; whether it came up is what `open` waits to hear.
-    let showing = started.clone();
-    let queued = slint::invoke_from_event_loop(move || {
-        with(|live| {
-            live.reveal(asked, move |shown| {
-                if shown.is_err() {
-                    let _ = slint::quit_event_loop();
-                }
-                let _ = showing.send(shown);
-            })
-        });
+    let poll = slint::Timer::default();
+    poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
+        with(|live| live.ask(live.model.poll()));
     });
-    if let Err(e) = queued {
-        let _ = started.send(Err(e.to_string()));
-        return;
-    }
-    guard::test_panic();
-    if let Err(e) = slint::run_event_loop_until_quit() {
-        eprintln!("heyo: slint's event loop ended: {e}");
-    }
-    guard::gone();
+    let mut live = Live { window, asking, model, lines, pictures, recording: None, held: Held::default(), _poll: poll };
+    live.push();
+
+    shared.host.listen(Box::new(|event, told| {
+        let event = event.to_string();
+        thread::on(move || {
+            with(|live| {
+                let asks = live.model.heard(&event, &told);
+                live.ask(asks);
+                live.push();
+            });
+        });
+    }));
+    Ok(live)
 }
 
-/// Brings the window back. Called on any thread; false when Slint's loop
-/// is no longer there to hear it.
-pub(super) fn reopen(asked: Instant) -> bool {
-    slint::invoke_from_event_loop(move || {
-        with(|live| {
-            live.reveal(asked, |shown| {
-                if let Err(reason) = shown {
-                    eprintln!("heyo: the settings could not be shown: {reason}");
-                    guard::gone();
-                }
-            })
-        });
-    })
-    .is_ok()
+/// Shows the window, made first if this is the first time, and brings it
+/// forward. On Slint's thread; `then` hears whether it came up.
+pub(super) fn reveal(asked: Instant, then: impl FnOnce(Result<(), String>) + 'static) {
+    let there = LIVE.with(|slot| slot.try_borrow().map(|live| live.is_some()).unwrap_or(true));
+    if !there {
+        match make() {
+            Ok(live) => LIVE.with(|slot| *slot.borrow_mut() = Some(live)),
+            Err(reason) => return then(Err(reason)),
+        }
+    }
+    let mut then = Some(then);
+    with(|live| {
+        if let Some(then) = then.take() {
+            live.reveal(asked, then);
+        }
+    });
+    if let Some(then) = then {
+        then(Err("the settings window was busy".into()));
+    }
 }
 
 #[cfg(test)]

@@ -70,8 +70,8 @@ export interface Failure {
   title?: string;
 }
 
-/// A window with nowhere to show a failure (the dictation pill, a pinned
-/// capture) leaves it in the log.
+/// A window with nowhere to show a failure (a pinned capture) leaves it
+/// in the log.
 const logged = ({ title, message }: Failure) => console.error(title ? `${title}: ${message}` : message);
 
 let report = logged;

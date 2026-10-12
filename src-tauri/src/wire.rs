@@ -34,8 +34,6 @@ events! {
     OPEN_ITEM = "heyo://open-item";
     /// A message from the extension runtime (`RuntimeMessage`).
     RUNTIME = "heyo://runtime";
-    /// The state of a dictation, for its window.
-    DICTATION = "heyo://dictation";
     /// Progress of installing the speech engine.
     DICTATION_INSTALL = "heyo://dictation-install";
     /// Progress of installing the text-recognition engine.

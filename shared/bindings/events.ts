@@ -7,7 +7,6 @@ export const event = {
   settingsChanged: "heyo://settings-changed",
   openItem: "heyo://open-item",
   runtime: "heyo://runtime",
-  dictation: "heyo://dictation",
   dictationInstall: "heyo://dictation-install",
   ocrInstall: "heyo://ocr-install",
   screenshot: "heyo://screenshot",

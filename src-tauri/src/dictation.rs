@@ -39,7 +39,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::helper::{self, Helper};
 use crate::platform::composing::{self, Composing, Stir};
@@ -48,11 +48,6 @@ use crate::{pasting, SettingsState};
 use composed::{Composed, Tell};
 use onscreen::{OnScreen, Shortfall, Standing, Step};
 
-pub const WINDOW: &str = "dictation";
-const EVENT: &str = crate::wire::event::DICTATION;
-/// Logical size of the dictation window.
-const WIDTH: f64 = 360.0;
-const HEIGHT: f64 = 44.0;
 
 #[derive(Default)]
 pub struct Dictation(Mutex<State>);
@@ -136,9 +131,8 @@ fn node_command(app: &AppHandle, args: &[&str]) -> Result<Command, String> {
 
 /// What the dictation window is told of a recording: the helper's account
 /// of it, and the host's own of one starting or failing.
-#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, ts_rs::TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
-#[ts(export, export_to = "../../shared/bindings/", rename = "DictationEvent")]
 pub(crate) enum Told {
     /// A recording begins; `polish` is the mode it will be polished in.
     Start { polish: String },
@@ -163,48 +157,31 @@ pub(crate) enum Told {
         raw: String,
         /// Why the text was not polished.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
         warning: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
         cancelled: Option<bool>,
         /// What a cancelled recording had written is still in the
         /// application: it could not be taken back.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
         kept: Option<bool>,
     },
     Error { message: String },
 }
 
-fn emit(app: &AppHandle, event: Value) {
-    // The window is told what `Told` declares and nothing else.
-    let told = match serde_json::from_value::<Told>(event) {
-        Ok(told) => told,
-        Err(e) => return eprintln!("heyo: dictation: not something its window is told: {e}"),
-    };
-    if let Some(window) = app.get_webview_window(WINDOW) {
-        let _ = window.emit(EVENT, told);
+/// Tells the pill of the recording: what `Told` declares and nothing else.
+/// The pill is Slint's (`slint_windows::pill`); without it, as when Slint
+/// could not start, the recording goes on all the same.
+fn emit(_app: &AppHandle, event: Value) {
+    match serde_json::from_value::<Told>(event) {
+        Ok(told) => crate::slint_windows::pill::tell(told),
+        Err(e) => eprintln!("heyo: dictation: not something its window is told: {e}"),
     }
 }
 
-/// Shows the progress window at the bottom center of the screen, without
-/// taking keyboard focus from the application being dictated into.
+/// Shows the pill at the bottom center of the screen, without taking
+/// keyboard focus from the application being dictated into.
 fn show_window(app: &AppHandle) {
-    let Some(window) = app.get_webview_window(WINDOW) else { return };
-    // The size is set here rather than read back: before the first show the
-    // window reports a size of zero.
-    if let Ok(Some(monitor)) = window.primary_monitor() {
-        let scale = monitor.scale_factor();
-        let (width, height) = ((WIDTH * scale) as i32, (HEIGHT * scale) as i32);
-        let area = monitor.size();
-        let origin = monitor.position();
-        let x = origin.x + (area.width as i32 - width) / 2;
-        let y = origin.y + area.height as i32 - height - area.height as i32 / 10;
-        let _ = window.set_size(PhysicalSize::new(width, height));
-        let _ = window.set_position(PhysicalPosition::new(x, y));
-    }
-    let _ = window.show();
+    crate::slint_windows::pill::show(app);
 }
 
 fn hide_window_after(app: &AppHandle, delay: Duration) {
@@ -213,9 +190,7 @@ fn hide_window_after(app: &AppHandle, delay: Duration) {
         std::thread::sleep(delay);
         // A new recording may have started meanwhile.
         if !app.state::<Dictation>().0.lock().unwrap().recording {
-            if let Some(window) = app.get_webview_window(WINDOW) {
-                let _ = window.hide();
-            }
+            crate::slint_windows::pill::hide();
         }
     });
 }

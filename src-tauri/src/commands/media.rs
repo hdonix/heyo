@@ -34,18 +34,3 @@ pub(crate) fn dictation_install(app: AppHandle) -> Result<(), String> {
     dictation::install(&app)
 }
 
-#[tauri::command(async)]
-pub(crate) fn dictation_toggle(app: AppHandle) {
-    dictation::toggle(&app);
-}
-
-#[tauri::command(async)]
-pub(crate) fn dictation_cancel(app: AppHandle) {
-    dictation::cancel(&app);
-}
-
-/// A mouse button went down on the dictation window.
-#[tauri::command]
-pub(crate) fn dictation_pressed(app: AppHandle) {
-    dictation::pressed(&app);
-}

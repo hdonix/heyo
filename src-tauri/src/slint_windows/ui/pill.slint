@@ -1,0 +1,250 @@
+// The dictation pill: a small black pill at the bottom of the screen,
+// whatever the theme (it sits over other applications, not on Heyo's own
+// surfaces; its colours are the dark ones of the scales). While it listens
+// it shows the microphone's level and says so; the latest words take the
+// place of that unless they are going into the application as they are
+// spoken. While the text is polished it says that, beside a sparkle.
+//
+// What it shows is decided in Rust (`pill/model.rs`) and set here; what is
+// done to it is said back (`pressed`, `clicked`, `cancel`). It never has
+// the keyboard: `pill/native.rs` sees to that.
+
+import { Tokens } from "tokens.slint";
+import { TextSm, Icon } from "widgets.slint";
+
+// Two stars, for the polishing that an AI model does. They breathe.
+component Sparkle inherits Rectangle {
+    property <float> beat: mod(animation-tick() / 1ms, 1400) / 1400;
+    // 0, 1 and 0 again over a beat, eased at both ends.
+    property <float> breath: (1 - cos(beat * 360deg)) / 2;
+    width: 16px;
+    height: 16px;
+    opacity: 1 - 0.45 * breath;
+    transform-scale: 1 - 0.1 * breath;
+    Path {
+        width: 16px;
+        height: 16px;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: "M9.5 2.5c.5 2.9 1.6 4 4.5 4.5-2.9.5-4 1.6-4.5 4.5-.5-2.9-1.6-4-4.5-4.5 2.9-.5 4-1.6 4.5-4.5Z";
+        fill: @linear-gradient(135deg, #9bd4ff 0%, #2f7df6 100%);
+    }
+
+    Path {
+        width: 16px;
+        height: 16px;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: "M4 9.5c.3 1.6.9 2.2 2.5 2.5-1.6.3-2.2.9-2.5 2.5-.3-1.6-.9-2.2-2.5-2.5 1.6-.3 2.2-.9 2.5-2.5Z";
+        fill: @linear-gradient(135deg, #9bd4ff 0%, #2f7df6 100%);
+    }
+}
+
+// The microphone's level, as five bars that swell from the middle. Each
+// level is a share of the tallest; they arrive about 25 a second, and a
+// bar moves to the next one rather than jumping there.
+component Waveform inherits HorizontalLayout {
+    in property <[float]> bars;
+    in property <color> colour;
+    spacing: 2px;
+    height: 14px;
+    for level in root.bars: Rectangle {
+        width: 2.5px;
+        Rectangle {
+            width: 2.5px;
+            height: max(2.5px, parent.height * level);
+            y: (parent.height - self.height) / 2;
+            border-radius: 1.25px;
+            background: root.colour;
+            animate height {
+                duration: 90ms;
+                easing: ease-out;
+            }
+            animate background {
+                duration: Tokens.duration-fast;
+                easing: Tokens.ease-out;
+            }
+        }
+    }
+}
+
+export component PillWindow inherits Window {
+    // loading, listening, polishing, done or error.
+    in property <string> phase: "loading";
+    in property <bool> recording;
+    // What it says of itself when it has no words to show.
+    in property <string> saying;
+    // The words: what is settled, and after it what may still change.
+    in property <string> words;
+    in property <string> partial;
+    in property <[float]> bars;
+    // Whether it is on screen, and whether it is on its way off it: it
+    // arrives and goes, it does not pop. It arrives from most of the way
+    // there, so that the first frame it is in already shows it: a window
+    // that fades in from nothing is seen a few frames after it was asked
+    // for. It goes to nothing.
+    in property <bool> shown;
+    in property <bool> leaving;
+    callback pressed();
+    callback clicked();
+    callback cancel();
+    property <bool> has-words: words != "" || partial != "";
+    property <bool> way-out: recording && (touch.has-hover || way-out-touch.has-hover);
+    title: "Heyo Dictation";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    // Wider than the pill, which grows with the words to at most this.
+    width: 360px;
+    height: 44px;
+    default-font-size: Tokens.text-sm-size;
+    init => {
+        Tokens.dark = true;
+    }
+    // A press anywhere on the window is said at once, before the click it
+    // may become.
+    TouchArea {
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                root.pressed();
+            }
+        }
+    }
+
+    pill := Rectangle {
+        width: min(root.width - 12px, content.preferred-width);
+        height: 30px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2 + (root.shown ? 0px : 5px);
+        opacity: root.shown ? 1 : root.leaving ? 0 : 0.6;
+        border-radius: 15px;
+        border-width: 1px;
+        border-color: Tokens.border-strong;
+        background: rgba(10, 10, 11, 0.94);
+        drop-shadow-blur: 5px;
+        drop-shadow-offset-y: 1px;
+        drop-shadow-color: rgba(0, 0, 0, 0.3);
+        // The width follows what is in it, and settles like a spring.
+        animate width {
+            duration: 380ms;
+            easing: spring(0.18);
+        }
+        animate opacity {
+            duration: 120ms;
+            easing: Tokens.ease-out;
+        }
+        animate y {
+            duration: 120ms;
+            easing: Tokens.ease-out;
+        }
+        touch := TouchArea {
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    root.pressed();
+                }
+            }
+            clicked => {
+                root.clicked();
+            }
+        }
+
+        // What is in it is as wide as it wants to be, and the pill shows
+        // as much of it as it has grown to: nothing is squeezed meanwhile.
+        Rectangle {
+            clip: true;
+            border-radius: 15px;
+            content := HorizontalLayout {
+                x: 0;
+                width: max(parent.width, min(root.width - 12px, self.preferred-width));
+                padding-left: 13px;
+                // The way out sits a little into the padding.
+                padding-right: root.way-out ? 8px : 13px;
+                spacing: 7px;
+                if root.phase == "polishing": VerticalLayout {
+                    alignment: center;
+                    Sparkle { }
+                }
+                if root.phase != "polishing" && root.phase != "error": VerticalLayout {
+                    alignment: center;
+                    Waveform {
+                        bars: root.bars;
+                        colour: root.phase == "listening" ? Tokens.accent : Tokens.text-muted;
+                    }
+                }
+                // Clipped on the left, so that the newest words stay
+                // visible; where they are, they fade into the pill rather
+                // than end in half a letter.
+                if root.has-words: Rectangle {
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                    preferred-width: said.preferred-width;
+                    clip: true;
+                    said := HorizontalLayout {
+                        width: self.preferred-width;
+                        x: parent.width - self.width;
+                        TextSm {
+                            text: root.words;
+                            font-weight: Tokens.weight-medium;
+                            color: root.phase == "error" ? Tokens.danger : Tokens.text;
+                        }
+
+                        TextSm {
+                            text: root.partial;
+                            font-weight: Tokens.weight-medium;
+                            color: Tokens.text-muted;
+                        }
+                    }
+
+                    // As tall as a line of them, and no taller: over the
+                    // pill's edge it would show.
+                    Rectangle {
+                        x: 0;
+                        y: (parent.height - self.height) / 2;
+                        width: 14px;
+                        height: 20px;
+                        opacity: clamp((said.width - parent.width) / 8px, 0, 1);
+                        background: @linear-gradient(90deg, rgba(10, 10, 11, 0.96) 0%, rgba(10, 10, 11, 0) 100%);
+                    }
+                }
+                if !root.has-words && root.saying != "": TextSm {
+                    text: root.saying;
+                    font-weight: Tokens.weight-medium;
+                }
+                // The way out of a recording shows when the pointer is on
+                // the pill.
+                if root.way-out: VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 17px;
+                        height: 17px;
+                        border-radius: Tokens.radius-sm;
+                        background: way-out-touch.has-hover ? Tokens.fill-3 : transparent;
+                        Icon {
+                            source: @image-url("icons/x.svg");
+                            size: 11px;
+                            tint: way-out-touch.has-hover ? Tokens.text : Tokens.text-muted;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Over the button's place whether it shows or not: it shows when
+        // the pointer is on the pill, and this is on the pill.
+        way-out-touch := TouchArea {
+            x: parent.width - 8px - 17px;
+            y: (parent.height - 17px) / 2;
+            width: root.recording ? 17px : 0px;
+            height: 17px;
+            mouse-cursor: pointer;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    root.pressed();
+                }
+            }
+            clicked => {
+                root.cancel();
+            }
+        }
+    }
+}

@@ -44,7 +44,7 @@ tauri-plugin-updater = { version = "2", optional = true }
 # For telling whether an address is this computer (the local model's).
 url = "2"
 # The settings window is drawn by Slint, on a thread of its own
-# (src/slint_settings/): with Skia on the CPU, or Slint's own renderer or
+# (src/slint_windows/): with Skia on the CPU, or Slint's own renderer or
 # Skia on the GPU when HEYO_SETTINGS_RENDERER names one. Skia is fetched
 # prebuilt for the target (or built, where there is none prebuilt).
 slint = { version = "=1.18.1", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "renderer-skia", "renderer-skia-opengl", "accessibility", "unstable-winit-030", "unstable-fontique-011"] }
@@ -66,7 +66,7 @@ xkbcommon = { version = "0.8", default-features = false }
 gtk = "0.18"
 gdkx11 = "0.18"
 # The socket of the X11 connection Slint draws through, which winit opens
-# with this (`slint_settings::guard`).
+# with this (`slint_windows::guard`).
 x11-dl = "2.21"
 libc = "0.2"
 

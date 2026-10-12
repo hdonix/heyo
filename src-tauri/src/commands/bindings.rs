@@ -23,7 +23,7 @@ use crate::open::Arguments;
 use crate::root::Item;
 use crate::screenshot::Finish;
 use crate::wire::WebviewMessage;
-use crate::{dictation, expand, screenshot};
+use crate::{expand, screenshot};
 
 commands! {
     search(query: String) -> Vec<Item>;
@@ -34,9 +34,6 @@ commands! {
     open_settings();
     set_item_hotkey(id: String, title: String, accelerator: String);
     screenshot_finish(request: Finish) -> String;
-    dictation_toggle();
-    dictation_cancel();
-    dictation_pressed();
     show_window();
     get_item(id: String) -> Option<Item>;
     list_quicklinks() -> Vec<Item>;
@@ -62,7 +59,6 @@ events! {
     SETTINGS_CHANGED: SettingsView;
     OPEN_ITEM: String;
     RUNTIME: RuntimeMessage;
-    DICTATION: dictation::Told;
     DICTATION_INSTALL: InstallProgress;
     OCR_INSTALL: InstallProgress;
     SCREENSHOT: screenshot::Capture;
@@ -410,7 +406,6 @@ pub(crate) fn hide(window: WebviewWindow) {
             "  runtime: RuntimeMessage;",
             "  activities: Array<ActivityView>;",
             "import type { Item } from \"./Item\";",
-            "import type { DictationEvent } from \"./DictationEvent\";",
             "import type { RuntimeMessage } from \"../wire\";",
             "  /** Counts a use of a root search item, for ranking. */",
         ] {
