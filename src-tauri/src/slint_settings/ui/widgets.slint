@@ -1,0 +1,1141 @@
+// What the lines of the settings window are made of: its controls, drawn
+// from the tokens of Heyo's interface.
+
+import { Tokens } from "tokens.slint";
+
+// What the web interface derives from the scales in base/_tokens.scss, by
+// the names it has there.
+export global Theme {
+    out property <color> selected: Tokens.fill-3;
+    out property <color> input: Tokens.fill-2;
+    out property <length> radius-card: Tokens.radius-xl;
+    // `--ring`: 3px of the accent at 28%.
+    out property <color> ring: Tokens.accent.with-alpha(0.28);
+    out property <color> white: #ffffff;
+    // How tall a line of the interface's font is by itself, for its size
+    // (Inter: ascender 1984 and descender 494 of 2048). Slint spaces lines
+    // by a factor of that, where CSS has a height.
+    out property <float> natural-line: 1.21;
+    // The renderer in use draws no shadows and rounds no clips (Slint's
+    // own): the window then has no margin for a shadow to fall in.
+    in property <bool> plain;
+    // Whether focus was last moved by the keyboard: only then is a ring
+    // drawn around a control that is not a field (`:focus-visible`).
+    in-out property <bool> keyboard;
+}
+
+// --- Text, at the sizes of the scale ----------------------------------------
+//
+// One line is set in a box as tall as the scale's line height; text that
+// wraps says so (`wrapped`) and has its lines spaced by it.
+
+component Line inherits Text {
+    in property <length> line;
+    in property <bool> wrapped;
+    color: Tokens.text;
+    vertical-alignment: center;
+    wrap: wrapped ? word-wrap : no-wrap;
+    overflow: wrapped ? clip : elide;
+    line-height-factor: wrapped ? line / (self.font-size * Theme.natural-line) : 1;
+    min-height: line;
+}
+
+export component TextXs inherits Line {
+    font-size: Tokens.text-xs-size;
+    letter-spacing: Tokens.text-xs-tracking;
+    line: Tokens.text-xs-line;
+}
+
+export component TextSm inherits Line {
+    font-size: Tokens.text-sm-size;
+    letter-spacing: Tokens.text-sm-tracking;
+    line: Tokens.text-sm-line;
+}
+
+export component TextMd inherits Line {
+    font-size: Tokens.text-md-size;
+    letter-spacing: Tokens.text-md-tracking;
+    line: Tokens.text-md-line;
+}
+
+export component TextRow inherits Line {
+    font-size: Tokens.text-row-size;
+    letter-spacing: Tokens.text-row-tracking;
+    line: Tokens.text-row-line;
+}
+
+export component TextLg inherits Line {
+    font-size: Tokens.text-lg-size;
+    letter-spacing: Tokens.text-lg-tracking;
+    line: Tokens.text-lg-line;
+}
+
+export component TextXl inherits Line {
+    font-size: Tokens.text-xl-size;
+    letter-spacing: Tokens.text-xl-tracking;
+    line: Tokens.text-xl-line;
+}
+
+export component Text2xl inherits Line {
+    font-size: Tokens.text-2xl-size;
+    letter-spacing: Tokens.text-2xl-tracking;
+    line: Tokens.text-2xl-line;
+}
+
+// A symbol, in the colour of the text around it.
+export component Icon inherits Image {
+    in property <length> size: Tokens.icon-md;
+    in property <color> tint: Tokens.text-muted;
+    width: size;
+    height: size;
+    colorize: tint;
+    image-fit: contain;
+}
+
+// The ring a control has while the keyboard is on it.
+export component FocusRing inherits Rectangle {
+    in property <bool> shown;
+    in property <length> radius;
+    border-radius: radius + 3px;
+    border-width: 3px;
+    border-color: Theme.ring;
+    opacity: shown ? 1 : 0;
+    animate opacity {
+        duration: Tokens.duration-fast;
+        easing: Tokens.ease-out;
+    }
+}
+
+// --- Cards and rows ---------------------------------------------------------
+
+export component Row inherits VerticalLayout {
+    in property <string> label;
+    in property <string> description;
+    in property <bool> danger;
+    // The rows after the first of a card have a line above them.
+    in property <bool> first;
+    in property <image> icon;
+    in property <bool> has-icon;
+    // A symbol, drawn in the colour of text; a picture has its own.
+    in property <bool> tinted;
+    if !first: HorizontalLayout {
+        padding-left: Tokens.unit * 3;
+        padding-right: Tokens.unit * 3;
+        Rectangle {
+            height: 1px;
+            background: Tokens.divider;
+        }
+    }
+    HorizontalLayout {
+        min-height: 48px;
+        padding-left: Tokens.unit * 3;
+        padding-right: Tokens.unit * 3;
+        padding-top: Tokens.unit * 2;
+        padding-bottom: Tokens.unit * 2;
+        spacing: Tokens.unit * 3;
+        if has-icon: VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 22px;
+                height: 22px;
+                image-fit: contain;
+                colorize: root.tinted ? Tokens.text : transparent;
+            }
+        }
+        VerticalLayout {
+            // Said outright: a text's height follows from its width, and
+            // Slint works the height out before a control that comes and
+            // goes (`if`) has taken its place beside it.
+            width: max(0px, root.width - Tokens.unit * 6 - (root.has-icon ? 22px + Tokens.unit * 3 : 0px) - (controls.preferred-width > 0 ? controls.preferred-width + Tokens.unit * 3 : 0px));
+            alignment: center;
+            spacing: 2px;
+            TextRow {
+                text: root.label;
+                horizontal-alignment: left;
+            }
+
+            if description != "": TextXs {
+                text: root.description;
+                wrapped: true;
+                line: 12px * 1.35;
+                color: root.danger ? Tokens.danger : Tokens.text-muted;
+                horizontal-alignment: left;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            controls := HorizontalLayout {
+                spacing: 10px;
+                @children
+            }
+        }
+    }
+}
+
+// --- Switch ------------------------------------------------------------------
+
+export component Switch {
+    in property <bool> checked;
+    in property <string> label;
+    callback toggled(on: bool);
+    width: 36px;
+    height: 21px;
+    accessible-role: switch;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-label: root.label;
+    accessible-action-default => {
+        root.toggled(!root.checked);
+    }
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        shown: scope.has-focus && Theme.keyboard;
+        radius: root.height / 2;
+    }
+
+    Rectangle {
+        border-radius: self.height / 2;
+        background: root.checked ? Tokens.accent : Tokens.fill-4;
+        border-width: root.checked ? 0px : 1px;
+        border-color: Tokens.border;
+        animate background {
+            duration: Tokens.duration-base;
+            easing: Tokens.ease-out;
+        }
+    }
+
+    // The knob leans the way it will go while it is held, and settles as a
+    // spring does when let go.
+    Rectangle {
+        property <length> lean: touch.pressed ? 4px : 0px;
+        x: root.checked ? 17px - self.lean : 2px;
+        y: 2px;
+        width: 17px + self.lean;
+        height: 17px;
+        border-radius: 8.5px;
+        background: Theme.white;
+        drop-shadow-blur: 2px;
+        drop-shadow-offset-y: 1px;
+        drop-shadow-color: Tokens.shadow-near;
+        animate x, width {
+            duration: 420ms;
+            easing: spring(0.32);
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            Theme.keyboard = false;
+            scope.focus();
+            root.toggled(!root.checked);
+        }
+    }
+
+    scope := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == " " || event.text == Key.Return) {
+                root.toggled(!root.checked);
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+// --- Button ------------------------------------------------------------------
+
+export component Button {
+    in property <string> text;
+    in property <bool> enabled: true;
+    // What it does cannot be undone.
+    in property <bool> danger;
+    callback clicked();
+    height: Tokens.height-md;
+    min-width: label.preferred-width + 24px;
+    horizontal-stretch: 0;
+    opacity: enabled ? 1 : 0.45;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        root.clicked();
+    }
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        shown: scope.has-focus && Theme.keyboard;
+        radius: Tokens.radius-md;
+    }
+
+    // `--shadow-control`: a hairline, the faintest lift, a lit top edge.
+    face := Rectangle {
+        border-radius: Tokens.radius-md;
+        background: touch.pressed ? Tokens.fill-3 : touch.has-hover ? Tokens.fill-2 : Tokens.surface;
+        border-width: 1px;
+        border-color: Tokens.border;
+        drop-shadow-blur: 2px;
+        drop-shadow-offset-y: 1px;
+        drop-shadow-color: Tokens.shadow-near;
+        transform-scale: touch.pressed ? 0.98 : 1;
+        animate background, transform-scale {
+            duration: Tokens.duration-fast;
+            easing: Tokens.ease-out;
+        }
+        label := TextSm {
+            text: root.text;
+            font-weight: Tokens.weight-medium;
+            color: root.danger ? Tokens.danger : Tokens.text;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            Theme.keyboard = false;
+            root.clicked();
+        }
+    }
+
+    scope := FocusScope {
+        enabled: root.enabled;
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == " " || event.text == Key.Return) {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+// A button for what cannot be undone: the first click only changes what it
+// says, and it goes back to its own words if no second one follows.
+export component ConfirmButton {
+    in property <string> words;
+    in property <string> confirm;
+    callback confirmed();
+    property <bool> armed;
+    height: Tokens.height-md;
+    min-width: inner.min-width;
+    horizontal-stretch: 0;
+    inner := Button {
+        text: root.armed ? root.confirm : root.words;
+        danger: true;
+        clicked => {
+            if (root.armed) {
+                root.armed = false;
+                root.confirmed();
+            } else {
+                root.armed = true;
+            }
+        }
+    }
+
+    Timer {
+        interval: 3s;
+        running: root.armed;
+        triggered => {
+            root.armed = false;
+        }
+    }
+}
+
+// A box that is ticked, or half ticked for some of what it stands for.
+export component Check {
+    in property <bool> checked;
+    in property <bool> mixed;
+    in property <string> label;
+    callback toggled(on: bool);
+    width: 16px;
+    height: 16px;
+    accessible-role: checkbox;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-label: root.label;
+    accessible-action-default => {
+        root.toggled(!root.checked);
+    }
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        shown: scope.has-focus && Theme.keyboard;
+        radius: Tokens.radius-xs;
+    }
+
+    Rectangle {
+        border-radius: Tokens.radius-xs;
+        background: root.checked ? Tokens.accent : Tokens.fill-2;
+        border-width: root.checked ? 0px : 1px;
+        border-color: Tokens.border-strong;
+        animate background {
+            duration: Tokens.duration-fast;
+            easing: Tokens.ease-out;
+        }
+    }
+
+    if root.checked && !root.mixed: Path {
+        x: 3.5px;
+        y: 4.5px;
+        width: 9px;
+        height: 7px;
+        commands: "M 0 3.5 L 3.2 6.7 L 9 0";
+        stroke: Tokens.on-accent;
+        stroke-width: 1.8px;
+        fill: transparent;
+    }
+    if root.checked && root.mixed: Rectangle {
+        x: 4px;
+        y: 7px;
+        width: 8px;
+        height: 2px;
+        border-radius: 1px;
+        background: Tokens.on-accent;
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            Theme.keyboard = false;
+            root.toggled(!root.checked);
+        }
+    }
+
+    scope := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == " ") {
+                root.toggled(!root.checked);
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+// A small label that says a state: "Installed".
+export component Badge inherits Rectangle {
+    in property <string> text;
+    height: 22px;
+    width: label.preferred-width + 16px;
+    border-radius: 11px;
+    background: Tokens.fill-2;
+    label := TextXs {
+        text: root.text;
+        color: Tokens.text-muted;
+        font-weight: Tokens.weight-medium;
+    }
+}
+
+// --- Fields ------------------------------------------------------------------
+
+// The frame of a field (`@mixin field`): a fill, a hairline, and the ring
+// while it is typed in.
+component FieldFrame inherits Rectangle {
+    in property <bool> focused;
+    in property <bool> hovered;
+    in property <bool> bare;
+    border-radius: Tokens.radius-md;
+    background: bare ? Tokens.fill-2 : focused ? Tokens.fill-2 : hovered ? Tokens.fill-3 : Tokens.fill-2;
+    border-width: 1px;
+    border-color: focused ? Tokens.accent : bare ? transparent : Tokens.border;
+    animate background, border-color {
+        duration: Tokens.duration-fast;
+        easing: Tokens.ease-out;
+    }
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        shown: root.focused;
+        radius: Tokens.radius-md;
+    }
+}
+
+// One line of text to type in. What is being composed by an input method
+// is drawn in the field, underlined, by Slint's own `TextInput`.
+export component Field {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <string> label;
+    in property <image> icon;
+    in property <bool> has-icon;
+    // Without its hairline: the search fields.
+    in property <bool> bare;
+    // What is typed is not shown.
+    in property <bool> password;
+    out property <bool> has-focus: input.has-focus;
+    callback edited(text: string);
+    callback accepted(text: string);
+    // The field was left.
+    callback done(text: string);
+    height: Tokens.height-lg;
+    forward-focus: input;
+    FieldFrame {
+        focused: input.has-focus;
+        hovered: touch.has-hover;
+        bare: root.bare;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => {
+            input.focus();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Tokens.unit * 2.5;
+        padding-right: Tokens.unit * 2.5;
+        spacing: 8px;
+        if has-icon: VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.icon;
+                size: 15px;
+            }
+        }
+        Rectangle {
+            clip: true;
+            horizontal-stretch: 1;
+            if input.text == "" && input.preedit-text == "": TextSm {
+                x: 0;
+                width: parent.width;
+                text: root.placeholder;
+                color: Tokens.text-faint;
+                horizontal-alignment: left;
+                accessible-role: none;
+            }
+            input := TextInput {
+                x: 0;
+                width: parent.width;
+                height: parent.height;
+                single-line: true;
+                input-type: root.password ? InputType.password : InputType.text;
+                vertical-alignment: center;
+                font-size: Tokens.text-sm-size;
+                letter-spacing: Tokens.text-sm-tracking;
+                color: Tokens.text;
+                selection-background-color: Tokens.accent.with-alpha(0.3);
+                selection-foreground-color: Tokens.text;
+                accessible-label: root.label;
+                accessible-placeholder-text: root.placeholder;
+                edited => {
+                    root.edited(self.text);
+                }
+                accepted => {
+                    root.accepted(self.text);
+                }
+                changed has-focus => {
+                    if (!self.has-focus) {
+                        root.done(self.text);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Several lines of text to type in, scrolled when they are more than fit.
+export component TextArea {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <string> label;
+    in property <int> rows: 6;
+    out property <bool> has-focus: input.has-focus;
+    callback done(text: string);
+    property <length> line: Tokens.text-md-line;
+    height: rows * line + Tokens.unit * 3;
+    forward-focus: input;
+    FieldFrame {
+        focused: input.has-focus;
+        hovered: touch.has-hover;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => {
+            input.focus();
+        }
+    }
+
+    Rectangle {
+        x: Tokens.unit * 2.5;
+        y: Tokens.unit * 1.5;
+        width: parent.width - Tokens.unit * 5;
+        height: parent.height - Tokens.unit * 3;
+        clip: true;
+        if input.text == "" && input.preedit-text == "": TextMd {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            text: root.placeholder;
+            wrapped: true;
+            line: root.line;
+            color: Tokens.text-faint;
+            horizontal-alignment: left;
+            vertical-alignment: top;
+            accessible-role: none;
+        }
+        scroller := Flickable {
+            content-width: self.width;
+            content-height: max(self.height, input.preferred-height);
+            interactive: false;
+            input := TextInput {
+                x: 0;
+                y: 0;
+                width: parent.content-width;
+                height: parent.content-height;
+                single-line: false;
+                wrap: word-wrap;
+                font-size: Tokens.text-md-size;
+                letter-spacing: Tokens.text-md-tracking;
+                line-height-factor: root.line / (self.font-size * Theme.natural-line);
+                color: Tokens.text;
+                selection-background-color: Tokens.accent.with-alpha(0.3);
+                selection-foreground-color: Tokens.text;
+                page-height: scroller.height;
+                accessible-label: root.label;
+                // The line the cursor is on stays in sight.
+                cursor-position-changed(at) => {
+                    if (at.y + scroller.content-y < 0) {
+                        scroller.content-y = -at.y;
+                    } else if (at.y + root.line + scroller.content-y > scroller.height) {
+                        scroller.content-y = scroller.height - at.y - root.line;
+                    }
+                }
+                changed has-focus => {
+                    if (!self.has-focus) {
+                        root.done(self.text);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Select ------------------------------------------------------------------
+
+export struct Choice {
+    value: string,
+    title: string,
+}
+
+export component Select {
+    in property <[Choice]> choices;
+    in property <string> value;
+    in property <string> label;
+    callback picked(value: string);
+    height: Tokens.height-lg;
+    width: max(132px, widest.preferred-width + 10px + 28px);
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: current.text;
+    accessible-expandable: true;
+    accessible-action-default => {
+        menu.show();
+    }
+    accessible-action-expand => {
+        menu.show();
+    }
+    // The field is as wide as its longest choice, as a `<select>` is.
+    widest := VerticalLayout {
+        visible: false;
+        height: 0px;
+        for choice in root.choices: TextSm {
+            text: choice.title;
+        }
+    }
+
+    FieldFrame {
+        focused: scope.has-focus && Theme.keyboard;
+        hovered: touch.has-hover;
+    }
+
+    // Only the chosen one has a title to show.
+    property <string> shown;
+    current := TextSm {
+        x: Tokens.unit * 2.5;
+        width: parent.width - Tokens.unit * 2.5 - 28px;
+        horizontal-alignment: left;
+        text: root.shown;
+    }
+
+    for choice in root.choices: Rectangle {
+        visible: false;
+        property <bool> chosen: choice.value == root.value;
+        init => {
+            if (self.chosen) {
+                root.shown = choice.title;
+            }
+        }
+        changed chosen => {
+            if (self.chosen) {
+                root.shown = choice.title;
+            }
+        }
+    }
+
+    Path {
+        x: parent.width - 19px;
+        y: (parent.height - 4px) / 2;
+        width: 8px;
+        height: 4px;
+        commands: "M 0 0 L 8 0 L 4 4 Z";
+        fill: Tokens.text;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            Theme.keyboard = false;
+            scope.focus();
+            menu.show();
+        }
+    }
+
+    scope := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == " " || event.text == Key.Return || event.text == Key.DownArrow || event.text == Key.UpArrow) {
+                menu.show();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    // The choices, over the field. The margin around the sheet is where its
+    // shadow falls.
+    menu := PopupWindow {
+        property <length> margin: Theme.plain ? 0px : 24px;
+        property <bool> arrived;
+        x: -4px - self.margin;
+        y: root.height + 4px - self.margin;
+        width: max(root.width + 8px, sheet-content.preferred-width) + 2 * self.margin;
+        height: sheet-content.preferred-height + 2 * self.margin;
+        close-policy: close-on-click-outside;
+        init => {
+            self.arrived = true;
+        }
+        sheet := Rectangle {
+            x: menu.margin;
+            y: menu.margin;
+            width: parent.width - 2 * menu.margin;
+            height: parent.height - 2 * menu.margin;
+            border-radius: Tokens.radius-lg;
+            background: Tokens.surface-raised;
+            border-width: 1px;
+            border-color: Tokens.border-strong;
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Tokens.shadow-far;
+            opacity: menu.arrived ? 1 : 0;
+            transform-scale: menu.arrived ? 1 : 0.96;
+            transform-origin: {x: self.width / 2, y: 0};
+            animate opacity {
+                duration: Tokens.duration-fast;
+                easing: Tokens.ease-out;
+            }
+            animate transform-scale {
+                duration: 280ms;
+                easing: spring(0.25);
+            }
+            sheet-content := VerticalLayout {
+                padding: 4px;
+                for choice in root.choices: Rectangle {
+                    height: Tokens.height-md;
+                    min-width: item-title.preferred-width + 44px;
+                    border-radius: Tokens.radius-sm;
+                    background: item-touch.has-hover ? Tokens.accent : transparent;
+                    accessible-role: list-item;
+                    accessible-label: choice.title;
+                    accessible-item-selected: choice.value == root.value;
+                    accessible-action-default => {
+                        root.picked(choice.value);
+                        menu.close();
+                    }
+                    if choice.value == root.value: Path {
+                        x: 9px;
+                        y: (parent.height - 8px) / 2;
+                        width: 10px;
+                        height: 8px;
+                        commands: "M 0 4 L 3.5 7.5 L 10 0";
+                        stroke: item-touch.has-hover ? Tokens.on-accent : Tokens.text;
+                        stroke-width: 1.5px;
+                        fill: transparent;
+                    }
+                    item-title := TextSm {
+                        x: 28px;
+                        width: parent.width - 36px;
+                        horizontal-alignment: left;
+                        text: choice.title;
+                        color: item-touch.has-hover ? Tokens.on-accent : Tokens.text;
+                    }
+
+                    item-touch := TouchArea {
+                        clicked => {
+                            root.picked(choice.value);
+                            menu.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Hotkey recorder -----------------------------------------------------------
+//
+// The field of src/hotkey.tsx. Which keys were pressed is not decided
+// here: while a field records, the host reads the keyboard as it is (the
+// keys by where they are on it, as the palette's recorder does) and says
+// what is held.
+
+export component Keycap inherits Rectangle {
+    in property <string> text;
+    height: 22px;
+    width: max(22px, label.preferred-width + Tokens.unit * 2);
+    border-radius: Tokens.radius-sm;
+    // An outline, no more: a key, not a button.
+    border-width: 1px;
+    border-color: Tokens.border-strong;
+    label := TextXs {
+        text: root.text;
+        color: Tokens.text-muted;
+        font-weight: Tokens.weight-medium;
+    }
+}
+
+export component Hotkey inherits HorizontalLayout {
+    // The keys bound, as they are shown; none when nothing is bound.
+    in property <[string]> keys;
+    in property <bool> recording;
+    // What is held so far while recording.
+    in property <[string]> held;
+    in property <string> label;
+    callback record();
+    callback cancel();
+    callback clear();
+    property <bool> bound: keys.length > 0;
+    spacing: 6px;
+    alignment: end;
+    horizontal-stretch: 0;
+    field := Rectangle {
+        // As wide as what it says, which changes: it goes there as a
+        // spring does, not at once.
+        property <length> wanted: max(118px, content.preferred-width + 22px);
+        height: root.bound && !root.recording ? 30px : 28px;
+        width: self.wanted;
+        accessible-role: button;
+        accessible-label: root.label;
+        accessible-value: root.recording ? "Press a shortcut" : root.bound ? "Set" : "None";
+        accessible-action-default => {
+            root.record();
+        }
+        animate width {
+            duration: 300ms;
+            easing: spring(0.22);
+        }
+        FocusRing {
+            x: -3px;
+            y: -3px;
+            width: parent.width + 6px;
+            height: parent.height + 6px;
+            shown: root.recording || (scope.has-focus && Theme.keyboard);
+            radius: Tokens.radius-md;
+        }
+
+        Rectangle {
+            border-radius: Tokens.radius-md;
+            background: touch.has-hover && !root.recording ? Tokens.fill-4 : Theme.selected;
+            border-width: 1px;
+            border-color: root.recording ? Tokens.accent : transparent;
+            animate background, border-color {
+                duration: Tokens.duration-fast;
+                easing: Tokens.ease-out;
+            }
+        }
+
+        touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                Theme.keyboard = false;
+                scope.focus();
+                if (root.recording) {
+                    root.cancel();
+                } else {
+                    root.record();
+                }
+            }
+        }
+
+        scope := FocusScope {
+            focus-on-click: false;
+            key-pressed(event) => {
+                if (!root.recording && (event.text == " " || event.text == Key.Return)) {
+                    root.record();
+                    return accept;
+                }
+                return reject;
+            }
+            changed has-focus => {
+                if (!self.has-focus && root.recording) {
+                    root.cancel();
+                }
+            }
+        }
+
+        content := HorizontalLayout {
+            x: (parent.width - self.preferred-width) / 2;
+            width: self.preferred-width;
+            spacing: 4px;
+            if root.recording && root.held.length == 0: TextSm {
+                text: "Press a shortcut…";
+                color: Tokens.text-muted;
+            }
+            if root.recording && root.held.length > 0: HorizontalLayout {
+                spacing: 4px;
+                for key in root.held: VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: key;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    TextSm {
+                        text: "…";
+                        color: Tokens.text-muted;
+                    }
+                }
+            }
+            if !root.recording && !root.bound: TextSm {
+                text: "Record Hotkey";
+                color: Tokens.text-muted;
+            }
+            if !root.recording && root.bound: HorizontalLayout {
+                spacing: 4px;
+                for key in root.keys: VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: key;
+                    }
+                }
+            }
+        }
+    }
+
+    if bound && !recording: VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 21px;
+            height: 21px;
+            border-radius: Tokens.radius-sm;
+            background: remove.has-hover ? Theme.selected : transparent;
+            accessible-role: button;
+            accessible-label: "Remove hotkey";
+            accessible-action-default => {
+                root.clear();
+            }
+            Icon {
+                source: @image-url("icons/x.svg");
+                size: 13px;
+                tint: remove.has-hover ? Tokens.text : Tokens.text-muted;
+            }
+
+            remove := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.clear();
+                }
+            }
+        }
+    }
+}
+
+// --- A scrolling area with the thin bar of the web interface ----------------
+
+export component Scrollbar inherits Rectangle {
+    in property <length> content-y;
+    in property <length> content-height;
+    in property <length> visible-height;
+    callback scrolled(y: length);
+    property <bool> needed: content-height > visible-height + 1px;
+    property <length> thumb: max(28px, visible-height * visible-height / max(1px, content-height));
+    property <float> at: needed ? -content-y / (content-height - visible-height) : 0;
+    width: 10px;
+    opacity: needed && (track.has-hover || track.pressed) ? 1 : needed ? 0.55 : 0;
+    animate opacity {
+        duration: Tokens.duration-base;
+        easing: Tokens.ease-out;
+    }
+    Rectangle {
+        x: 3px;
+        y: 2px + root.at * (root.height - 4px - root.thumb);
+        width: track.has-hover || track.pressed ? 6px : 4px;
+        height: root.thumb;
+        border-radius: self.width / 2;
+        background: Tokens.fill-4;
+    }
+
+    track := TouchArea {
+        property <length> grabbed;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                self.grabbed = self.mouse-y - (2px + root.at * (root.height - 4px - root.thumb));
+            }
+        }
+        moved => {
+            if (self.pressed && root.needed) {
+                root.scrolled(-clamp((self.mouse-y - self.grabbed - 2px) / (root.height - 4px - root.thumb), 0, 1) * (root.content-height - root.visible-height));
+            }
+        }
+    }
+}
+
+// --- A menu of things to tick, behind a button ---------------------------------
+
+export struct Pick {
+    id: string,
+    title: string,
+    // A heading of the menu, not a choice.
+    heading: bool,
+    checked: bool,
+}
+
+export component FilterMenu {
+    in property <string> title;
+    in property <int> count;
+    in property <[Pick]> picks;
+    callback picked(id: string);
+    height: Tokens.height-lg;
+    width: content.preferred-width + 24px;
+    horizontal-stretch: 0;
+    accessible-role: button;
+    accessible-label: root.title;
+    accessible-action-default => {
+        menu.show();
+    }
+    Rectangle {
+        border-radius: Tokens.radius-md;
+        background: touch.has-hover ? Tokens.fill-3 : Tokens.fill-2;
+        animate background {
+            duration: Tokens.duration-fast;
+            easing: Tokens.ease-out;
+        }
+    }
+
+    content := HorizontalLayout {
+        x: 12px;
+        width: self.preferred-width;
+        spacing: 8px;
+        TextSm {
+            text: root.title;
+        }
+
+        if root.count > 0: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                background: Tokens.accent;
+                TextXs {
+                    text: root.count;
+                    color: Tokens.on-accent;
+                    font-weight: Tokens.weight-medium;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Path {
+                width: 8px;
+                height: 4px;
+                commands: "M 0 0 L 8 0 L 4 4 Z";
+                fill: Tokens.text;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            menu.show();
+        }
+    }
+
+    // It stays open while its boxes are ticked, and closes at a click
+    // beside it.
+    menu := PopupWindow {
+        property <length> margin: Theme.plain ? 0px : 24px;
+        x: root.width - self.width + self.margin;
+        y: root.height + 4px - self.margin;
+        width: 220px + 2 * self.margin;
+        height: items.preferred-height + 2 * self.margin;
+        close-policy: close-on-click-outside;
+        Rectangle {
+            x: menu.margin;
+            y: menu.margin;
+            width: parent.width - 2 * menu.margin;
+            height: parent.height - 2 * menu.margin;
+            border-radius: Tokens.radius-lg;
+            background: Tokens.surface-raised;
+            border-width: 1px;
+            border-color: Tokens.border-strong;
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+            drop-shadow-color: Tokens.shadow-far;
+            items := VerticalLayout {
+                padding: 4px;
+                for pick in root.picks: Rectangle {
+                    height: pick.heading ? 26px : Tokens.height-md;
+                    border-radius: Tokens.radius-sm;
+                    background: !pick.heading && item-touch.has-hover ? Tokens.fill-2 : transparent;
+                    if pick.heading: TextXs {
+                        x: 8px;
+                        width: parent.width - 16px;
+                        horizontal-alignment: left;
+                        text: pick.title;
+                        color: Tokens.text-faint;
+                        font-weight: Tokens.weight-medium;
+                    }
+                    if !pick.heading: Check {
+                        x: 8px;
+                        y: (parent.height - 16px) / 2;
+                        label: pick.title;
+                        checked: pick.checked;
+                        toggled => {
+                            root.picked(pick.id);
+                        }
+                    }
+                    if !pick.heading: TextSm {
+                        x: 32px;
+                        width: parent.width - 40px;
+                        horizontal-alignment: left;
+                        text: pick.title;
+                    }
+                    item-touch := TouchArea {
+                        enabled: !pick.heading;
+                        clicked => {
+                            root.picked(pick.id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

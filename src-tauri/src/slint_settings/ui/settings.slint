@@ -1,0 +1,1071 @@
+// Heyo's settings window. It knows nothing of settings: the host hands it
+// what a page shows as lines (`Line`: a heading, a row with a control, a
+// row of a table…) and it draws them, from the tokens of Heyo's interface
+// (`tokens.slint`, written by build.rs from src/styles/abstracts/_scales.scss);
+// what is done in it is said back to the host (`Host.act`) and decided
+// there (src/slint_settings/model.rs).
+
+import { ListView, Palette } from "std-widgets.slint";
+import { Tokens } from "tokens.slint";
+import { Theme, TextXs, TextSm, TextMd, TextRow, TextLg, TextXl, Text2xl, Icon, Row, Switch, Button, ConfirmButton, Badge, Check, Field, TextArea, Select, Choice, Hotkey, Scrollbar, FocusRing, FilterMenu, Pick } from "widgets.slint";
+
+export { Theme, Choice, Pick }
+
+export struct NavItem {
+    id: string,
+    title: string,
+    // An extension: its icon is a picture or symbol of its own.
+    extension: bool,
+    icon: image,
+    tinted: bool,
+}
+
+// One line of a page. `kind` says what it is:
+//   heading  the title of a card
+//   note     a paragraph
+//   head     an extension's name, with its icon and what it is
+//   row      a setting: label and description, and on the right what
+//            `control` names (switch, select, field, password, button,
+//            confirm, badge, text, check), a hotkey field when `hotkey`
+//            names one, and a second button when `more` has its words
+//            (which says `more:<id>` when pressed)
+//   area     a field of several lines
+//   group    a row that opens and closes what is under it
+//   columns  the titles of the columns of a table
+//   entry    a row of that table: name, alias, hotkey, whether it is on
+//   about    the page about Heyo
+export struct Line {
+    kind: string,
+    id: string,
+    // Its place in its card: the first has no line above it and round
+    // upper corners, the last round lower ones.
+    first: bool,
+    last: bool,
+    // Room above it: between cards.
+    space: length,
+    indent: bool,
+    label: string,
+    description: string,
+    danger: bool,
+    icon: image,
+    has-icon: bool,
+    tinted: bool,
+    control: string,
+    on: bool,
+    mixed: bool,
+    value: string,
+    placeholder: string,
+    choices: [Choice],
+    hotkey: string,
+    keys: [string],
+    more: string,
+    // A table's row: its alias, and whether it has a box to tick.
+    alias: string,
+    checkable: bool,
+    open: bool,
+    busy: bool,
+}
+
+export global Host {
+    // --- What the host says ---
+    in property <string> page: "general";
+    in property <string> title: "General";
+    in property <[NavItem]> nav;
+    // How many of them are pages; the rest are extensions.
+    in property <int> nav-pages;
+    in property <int> nav-selected;
+    in property <[Line]> lines;
+    // The field above the lines, where a page has one, and what it holds.
+    in property <string> find-placeholder;
+    in property <string> find-text;
+    // The menu beside it, where a page has one.
+    in property <string> filter-title;
+    in property <int> filter-count;
+    in property <[Pick]> filter-picks;
+    in property <string> error;
+    // The hotkey field that is recording ("" when none is), and what is
+    // held so far.
+    in property <string> recording;
+    in property <[string]> held;
+    // Whether hotkeys can be set in this session at all.
+    in property <bool> hotkeys;
+
+    // --- What is done in the window ---
+    callback show(id: string);
+    callback search(text: string);
+    // A control was used: which, and what it now says.
+    callback act(id: string, value: string);
+    callback find(text: string);
+    callback pick(id: string);
+    callback record(id: string);
+    callback stop-recording();
+    callback clear-hotkey(id: string);
+    callback close();
+    callback drag();
+}
+
+// A hotkey field wired to the host, for the line it stands on.
+component LineHotkey inherits Hotkey {
+    in property <string> name;
+    in property <string> title;
+    label: "Hotkey for " + title;
+    recording: Host.recording == name;
+    held: Host.held;
+    record => {
+        Host.record(root.name);
+    }
+    cancel => {
+        Host.stop-recording();
+    }
+    clear => {
+        Host.clear-hotkey(root.name);
+    }
+}
+
+// A field that shows what is stored, and says what was typed when it is
+// left or Enter is pressed. What is being typed stays through a change of
+// what is stored only while the field is typed in.
+component LineField inherits Field {
+    in property <string> name;
+    in property <string> stored;
+    in property <bool> forget;
+    init => {
+        self.text = self.stored;
+    }
+    changed stored => {
+        if (!self.has-focus) {
+            self.text = self.stored;
+        }
+    }
+    changed name => {
+        self.text = self.stored;
+    }
+    accepted(text) => {
+        self.commit(text);
+    }
+    done(text) => {
+        self.commit(text);
+    }
+    function commit(text: string) {
+        if (text != self.stored) {
+            Host.act(self.name, text);
+            // A secret is not left in the field it was typed into.
+            if (self.forget) {
+                self.text = "";
+            }
+        }
+    }
+}
+
+// The card a line belongs to, behind it.
+component Sheet inherits Rectangle {
+    in property <bool> first;
+    in property <bool> last;
+    background: Tokens.card;
+    border-top-left-radius: first ? Theme.radius-card : 0px;
+    border-top-right-radius: first ? Theme.radius-card : 0px;
+    border-bottom-left-radius: last ? Theme.radius-card : 0px;
+    border-bottom-right-radius: last ? Theme.radius-card : 0px;
+}
+
+// A line between two rows of a card.
+component Divider inherits HorizontalLayout {
+    y: 0;
+    height: 1px;
+    padding-left: Tokens.unit * 3;
+    padding-right: Tokens.unit * 3;
+    Rectangle {
+        background: Tokens.divider;
+    }
+}
+
+component AboutPage inherits VerticalLayout {
+    in property <Line> line;
+    alignment: center;
+    spacing: 4px;
+    padding-top: 90px;
+    HorizontalLayout {
+        alignment: center;
+        Image {
+            source: @image-url("../../../icons/128x128.png");
+            width: 96px;
+            height: 96px;
+        }
+    }
+
+    Rectangle {
+        height: 10px;
+    }
+
+    Text2xl {
+        text: "Heyo";
+        font-weight: Tokens.weight-semibold;
+        horizontal-alignment: center;
+    }
+
+    TextSm {
+        text: "Version " + root.line.value;
+        color: Tokens.text-muted;
+        horizontal-alignment: center;
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        TextSm {
+            width: 340px;
+            text: root.line.description;
+            wrapped: true;
+            line: 13px * 1.45;
+            color: Tokens.text-muted;
+            horizontal-alignment: center;
+        }
+    }
+
+    if root.line.more != "": HorizontalLayout {
+        alignment: center;
+        padding-top: Tokens.unit * 3;
+        Button {
+            text: root.line.more;
+            enabled: !root.line.busy;
+            clicked => {
+                Host.act("act:update", "");
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: center;
+        padding-top: Tokens.unit * 3;
+        Button {
+            text: root.line.on ? "Copied" : "Copy Diagnostics";
+            clicked => {
+                Host.act("act:copy-diagnostics", "");
+            }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        padding-top: 13px;
+        TextSm {
+            width: 340px;
+            text: root.line.placeholder;
+            wrapped: true;
+            line: 13px * 1.45;
+            color: Tokens.text-faint;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+// One line, drawn as its kind asks.
+component LineView inherits VerticalLayout {
+    in property <Line> line;
+    callback rested();
+    padding-top: line.space;
+    if line.kind == "about": AboutPage {
+        line: root.line;
+    }
+    if line.kind == "heading": HorizontalLayout {
+        padding-left: Tokens.unit * 3;
+        padding-bottom: Tokens.unit * 2;
+        TextMd {
+            text: root.line.label;
+            font-weight: Tokens.weight-medium;
+            horizontal-alignment: left;
+        }
+    }
+    if line.kind == "note": HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        padding-bottom: 14px;
+        TextSm {
+            width: root.width - 28px;
+            text: root.line.label;
+            wrapped: true;
+            line: 13px * 1.45;
+            color: Tokens.text-muted;
+            horizontal-alignment: left;
+        }
+    }
+    if line.kind == "head": HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        padding-top: 4px;
+        padding-bottom: 12px;
+        spacing: 14px;
+        alignment: start;
+        Image {
+            source: root.line.icon;
+            width: 44px;
+            height: 44px;
+            image-fit: contain;
+            colorize: root.line.tinted ? Tokens.text : transparent;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            TextXl {
+                text: root.line.label;
+                font-weight: Tokens.weight-semibold;
+                horizontal-alignment: left;
+            }
+
+            TextXs {
+                text: root.line.description;
+                color: Tokens.text-muted;
+                horizontal-alignment: left;
+            }
+        }
+    }
+    if line.kind == "row": Sheet {
+        first: root.line.first;
+        last: root.line.last;
+        TouchArea {
+            clicked => {
+                root.rested();
+            }
+        }
+
+        Row {
+            first: root.line.first;
+            label: root.line.label;
+            description: root.line.description;
+            danger: root.line.danger;
+            icon: root.line.icon;
+            has-icon: root.line.has-icon;
+            tinted: root.line.tinted;
+            if root.line.control == "text": TextXs {
+                text: root.line.value;
+                color: Tokens.text-muted;
+            }
+            if root.line.control == "badge": Badge {
+                text: root.line.value;
+            }
+            if root.line.hotkey != "" && Host.hotkeys: LineHotkey {
+                name: root.line.hotkey;
+                title: root.line.label;
+                keys: root.line.keys;
+            }
+            if root.line.control == "field" || root.line.control == "password": LineField {
+                width: 220px;
+                name: root.line.id;
+                stored: root.line.value;
+                label: root.line.label;
+                placeholder: root.line.placeholder;
+                password: root.line.control == "password";
+                forget: root.line.control == "password";
+            }
+            if root.line.control == "select": Select {
+                label: root.line.label;
+                value: root.line.value;
+                choices: root.line.choices;
+                picked(value) => {
+                    Host.act(root.line.id, value);
+                }
+            }
+            if root.line.control == "button": Button {
+                text: root.line.value;
+                enabled: !root.line.busy;
+                clicked => {
+                    Host.act(root.line.id, "");
+                }
+            }
+            if root.line.control == "confirm": ConfirmButton {
+                words: root.line.value;
+                confirm: root.line.placeholder;
+                confirmed => {
+                    Host.act(root.line.id, "");
+                }
+            }
+            if root.line.more != "": Button {
+                text: root.line.more;
+                clicked => {
+                    Host.act("more:" + root.line.id, "");
+                }
+            }
+            if root.line.control == "switch": Switch {
+                label: root.line.label;
+                checked: root.line.on;
+                toggled(on) => {
+                    Host.act(root.line.id, on ? "true" : "false");
+                }
+            }
+            if root.line.control == "check": Check {
+                label: root.line.label;
+                checked: root.line.on;
+                mixed: root.line.mixed;
+                toggled(on) => {
+                    Host.act(root.line.id, on ? "true" : "false");
+                }
+            }
+        }
+    }
+    if line.kind == "area": Sheet {
+        first: root.line.first;
+        last: root.line.last;
+        if !root.line.first: Divider { }
+        VerticalLayout {
+            padding: Tokens.unit * 3;
+            padding-top: Tokens.unit * 2;
+            // Saved when the field is left, so that a line half typed (or
+            // half composed) is never applied.
+            TextArea {
+                label: root.line.label;
+                placeholder: root.line.placeholder;
+                property <string> stored: root.line.value;
+                init => {
+                    self.text = self.stored;
+                }
+                changed stored => {
+                    if (!self.has-focus) {
+                        self.text = self.stored;
+                    }
+                }
+                done(text) => {
+                    Host.act(root.line.id, text);
+                }
+            }
+        }
+    }
+    if line.kind == "group": Sheet {
+        first: root.line.first;
+        last: root.line.last;
+        height: 44px;
+        if !root.line.first: Divider { }
+        opener := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                Host.act(root.line.id, "toggle");
+            }
+        }
+
+        HorizontalLayout {
+            padding-left: Tokens.unit * 3;
+            padding-right: Tokens.unit * 3;
+            spacing: Tokens.unit * 2;
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: root.line.icon;
+                    width: 18px;
+                    height: 18px;
+                    image-fit: contain;
+                    colorize: root.line.tinted ? Tokens.text : transparent;
+                }
+            }
+
+            TextRow {
+                text: root.line.label;
+                font-weight: root.line.indent ? Tokens.weight-regular : Tokens.weight-medium;
+                horizontal-alignment: left;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Path {
+                    width: 9px;
+                    height: 9px;
+                    commands: "M 2 0.5 L 6.5 4.5 L 2 8.5";
+                    stroke: Tokens.text-muted;
+                    stroke-width: 1.5px;
+                    fill: transparent;
+                    transform-rotation: root.line.open ? 90deg : 0deg;
+                    animate transform-rotation {
+                        duration: 260ms;
+                        easing: spring(0.2);
+                    }
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            if root.line.checkable: VerticalLayout {
+                alignment: center;
+                width: 56px;
+                HorizontalLayout {
+                    alignment: center;
+                    Check {
+                        label: root.line.label;
+                        checked: root.line.on;
+                        mixed: root.line.mixed;
+                        toggled(on) => {
+                            Host.act("enable-all:" + root.line.id, on ? "true" : "false");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if line.kind == "columns": Sheet {
+        height: 28px;
+        Divider { }
+
+        HorizontalLayout {
+            padding-left: Tokens.unit * 3;
+            padding-right: Tokens.unit * 3;
+            spacing: Tokens.unit * 2;
+            TextXs {
+                horizontal-stretch: 1;
+                text: "Name";
+                color: Tokens.text-faint;
+                horizontal-alignment: left;
+            }
+
+            TextXs {
+                width: 130px;
+                text: "Alias";
+                color: Tokens.text-faint;
+                horizontal-alignment: left;
+            }
+
+            TextXs {
+                width: 150px;
+                text: "Hotkey";
+                color: Tokens.text-faint;
+                horizontal-alignment: left;
+            }
+
+            TextXs {
+                width: 56px;
+                text: "Enabled";
+                color: Tokens.text-faint;
+                horizontal-alignment: center;
+            }
+        }
+    }
+    if line.kind == "entry": Sheet {
+        first: root.line.first;
+        last: root.line.last;
+        height: 40px;
+        Divider { }
+
+        TouchArea {
+            clicked => {
+                root.rested();
+            }
+        }
+
+        HorizontalLayout {
+            padding-left: Tokens.unit * 3 + (root.line.indent ? 26px : 0px);
+            padding-right: Tokens.unit * 3;
+            spacing: Tokens.unit * 2;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 18px;
+                    height: 18px;
+                    if root.line.has-icon: Image {
+                        source: root.line.icon;
+                        width: 18px;
+                        height: 18px;
+                        image-fit: contain;
+                        colorize: root.line.tinted ? Tokens.text-muted : transparent;
+                    }
+                }
+            }
+
+            TextRow {
+                horizontal-stretch: 1;
+                text: root.line.label;
+                horizontal-alignment: left;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                LineField {
+                    width: 130px;
+                    height: Tokens.height-md;
+                    bare: true;
+                    name: "alias:" + root.line.id;
+                    stored: root.line.alias;
+                    label: "Alias for " + root.line.label;
+                    placeholder: "Add Alias";
+                }
+            }
+
+            HorizontalLayout {
+                width: 150px;
+                alignment: start;
+                if root.line.hotkey != "" && Host.hotkeys: VerticalLayout {
+                    alignment: center;
+                    LineHotkey {
+                        name: root.line.hotkey;
+                        title: root.line.label;
+                        keys: root.line.keys;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                width: 56px;
+                alignment: center;
+                if root.line.checkable: VerticalLayout {
+                    alignment: center;
+                    Check {
+                        label: root.line.label + " enabled";
+                        checked: root.line.on;
+                        toggled(on) => {
+                            Host.act("enable:" + root.line.id, on ? "true" : "false");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- The window ----------------------------------------------------------------
+
+component NavRow inherits Rectangle {
+    in property <NavItem> item;
+    in property <bool> selected;
+    callback chosen();
+    height: 34px;
+    border-radius: Tokens.radius-lg;
+    background: touch.pressed ? Tokens.fill-3 : touch.has-hover && !selected ? Tokens.fill-2 : transparent;
+    accessible-role: list-item;
+    accessible-label: item.title;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-action-default => {
+        root.chosen();
+    }
+    animate background {
+        duration: Tokens.duration-fast;
+        easing: Tokens.ease-out;
+    }
+    FocusRing {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        shown: scope.has-focus && Theme.keyboard;
+        radius: Tokens.radius-lg;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            Theme.keyboard = false;
+            root.chosen();
+        }
+    }
+
+    scope := FocusScope {
+        focus-on-click: false;
+        key-pressed(event) => {
+            if (event.text == " " || event.text == Key.Return) {
+                root.chosen();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Tokens.unit * 2;
+        padding-right: Tokens.unit * 2;
+        spacing: Tokens.unit * 2.5;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 22px;
+                height: 22px;
+                // Each page its own colour, as each command has in the palette.
+                if !root.item.extension: Rectangle {
+                    property <color> tint: root.item.id == "shortcuts" ? Tokens.raycast-blue : root.item.id == "dictation" ? Tokens.raycast-red : root.item.id == "screenshots" ? Tokens.raycast-green : root.item.id == "advanced" ? Tokens.raycast-purple : root.item.id == "about" ? Tokens.raycast-orange : Tokens.text-muted;
+                    border-radius: Tokens.radius-sm;
+                    background: @linear-gradient(180deg, self.tint.mix(#ffffff, 0.86) 0%, self.tint 100%);
+                    border-width: 0.5px;
+                    border-color: #0000001f;
+                    drop-shadow-blur: 1px;
+                    drop-shadow-offset-y: 1px;
+                    drop-shadow-color: Tokens.shadow-near;
+                    Icon {
+                        source: root.item.icon;
+                        size: 14px;
+                        tint: #ffffff;
+                    }
+                }
+                if root.item.extension: Image {
+                    x: 1px;
+                    y: 1px;
+                    source: root.item.icon;
+                    width: 20px;
+                    height: 20px;
+                    image-fit: contain;
+                    colorize: root.item.tinted ? Tokens.text : transparent;
+                }
+            }
+        }
+
+        TextRow {
+            horizontal-stretch: 1;
+            horizontal-alignment: left;
+            text: root.item.title;
+        }
+    }
+}
+
+export component SettingsWindow inherits Window {
+    // system, light or dark: the theme chosen in the settings.
+    in property <string> appearance: "system";
+    // What the host knows the system to be, for where Slint cannot tell.
+    in property <bool> system-dark;
+    // The room the screen has for the window: it is no larger.
+    in property <length> room-width: 4000px;
+    in property <length> room-height: 4000px;
+    // Set for a moment when a page is shown, for it to arrive from.
+    in-out property <bool> fresh;
+    // Counted up when the window has been moved: see below.
+    in-out property <int> moved;
+    // The shadow needs a margin to fall in, which a screen too small for
+    // the window with it has not.
+    out property <length> margin: Theme.plain || room-width < 924px || room-height < 704px ? 0px : Tokens.window-margin;
+    property <length> panel-width: min(860px, room-width);
+    property <length> panel-height: min(640px, room-height);
+    property <bool> dark: appearance == "dark" || (appearance == "system" && (Palette.color-scheme == ColorScheme.dark || (Palette.color-scheme == ColorScheme.unknown && system-dark)));
+    property <string> page: Host.page;
+    pure function nav-y(index: int) -> length {
+        return index * 34px + (index >= Host.nav-pages && Host.nav-pages > 0 ? 14px : 0px);
+    }
+    title: "Heyo Settings";
+    icon: @image-url("../../../icons/128x128.png");
+    no-frame: true;
+    background: transparent;
+    width: self.panel-width + 2 * self.margin;
+    height: self.panel-height + 2 * self.margin;
+    default-font-size: Tokens.text-sm-size;
+    forward-focus: keys;
+    init => {
+        Tokens.dark = self.dark;
+    }
+    changed dark => {
+        Tokens.dark = self.dark;
+    }
+    changed page => {
+        self.fresh = true;
+        // Another page begins at its top, wherever the last was left.
+        list.content-y = 0px;
+    }
+    Timer {
+        interval: 16ms;
+        running: root.fresh;
+        triggered => {
+            root.fresh = false;
+        }
+    }
+
+    // Slint draws again only what changed. On Windows, what was drawn
+    // while a part of the window was beyond the screen's edge never reached
+    // that part, and moving the window onto the screen changes nothing
+    // Slint knows of: the part stayed empty. So a move changes this, which
+    // covers the window and is seen through, and all of it is drawn again.
+    Rectangle {
+        background: mod(root.moved, 2) == 0 ? #00000000 : #ffffff00;
+    }
+
+    // The shadow the window casts (0 2px 4px near, 0 8px 24px far).
+    if root.margin > 0: Rectangle {
+        x: root.margin;
+        y: root.margin;
+        width: root.panel-width;
+        height: root.panel-height;
+        border-radius: Tokens.radius-xl;
+        background: Tokens.bg-solid;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Tokens.shadow-far;
+    }
+    if root.margin > 0: Rectangle {
+        x: root.margin;
+        y: root.margin;
+        width: root.panel-width;
+        height: root.panel-height;
+        border-radius: Tokens.radius-xl;
+        background: Tokens.bg-solid;
+        drop-shadow-blur: 4px;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-color: Tokens.shadow-near;
+    }
+    keys := FocusScope {
+        x: root.margin;
+        y: root.margin;
+        width: root.panel-width;
+        height: root.panel-height;
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                Host.close();
+                return accept;
+            }
+            if (event.text == Key.Tab || event.text == Key.Backtab) {
+                Theme.keyboard = true;
+            }
+            if (event.text == Key.PageDown) {
+                list.content-y = max(list.visible-height - list.content-height, list.content-y - list.visible-height * 0.9);
+                return accept;
+            }
+            if (event.text == Key.PageUp) {
+                list.content-y = min(0px, list.content-y + list.visible-height * 0.9);
+                return accept;
+            }
+            return reject;
+        }
+        Rectangle {
+            border-radius: root.margin > 0 ? Tokens.radius-xl : 0px;
+            background: Tokens.bg-solid;
+            border-width: 1px;
+            border-color: Tokens.shadow-hairline;
+            // Whatever is clicked that takes no focus of its own gives it
+            // back to the window, so that a field is left.
+            TouchArea {
+                clicked => {
+                    keys.focus();
+                }
+            }
+
+            // --- The sidebar ---
+            Rectangle {
+                x: Tokens.unit * 2;
+                y: Tokens.unit * 2;
+                width: 232px;
+                height: parent.height - Tokens.unit * 4;
+                border-radius: Tokens.radius-lg;
+                background: @linear-gradient(180deg, Tokens.accent.mix(Tokens.card, 0.07) 0%, Tokens.card 30%, Tokens.card 100%);
+                // The window is moved by its top edge.
+                TouchArea {
+                    height: Tokens.unit * 3 + 4px;
+                    y: 0;
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                            Host.drag();
+                        }
+                    }
+                }
+
+                Field {
+                    x: 12px;
+                    y: Tokens.unit * 3 + 4px;
+                    width: parent.width - 24px;
+                    bare: true;
+                    has-icon: true;
+                    icon: @image-url("icons/search.svg");
+                    label: "Search settings";
+                    placeholder: "Search settings…";
+                    edited(text) => {
+                        Host.search(text);
+                    }
+                }
+
+                nav := Flickable {
+                    x: 12px;
+                    y: Tokens.unit * 3 + 4px + 32px + 8px + 2px;
+                    width: parent.width - 24px;
+                    height: parent.height - self.y;
+                    content-width: self.width;
+                    content-height: root.nav-y(Host.nav.length) + 12px;
+                    accessible-role: AccessibleRole.list;
+                    accessible-label: "Pages";
+                    // What is selected: one shape that moves to it.
+                    Rectangle {
+                        y: root.nav-y(max(0, Host.nav-selected));
+                        width: parent.width;
+                        height: 34px;
+                        border-radius: Tokens.radius-lg;
+                        background: Tokens.fill-3;
+                        opacity: Host.nav-selected >= 0 ? 1 : 0;
+                        animate y {
+                            duration: 360ms;
+                            easing: spring(0.24);
+                        }
+                        animate opacity {
+                            duration: Tokens.duration-fast;
+                        }
+                    }
+
+                    for item[index] in Host.nav: NavRow {
+                        y: root.nav-y(index);
+                        width: parent.width;
+                        item: item;
+                        selected: index == Host.nav-selected;
+                        chosen => {
+                            Host.show(item.id);
+                        }
+                    }
+                }
+            }
+
+            // --- The page ---
+            Rectangle {
+                x: 240px;
+                y: 0;
+                width: parent.width - 240px;
+                height: parent.height;
+                TouchArea {
+                    height: 48px;
+                    y: 0;
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                            Host.drag();
+                        }
+                    }
+                }
+
+                TextLg {
+                    x: Tokens.unit * 7;
+                    y: 0;
+                    height: 48px;
+                    width: parent.width - Tokens.unit * 7 - 52px;
+                    horizontal-alignment: left;
+                    text: Host.title;
+                    font-weight: Tokens.weight-semibold;
+                }
+
+                close := Rectangle {
+                    x: parent.width - Tokens.unit * 3 - 28px;
+                    y: 10px;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 14px;
+                    background: close-touch.pressed ? Tokens.fill-3 : close-touch.has-hover ? Tokens.fill-2 : transparent;
+                    accessible-role: button;
+                    accessible-label: "Close";
+                    accessible-action-default => {
+                        Host.close();
+                    }
+                    animate background {
+                        duration: Tokens.duration-fast;
+                        easing: Tokens.ease-out;
+                    }
+                    Icon {
+                        source: @image-url("icons/x.svg");
+                        size: 14px;
+                        tint: close-touch.has-hover ? Tokens.text : Tokens.text-muted;
+                    }
+
+                    close-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            Host.close();
+                        }
+                    }
+                }
+
+                // What a page is searched and narrowed with stays above its
+                // lines while they scroll.
+                tools := HorizontalLayout {
+                    x: 16px;
+                    y: 48px + 8px;
+                    width: parent.width - 32px;
+                    height: Host.find-placeholder != "" ? 32px : 0px;
+                    spacing: Tokens.unit * 2;
+                    if Host.find-placeholder != "": Field {
+                        horizontal-stretch: 1;
+                        bare: true;
+                        has-icon: true;
+                        icon: @image-url("icons/search.svg");
+                        label: Host.find-placeholder;
+                        placeholder: Host.find-placeholder;
+                        property <string> page: Host.page;
+                        changed page => {
+                            self.text = Host.find-text;
+                        }
+                        edited(text) => {
+                            Host.find(text);
+                        }
+                    }
+                    if Host.filter-title != "": FilterMenu {
+                        title: Host.filter-title;
+                        count: Host.filter-count;
+                        picks: Host.filter-picks;
+                        picked(id) => {
+                            Host.pick(id);
+                        }
+                    }
+                }
+
+                body := Rectangle {
+                    property <length> shift;
+                    property <length> top: 48px + 8px + (tools.height > 0 ? tools.height + 14px : 0px);
+                    x: 0;
+                    y: self.top + self.shift;
+                    width: parent.width;
+                    height: parent.height - self.top - footer.height;
+                    list := ListView {
+                        x: 16px;
+                        width: parent.width - 32px;
+                        vertical-scrollbar-policy: always-off;
+                        horizontal-scrollbar-policy: always-off;
+                        for line in Host.lines: LineView {
+                            line: line;
+                            rested => {
+                                keys.focus();
+                            }
+                        }
+                    }
+
+                    Scrollbar {
+                        x: parent.width - 11px;
+                        y: 0;
+                        height: parent.height;
+                        content-y: list.content-y;
+                        content-height: list.content-height;
+                        visible-height: list.visible-height;
+                        scrolled(y) => {
+                            list.content-y = y;
+                        }
+                    }
+                }
+
+                footer := Rectangle {
+                    x: 0;
+                    y: parent.height - self.height;
+                    width: parent.width;
+                    height: Host.error != "" ? message.preferred-height + 16px : 0px;
+                    clip: true;
+                    animate height {
+                        duration: Tokens.duration-base;
+                        easing: Tokens.ease-out;
+                    }
+                    Rectangle {
+                        y: 0;
+                        height: 1px;
+                        background: Tokens.border;
+                    }
+
+                    message := TextXs {
+                        x: 20px;
+                        y: 8px;
+                        width: parent.width - 40px;
+                        wrapped: true;
+                        horizontal-alignment: left;
+                        color: Tokens.danger;
+                        text: Host.error;
+                    }
+                }
+            }
+        }
+    }
+
+    // A page arrives: a little from below, out of nothing.
+    states [
+        arriving when root.fresh: {
+            body.opacity: 0;
+            body.shift: 8px;
+            out {
+                animate body.opacity {
+                    duration: Tokens.duration-base;
+                    easing: Tokens.ease-out;
+                }
+                animate body.shift {
+                    duration: 420ms;
+                    easing: spring(0.18);
+                }
+            }
+        }
+    ]
+}

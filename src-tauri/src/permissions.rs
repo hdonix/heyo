@@ -583,14 +583,12 @@ fn rows(heyo: Option<&Heyo>, granted: &BTreeSet<Permission>) -> Vec<Row> {
 }
 
 /// The permissions of the extension installed in `id`.
-#[tauri::command(async)]
 pub(crate) fn extension_permissions(id: String) -> Vec<Row> {
     let Some(declared) = crate::extensions::declared(Path::new(&id)) else { return Vec::new() };
     rows(declared.heyo.as_ref(), &GRANTED.with_grants(|grants| grants.of(&declared.name)))
 }
 
 /// Takes back what an extension was allowed; it asks again when it next needs it.
-#[tauri::command(async)]
 pub(crate) fn revoke_extension_permission(extension: String, permission: Permission) -> Result<(), String> {
     GRANTED.change(|grants| grants.revoke(&extension, permission))
 }

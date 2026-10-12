@@ -1,9 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "standalone",
-  "description": "The settings window and pinned captures draw their own frame: they close and drag themselves.",
+  "description": "Pinned captures draw their own frame: they close and drag themselves.",
   "windows": [
-    "settings",
     "pin-*"
   ],
   "permissions": [

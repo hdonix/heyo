@@ -14,7 +14,7 @@ export async function calls() {
   await call("launch", { id: items[0].id });
   await call("launch", { id: "cmd:@heyo:ask-ai", fallbackText: "why", arguments: { city: "Oslo" } });
   await call("hide");
-  await call("change_settings", { changes: { compactMode: true, launchAtLogin: false } });
+  await call("set_alias", { id: items[0].id, alias: "a" });
 
   // @ts-expect-error not a command (`search` is)
   await call("serach", { query: "a" });
@@ -32,12 +32,8 @@ export async function calls() {
   await call("hide", {});
   // @ts-expect-error it answers with items, not a sentence
   const sentence: string = await call("search", { query: "a" });
-  // @ts-expect-error not one of Heyo's own hotkeys
-  await call("set_hotkey", { name: "screenshot", accelerator: "" });
-  // @ts-expect-error the API key has a command of its own
-  await call("change_settings", { changes: { anthropicApiKey: "sk-ant" } });
-  // @ts-expect-error told by the host, not a setting to change
-  await call("change_settings", { changes: { nodeVersion: { Ok: "v24.0.0" } } });
+  // @ts-expect-error changing the settings is not a web view's to ask: the host's own settings window does
+  await call("change_settings", { changes: { compactMode: true } });
   return sentence;
 }
 
@@ -65,7 +61,7 @@ export function fakes() {
   // @ts-expect-error not a command
   fakeHost({ serach: [] });
   // @ts-expect-error not what the host would answer
-  host.answer("get_hotkeys", { supported: "yes" });
+  host.answer("get_item", { id: 3 });
   // @ts-expect-error not a command
   host.refuse("format_disk", "no");
   // @ts-expect-error it carries the id of an item

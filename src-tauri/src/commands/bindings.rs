@@ -37,33 +37,15 @@ commands! {
     runtime_send(message: WebviewMessage);
     hide();
     get_settings() -> SettingsView;
-    change_settings(changes: serde_json::Map<String, Value> as SettingsChanges) -> SettingsView;
-    set_anthropic_api_key(key: String) -> SettingsView;
     open_settings();
-    open_extensions_folder();
-    list_extensions() -> Vec<ExtensionInfo>;
-    set_extension_preferences(extension: String, values: PreferenceValues);
-    uninstall_extension(id: String);
-    clear_clipboard_history();
-    get_hotkeys() -> Hotkeys;
-    set_hotkey(name: HotkeyName, accelerator: String) -> Hotkeys;
     set_item_hotkey(id: String, title: String, accelerator: String);
-    item_hotkeys() -> HashMap<String, String>;
     screenshot_finish(request: Finish) -> String;
-    ocr_status() -> OcrStatus;
-    ocr_install();
-    dictation_status() -> dictation::Status;
-    dictation_install();
     dictation_toggle();
     dictation_cancel();
     dictation_pressed();
     show_window();
     get_item(id: String) -> Option<Item>;
-    list_applications() -> Vec<Item>;
     list_quicklinks() -> Vec<Item>;
-    get_capabilities() -> Capabilities;
-    install_shell_extension() -> Capabilities;
-    local_models(url: String) -> Vec<String>;
     record_usage(id: String);
     set_favorite(id: String, favorite: bool);
     move_favorite(id: String, offset: i32);
@@ -72,14 +54,6 @@ commands! {
     read_clipboard() -> String;
     copy_text(text: String, paste: bool);
     open_target(target: String);
-    clipboard_sources() -> Vec<Source>;
-    clipboard_meaning_status() -> meaning::Status;
-    clipboard_meaning_install();
-    check_for_update() -> Option<String>;
-    install_update();
-    copy_diagnostics();
-    extension_permissions(id: String) -> Vec<Row>;
-    revoke_extension_permission(extension: String, permission: Permission);
     snippet_expanded(request: u64, text: String);
     activities() -> Vec<ActivityView>;
     activity_action(key: String, button: Option<usize>);
@@ -101,28 +75,6 @@ events! {
     EXPAND_SNIPPET: expand::ExpandSnippet;
     CLIPBOARD_MEANING_INSTALL: InstallProgress;
     ACTIVITIES: Vec<ActivityView>;
-}
-
-/// The settings that change, under the names they are stored by, and
-/// whether Heyo opens at login. The API key is not among them: it has a
-/// command of its own.
-struct SettingsChanges;
-
-impl TS for SettingsChanges {
-    type WithoutGenerics = Self;
-    type OptionInnerType = Self;
-
-    fn name(cfg: &Config) -> String {
-        format!("Partial<Omit<{}, \"anthropicApiKey\">> & {{ launchAtLogin?: boolean }}", Settings::name(cfg))
-    }
-
-    fn inline(cfg: &Config) -> String {
-        Self::name(cfg)
-    }
-
-    fn visit_dependencies(visitor: &mut impl TypeVisitor) {
-        visitor.visit::<Settings>();
-    }
 }
 
 /// What the runtime tells the webview. The host passes it on unread, so it
@@ -391,7 +343,7 @@ mod tests {
     #[test]
     fn the_rows_are_the_commands_as_they_are_defined() {
         let (rows, defined, registered) = (command_rows(), defined(), registered());
-        assert!(registered.len() > 30, "could not read the commands out of lib.rs: {registered:?}");
+        assert!(registered.len() > 20, "could not read the commands out of lib.rs: {registered:?}");
         for name in &registered {
             assert_eq!(rows.iter().filter(|row| row.name == name).count(), 1, "{name} is registered in lib.rs: give it a row in commands/bindings.rs (once)");
             assert_eq!(defined.iter().filter(|command| &command.name == name).count(), 1, "{name} is registered in lib.rs but not defined once as a #[tauri::command]");
@@ -458,15 +410,12 @@ pub(crate) fn hide(window: WebviewWindow) {
             "  search: { args: { query: string }; result: Array<Item> };",
             "  launch: { args: { id: string; fallbackText?: string | null; arguments?: { [key in string]: string } | null }; result: null };",
             "  hide: { args: null; result: null };",
-            "  change_settings: { args: { changes: Partial<Omit<Settings, \"anthropicApiKey\">> & { launchAtLogin?: boolean } }; result: SettingsView };",
             "  snippet_expanded: { args: { request: number; text: string }; result: null };",
-            "  check_for_update: { args: null; result: string | null };",
             "  settingsChanged: SettingsView;",
             "  shown: null;",
             "  runtime: RuntimeMessage;",
             "  activities: Array<ActivityView>;",
             "import type { Item } from \"./Item\";",
-            "import type { Settings } from \"./Settings\";",
             "import type { DictationEvent } from \"./DictationEvent\";",
             "import type { RuntimeMessage } from \"../wire\";",
             "  /** Counts a use of a root search item, for ranking. */",

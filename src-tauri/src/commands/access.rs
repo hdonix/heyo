@@ -14,7 +14,6 @@ use tauri::Runtime;
 pub(crate) enum Caller {
     /// `main`: the root search and the commands of extensions.
     Palette,
-    Settings,
     Dictation,
     /// The overlay a capture is selected on.
     Screenshot,
@@ -26,7 +25,6 @@ impl Caller {
     fn of(label: &str) -> Option<Caller> {
         match label {
             crate::palette::WINDOW => Some(Caller::Palette),
-            super::settings::SETTINGS_WINDOW => Some(Caller::Settings),
             crate::dictation::WINDOW => Some(Caller::Dictation),
             crate::screenshot::WINDOW => Some(Caller::Screenshot),
             _ => label.strip_prefix("pin-").filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).map(|_| Caller::Pin),
@@ -34,7 +32,7 @@ impl Caller {
     }
 }
 
-use Caller::{Dictation, Palette, Screenshot, Settings};
+use Caller::{Dictation, Palette, Screenshot};
 
 /// Each command and the windows whose view calls it (`call(` in `src/`).
 const TABLE: &[(&str, &[Caller])] = &[
@@ -62,35 +60,9 @@ const TABLE: &[(&str, &[Caller])] = &[
     ("activity_dismiss", &[Palette]),
     // Both read the settings (the palette for its appearance and layout),
     // and both bind a hotkey to an item.
-    ("get_settings", &[Palette, Settings]),
-    ("set_item_hotkey", &[Palette, Settings]),
+    ("get_settings", &[Palette]),
+    ("set_item_hotkey", &[Palette]),
     // Changing things is the settings window's alone.
-    ("change_settings", &[Settings]),
-    ("set_anthropic_api_key", &[Settings]),
-    ("open_extensions_folder", &[Settings]),
-    ("list_extensions", &[Settings]),
-    ("set_extension_preferences", &[Settings]),
-    ("uninstall_extension", &[Settings]),
-    ("clear_clipboard_history", &[Settings]),
-    ("get_hotkeys", &[Settings]),
-    ("set_hotkey", &[Settings]),
-    ("item_hotkeys", &[Settings]),
-    ("list_applications", &[Settings]),
-    ("get_capabilities", &[Settings]),
-    ("install_shell_extension", &[Settings]),
-    ("local_models", &[Settings]),
-    ("ocr_status", &[Settings]),
-    ("ocr_install", &[Settings]),
-    ("dictation_status", &[Settings]),
-    ("dictation_install", &[Settings]),
-    ("copy_diagnostics", &[Settings]),
-    ("clipboard_sources", &[Settings]),
-    ("clipboard_meaning_status", &[Settings]),
-    ("clipboard_meaning_install", &[Settings]),
-    ("check_for_update", &[Settings]),
-    ("install_update", &[Settings]),
-    ("extension_permissions", &[Settings]),
-    ("revoke_extension_permission", &[Settings]),
     ("dictation_toggle", &[Dictation]),
     ("dictation_cancel", &[Dictation]),
     ("dictation_pressed", &[Dictation]),
@@ -125,11 +97,10 @@ mod tests {
     #[test]
     fn a_window_is_known_by_its_label() {
         assert_eq!(Caller::of("main"), Some(Palette));
-        assert_eq!(Caller::of("settings"), Some(Settings));
         assert_eq!(Caller::of("dictation"), Some(Dictation));
         assert_eq!(Caller::of("screenshot"), Some(Screenshot));
         assert_eq!(Caller::of("pin-3"), Some(Caller::Pin));
-        for stranger in ["", "Main", "pin-", "pin-x", "pin-3-settings", "settings2", "other"] {
+        for stranger in ["", "Main", "pin-", "pin-x", "pin-3-settings", "settings", "other"] {
             assert_eq!(Caller::of(stranger), None, "{stranger}");
         }
     }
@@ -154,20 +125,11 @@ mod tests {
             ("main", "local_models", false),
             ("main", "copy_diagnostics", false),
             ("main", "screenshot_finish", false),
-            ("settings", "change_settings", true),
-            ("settings", "set_anthropic_api_key", true),
-            ("settings", "set_item_hotkey", true),
-            ("settings", "copy_diagnostics", true),
             // What an extension was allowed is the user's to take back, in the
             // settings; the palette, which extensions draw in, cannot.
-            ("settings", "revoke_extension_permission", true),
             ("main", "revoke_extension_permission", false),
             ("main", "extension_permissions", false),
             // The settings window runs nothing and pastes nothing.
-            ("settings", "launch", false),
-            ("settings", "runtime_send", false),
-            ("settings", "copy_text", false),
-            ("settings", "read_clipboard", false),
             ("dictation", "dictation_toggle", true),
             ("dictation", "dictation_cancel", true),
             ("dictation", "get_settings", false),
@@ -195,7 +157,7 @@ mod tests {
     #[test]
     fn the_table_holds_exactly_the_registered_commands() {
         let registered = registered();
-        assert!(registered.len() > 30, "could not read the commands out of lib.rs: {registered:?}");
+        assert!(registered.len() > 20, "could not read the commands out of lib.rs: {registered:?}");
         for command in &registered {
             let rows = TABLE.iter().filter(|(name, _)| name == command).count();
             assert_eq!(rows, 1, "{command} is registered in lib.rs: say in commands/access.rs which windows may call it (once)");
@@ -211,7 +173,7 @@ mod tests {
     #[test]
     fn every_command_defined_is_registered() {
         let (registered, defined) = (registered(), defined());
-        assert!(defined.len() > 30, "could not read the commands out of the sources");
+        assert!(defined.len() > 20, "could not read the commands out of the sources");
         for command in defined {
             assert!(registered.contains(&command.name), "{} is a command but lib.rs does not register it", command.name);
         }

@@ -22,6 +22,7 @@ updater = ["dep:tauri-plugin-updater"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+slint-build = "=1.18.1"
 
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
@@ -40,6 +41,13 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
 ts-rs = "12.0.1"
 tauri-plugin-updater = { version = "2", optional = true }
+# For telling whether an address is this computer (the local model's).
+url = "2"
+# The settings window is drawn by Slint, on a thread of its own
+# (src/slint_settings/): with Skia on the CPU, or Slint's own renderer or
+# Skia on the GPU when HEYO_SETTINGS_RENDERER names one. Skia is fetched
+# prebuilt for the target (or built, where there is none prebuilt).
+slint = { version = "=1.18.1", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "renderer-skia", "renderer-skia-opengl", "accessibility", "unstable-winit-030", "unstable-fontique-011"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Registry", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
@@ -57,6 +65,9 @@ x11rb = { version = "0.13", features = ["xfixes", "xinput", "xkb", "xtest"] }
 xkbcommon = { version = "0.8", default-features = false }
 gtk = "0.18"
 gdkx11 = "0.18"
+# The socket of the X11 connection Slint draws through, which winit opens
+# with this (`slint_settings::guard`).
+x11-dl = "2.21"
 libc = "0.2"
 
 

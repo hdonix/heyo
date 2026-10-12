@@ -398,13 +398,11 @@ pub fn status(app: &AppHandle) -> Status {
 }
 
 /// Where finding by meaning stands, for the settings window.
-#[tauri::command(async)]
 pub(crate) fn clipboard_meaning_status(app: AppHandle) -> meaning::Status {
     meaning::status(&app)
 }
 
 /// Downloads what finding by meaning needs.
-#[tauri::command]
 pub(crate) fn clipboard_meaning_install(app: AppHandle) -> Result<(), String> {
     meaning::install(&app)
 }
@@ -427,7 +425,6 @@ pub fn toggle_paused(app: &AppHandle) {
 
 /// The applications that can be named as ones not to record from, for the
 /// settings window.
-#[tauri::command]
 pub(crate) fn clipboard_sources(app: AppHandle) -> Vec<sources::Source> {
     let seen = app.state::<ClipboardHistory>().apps();
     let index = app.state::<crate::IndexState>();

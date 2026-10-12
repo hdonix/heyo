@@ -49,7 +49,6 @@ async fn newer(app: &AppHandle) -> Result<Option<tauri_plugin_updater::Update>, 
 }
 
 /// The version that can be installed, if there is one newer than this.
-#[tauri::command]
 pub(crate) async fn check_for_update(app: AppHandle) -> Result<Option<String>, String> {
     #[cfg(feature = "updater")]
     return Ok(newer(&app).await?.map(|update| update.version));
@@ -62,7 +61,6 @@ pub(crate) async fn check_for_update(app: AppHandle) -> Result<Option<String>, S
 
 /// Downloads the newer version, checks its signature, installs it and
 /// starts Heyo again.
-#[tauri::command]
 pub(crate) async fn install_update(app: AppHandle) -> Result<(), String> {
     #[cfg(feature = "updater")]
     {

@@ -5,14 +5,14 @@ import App from "./App";
 import { DictationWindow } from "./Dictation";
 import { call, reported } from "./host";
 import { PinWindow, ScreenshotOverlay } from "./Screenshot";
-import { SettingsWindow } from "./Settings";
 import { applyAppearance, followAppearance } from "./theme";
 import "@fontsource-variable/inter";
 import "./styles/index.scss";
 
 // Each window renders its own root. Windows declared in tauri.conf.json are
-// told apart by label; those created at run time (settings, pinned
-// screenshots) set `window.__HEYO_VIEW__` in an initialization script.
+// told apart by label; those created at run time (pinned screenshots)
+// set `window.__HEYO_VIEW__` in an initialization script. (The settings
+// are not a web view's: the host draws them, src-tauri/src/slint_settings.)
 const label = getCurrentWindow().label;
 const heyo = window as { __HEYO_VIEW__?: string; __HEYO_PIN__?: string };
 if (heyo.__HEYO_VIEW__) document.documentElement.classList.add("standalone");
@@ -41,7 +41,6 @@ function root() {
   if (label === "dictation") return <DictationWindow />;
   if (label === "screenshot") return <ScreenshotOverlay />;
   if (heyo.__HEYO_VIEW__ === "pin") return <PinWindow path={heyo.__HEYO_PIN__ ?? ""} />;
-  if (heyo.__HEYO_VIEW__ === "settings") return <SettingsWindow />;
   return <App />;
 }
 

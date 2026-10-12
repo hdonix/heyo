@@ -15,7 +15,6 @@ pub(crate) fn get_item(id: String, app: AppHandle) -> Option<root::Item> {
     with_context(&app, |index, ctx| index.get(&id, ctx))
 }
 
-#[tauri::command]
 pub(crate) fn list_applications(app: AppHandle) -> Vec<root::Item> {
     with_context(&app, |index, ctx| index.applications(ctx))
 }

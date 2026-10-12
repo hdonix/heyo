@@ -18,22 +18,18 @@ pub(crate) struct OcrStatus {
     installing: bool,
 }
 
-#[tauri::command]
 pub(crate) fn ocr_status() -> OcrStatus {
     OcrStatus { installed: ocr::installed(), installing: ocr::installing() }
 }
 
-#[tauri::command]
 pub(crate) fn ocr_install(app: AppHandle) -> Result<(), String> {
     ocr::install(&app)
 }
 
-#[tauri::command(async)]
 pub(crate) fn dictation_status(app: AppHandle) -> dictation::Status {
     dictation::status(&app)
 }
 
-#[tauri::command]
 pub(crate) fn dictation_install(app: AppHandle) -> Result<(), String> {
     dictation::install(&app)
 }

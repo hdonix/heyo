@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::*;
 
@@ -12,7 +12,6 @@ pub(crate) const SETTINGS_WINDOW: &str = "settings";
 
 /// The models an OpenAI-compatible server on this computer offers; an error
 /// says why it could not be asked.
-#[tauri::command]
 pub(crate) async fn local_models(url: String) -> Result<Vec<String>, String> {
     let endpoint = format!("{}/models", url.trim_end_matches('/'));
     let output = tauri::async_runtime::spawn_blocking(move || {
@@ -134,6 +133,12 @@ fn view(app: &AppHandle) -> SettingsView {
     }
 }
 
+/// What `get_settings` answers the settings window, for one that is not a
+/// web view.
+pub(crate) fn settings_for_its_window(app: &AppHandle) -> SettingsView {
+    view(app).for_window(SETTINGS_WINDOW)
+}
+
 // Async: the Node.js version is asked of Node.js.
 #[tauri::command(async)]
 pub(crate) fn get_settings(app: AppHandle, window: tauri::WebviewWindow) -> SettingsView {
@@ -142,7 +147,6 @@ pub(crate) fn get_settings(app: AppHandle, window: tauri::WebviewWindow) -> Sett
 
 /// Changes some settings: `changes` holds the new values of the ones that
 /// change, by name, and nothing else. `launchAtLogin` may be among them.
-#[tauri::command(async)]
 pub(crate) fn change_settings(mut changes: serde_json::Map<String, Value>, app: AppHandle) -> Result<SettingsView, String> {
     // The key has a command of its own, which is the only way it is set.
     if changes.contains_key("anthropicApiKey") {
@@ -160,20 +164,17 @@ pub(crate) fn change_settings(mut changes: serde_json::Map<String, Value>, app: 
 }
 
 /// What the running session can do, for explaining what is unavailable.
-#[tauri::command(async)]
 pub(crate) fn get_capabilities() -> platform::Capabilities {
     platform::capabilities()
 }
 
 /// Installs the GNOME Shell extension that Wayland sessions need.
-#[tauri::command(async)]
 pub(crate) fn install_shell_extension() -> Result<platform::Capabilities, String> {
     platform::install_extension()?;
     Ok(platform::capabilities())
 }
 
 /// Stores the Claude API key; an empty one removes it.
-#[tauri::command(async)]
 pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<SettingsView, String> {
     let _changing = changing();
     let mut next = app.state::<SettingsState>().0.read().unwrap().clone();
@@ -185,25 +186,26 @@ pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<Setti
 // Async: creating a window from a synchronous command can deadlock.
 #[tauri::command]
 pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
-    palette::hide(&app);
-    let window = match app.get_webview_window(SETTINGS_WINDOW) {
-        Some(window) => window,
-        None => WebviewWindowBuilder::new(&app, SETTINGS_WINDOW, WebviewUrl::default())
-            .title("Heyo Settings")
-            // Drawn by Heyo itself, title bar and all: 860 by 640, in a
-            // window that much larger for its shadow (the margin of
-            // styles/abstracts/_scales.scss on every side).
-            .inner_size(860.0 + 64.0, 640.0 + 64.0)
-            .decorations(false)
-            .transparent(true)
-            .resizable(false)
-            .center()
-            .initialization_script("window.__HEYO_VIEW__ = 'settings';")
-            .build()
-            .map_err(|e| e.to_string())?,
+    if crate::slint_settings::open(&app) {
+        palette::hide(&app);
+        return Ok(());
+    }
+    // What draws the settings is gone for this run, and cannot be started
+    // twice in one. Heyo itself goes on; the palette says so, and offers
+    // the one thing that brings the settings back.
+    palette::bring_back(&app);
+    let restarting = app.clone();
+    let consent = crate::confirm::Consent {
+        title: "Settings need Heyo to be restarted".into(),
+        message: format!("The settings window stopped working ({}). Everything else goes on as it was.", crate::slint_settings::failure()),
+        yes: "Restart Heyo",
+        no: "Not Now",
     };
-    let _ = window.show();
-    focus(&window);
+    crate::confirm::ask_consent(&app, consent, move |yes| {
+        if yes {
+            restarting.restart();
+        }
+    });
     Ok(())
 }
 
@@ -217,7 +219,6 @@ pub(crate) struct Hotkeys {
 }
 
 // Async so the `gsettings` calls stay off the main thread.
-#[tauri::command]
 pub(crate) async fn get_hotkeys() -> Hotkeys {
     let supported = hotkeys::supported();
     Hotkeys {
@@ -238,7 +239,6 @@ pub(crate) enum HotkeyName {
     Dictation,
 }
 
-#[tauri::command]
 pub(crate) async fn set_hotkey(name: HotkeyName, accelerator: String) -> Result<Hotkeys, String> {
     let target = match name {
         HotkeyName::Toggle => hotkeys::Target::toggle(),
@@ -268,22 +268,18 @@ pub(crate) async fn set_item_hotkey(id: String, title: String, accelerator: Stri
     Ok(())
 }
 
-#[tauri::command]
 pub(crate) fn item_hotkeys(hotkeys: State<ItemHotkeys>) -> HashMap<String, String> {
     hotkeys.0.read().unwrap().clone()
 }
 
-#[tauri::command(async)]
 pub(crate) fn list_extensions() -> Vec<extensions::ExtensionInfo> {
     extensions::list()
 }
 
-#[tauri::command(async)]
 pub(crate) fn set_extension_preferences(extension: String, values: extensions::PreferenceValues) -> Result<(), String> {
     extensions::save_preferences(&extension, &values)
 }
 
-#[tauri::command(async)]
 pub(crate) fn uninstall_extension(id: String, app: AppHandle) -> Result<(), String> {
     let name = extensions::declared(std::path::Path::new(&id)).map(|declared| declared.name);
     extensions::uninstall(&id)?;
@@ -295,12 +291,10 @@ pub(crate) fn uninstall_extension(id: String, app: AppHandle) -> Result<(), Stri
     Ok(())
 }
 
-#[tauri::command(async)]
 pub(crate) fn clear_clipboard_history(history: State<ClipboardHistory>) {
     history.clear();
 }
 
-#[tauri::command]
 pub(crate) fn open_extensions_folder() -> Result<(), String> {
     let dir = paths::extensions();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -309,7 +303,6 @@ pub(crate) fn open_extensions_folder() -> Result<(), String> {
 
 /// Puts a description of this Heyo and where it runs on the clipboard, for
 /// a bug report: versions, the session, the end of the log, secrets removed.
-#[tauri::command(async)]
 pub(crate) fn copy_diagnostics(app: AppHandle) -> Result<(), String> {
     crate::platform::clipboard_watch::write_text(&diagnostics::report(&app))
 }

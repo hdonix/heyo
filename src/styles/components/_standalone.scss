@@ -1,0 +1,9 @@
+@use "../abstracts" as *;
+
+// A window that draws itself (a pinned capture): no frame of the desktop's,
+// which looks different on every desktop and like none of Heyo. Like the
+// palette's, it is larger by a transparent margin where its shadow falls.
+.standalone #root {
+  padding: var(--window-margin);
+  @include window-shadow("xl");
+}

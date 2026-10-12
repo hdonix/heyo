@@ -8,12 +8,12 @@ import { fakeHost } from "./host.fake";
 afterEach(() => void vi.restoreAllMocks());
 
 test("a call reaches the host with its arguments and brings back the answer", async () => {
-  const host = fakeHost({ read_clipboard: "copied", local_models: ({ url }) => [`${url}/qwen`] });
+  const host = fakeHost({ read_clipboard: "copied", search: ({ query }) => [{ id: query, title: query, subtitle: null, icon: null, kind: "Command", favorite: false }] });
   expect(await call("read_clipboard")).toBe("copied");
-  expect(await call("local_models", { url: "http://127.0.0.1:8000/v1" })).toEqual(["http://127.0.0.1:8000/v1/qwen"]);
+  expect((await call("search", { query: "timer" })).map((item) => item.id)).toEqual(["timer"]);
   // One that answers nothing needs no telling.
   expect(await call("copy_text", { text: "a", paste: false })).toBeNull();
-  expect(host.calls).toEqual([["read_clipboard"], ["local_models", { url: "http://127.0.0.1:8000/v1" }], ["copy_text", { text: "a", paste: false }]]);
+  expect(host.calls).toEqual([["read_clipboard"], ["search", { query: "timer" }], ["copy_text", { text: "a", paste: false }]]);
   expect(host.callsOf("copy_text")).toEqual([{ text: "a", paste: false }]);
   host.forget();
   expect(host.calls).toEqual([]);
@@ -21,13 +21,13 @@ test("a call reaches the host with its arguments and brings back the answer", as
 
 test("a command the test did not answer fails, and so does one the host refuses", async () => {
   const host = fakeHost();
-  await expect(call("get_hotkeys")).rejects.toThrow("the fake host was not told what get_hotkeys answers");
-  host.answer("get_hotkeys", { supported: false, toggle: null, clipboard: null, dictation: null });
-  expect((await call("get_hotkeys")).supported).toBe(false);
+  await expect(call("read_clipboard")).rejects.toThrow("the fake host was not told what read_clipboard answers");
+  host.answer("read_clipboard", "copied");
+  expect(await call("read_clipboard")).toBe("copied");
   // In the host's own words, as Tauri rejects with them.
   host.refuse("copy_text", "the clipboard is busy");
   await expect(call("copy_text", { text: "a", paste: true })).rejects.toBe("the clipboard is busy");
-  expect(host.calls.map(([command]) => command)).toEqual(["get_hotkeys", "get_hotkeys", "copy_text"]);
+  expect(host.calls.map(([command]) => command)).toEqual(["read_clipboard", "read_clipboard", "copy_text"]);
 });
 
 test("a failure is shown where the window says, and logged where it says nothing", async () => {
