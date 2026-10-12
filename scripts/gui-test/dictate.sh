@@ -4,12 +4,12 @@
 # Uses the speech engine installed for the real Heyo (read only).
 . "$(dirname "$0")/env.sh"
 mkdir -p "$XDG_DATA_HOME/heyo"
-ln -sfn "$HOME/.local/share/heyo/dictation" "$XDG_DATA_HOME/heyo/dictation"
+speech
 python3 -c "
 import wave,sys
 w=wave.open(sys.argv[1],'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(b'\0\0'*16000*4); w.close()" "$T/silence.wav"
 export HEYO_DICTATION_WAV="$T/silence.wav"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 # The window is made when Heyo starts, and is on screen or not.
 state() {
   id=$(xwininfo -root -tree | grep '"Heyo Dictation"' | head -1 | awk '{print $1}')
@@ -39,4 +39,4 @@ for round in 1 2; do
   w 2; heyo --dictate; echo "round $round: window gone after $(until_state IsUnMapped)"
 done
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | grep -v DEBUG | tail -3 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

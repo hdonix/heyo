@@ -5,7 +5,7 @@
 # The sandbox has a home directory with nothing personal in it, a short list
 # of applications and a backdrop drawn for the purpose (readme-backdrop.py),
 # so that the pictures show Heyo and not the machine they were taken on. The
-# session runs at twice the size (a 3840x2160 screen, GDK_SCALE=2), for
+# session runs at twice the size (a 3840x2160 screen at scale 2), for
 # pictures that stay sharp on a dense display; the README shows them at half
 # their width.
 #
@@ -13,14 +13,14 @@
 # temporary directory); what an earlier run left there is removed.
 export HEYO_TEST_DIR="${HEYO_TEST_DIR:-${TMPDIR:-/tmp}/heyo-readme-shots}"
 . "$(dirname "$0")/env.sh"
-python3 "$HERE/down.py" > /dev/null; w 1
-OUT="$REPO/docs/images"
+"$HERE/sandbox.sh" down > /dev/null; w 1
+OUT="${HEYO_TEST_PICTURES:-$REPO/docs/images}"
 mkdir -p "$OUT"
 
-# Twice the size. The web view takes the scale from GTK; the settings
-# window is drawn by Slint, which on X11 takes it from the desktop's
-# settings, and a bare X server has none: it is told.
-export SCREEN=3840x2160 GDK_SCALE=2 WINIT_X11_SCALE_FACTOR=2
+# Twice the size, published by the session as a desktop publishes it
+# (sandbox.sh): the web view and the windows Slint draws both find it
+# there, and nothing says it in the environment.
+export SCREEN=3840x2160 HEYO_TEST_SCALE=2
 # The backdrop kept around a window, in pixels of the picture, and the
 # radius the picture's corners are rounded to.
 MARGIN=16
@@ -30,10 +30,10 @@ RADIUS=28
 # picture of dictation reads (and writes nothing to). In the environment,
 # for the script that another of these runs when it is done: by then the
 # home directory is no longer theirs.
-export HEYO_TEST_SPEECH="${HEYO_TEST_SPEECH:-$HOME/.local/share/heyo/dictation}"
-# A home with nothing in it: no path of whoever runs this can show.
-export HOME="$T/home/user"
-rm -rf "$HOME"; mkdir -p "$HOME"
+export HEYO_TEST_SPEECH="${HEYO_TEST_SPEECH:-$REAL_HOME/.local/share/heyo/dictation}"
+# The sandbox's home (env.sh), with nothing in it: no path of whoever
+# runs this can show.
+rm -rf "$H/user"; mkdir -p "$H/user"
 
 # The applications in the pictures: a few that most GNOME desktops have,
 # instead of everything installed here. The sandbox is given a data

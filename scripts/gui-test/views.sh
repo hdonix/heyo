@@ -15,7 +15,7 @@ export HEYO_PROBE_OUT="$T/probe.json"; rm -f "$T"/probe-*.json
 # A fresh start: nothing kept from an earlier run.
 rm -f "$XDG_DATA_HOME/heyo/support/view-probe/stored-values.json"
 mkdir -p "$T/pick/.hidden" "$T/pick/sub"; touch "$T/pick/a.txt" "$T/pick/b.txt" "$T/pick/.secret"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 
 open() { heyo --open "cmd:$EXT/view-probe:$1"; w 3; }
 show() { printf '%s: ' "$1"; tr -d '\n' < "$T/probe-$1.json" 2>/dev/null | sed 's/  */ /g' | cut -c1-600; echo; }
@@ -82,4 +82,4 @@ open counter; w 3; show counter
 echo "tray icon windows: $(xwininfo -root -tree | grep -c 'tray-icon')"
 python3 "$HERE/menubar.py"
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -3 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

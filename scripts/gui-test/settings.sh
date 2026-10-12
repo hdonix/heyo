@@ -3,35 +3,33 @@
 # $HEYO_TEST_DIR/shots/settings-<page>-<theme>.png (and -2, -3 where the
 # page scrolls). The api-probe, prefs-probe and view-probe extensions are
 # installed so that an extension's page with a permissions card, and one
-# with a preference of every type, are among them. "Copy Diagnostics" on
-# the About page is pressed and what it copied is printed, with the home
-# directory and user name looked for (they must be scrubbed), and the
-# first permission api-probe was given is taken back.
+# with a preference of every type, are among them. On Shortcuts a group is
+# opened and pictured. "Copy Diagnostics" on the About page is pressed and
+# what it copied is printed, with the home directory and user name looked
+# for (they must be scrubbed), and the first permission api-probe was
+# given is taken back.
 #
 #   settings.sh [light|dark]     both when not given
 #
-# The window is drawn by Slint (src-tauri/src/slint_windows/): nothing
-# in it can be asked where it is, so what is clicked is clicked where the
-# window's layout puts it, in the window's own pixels (924 by 704, which
-# includes the margin its shadow falls in), times the scale it is shown at.
+# The window is drawn by Slint (src-tauri/src/slint_windows/) and says
+# where its controls are on the accessibility bus: a page's entry in the
+# sidebar and a button are found by what they are and say (ask.py), at
+# whatever scale and size the window is.
 . "$(dirname "$0")/env.sh"
-EXT="$XDG_DATA_HOME/heyo/extensions"
-mkdir -p "$EXT" "$XDG_CONFIG_HOME/heyo"
-for extension in api-probe prefs-probe view-probe; do
-  rm -rf "$EXT/$extension"
-  cp -r "$HERE/extensions/$extension" "$EXT/"
-done
-# The pages, by their row in the sidebar: the six pages, then Applications,
-# Heyo's commands and the extensions by title.
-PAGES="general:0 shortcuts:1 dictation:2 screenshots:3 advanced:4 about:5 applications:6 heyo-commands:7 api-probe:8 prefs-probe:9 view-probe:10"
+extensions api-probe prefs-probe view-probe
+# The pages, by the name of their picture and their entry in the sidebar:
+# the six pages, then Applications, Heyo's commands and the extensions.
+PAGES="general:General shortcuts:Shortcuts dictation:Dictation screenshots:Screenshots advanced:Advanced about:About applications:Applications heyo-commands:Heyo_Commands api-probe:API_Probe prefs-probe:Preferences_Probe view-probe:View_Probe"
 
-window() { xdotool search --onlyvisible --name '^Heyo Settings$' | tail -1; }
-# at X Y: the pointer there, in the window's own pixels.
-at() { xdotool mousemove $((X + $1 * W / 924)) $((Y + $2 * W / 924)); }
-click() { at "$1" "$2"; xdotool click 1; }
-# page ROW: the page of that row of the sidebar, the pointer then over its
-# lines, for the wheel.
-page() { click 152 $((32 + 8 + 58 + $1 * 34 + 17 + ($1 >= 6 ? 14 : 0))); at 560 400; }
+# press ROLE NAME: a click on that control of the window.
+press() { ask click "$1" "$2" "Heyo Settings" > /dev/null; }
+# page TITLE: the page of that entry of the sidebar, the pointer then over
+# its lines, for the wheel.
+page() {
+  press "list item" "$1" || { echo "no page $1 in the sidebar" >&2; return 1; }
+  set -- $(ask where "list box" "" "Heyo Settings")
+  xdotool mousemove $(($1 + $3 / 2)) $(($2 + $4 / 2))
+}
 grab() { python3 "$HERE/grab.py" "$T/shots/$1.png" $((X - 10)) $((Y - 10)) $((X + W + 10)) $((Y + H + 10)); }
 
 for theme in ${1:-light dark}; do
@@ -43,16 +41,16 @@ settings.update(appearance=theme, hideOnBlur=False, dictationVocabulary=["TypeSc
 json.dump(settings, open(path, "w"))
 PY
   printf '{ "api-probe": ["windows", "screen.capture"] }\n' > "$XDG_CONFIG_HOME/heyo/permissions.json"
-  "$HERE/up.sh"
+  "$HERE/sandbox.sh" up
   heyo --open heyo:settings; w 4
-  id=$(window)
-  [ -n "$id" ] || { echo "$theme: no settings window came up" >&2; python3 "$HERE/down.py" > /dev/null; exit 1; }
-  set -- $(xwininfo -id "$id" | awk '/Absolute upper-left X/{x=$4} /Absolute upper-left Y/{y=$4} /Width/{w=$2} /Height/{h=$2} END{print x, y, w, h}')
+  id=$(window '^Heyo Settings$')
+  [ -n "$id" ] || { echo "$theme: no settings window came up" >&2; "$HERE/sandbox.sh" down > /dev/null; exit 1; }
+  set -- $(place "$id")
   X=$1; Y=$2; W=$3; H=$4
-  echo "$theme: settings window ${W}x${H} at $X,$Y"
+  echo "$theme: settings window ${W}x${H} at $X,$Y, the session at scale $(scale)"
   for entry in $PAGES; do
     name=${entry%%:*}
-    page "${entry#*:}"; w 1.5
+    page "$(echo "${entry#*:}" | tr _ ' ')"; w 1.5
     grab "settings-$name-$theme"
     # Pages taller than the window: the rest of them, most of a screen at
     # a time (a notch of the wheel is 120 of the window's pixels).
@@ -64,9 +62,15 @@ PY
       last="settings-$name-$theme-$part"
     done
   done
+  # On Shortcuts, the applications' group opened (its row in the list: the
+  # second thing that says "Applications", after the sidebar's entry).
+  page Shortcuts; w 1
+  press label "Applications -2"; w 1.5
+  grab "settings-shortcuts-open-$theme"
   # Copy Diagnostics, on About, then what it copied.
-  page 5; w 1
-  click 582 440; w 1.5
+  page About; w 1
+  press "push button" "Copy Diagnostics" || echo "no Copy Diagnostics button on About" >&2
+  w 1.5
   copied=$(/usr/bin/python3 - <<'PY'
 import gi
 gi.require_version("Gtk", "3.0"); gi.require_version("Gdk", "3.0")
@@ -75,15 +79,22 @@ print(Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text() or "")
 PY
   )
   echo "diagnostics copied ($(printf %s "$copied" | wc -l) lines):"; printf %s "$copied" | head -40 | sed 's/^/  /'
-  echo "home directory in it: $(printf %s "$copied" | grep -c "$HOME"); user name in it: $(printf %s "$copied" | grep -c "$(id -un)")"
-  # The permissions card of api-probe, four notches above the page's end:
-  # Revoke on the first of the two it was given takes that one back.
-  page 8; w 1.5
+  echo "home directory in it: $(printf %s "$copied" | grep -c -e "$HOME" -e "$REAL_HOME"); user name in it: $(printf %s "$copied" | grep -c "$(id -un)")"
+  # The permissions card of api-probe, a little above the page's end (the
+  # window says only what is in view: from the end, a notch up at a time
+  # until it is): Revoke on the first of the two it was given takes that
+  # one back.
+  page "API Probe"; w 1.5
   xdotool click --repeat 40 --delay 20 5; w 0.8
-  xdotool click --repeat 4 --delay 30 4; w 0.8
-  click 828 471; w 1.5
+  revoked=
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    press "push button" "Revoke" 2> /dev/null && { revoked=yes; break; }
+    xdotool click 4; w 0.5
+  done
+  [ -n "$revoked" ] || echo "no Revoke button near the end of API Probe's page" >&2
+  w 1.5
   grab "settings-permissions-revoked-$theme"
   echo "allowed after Revoke: $(tr -d '\n ' < "$XDG_CONFIG_HOME/heyo/permissions.json")"
   xdotool key Escape; w 1
-  python3 "$HERE/down.py" > /dev/null
+  "$HERE/sandbox.sh" down > /dev/null
 done

@@ -27,7 +27,7 @@ notes() {
 # Dictation hears a silent recording instead of a microphone, with the
 # speech engine installed for the real Heyo (read only); without one,
 # `heard` is "unavailable".
-[ -d "$HOME/.local/share/heyo/dictation" ] && ln -sfn "$HOME/.local/share/heyo/dictation" "$XDG_DATA_HOME/heyo/dictation"
+[ -d "$REAL_HOME/.local/share/heyo/dictation" ] && speech
 python3 -c "
 import wave,sys
 w=wave.open(sys.argv[1],'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(b'\0\0'*16000*4); w.close()" "$T/silence.wav"
@@ -35,7 +35,7 @@ export HEYO_DICTATION_WAV="$T/silence.wav"
 
 # --- First: allowed beforehand all but the two the question is about. ---
 printf '{ "api-probe": ["windows", "screen.capture", "system", "microphone"] }\n' > "$GRANTS"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 notes
 
 run api-probe heyo-info; w 4; show info
@@ -66,14 +66,14 @@ run api-probe-bare bare; w 3; shot asked-bare
 xdotool key Tab Return; w 3; show bare
 echo "allowed now: $(tr -d '\n' < "$GRANTS" | sed 's/  */ /g')"
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -5 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null
 
 # --- Then: with the memory allowed too (Heyo reads the grants as it starts). ---
 printf '{ "api-probe": ["windows", "screen.capture", "system", "microphone", "memory.read", "clipboard.history"] }\n' > "$GRANTS"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 copy "probe text two"
 copy "https://example.com/probe-again"
 copy "the last thing copied"
 run api-probe heyo-memory; w 5; show memory 2600
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -3 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

@@ -14,7 +14,7 @@ settings.update(hideOnBlur=False, confirmTerminalPaste=True, clipboardPaused=Fal
 json.dump(settings, open(path, "w"))
 PY
 rm -f "$T/term.txt"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 shot() {
   id=$(xdotool search --onlyvisible --name '^Heyo$' | tail -1)
   set -- "$1" $(xwininfo -id "$id" | awk '/Absolute upper-left X/{x=$4} /Absolute upper-left Y/{y=$4} /Width/{w=$2} /Height/{h=$2} END{print x-10, y-10, x+w+10, y+h+10}')
@@ -47,4 +47,4 @@ heyo --clipboard; w 3; shot clip-paused; xdotool key ctrl+k; w 1; shot clip-paus
 xdotool key Escape; w 0.5; xdotool key Escape; w 1
 heyo --open heyo:clipboard-pause; w 2
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -3 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

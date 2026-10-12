@@ -2,7 +2,7 @@
 # Opening from the palette itself: a command of the runtime's, then one of
 # Heyo's own. Pictures in $HEYO_TEST_DIR/shots/open-*.png.
 . "$(dirname "$0")/env.sh"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 for _ in 1 2 3 4 5 6; do
   [ -n "$(xdotool search --onlyvisible --name '^Heyo$' 2>/dev/null)" ] && break
   heyo; w 3
@@ -14,4 +14,4 @@ xdotool key Escape; w 1; xdotool key ctrl+a BackSpace; xdotool type --delay 30 "
 xdotool key Return; w 4
 echo "windows now: $(xwininfo -root -tree | grep -i '"heyo\|"settings' | grep -v '10x10' | cut -c1-80 | tr '\n' ';')"
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -3 | cut -c1-160
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

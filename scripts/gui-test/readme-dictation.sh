@@ -32,16 +32,16 @@ unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
 # What a GNOME session's settings tell the toolkits, and nothing here does.
 export GTK_IM_MODULE=ibus QT_IM_MODULE=ibus XMODIFIERS=@im=ibus
 
-# The dictation window is 360 by 44 at the bottom of the screen, in the
-# middle, a tenth of the screen's height up (Slint draws it:
-# src-tauri/src/slint_windows/pill), and the editor
-# is put where that is over the empty end of its page: its lower edge 152
-# below the dictation window's upper one. It is as wide as the palette is
-# seen to be in the other pictures, with as much of the backdrop around it:
-# the palette's window has 64 of its own around it, for its shadow. In
-# pixels of the screen, which is twice the size.
+# The dictation window is at the bottom of the screen, in the middle (Slint
+# draws it: src-tauri/src/slint_windows/pill; Heyo makes it when it starts
+# and keeps it off the screen, so the display can be asked where it is),
+# and the editor is put where that is over the empty end of its page: its
+# lower edge 152 below the dictation window's upper one. It is as wide as
+# the palette is seen to be in the other pictures, with as much of the
+# backdrop around it: the palette's window has 64 of its own around it,
+# for its shadow. In pixels of the screen, which is twice the size.
 EDITOR_WIDTH=1500; EDITOR_HEIGHT=800
-EDITOR_X=$(((3840 - EDITOR_WIDTH) / 2)); EDITOR_Y=$((2160 - 216 - 88 + 152 - EDITOR_HEIGHT))
+EDITOR_X=$(((3840 - EDITOR_WIDTH) / 2))
 AROUND=$((MARGIN + 64))
 
 # note: the note as it is before a word is spoken, with an empty line at
@@ -78,18 +78,17 @@ EOF
     [ -f "/usr/share/libgedit-gtksourceview-300/styles/$scheme.xml" ] &&
       sed 's/<style-scheme /<style-scheme version="1.0" /' "/usr/share/libgedit-gtksourceview-300/styles/$scheme.xml" > "$XDG_DATA_HOME/libgedit-gtksourceview-300/styles/$scheme.xml"
   done
-  # Without a settings daemon GTK reads its own file, not the session's
-  # settings. The cursor does not blink, so that it is in every picture;
-  # and the text has a little room around it.
-  mkdir -p "$XDG_CONFIG_HOME/gtk-3.0"
-  cat > "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" <<EOF
-[Settings]
-gtk-theme-name=$([ "$1" = dark ] && echo Yaru-dark || echo Yaru)
-gtk-application-prefer-dark-theme=$([ "$1" = dark ] && echo 1 || echo 0)
-gtk-icon-theme-name=Yaru
-gtk-font-name=Cantarell 11
-gtk-cursor-blink=0
+  # What GTK looks like is the session's to say (its settings daemon
+  # publishes it from these). The cursor does not blink, so that it is in
+  # every picture; and the text has a little room around it.
+  cat >> "$T/dconf.d/editor" <<EOF
+
+[org/gnome/desktop/interface]
+gtk-theme='$([ "$1" = dark ] && echo Yaru-dark || echo Yaru)'
+font-name='Cantarell 11'
+cursor-blink=false
 EOF
+  mkdir -p "$XDG_CONFIG_HOME/gtk-3.0"
   echo ".gedit-view { padding: 12px 20px 12px 6px; }" > "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"
 }
 
@@ -113,14 +112,18 @@ for THEME in ${*:-light dark}; do
   editor "$THEME"
   session "$THEME"
   note
-  mkdir -p "$XDG_DATA_HOME/heyo"
-  ln -sfn "$HEYO_TEST_SPEECH" "$XDG_DATA_HOME/heyo/dictation"
+  speech
   printf '{ "appearance": "%s", "dictationLive": true, "dictationPolish": "off", "dictationHoldKey": "", "dictationLanguage": "en" }\n' "$THEME" > "$XDG_CONFIG_HOME/heyo/settings.json"
-  "$HERE/up.sh" gnome
+  "$HERE/sandbox.sh" up gnome
   # The sandbox's own IBus, never the one of the desktop this is run from.
-  case "$(ibus address)" in *"$H/"*) ;; *) echo "readme-dictation: IBus is at $(ibus address), which is not the sandbox's" >&2; python3 "$HERE/down.py" > /dev/null; exit 1 ;; esac
+  case "$(ibus address)" in *"$H/"*) ;; *) echo "readme-dictation: IBus is at $(ibus address), which is not the sandbox's" >&2; "$HERE/sandbox.sh" down > /dev/null; exit 1 ;; esac
 
-  start gedit --standalone "$NOTE" > /dev/null 2>&1; echo "$STARTED" > "$T/editor.pid"
+  hidden=$(xdotool search --name '^Heyo Dictation$' 2> /dev/null | tail -1)
+  [ -n "$hidden" ] || { echo "readme-dictation: Heyo has no dictation window to ask where it will be" >&2; "$HERE/sandbox.sh" down > /dev/null; exit 1; }
+  set -- $(place "$hidden")
+  EDITOR_Y=$(($2 + 152 - EDITOR_HEIGHT))
+
+  start_as editor gedit --standalone "$NOTE" > /dev/null 2>&1
   id=
   for _ in $(seq 40); do id=$(xdotool search --onlyvisible --class gedit 2> /dev/null | tail -1); [ -n "$id" ] && break; w 0.5; done
   w 2
@@ -145,8 +148,8 @@ for THEME in ${*:-light dark}; do
 
   if [ -z "$KEEP" ]; then
     heyo --dictate; w 2
-    kill "$(cat "$T/editor.pid")" 2> /dev/null
-    python3 "$HERE/down.py" > /dev/null
+    stop editor > /dev/null
+    "$HERE/sandbox.sh" down > /dev/null
   fi
 done
 [ -z "$FAILED" ]

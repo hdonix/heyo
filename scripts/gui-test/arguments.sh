@@ -7,7 +7,7 @@ mkdir -p "$XDG_DATA_HOME/heyo/extensions"
 rm -rf "$XDG_DATA_HOME/heyo/extensions/api-probe"
 cp -r "$HERE/extensions/api-probe" "$XDG_DATA_HOME/heyo/extensions/"
 export HEYO_PROBE_OUT="$T/probe.json"; rm -f "$HEYO_PROBE_OUT"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 for _ in 1 2 3 4 5 6; do
   [ -n "$(xdotool search --onlyvisible --name '^Heyo$' 2>/dev/null)" ] && break
   heyo; w 3
@@ -22,4 +22,4 @@ python3 "$HERE/grab.py" "$T/shots/args-typed.png" 440 200 1480 920
 xdotool key Return; w 2.5
 echo "launched with: $(cat "$HEYO_PROBE_OUT" 2>/dev/null)"
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -3 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

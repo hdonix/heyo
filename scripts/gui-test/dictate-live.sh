@@ -67,7 +67,7 @@ SPOKEN="$T/spoken.wav"
 # Ctrl+Alt+D to show the desktop, and the hotkey would not be granted).
 HOTKEY="ctrl+alt+shift+F9"
 mkdir -p "$XDG_DATA_HOME/heyo"
-ln -sfn "$HOME/.local/share/heyo/dictation" "$XDG_DATA_HOME/heyo/dictation"
+speech
 LENGTH=$(/usr/bin/python3 "$HERE/say.py" "$SPOKEN" \
   "The weather is nice today, so let us walk to the park." \
   "I will bring forty two sandwiches and some coffee." \
@@ -113,10 +113,12 @@ source_in_use() { gsettings get org.gnome.desktop.input-sources mru-sources | se
 # WHAT typed by hand as it is. FIELD is what to read instead of Notes: a
 # file that a terminal writes when Enter is pressed.
 record() {
-  python3 - "$REPO/src-tauri/target/$BUILD/heyo" "$T/$1.json" "$LENGTH" "${2:-0}" "${3:-}" "${4:-cli}" "${5:-}" "$HOTKEY" <<'PY'
+  python3 - "$HEYO" "$T/$1.json" "$LENGTH" "${2:-0}" "${3:-}" "${4:-cli}" "${5:-}" "$HOTKEY" "$GUI" <<'PY'
 import json, os, signal, subprocess, sys, threading, time
-heyo, out, length, at, what, begun, terminal, hotkey = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), *sys.argv[5:9]
-notes = "/tmp/window-org.test.Notes"
+heyo, out, length, at, what, begun, terminal, hotkey, gui = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), *sys.argv[5:10]
+sys.path.insert(0, gui)
+import layout
+notes = os.environ["WINDOW_DIR"] + "/window-org.test.Notes"
 states, stop = [], threading.Event()
 def run(*command):
     return subprocess.run(command, capture_output=True, text=True, timeout=15).stdout
@@ -150,35 +152,10 @@ def talk_key():
 held = hotkey if begun == "hold" else talk_key() if begun == "talk" else None
 def kill():
     """The sandbox's Heyo, as nothing it could prepare for: the one written
-    down when it was started ($HEYO_TEST_DIR/pids, env.sh's `start`). What
-    it had started itself is written down first: with Heyo gone, nothing
-    would say afterwards that those are the sandbox's, for down.py to end."""
-    ledger = os.path.join(os.environ["HEYO_TEST_DIR"], "pids")
-    def born(pid):
-        try:
-            return open(f"/proc/{pid}/stat").read().rsplit(") ", 1)[1].split()[19]
-        except OSError:
-            return None
-    def parent(pid):
-        try:
-            return open(f"/proc/{pid}/stat").read().rsplit(") ", 1)[1].split()[1]
-        except OSError:
-            return None
-    heyo = None
-    for line in open(ledger).read().splitlines():
-        pid, started, what = line.split(" ", 2)
-        if what == "heyo" and born(pid) == started:
-            heyo = pid
-    if heyo is None:
-        return
-    family, found = [heyo], True
-    while found:
-        found = [pid for pid in filter(str.isdigit, os.listdir("/proc")) if pid not in family and parent(pid) in family]
-        family += found
-    with open(ledger, "a") as file:
-        for pid in family[1:]:
-            file.write(f"{pid} {born(pid)} started-by-heyo\n")
-    os.kill(int(heyo), signal.SIGKILL)
+    down when it was started, and no other (ledger.py, which first writes
+    down what that Heyo had started: with Heyo gone, nothing would say
+    afterwards that those are the sandbox's to end)."""
+    run(sys.executable, os.path.join(gui, "ledger.py"), "kill", "heyo")
 # The field as it is before every recording: some text of the user's own.
 # (Not typed: that would go through the user's input method.)
 if not terminal:
@@ -191,20 +168,18 @@ time.sleep(2.0)
 during = engine()
 ended = None
 if what in ("click", "cancel"):
-    # The pill is in the middle of its window, which Slint draws: nothing in
-    # it can be asked where it is. Its X shows when the pointer is on the
-    # pill, at the right end of the pill as it then is ("Listening" and the
-    # X: 49 of the window's pixels right of the middle, the window being 360
-    # of them wide). So the pointer is on the pill a little ahead of the
-    # click, and the click still comes when it was asked for.
+    # The pill is in the middle of its window, which Slint draws, and of
+    # which only the text can be asked where it is: where its body and its
+    # X are is layout.py's to say. The X shows when the pointer is on the
+    # pill. So the pointer is on the pill a little ahead of the click, and
+    # the click still comes when it was asked for.
     ahead = 0.7 if what == "cancel" else 0
     time.sleep(max(0, at - ahead - (time.time() - start)))
-    x, y, width, height = pill()
-    scale = width / 360
-    run("xdotool", "mousemove", str(x + width // 2 - int(20 * scale)), str(y + height // 2))
+    window = pill()
+    run("xdotool", "mousemove", *map(str, layout.pill("body", *window)))
     if what == "cancel":
         time.sleep(0.4)
-        run("xdotool", "mousemove", str(x + width // 2 + int(49 * scale)), str(y + height // 2))
+        run("xdotool", "mousemove", *map(str, layout.pill("cancel", *window)))
         time.sleep(max(0, at - (time.time() - start)))
     ended = round(time.time() - start, 2)
     run("xdotool", "click", "1")
@@ -232,29 +207,29 @@ time.sleep(1.0)
 if terminal:
     run("xdotool", "key", "Return"); time.sleep(0.7)
 stop.set(); watching.join()
-json.dump({"ended": ended, "states": states, "engines": [before, during, engine()], "other": read("/tmp/window-org.test.Other.txt")}, open(out, "w"), ensure_ascii=False)
+json.dump({"ended": ended, "states": states, "engines": [before, during, engine()], "other": read(os.environ["WINDOW_DIR"] + "/window-org.test.Other.txt")}, open(out, "w"), ensure_ascii=False)
 PY
 }
 
 # --- By pasting: a session without an input method ---------------------------------
 if [ "$HALF" != composed ]; then
-  configure off off; "$HERE/up.sh"; notes
+  configure off off; "$HERE/sandbox.sh" up xfwm; notes
   record live-sentences
-  python3 "$HERE/down.py" > /dev/null
+  "$HERE/sandbox.sh" down > /dev/null
 
-  configure on off; "$HERE/up.sh"; notes
+  configure on off; "$HERE/sandbox.sh" up xfwm; notes
   record live-live
   record live-typed 3.2 '#'
   record live-clicked 8.6 click
   record live-cancelled 8.6 cancel
   grep "heyo: dictation" "$T/app.log" | tail -4 | cut -c1-160
-  python3 "$HERE/down.py" > /dev/null
+  "$HERE/sandbox.sh" down > /dev/null
 
-  configure on clean; "$HERE/up.sh"; notes
+  configure on clean; "$HERE/sandbox.sh" up xfwm; notes
   start python3 "$HERE/llm-stub.py" "$PORT"; w 1
   record live-polished
   grep "heyo: dictation" "$T/app.log" | tail -3 | cut -c1-160
-  python3 "$HERE/down.py" > /dev/null
+  "$HERE/sandbox.sh" down > /dev/null
 fi
 
 # --- Through the input method: GNOME Shell and IBus, with Pinyin chosen -------------
@@ -262,17 +237,17 @@ fi
 # dictation hotkey as GNOME keeps it, something of the user's own on the
 # clipboard, and the field.
 session() {
-  "$HERE/up.sh" gnome
+  "$HERE/sandbox.sh" up gnome
   mine=$(ibus address)
   # The sandbox's own IBus, never the one of the desktop this is run from.
-  case "$mine" in *"$H/"*) ;; *) echo "dictate-live: IBus is at $mine, which is not the sandbox's"; python3 "$HERE/down.py" > /dev/null; exit 1 ;; esac
+  case "$mine" in *"$H/"*) ;; *) echo "dictate-live: IBus is at $mine, which is not the sandbox's"; "$HERE/sandbox.sh" down > /dev/null; exit 1 ;; esac
   gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('ibus', 'libpinyin')]"; w 2
   # Chosen as the user chooses it, unless the Shell remembers it as chosen.
   [ "$(engine)" = libpinyin ] || { xdotool key super+space; w 2; }
   K=/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/heyo-dictation/
   gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['$K']"
   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K name 'Heyo Dictation'
-  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K command "$REPO/src-tauri/target/$BUILD/heyo --dictate"
+  gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K command "$HEYO --dictate"
   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K binding '<Control><Alt><Shift>F9'
   # It takes its shortcuts a while after it starts, longer on a busy machine.
   start /usr/libexec/gsd-media-keys > "$T/media-keys.log" 2>&1; w 8
@@ -288,7 +263,7 @@ leave() {
   gsettings reset org.gnome.settings-daemon.plugins.media-keys custom-keybindings
   gsettings reset-recursively org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/heyo-dictation/
   w 1
-  python3 "$HERE/down.py" > /dev/null
+  "$HERE/sandbox.sh" down > /dev/null
 }
 clipboard() { /usr/bin/python3 "$HERE/clip.py"; }
 history() {
@@ -339,7 +314,7 @@ elif command -v gnome-shell > /dev/null && [ -f /usr/share/ibus/component/libpin
   # Heyo is killed while it composes, and started again.
   record composed-killed 3.2 kill
   LEFT=$(engine)
-  start "$REPO/src-tauri/target/$BUILD/heyo" --hidden >> "$T/app.log" 2>&1
+  start_as heyo "$HEYO" --hidden >> "$T/app.log" 2>&1
   BACK=$(python3 - "$ENGINE" <<'PY'
 import subprocess, sys, time
 start = time.time()

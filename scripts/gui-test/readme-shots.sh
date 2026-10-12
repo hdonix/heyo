@@ -40,8 +40,8 @@ PY
 # open does (a copy whose owner goes away is handed to the desktop, and is
 # then counted twice).
 copies() {
-  start gnome-text-editor > /dev/null 2>&1; echo "$STARTED" > "$T/editor.pid"
-  start eog "$REPO/src-tauri/icons/icon.png" > /dev/null 2>&1; echo "$STARTED" > "$T/viewer.pid"
+  start_as editor gnome-text-editor > /dev/null 2>&1
+  start_as viewer eog "$REPO/src-tauri/icons/icon.png" > /dev/null 2>&1
   # The terminal's own program ends, and its window with it, when the
   # copies are made.
   rm -f "$T/copied"
@@ -89,7 +89,7 @@ PY
   start /usr/bin/python3 "$T/copies.py" "$REPO/src-tauri/icons/icon.png" "$T/copied" > /dev/null 2>&1
   for _ in $(seq 40); do [ -f "$T/copied" ] && break; w 0.5; done
   # The applications go, so that none is behind the palette.
-  kill "$(cat "$T/editor.pid")" "$(cat "$T/viewer.pid")" 2> /dev/null
+  stop editor viewer > /dev/null
   for _ in $(seq 20); do [ -z "$(xdotool search --onlyvisible --class gnome-terminal 2> /dev/null)" ] && break; w 0.5; done
   w 1
 }
@@ -109,7 +109,7 @@ for THEME in ${*:-light dark}; do
   home
   session "$THEME"
   heyo_state "$THEME"
-  "$HERE/up.sh" gnome
+  "$HERE/sandbox.sh" up gnome
   EXT="$XDG_DATA_HOME/heyo/extensions"
 
   # The palette as it opens: favourites and suggestions.
@@ -157,6 +157,6 @@ for THEME in ${*:-light dark}; do
   shot settings '^Heyo Settings$'
 
   grep -v "EGL\|dbind\|heyo: started\|heyo: renderer" "$T/app.log" | tail -n 5 | cut -c1-200
-  [ -n "$KEEP" ] || python3 "$HERE/down.py" > /dev/null
+  [ -n "$KEEP" ] || "$HERE/sandbox.sh" down > /dev/null
 done
 [ -n "$KEEP" ] || exec "$HERE/readme-dictation.sh" "$@"

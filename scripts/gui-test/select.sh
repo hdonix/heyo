@@ -2,7 +2,7 @@
 # The selection in the root search, a command's list and the action panel
 # moving with the arrow keys: pictures in $HEYO_TEST_DIR/shots/select-*.png.
 . "$(dirname "$0")/env.sh"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 for _ in 1 2 3 4 5 6; do
   [ -n "$(xdotool search --onlyvisible --name '^Heyo$' 2>/dev/null)" ] && break
   heyo; w 3
@@ -13,4 +13,4 @@ xdotool key Up Up Up; w 0.6; shot root-wrapped
 xdotool key ctrl+k; w 0.8; xdotool key Down; w 0.6; shot actions-second
 xdotool key Escape; w 0.5
 heyo --open cmd:@heyo:emoji; w 3; xdotool key Down Right; w 0.6; shot grid
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

@@ -6,7 +6,7 @@
 # renders in software, which is what a machine without a usable GPU does.
 . "$(dirname "$0")/env.sh"
 export HEYO_BENCH_OUT="$T/bench.txt"; rm -f "$HEYO_BENCH_OUT"
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 for _ in 1 2 3 4 5 6; do
   [ -n "$(xdotool search --onlyvisible --name '^Heyo$' 2>/dev/null)" ] && break
   heyo; w 3
@@ -21,4 +21,4 @@ walk() { xdotool key ctrl+alt+shift+n; xdotool key --delay 33 --repeat "${3:-70}
 walk "emoji grid, Down held" Down 60
 xdotool key Escape; w 1; xdotool key ctrl+a BackSpace; xdotool type --delay 20 "e"; w 1
 walk "root list, Down held" Down 45
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null

@@ -12,6 +12,9 @@ SIGUSR1 (its process is in /tmp/window-APP_ID.pid.txt) makes its text TEXT
 again, with the cursor after it: typing it would go through whatever input
 method the session has.
 
+WINDOW_DIR in the environment names another directory than /tmp for those
+files: two sessions on one machine then do not read each other's window.
+
 With WINDOW_INPUT_METHOD=none in the environment the text box takes no input
 method (only the toolkit's own handling of dead keys and Compose), as in a
 session whose applications are not set up for one. With WINDOW_FULLSCREEN
@@ -42,7 +45,7 @@ def afresh(*_):
     return True
 
 def put(suffix, text):
-    path = f"/tmp/window-{app_id}{suffix}.txt"
+    path = f"{os.environ.get('WINDOW_DIR', '/tmp')}/window-{app_id}{suffix}.txt"
     with open(path + ".new", "w") as f:
         f.write(text)
     os.replace(path + ".new", path)

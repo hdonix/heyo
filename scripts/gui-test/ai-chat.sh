@@ -26,7 +26,7 @@ ask() { heyo --open cmd:@heyo:ask-ai; w 3; xdotool type --delay 20 "$1"; w 0.5; 
 configure claude
 # Nothing of this shell's reaches the model either.
 unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 ask "What is a launcher?"; w 4; shot nokey
 echo "without a key: $(python3 - "$XDG_DATA_HOME/heyo/support/@heyo/conversations" <<'PY'
 import json, os, sys
@@ -36,11 +36,11 @@ c = json.load(open(os.path.join(d, files[-1]))) if files else {}
 print([m.get("role") for m in c.get("messages", [])], "(no answer kept)" if len(c.get("messages", [])) == 1 else "")
 PY
 )"
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null
 
 # --- A local model: the stub. ---
 configure local
-"$HERE/up.sh"
+"$HERE/sandbox.sh" up
 start python3 "$HERE/llm-stub.py" "$PORT"; w 1
 ask "What is a launcher?"; w 1.5; shot streaming; w 6; shot answered
 xdotool key Return; w 3; shot chat
@@ -60,4 +60,4 @@ echo "after the rename:"; kept
 xdotool key ctrl+x; w 1.5; shot delete-dialog; xdotool key Return; w 2; shot deleted
 echo "after the delete:"; kept
 grep -v "EGL\|dbind\|heyo: started" "$T/app.log" | tail -3 | cut -c1-200
-python3 "$HERE/down.py" > /dev/null
+"$HERE/sandbox.sh" down > /dev/null
