@@ -39,6 +39,7 @@ pub(super) struct Shared {
 pub(super) enum Kind {
     Settings,
     Pill,
+    Screenshot,
 }
 
 thread_local! {
@@ -144,6 +145,7 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
             match MAKING.with(Cell::get) {
                 Kind::Settings => attributes,
                 Kind::Pill => super::pill::native::attributes(attributes),
+                Kind::Screenshot => super::screenshot::native::attributes(attributes),
             }
         });
         let selector = if super::window::frames::wanted().is_some() { selector.with_winit_custom_application_handler(super::window::frames::Timing) } else { selector };

@@ -1,0 +1,241 @@
+// The screenshot overlay: a frozen picture of a monitor, covering it, on
+// which part is selected. Everything but the selection is dimmed.
+//
+// What it shows is decided in Rust (`screenshot::selecting`, which is told
+// of the pointer and the keys by the window itself: `screenshot/mod.rs`)
+// and set here. Nothing here answers the pointer or a key.
+//
+// The picture is here twice, as it was read and dimmed, and the selection
+// is the first drawn over the second. So what a drag changes on the screen
+// is the selection and not the whole monitor: dimming round it with
+// rectangles would have every one of them change with each movement of the
+// pointer, and the whole picture drawn again under them.
+//
+// Each picture is drawn by one element, which is there from the first
+// frame: the renderer copies a picture the first time an element draws it,
+// and a whole screen takes it long enough to be felt. So the part shown as
+// it is never is nothing (while nothing is selected it is one pixel, under
+// the hint), and the loupe has a small picture of its own.
+
+import { Tokens } from "tokens.slint";
+import { TextXs, TextSm } from "widgets.slint";
+
+// A part of the overlay, in its logical pixels.
+export struct Part {
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
+// The same part in the capture's own pixels.
+export struct Pixels {
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+}
+
+export struct Spot {
+    x: length,
+    y: length,
+}
+
+// A dark label over the screen.
+component Hud inherits Rectangle {
+    background: rgba(20, 20, 22, 0.9);
+}
+
+export component ScreenshotWindow inherits Window {
+    // The monitor as it was read, and the same dimmed: one of their pixels
+    // is a pixel of the screen.
+    in property <image> clear;
+    in property <image> dimmed;
+    in property <bool> dark;
+    // The part shown as it is, here and in the capture, and whether it is
+    // something selected (or a window that would be): it then has an outline.
+    in property <bool> selected;
+    in property <Part> part;
+    in property <Pixels> from;
+    // The outline is inside it for a window that may fill the screen.
+    in property <bool> outline-inside;
+    in property <[Spot]> handles;
+    in property <string> label;
+    in property <Spot> label-at;
+    in property <string> hint;
+    in property <string> status;
+    in property <bool> status-error;
+    // The magnifier: where it is, and the capture's pixels round the
+    // pointer as a picture of their own, one pixel a cell.
+    in property <bool> loupe;
+    in property <Spot> loupe-at;
+    in property <image> loupe-picture;
+    in property <length> loupe-cell: 8px;
+    in property <int> loupe-cells: 15;
+    title: "Heyo Screenshot";
+    no-frame: true;
+    always-on-top: true;
+    background: black;
+    default-font-size: Tokens.text-sm-size;
+    init => {
+        Tokens.dark = self.dark;
+    }
+    changed dark => {
+        Tokens.dark = self.dark;
+    }
+    Image {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        source: root.dimmed;
+        image-fit: fill;
+    }
+
+    Image {
+        x: root.part.x;
+        y: root.part.y;
+        width: root.part.width;
+        height: root.part.height;
+        source: root.clear;
+        source-clip-x: root.from.x;
+        source-clip-y: root.from.y;
+        source-clip-width: root.from.width;
+        source-clip-height: root.from.height;
+        image-fit: fill;
+    }
+
+    // The outline: outside the selection, its inner edge on the
+    // selection's; inside a window.
+    if root.selected: Rectangle {
+        property <length> out: root.outline-inside ? 0px : 1.5px;
+        x: root.part.x - self.out;
+        y: root.part.y - self.out;
+        width: root.part.width + 2 * self.out;
+        height: root.part.height + 2 * self.out;
+        border-width: 1.5px;
+        border-color: Tokens.accent;
+    }
+
+    for handle in root.handles: Rectangle {
+        x: handle.x - 4.5px;
+        y: handle.y - 4.5px;
+        width: 9px;
+        height: 9px;
+        border-radius: 4.5px;
+        border-width: 1px;
+        border-color: white;
+        background: Tokens.accent;
+    }
+
+    if root.label != "": Hud {
+        x: root.label-at.x;
+        y: root.label-at.y;
+        width: size.preferred-width + 12px;
+        height: 20px;
+        border-radius: Tokens.radius-xs;
+        size := Text {
+            x: 6px;
+            height: parent.height;
+            vertical-alignment: center;
+            text: root.label;
+            color: white;
+            font-size: Tokens.text-2xs-size;
+            letter-spacing: Tokens.text-2xs-tracking;
+        }
+    }
+
+    if root.hint != "": Hud {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: said.preferred-width + 28px;
+        height: Tokens.text-sm-line + 16px;
+        border-radius: Tokens.radius-lg;
+        said := TextSm {
+            x: 14px;
+            height: parent.height;
+            vertical-alignment: center;
+            text: root.hint;
+            color: white;
+        }
+    }
+
+    if root.status != "": Hud {
+        x: (root.width - self.width) / 2;
+        y: root.height - 40px - self.height;
+        width: min(root.width * 0.7, told.preferred-width + 28px);
+        height: Tokens.text-sm-line + 16px;
+        border-radius: Tokens.radius-lg;
+        told := TextSm {
+            x: 14px;
+            width: parent.width - 28px;
+            height: parent.height;
+            vertical-alignment: center;
+            overflow: elide;
+            text: root.status;
+            color: root.status-error ? Tokens.danger : white;
+        }
+    }
+
+    // The loupe: the capture's pixels round the pointer, each a square, not
+    // smoothed, with a grid; black where the screen ends.
+    if root.loupe: Rectangle {
+        property <length> side: root.loupe-cells * root.loupe-cell;
+        x: root.loupe-at.x;
+        y: root.loupe-at.y;
+        width: self.side;
+        height: self.side;
+        Rectangle {
+            width: parent.width;
+            height: parent.height;
+            border-radius: Tokens.radius-lg;
+            background: black;
+            clip: true;
+            Image {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height;
+                source: root.loupe-picture;
+                image-fit: fill;
+                image-rendering: pixelated;
+            }
+
+            for line in root.loupe-cells - 1: Rectangle {
+                x: (line + 1) * root.loupe-cell;
+                y: 0;
+                width: 1phx;
+                height: parent.height;
+                background: #ffffff29;
+            }
+
+            for line in root.loupe-cells - 1: Rectangle {
+                x: 0;
+                y: (line + 1) * root.loupe-cell;
+                width: parent.width;
+                height: 1phx;
+                background: #ffffff29;
+            }
+        }
+
+        // The pixel under the pointer.
+        Rectangle {
+            x: (parent.width - root.loupe-cell) / 2 - 0.5px;
+            y: (parent.height - root.loupe-cell) / 2 - 0.5px;
+            width: root.loupe-cell + 1px;
+            height: root.loupe-cell + 1px;
+            border-width: 1px;
+            border-color: Tokens.accent;
+        }
+
+        Rectangle {
+            x: -1px;
+            y: -1px;
+            width: parent.width + 2px;
+            height: parent.height + 2px;
+            border-radius: Tokens.radius-lg + 1px;
+            border-width: 1.5px;
+            border-color: #ffffffe6;
+        }
+    }
+}

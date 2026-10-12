@@ -14,6 +14,8 @@
 //! - `window` puts the two together on Slint's thread.
 //! - `pill` is the dictation pill: what it shows, its window, and what a
 //!   desktop must be told for it to float over everything unfocused.
+//! - `screenshot` is the screenshot overlay: its window, and what a
+//!   desktop must be told for it to cover a monitor and have every key.
 //! - `fonts` gives Slint the fonts Heyo carries.
 //! - `guard` keeps a panic on Slint's thread from ending Heyo.
 
@@ -25,6 +27,7 @@ mod icons;
 mod keys;
 mod model;
 pub(crate) mod pill;
+pub(crate) mod screenshot;
 mod thread;
 #[cfg(test)]
 mod tokens;
@@ -81,8 +84,12 @@ pub(crate) fn warm(app: &AppHandle) {
     let app = app.clone();
     let _ = std::thread::Builder::new().name("heyo-slint-warm".into()).spawn(move || {
         if ensure(&app) {
-            // The pill is the window that cannot wait to be made.
+            // The pill is the window that cannot wait to be made, and the
+            // screenshot overlay the other.
             thread::on(pill::prepare);
+            if crate::screenshot::drawn_by_slint() {
+                thread::on(screenshot::prepare);
+            }
         }
     });
 }

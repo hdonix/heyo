@@ -30,12 +30,39 @@ use crate::platform::common::notify;
 use crate::platform::overlay;
 use crate::platform::windows::Rect;
 
-#[cfg(any(test, feature = "native-overlay"))]
-mod selecting;
+pub(crate) mod selecting;
 
 pub const WINDOW: &str = "screenshot";
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+/// Whether the overlay is the one Slint draws (`slint_windows::screenshot`)
+/// and not the web view's. Until the web view's is removed, it is so where
+/// `HEYO_SCREENSHOT` says `slint`.
+pub(crate) fn drawn_by_slint() -> bool {
+    static ASKED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ASKED.get_or_init(|| std::env::var("HEYO_SCREENSHOT").is_ok_and(|by| by == "slint"))
+}
+
+/// For measuring how soon the overlay is up: with `HEYO_OVERLAY_DEBUG`
+/// set, says what happened, when by the system's clock, and how long after
+/// the screenshot was asked for.
+pub(crate) fn mark(what: &str, asked: std::time::Instant) {
+    static WANTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *WANTED.get_or_init(|| std::env::var_os("HEYO_OVERLAY_DEBUG").is_some()) {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_millis());
+        eprintln!("heyo: {what} at {now} ms, {:.1} ms after it was asked for", asked.elapsed().as_secs_f64() * 1e3);
+    }
+}
+
+/// The monitor that the overlay Slint draws is showing, as it was read:
+/// what is selected is cut from it here.
+struct Frozen {
+    shot: Shot,
+    area: Area,
+}
+
+static FROZEN: std::sync::Mutex<Option<std::sync::Arc<Frozen>>> = std::sync::Mutex::new(None);
 fn cache_dir() -> PathBuf {
     crate::paths::cache().join("screenshot")
 }
@@ -210,6 +237,8 @@ fn window_frames() -> Vec<Rect> {
 
 /// Captures the screen and opens the selection overlay.
 pub fn start(app: &AppHandle, mode: &str) {
+    let asked = std::time::Instant::now();
+    mark("screenshot asked for", asked);
     let app = app.clone();
     let mode = mode.to_owned();
     let picking = mode == "pick";
@@ -220,7 +249,12 @@ pub fn start(app: &AppHandle, mode: &str) {
     std::thread::spawn(move || {
         // Neither the palette nor a previous overlay may end up in the capture.
         crate::palette::hide_until_gone(&app);
-        if app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false)) {
+        if drawn_by_slint() {
+            if crate::slint_windows::screenshot::up() {
+                close_overlay(&app);
+                std::thread::sleep(Duration::from_millis(60));
+            }
+        } else if app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false)) {
             close_overlay(&app);
             std::thread::sleep(Duration::from_millis(180));
         }
@@ -229,7 +263,25 @@ pub fn start(app: &AppHandle, mode: &str) {
             // Asked for meanwhile: the overlay does not wait for it to appear.
             let frames = std::thread::spawn(window_frames);
             let shot = grab(monitor)?;
+            mark("screen read", asked);
             let area = Area { width: shot.width, height: shot.height, ..monitor };
+            if drawn_by_slint() {
+                let mode = match mode.as_str() {
+                    "text" => selecting::Mode::Text,
+                    "pick" => selecting::Mode::Pick,
+                    _ => selecting::Mode::Capture,
+                };
+                let frozen = std::sync::Arc::new(Frozen { shot, area });
+                *FROZEN.lock().unwrap() = Some(frozen.clone());
+                if !crate::slint_windows::screenshot::show(&app, area, &frozen.shot, mode, asked) {
+                    *FROZEN.lock().unwrap() = None;
+                    return Err(format!("the overlay cannot be shown: {}", crate::slint_windows::failure()));
+                }
+                let windows = fitted(windows_in(monitor, &frames.join().unwrap_or_default()), monitor, area.width);
+                let windows = windows.into_iter().map(|w| selecting::Area { x: w.x.max(0) as u32, y: w.y.max(0) as u32, width: w.width.max(0) as u32, height: w.height.max(0) as u32 });
+                crate::slint_windows::screenshot::windows(windows.collect());
+                return Ok(());
+            }
             // A new name each time, so the webview never shows a stale capture.
             let path = cache_dir().join(format!("capture-{}.bmp", COUNTER.fetch_add(1, Ordering::Relaxed)));
             if let Ok(entries) = std::fs::read_dir(cache_dir()) {
@@ -278,7 +330,12 @@ pub fn cancel(app: &AppHandle) {
 }
 
 fn close_overlay(app: &AppHandle) {
-    overlay::hide(app, WINDOW);
+    if drawn_by_slint() {
+        crate::slint_windows::screenshot::hide();
+        *FROZEN.lock().unwrap() = None;
+    } else {
+        overlay::hide(app, WINDOW);
+    }
     // The capture shows the whole screen; do not keep it around.
     if let Ok(entries) = std::fs::read_dir(cache_dir()) {
         for entry in entries.flatten().filter(|e| e.file_name().to_string_lossy().starts_with("capture-")) {
@@ -356,7 +413,6 @@ fn one() -> f64 {
 /// the page, or pixels cut from the capture by an overlay the host draws.
 enum Selected {
     Png(Vec<u8>),
-    #[cfg(any(test, feature = "native-overlay"))]
     Pixels(image::RgbaImage),
 }
 
@@ -364,7 +420,6 @@ impl Selected {
     fn png(&self) -> Result<std::borrow::Cow<'_, [u8]>, String> {
         match self {
             Selected::Png(bytes) => Ok(bytes.into()),
-            #[cfg(any(test, feature = "native-overlay"))]
             Selected::Pixels(pixels) => {
                 let mut png = Vec::new();
                 pixels.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png).map_err(|e| e.to_string())?;
@@ -376,7 +431,6 @@ impl Selected {
     fn pixels(self) -> Result<image::RgbaImage, String> {
         match self {
             Selected::Png(bytes) => Ok(image::load(Cursor::new(&bytes), image::ImageFormat::Png).map_err(|e| e.to_string())?.into_rgba8()),
-            #[cfg(any(test, feature = "native-overlay"))]
             Selected::Pixels(pixels) => Ok(pixels),
         }
     }
@@ -394,7 +448,6 @@ struct Place {
 
 /// Part of a capture (`Shot::bgrx`, `width` pixels wide) as a picture, cut
 /// to what the capture has.
-#[cfg(any(test, feature = "native-overlay"))]
 fn cut(bgrx: &[u8], width: u32, area: selecting::Area) -> image::RgbaImage {
     let height = (bgrx.len() / 4).checked_div(width as usize).unwrap_or(0) as u32;
     let (x, y) = (area.x.min(width), area.y.min(height));
@@ -407,6 +460,40 @@ fn cut(bgrx: &[u8], width: u32, area: selecting::Area) -> image::RgbaImage {
         }
     }
     image::RgbaImage::from_raw(across, down, rgba).expect("as many bytes as the picture has pixels")
+}
+
+/// What the overlay Slint draws was told to do with the capture: does it.
+/// What cannot be done is said in the overlay where that is still up, and
+/// in a notification where it is not.
+pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome) {
+    let selecting::Outcome::Finish { action, area } = outcome else { return cancel(app) };
+    let Some(frozen) = FROZEN.lock().unwrap().clone() else { return };
+    let action = match action {
+        selecting::Action::Copy => "copy",
+        selecting::Action::Save => "save",
+        selecting::Action::Text => "text",
+        selecting::Action::Pick => "pick",
+    };
+    let scale = if frozen.area.scale > 0.0 { frozen.area.scale } else { 1.0 };
+    // A pinned image sits exactly where it was captured.
+    let place = Place {
+        x: (frozen.area.x as f64 + area.x as f64) / scale,
+        y: (frozen.area.y as f64 + area.y as f64) / scale,
+        width: area.width as f64 / scale,
+        height: area.height as f64 / scale,
+        scale,
+    };
+    let selected = Selected::Pixels(cut(&frozen.shot.bgrx, frozen.shot.width, area));
+    if let Err(e) = tauri::async_runtime::block_on(complete(app.clone(), action, selected, place)) {
+        eprintln!("heyo: screenshot failed: {e}");
+        if crate::slint_windows::screenshot::up() {
+            crate::slint_windows::screenshot::failed(e);
+        } else if action == "pick" {
+            end_pick(Picked::Failed(e));
+        } else {
+            notify("Screenshot failed", &e);
+        }
+    }
 }
 
 /// Completes a capture. Returns the recognized text for `text`.

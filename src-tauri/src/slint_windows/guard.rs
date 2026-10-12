@@ -193,6 +193,23 @@ pub(super) fn install() {
     });
 }
 
+/// For testing that the screenshot overlay cannot trap the user: with
+/// `HEYO_SLINT_PANIC_IN_DRAG` set, Slint's thread panics at the tenth
+/// movement of a drag on it; with `HEYO_SLINT_STALL_IN_DRAG`, it stops
+/// there for a minute instead.
+pub(super) fn test_in_drag(movements: u32) {
+    if movements != 10 {
+        return;
+    }
+    if std::env::var_os("HEYO_SLINT_PANIC_IN_DRAG").is_some() {
+        panic!("HEYO_SLINT_PANIC_IN_DRAG asked for this panic");
+    }
+    if std::env::var_os("HEYO_SLINT_STALL_IN_DRAG").is_some() {
+        eprintln!("heyo: HEYO_SLINT_STALL_IN_DRAG asked Slint's thread to stop for a minute");
+        std::thread::sleep(std::time::Duration::from_secs(60));
+    }
+}
+
 /// For testing that Slint cannot start at all: with `HEYO_SLINT_NO_START`
 /// set, it does not.
 pub(super) fn test_no_start() -> Result<(), String> {

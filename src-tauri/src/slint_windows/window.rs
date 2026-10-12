@@ -50,8 +50,8 @@ pub(super) mod frames {
         std::env::var("HEYO_SETTINGS_FRAMES").ok().filter(|file| !file.is_empty())
     }
 
-    /// winit asked for the window to be drawn.
-    pub(super) fn begun() {
+    /// winit asked for a window to be drawn.
+    pub(in crate::slint_windows) fn begun() {
         BEGUN.set(Some((Instant::now(), SystemTime::now())));
     }
 
@@ -68,7 +68,7 @@ pub(super) mod frames {
     }
 
     /// Writes down the frames so far, and starts again.
-    pub(super) fn write() {
+    pub(in crate::slint_windows) fn write() {
         let Some(file) = wanted() else { return };
         let lines: String = TAKEN.with_borrow_mut(|taken| taken.drain(..).map(|(at, took)| format!("{at} {took:.3}\n")).collect());
         if let Err(e) = std::fs::write(&file, lines) {
