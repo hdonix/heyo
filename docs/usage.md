@@ -416,6 +416,13 @@ The settings window is laid out like Raycast's: a sidebar with **General**
 Commands** and one page per extension (enable or disable commands,
 preferences, permissions, uninstall).
 
+It works without the pointer: `Tab` and `Shift+Tab` move between the
+search field, the pages and the controls of the page, `Space` works the
+control the ring is on, and `Page Up` and `Page Down` scroll the page. A
+menu opens with `Space`, `Enter` or `↓`; in it the arrows move, `Enter`
+or `Space` chooses, and `Esc` closes the menu. `Esc` otherwise closes the
+window.
+
 | What | Where |
 |---|---|
 | Settings | `~/.config/heyo/settings.json` |

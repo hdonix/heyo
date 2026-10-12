@@ -38,6 +38,14 @@ again when `src-tauri/` changes. A debug build loads the runtime's scripts
 from `runtime/dist/` in the repository: after changing anything under
 `runtime/`, run `pnpm build:runtime` and start Heyo again.
 
+The settings window is not part of the web view: Slint draws it, from
+`src-tauri/src/slint_settings/ui/*.slint`, which the host's build compiles
+in. A change there is a build of the host, like any change to
+`src-tauri/`. The first build also fetches Skia, prebuilt for the target,
+from the releases of `rust-skia/skia-binaries`: the build script of the
+crate that binds it does, with `curl`
+([packaging/README.md](../packaging/README.md) says more).
+
 Two things to know:
 
 - Heyo is single-instance. If another Heyo is running in the same session
@@ -74,13 +82,17 @@ pull request:
 - **Windows**: `pnpm build:runtime` and `cargo check --locked`. The
   Windows code is compiled, not tested, there.
 
-To check that Windows still compiles without a Windows machine, from
-Linux, with the Rust target installed and
-[llvm-mingw](https://github.com/mstorsjo/llvm-mingw) on `PATH`:
+To build for Windows without a Windows machine, from Linux:
 
 ```sh
-cd src-tauri && cargo check --target aarch64-pc-windows-gnullvm   # or x86_64-…
+scripts/package/build.sh aarch64-pc-windows-msvc   # or x86_64-…
 ```
+
+It needs the Rust target, llvm-mingw (`scripts/package/toolchain.sh`) and
+Microsoft's headers and libraries (`scripts/package/winsdk.sh`);
+[packaging/README.md](../packaging/README.md) says what fetching those
+accepts. The targets are the msvc ones because Skia, which draws the
+settings window, comes prebuilt for those only.
 
 ## Generated files
 
@@ -134,7 +146,11 @@ The parts they are made of:
   look right in a picture. Settings are
   `$HEYO_TEST_DIR/home/config/heyo/settings.json`; write them before
   starting.
-- `down.py` stops what `up.sh` started, and only that.
+- `down.py` stops what the scripts started, and only that: every process
+  is started through `start` (in `env.sh`), which writes its number down
+  with when it was started, and `down.py` ends those and what they started
+  themselves. It never looks for a process by its name or its
+  environment; what it cannot reach that way it says and leaves.
 - `grab.py FILE [LEFT TOP RIGHT BOTTOM]` takes a picture of the sandbox's
   screen.
 
@@ -150,7 +166,8 @@ The scripts, by what they try:
 
 | Script | What it tries |
 |---|---|
-| `look.sh`, `compact.sh`, `settings.sh`, `select.sh` | pictures of the interface: the themes, compact mode, every settings page, the selection moving |
+| `look.sh`, `compact.sh`, `select.sh` | pictures of the interface: the themes, compact mode, the selection moving |
+| `settings.sh` | the settings window, which Slint draws: every page pictured a screen at a time, Copy Diagnostics pressed and read back, a permission taken back. Nothing in that window can be asked where it is, so the script clicks where the layout puts things, in the window's own pixels times its scale |
 | `open.sh`, `arguments.sh`, `views.sh` | opening commands, arguments typed in the search bar, what an extension's views do (forms, the file picker, typing into a slow extension) |
 | `regress.sh`, `clipboard.sh`, `snap.sh`, `expand.sh`, `dictate.sh` | the platform layer on X11: pasting, layouts, the clipboard history, the screenshot overlay, snippets expanding, dictation |
 | `dictate-live.sh` | dictated words going into another application as they are spoken: spoken sentences (`say.py` makes the audio) are dictated into a text field that is read back all the while (its text, and what is being composed in it), with the setting off and on, a key typed in between, the dictation window clicked, cancelling, and a stub model polishing. Once by pasting, in a session without an input method; and once through the input method, under GNOME Shell with IBus and Pinyin chosen, where it also dictates into a terminal and into a field that takes no input method, starts and finishes with the hotkey, kills Heyo in the middle of a sentence, and checks that the clipboard was never touched and that Pinyin is the session's again each time |
@@ -177,7 +194,10 @@ applications, a backdrop drawn by `readme-backdrop.py`, and a little
 sample data (favourites, a few things copied). The session runs at twice
 the size, so the pictures are 2× and the README shows them at half their
 width. It needs GNOME Shell, the network (it installs one extension from
-the Raycast Store and converts a currency) and a few minutes.
+the Raycast Store and converts a currency) and a few minutes. The scale
+is said twice: `GDK_SCALE` for the web view, and `WINIT_X11_SCALE_FACTOR`
+for the settings window, which on a desktop takes it from the session's
+settings.
 
 The picture of dictation is taken last, by `readme-dictation.sh`, in a
 session of its own: a note is open in gedit, which takes the input method,
@@ -210,7 +230,7 @@ cross-compiles Heyo for it from Linux:
 
 ```sh
 scripts/windows-test/run.sh start       # the first start installs Windows
-scripts/windows-test/build.sh           # ARCH=x86_64 for Intel/AMD; needs llvm-mingw
+scripts/windows-test/build.sh           # ARCH=x86_64 for Intel/AMD; needs llvm-mingw (toolchain.sh) and winsdk.sh
 ```
 
 then, inside the machine (in a browser at `http://127.0.0.1:8006`),

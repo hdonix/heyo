@@ -13,10 +13,11 @@ the desktop.
 flowchart LR
   subgraph web["Web view: src/ (React)"]
     palette["Palette: root search, a command's view"]
-    windows["Settings, dictation pill, screenshot overlay"]
+    windows["Dictation pill, screenshot overlay"]
   end
   subgraph host["Host: src-tauri/ (Rust, Tauri)"]
     core["Index, settings, clipboard history, permissions, live activities"]
+    settings["Settings window: slint_settings/ (Slint)"]
     platform["platform/: trait Desktop"]
   end
   subgraph node["Node.js: runtime/"]
@@ -29,6 +30,7 @@ flowchart LR
   palette -- "commands" --> core
   core -- "events" --> palette
   windows -- "commands" --> core
+  settings -- "the same functions, called directly" --> core
   core -- "launch, replies, events" --> runtime
   runtime -- "host.* and ext.* requests, views, toasts" --> core
   core --- background
@@ -43,11 +45,13 @@ flowchart LR
   have been given and everything that touches the desktop. It starts the
   other two parts and carries their messages.
 - **The web view** (`src/`, React 19, in WebKitGTK on Linux and WebView2 on
-  Windows) draws every window. All windows load the same page;
+  Windows) draws every window but one. Its windows load the same page;
   `src/main.tsx` picks what to draw from the window's label: the palette
-  (`main`), the settings, the dictation pill, the screenshot overlay, a
-  pinned capture. It keeps nothing of its own: what it shows it asked the
-  host for, or was sent by the runtime.
+  (`main`), the dictation pill, the screenshot overlay, a pinned capture.
+  It keeps nothing of its own: what it shows it asked the host for, or was
+  sent by the runtime. The settings window is the one it does not draw:
+  that is the host's own, drawn with [Slint](https://slint.dev)
+  ("[The settings window](#the-settings-window)" below).
 - **The runtime** (`runtime/`, Node.js 22 or newer) runs extensions: the
   builds the Raycast Store hands out, loaded as they are. It gives them
   `@raycast/api`, `@heyo/api` and React, renders their components with a
@@ -92,8 +96,9 @@ fails until both are there:
 
 - which windows may call it (`commands/access.rs`). Every window loads the
   same page and the palette draws what extensions hand it, so a window is
-  held to the commands its own view calls: a palette that was talked into
-  something still cannot change the settings;
+  held to the commands its own view calls. What changes the settings is no
+  command at all: the settings window is not a web view, and calls those
+  functions directly;
 - what it takes and answers as a window sees it (`commands/bindings.rs`,
   which also says what every event carries). That table is written to
   `shared/bindings/commands.ts`.
@@ -479,8 +484,7 @@ Windows it registers them itself.
   action panel, the same one for an extension's actions and the root
   search's; `model.ts` reads the tree the runtime sends; `memory.ts`
   remembers what a view was showing when another was pushed over it.
-- `Settings.tsx`, `Dictation.tsx` and `Screenshot.tsx` are the other
-  windows.
+- `Dictation.tsx` and `Screenshot.tsx` are the other windows.
 - `selection.ts` and `pointer.ts` are what every list shares: how the
   selection moves, and when a mouse event is the pointer really moving.
   `SelectionIndicator.tsx` is the one element that slides between rows.
@@ -532,6 +536,43 @@ rest (`Settings::changed`), saves, does what the change calls for
 field, its default and its control. "Launch at login" is not stored: it is
 whether the autostart entry exists.
 
+### The settings window
+
+The settings window is drawn by Slint, with Skia on the CPU, inside the
+host (`src-tauri/src/slint_settings/`); why, and what was measured, is in
+[slint-settings.md](slint-settings.md). The same `.slint` files and the
+same Rust are the window on Linux and on Windows.
+
+- `model.rs` is the window without anything drawn: what each page shows,
+  as a list of lines (a heading, a note, a row with its control, …), and
+  what using a control asks of the host, as values (`Ask`: a command's
+  name, its arguments and what to do with the answer). Nothing in it
+  touches Slint or Tauri, so the tests are of this file: a page is asked
+  for its lines and a control for what it asks. A new control on a page is
+  a line here, and the branch of `acted` that says what it changes.
+- `ui/settings.slint` draws a line of each kind, the sidebar and the
+  window; `ui/widgets.slint` is the controls (switch, field, select, hotkey
+  recorder, menus), drawn here rather than taken from Slint's own set so
+  that they are the web interface's. Colours, sizes, radii and durations
+  come from the scales the stylesheet is made of: `build.rs` reads
+  `src/styles/abstracts/_scales.scss` and writes them as a Slint global
+  (`tokens.rs` is the reading, and is tested).
+- `window.rs` shows what the model says and passes on what is done in the
+  window. It runs Slint on a thread of its own ("heyo-slint"), beside
+  Tauri's; what the model asks is answered on a third, so that Slint's
+  thread never waits for the host. `host.rs` is the list of the host's
+  functions the window may call, by name; a test holds that none of the
+  ones that change settings is a command a web view could call.
+- `fonts.rs` puts Inter and Noto Sans SC, which Heyo carries
+  (`src-tauri/fonts/`), before the system's fonts; `keys.rs` names keys by
+  where they are, as the palette's hotkey recorder does; `area.rs` asks
+  the screen for the room the window has, so that it is no larger.
+- `guard.rs` is what happens when Slint cannot start or its thread
+  panics: Heyo goes on without it, and asking for the settings then shows
+  the palette saying that they need Heyo restarted, with the button that
+  does it. A process has one event loop of Slint's and it cannot be
+  started twice.
+
 ## Styles and themes
 
 The interface has a light and a dark scheme, following the system unless
@@ -543,7 +584,9 @@ The stylesheet is SCSS, in `src/styles/`:
 - `abstracts/_scales.scss` holds the scales as Sass maps, the single source
   for every colour (as a light and dark pair), the 4 px spacing grid, the
   type scale (each size with its line height and letter spacing), radii,
-  control heights, shadows, durations and easings.
+  control heights, shadows, durations and easings. The settings window,
+  which is not a web page, is made of the same scales: the host's build
+  reads this file.
 - `abstracts/_mixins.scss` is what components are assembled from: `text`,
   `truncate`, `fade-end`, `scroll-fade`, `interactive` (resting, hovered,
   pressed, disabled), `field`, `select`, `card`, `floating`, `focus-ring`,
@@ -594,6 +637,7 @@ stand-in:
 |---|---|---|
 | the desktop (`platform::desktop::Desktop`) | `X11`, `Gnome`, `Windows`, `Generic` | `desktop::fake::Fake` |
 | the host, as a window calls it (`Bridge` in `src/host.ts`) | Tauri | `fakeHost` (`src/host.fake.ts`) |
+| the settings window, as what it shows and asks (`slint_settings/model.rs`) | drawn by `window.rs`, answered through `host.rs` | the model by itself: its lines and what it asks are values |
 | what carries the runtime's conversation (`Transport` in `runtime/src/transport.ts`) | stdin and stdout | a pair in memory, with `testhost.ts` as the host |
 | the running application, as `ext/answer.rs` sees it (`Running`) | the Tauri side of `ext.rs` | tables and a port made by the test |
 
