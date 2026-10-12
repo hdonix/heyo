@@ -27,7 +27,7 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 use super::keys::{self, Held};
 use super::model::{Ask, Line, Model, Then};
 use super::thread::{self, Job, Kind};
-use super::{area, guard, icons, ui};
+use super::{area, guard, icons, reach, ui};
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
 /// frame took is written there when the window is closed, a line a frame:
@@ -207,6 +207,8 @@ struct Live {
     /// The hotkey field that is recording, and the modifiers held.
     recording: Option<String>,
     held: Held,
+    /// Where the pointer is in the window, in its device pixels.
+    pointer: (f64, f64),
     /// Asks again, while something is under way that the page counts down.
     /// Kept, so that it goes on asking.
     _poll: slint::Timer,
@@ -325,6 +327,18 @@ impl Live {
                 self.window.set_moved(self.window.get_moved().wrapping_add(1));
                 EventResult::Propagate
             }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.pointer = (position.x, position.y);
+                EventResult::Propagate
+            }
+            // Its panel is elsewhere in it, or of another size: once Slint
+            // has laid it out for what it was just told.
+            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
+                slint::Timer::single_shot(Duration::ZERO, || {
+                    with(|live| live.reach());
+                });
+                EventResult::Propagate
+            }
             WindowEvent::ModifiersChanged(modifiers) => {
                 let state = modifiers.state();
                 self.held = Held { control: state.control_key(), shift: state.shift_key(), alt: state.alt_key(), superkey: state.super_key() };
@@ -366,6 +380,16 @@ impl Live {
         frames::write();
     }
 
+    /// Has the window take the pointer where its panel is, and not in the
+    /// margin its shadow falls in (`reach`).
+    fn reach(&self) {
+        let (margin, scale) = (self.window.get_margin(), self.window.window().scale_factor());
+        self.window.window().with_winit_window(|made| {
+            let size = made.inner_size();
+            reach::limit(made, reach::panel((size.width, size.height), margin, scale));
+        });
+    }
+
     /// Puts the window on screen, in the middle of the room the screen has
     /// for it and no larger, in front, and reads again what may have
     /// changed while it was away. `then` hears whether winit made the
@@ -394,6 +418,7 @@ impl Live {
                         let (wide, high) = ((860.0_f32.min(width as f32 / scale) + margin) * scale, (640.0_f32.min(height as f32 / scale) + margin) * scale);
                         made.set_outer_position(PhysicalPosition::new(x + ((width as f32 - wide) / 2.0) as i32, y + ((height as f32 - high) / 2.0) as i32));
                     }
+                    reach::limit(&made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
                     made.focus_window();
                     // Which on Wayland a window may not do for itself: the
                     // desktop is asked to.
@@ -480,12 +505,32 @@ fn wire(window: &ui::SettingsWindow) {
                 let _ = window.drag_window();
             });
         });
+        // Once Slint is done with the press that asked for this.
+        slint::Timer::single_shot(Duration::ZERO, let_go);
     });
     window.window().on_close_requested(|| {
         with(Live::hide);
         slint::CloseRequestResponse::HideWindow
     });
     window.window().on_winit_window_event(|_, event| with(|live| live.told(event)).unwrap_or(EventResult::Propagate));
+}
+
+/// The window is being moved by the desktop, which has the pointer from
+/// the press that began the move until the button is let go: the window
+/// is never told that it was. Slint would go on taking what was pressed
+/// for pressed, and hand it every press after: each would begin another
+/// move, and nothing in the window could be clicked again. So Slint is
+/// told now what it will not hear: the button is up, and the pointer is
+/// away until it is next heard of.
+fn let_go() {
+    let Some((window, at)) = with(|live| (live.window.as_weak(), live.pointer)) else { return };
+    // Not while the window is being done something with here: what Slint
+    // is told may come back as something a control did.
+    let Some(window) = window.upgrade() else { return };
+    let scale = f64::from(window.window().scale_factor()).max(0.1);
+    let position = slint::LogicalPosition::new((at.0 / scale) as f32, (at.1 / scale) as f32);
+    let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerReleased { position, button: slint::platform::PointerEventButton::Left });
+    let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
 }
 
 /// Makes the window, on Slint's thread, the first time it is asked for.
@@ -527,7 +572,7 @@ fn make() -> Result<Live, String> {
     poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
         with(|live| live.ask(live.model.poll()));
     });
-    let mut live = Live { window, asking, model, lines, pictures, recording: None, held: Held::default(), _poll: poll };
+    let mut live = Live { window, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: (0.0, 0.0), _poll: poll };
     live.push();
 
     shared.host.listen(Box::new(|event, told| {

@@ -16,6 +16,7 @@
 //!   desktop must be told for it to float over everything unfocused.
 //! - `screenshot` is the screenshot overlay: its window, and what a
 //!   desktop must be told for it to cover a monitor and have every key.
+//! - `reach` is where in its window a window takes the pointer.
 //! - `fonts` gives Slint the fonts Heyo carries.
 //! - `guard` keeps a panic on Slint's thread from ending Heyo.
 
@@ -27,6 +28,7 @@ mod icons;
 mod keys;
 mod model;
 pub(crate) mod pill;
+mod reach;
 pub(crate) mod screenshot;
 mod thread;
 #[cfg(test)]
