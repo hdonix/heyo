@@ -46,6 +46,14 @@ pub(crate) fn show(app: &AppHandle) {
     let window = window(app);
     centre(app, &window);
     let _ = window.show();
+    // And once more now that it is shown. A window that was hidden while
+    // the display changed has been resized for the new scale by its
+    // toolkit meanwhile, and GTK, having heard of that, takes the next
+    // showing for a size the desktop gave it and does not ask for its
+    // place: the first showing after the change came up where the window
+    // had been on the old display. Asked of a window that is shown, the
+    // place is asked for at once; where it is there already, nothing moves.
+    centre(app, &window);
     focus(&window);
     let _ = tell(app, event::SHOWN, ());
 }
@@ -58,6 +66,13 @@ pub(crate) fn show(app: &AppHandle) {
 /// has never been on the screen does not have its size yet, so the first
 /// showing of a run came up off the middle (by a quarter of the window, at
 /// a scale of 2).
+///
+/// And the toolkit is told the place in logical pixels, by the monitor's
+/// scale as it is now. Told device pixels, it converts them by the scale
+/// it last knew the window to have, and a window that was hidden while the
+/// display changed hears of the new scale only once it is shown: the first
+/// showing after a monitor of another density was connected came up at
+/// twice the place, or half.
 fn centre(app: &AppHandle, window: &WebviewWindow) {
     let monitor = window.current_monitor().ok().flatten().or_else(|| window.primary_monitor().ok().flatten());
     let declared = app.config().app.windows.iter().find(|declared| declared.label == WINDOW);
@@ -65,13 +80,9 @@ fn centre(app: &AppHandle, window: &WebviewWindow) {
         let _ = window.center();
         return;
     };
-    let (x, y) = centred(
-        (monitor.position().x, monitor.position().y),
-        (monitor.size().width, monitor.size().height),
-        (declared.width, declared.height),
-        monitor.scale_factor(),
-    );
-    let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+    let scale = monitor.scale_factor();
+    let (x, y) = centred((monitor.position().x, monitor.position().y), (monitor.size().width, monitor.size().height), (declared.width, declared.height), scale);
+    let _ = window.set_position(tauri::LogicalPosition::new(f64::from(x) / scale, f64::from(y) / scale));
 }
 
 /// Where a window of a size in logical pixels goes to be in the middle of
