@@ -39,7 +39,8 @@ about the extension: `run.sh start bare` (not installed), `run.sh start old`
 - `colour.py` is a window of one colour, to find again in a capture.
 - `check.py` checks what Heyo does through its extension against what the
   Shell says: `lists` (the palette is in no list of windows, the settings
-  window is; also with the way GNOME 45–48 need, tried on this Shell),
+  window is, comes forward from behind another window and is still Heyo's
+  when shown again; also with the way GNOME 45–48 need, tried on this Shell),
   `layout`, `capture` (the right monitor, its own pixels, a window picked
   with a click and saved pixel for pixel) and `relock` (the extension
   switched off and on, as the lock screen does).
