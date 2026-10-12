@@ -1,0 +1,19 @@
+name	by	processors	what	ms_median	ms_worst	ms_each
+gnome-1x	slint	all	switch	43	47	44 43 47 42 43 45 41
+gnome-1x	slint	all	page	28	31	31 28 27 24 30 27 30
+gnome-1x	slint	all	typing	34	36	31 36 35 34 34 36 34
+gnome-1x	web	all	switch	35	40	33 26 37 34 35 36 40
+gnome-1x	web	all	page	24	64	64 18 24 28 27 21 18
+gnome-1x	web	all	typing	20	22	17 21 20 18 22 16 22
+gnome-1x-small	slint	0-3	switch	31	45	45 43 45 28 28 31 30
+gnome-1x-small	slint	0-3	page	29	31	31 29 29 27 31 30 28
+gnome-1x-small	slint	0-3	typing	36	38	36 38 37 38 36 36 36
+gnome-1x-small	web	0-3	switch	37	41	38 37 41 37 36 36 37
+gnome-1x-small	web	0-3	page	27	93	93 25 24 29 27 30 25
+gnome-1x-small	web	0-3	typing	24	27	22 24 27 21 23 24 25
+gnome-1x-drawn-at-once	slint	all	switch	28	30	26 28 28 28 28 30 26
+gnome-1x-drawn-at-once	slint	all	page	16	22	13 17 19 16 22 12 14
+gnome-1x-drawn-at-once	slint	all	typing	18	31	31 18 16 17 18 19 18
+gnome-1x-drawn-at-once	web	all	switch	34	39	39 18 37 18 33 34 34
+gnome-1x-drawn-at-once	web	all	page	24	85	85 24 30 21 23 24 25
+gnome-1x-drawn-at-once	web	all	typing	23	24	23 19 22 24 19 24 23

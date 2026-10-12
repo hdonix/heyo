@@ -1,0 +1,11 @@
+name	by	run	window_ms	drawn_ms	pss_before_mb	pss_open_mb	pss_closed_mb	heyo_rss_before_mb	heyo_rss_open_mb	heyo_rss_closed_mb	processes_open
+gnome-1x	slint	1	138	138	278.4	282.2	281.9	170.4	190.9	191.0	4
+gnome-1x	slint	2	72	71							
+gnome-1x	slint	3	68	67							
+gnome-1x	slint	4	76	77							
+gnome-1x	slint	5	67	66							
+gnome-1x	web	1	778	-	277.6	340.8	269.0	165.1	176.9	174.8	5
+gnome-1x	web	2	762	-							
+gnome-1x	web	3	756	-							
+gnome-1x	web	4	758	-							
+gnome-1x	web	5	755	-							

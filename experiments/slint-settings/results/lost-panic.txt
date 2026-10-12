@@ -1,0 +1,17 @@
+# 2026-10-12, heyo, panic
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+settings asked for: Heyo running; windows: "Heyo Settings" 531,264,924,704; 
+after the panic: Heyo running; windows: 
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+settings asked for again: Heyo running; windows: "Heyo" 586,349,814,534; 
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+palette toggled after that: Heyo running; windows: 
+## what Heyo said
+heyo: settings drawn by Slint with skia-software, in Inter and Noto Sans SC
+heyo: settings up 73 ms after they were asked for
+heyo: panicked at src/slint_settings/guard.rs:206:75 (thread heyo-slint, version 0.1.0): HEYO_SLINT_PANIC_AFTER asked for this panic
+heyo: Slint's thread panicked. Its window is taken away; the settings cannot be shown again until Heyo is restarted
+ended heyo 2891427

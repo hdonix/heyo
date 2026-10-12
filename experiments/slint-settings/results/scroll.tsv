@@ -1,0 +1,9 @@
+name	by	processors	gesture	seconds	cpu_seconds	screen_updates	gap_ms_median	gap_ms_p95	gap_ms_worst	frames	frame_ms_median	frame_ms_p95	frame_ms_worst	over_16ms
+gnome-1x	slint	all	down-30ms	2.32	0.52	111	17	20	50	124	4.165	5.446	6.317	0
+gnome-1x	slint	all	up-16ms	1.48	0.23	67	17	21	33	73	2.521	4.768	5.114	0
+gnome-1x	web	all	down-30ms	2.32	0.81	112	17	20	80					
+gnome-1x	web	all	up-16ms	1.48	0.68	73	17	22	24					
+gnome-1x-small	slint	0-3	down-30ms	2.32	0.66	113	17	19	34	123	4.861	5.627	6.244	0
+gnome-1x-small	slint	0-3	up-16ms	1.48	0.39	64	17	19	50	72	4.909	5.720	7.236	0
+gnome-1x-small	web	0-3	down-30ms	2.32	0.88	109	17	29	69					
+gnome-1x-small	web	0-3	up-16ms	1.47	0.90	75	17	22	32					

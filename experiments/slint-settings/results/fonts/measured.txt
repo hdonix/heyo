@@ -1,0 +1,78 @@
+# The fonts tried, 2026-10-12, Slint 1.18.1 with Skia on the CPU, aarch64
+
+# round 1
+## system-only
+first frame drawn in 3.0 ms; memory after it: VmRSS: 180740 kB  RssAnon: 111460 kB  RssFile: 67252 kB  
+## inter-only
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.38 ms, registered in 0.01 ms as Inter (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 179880 kB  RssAnon: 112748 kB  RssFile: 65104 kB  
+## variable-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.36 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-VF.otf: 15054748 bytes, read in 6.64 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 211200 kB  RssAnon: 142416 kB  RssFile: 66756 kB  
+## variable-ttf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.35 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-VF.ttf: 17773132 bytes, read in 8.53 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 216600 kB  RssAnon: 147800 kB  RssFile: 66772 kB  
+## static-regular-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.40 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-Regular.otf: 8331336 bytes, read in 4.05 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 4.0 ms; memory after it: VmRSS: 198480 kB  RssAnon: 129676 kB  RssFile: 66776 kB  
+## static-three-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.40 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-Regular.otf: 8331336 bytes, read in 3.87 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+font NotoSansSC-Medium.otf: 8345436 bytes, read in 3.86 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+font NotoSansSC-Bold.otf: 8543168 bytes, read in 4.03 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 214964 kB  RssAnon: 146160 kB  RssFile: 66776 kB  
+## subset-variable-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.36 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-VF-gb2312.otf: 3183516 bytes, read in 1.12 ms, registered in 0.00 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 187792 kB  RssAnon: 119136 kB  RssFile: 66628 kB  
+## subset-regular-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.35 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-Regular-gb2312.otf: 1870968 bytes, read in 0.65 ms, registered in 0.00 ms as Noto Sans SC (1 fonts)
+first frame drawn in 3.0 ms; memory after it: VmRSS: 185472 kB  RssAnon: 116680 kB  RssFile: 66764 kB  
+
+# round 2
+## system-only
+first frame drawn in 2.0 ms; memory after it: VmRSS: 180812 kB  RssAnon: 111512 kB  RssFile: 67272 kB  
+## inter-only
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.38 ms, registered in 0.01 ms as Inter (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 181516 kB  RssAnon: 112756 kB  RssFile: 66732 kB  
+## variable-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.32 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-VF.otf: 15054748 bytes, read in 6.28 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 211152 kB  RssAnon: 142392 kB  RssFile: 66732 kB  
+## variable-ttf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.37 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-VF.ttf: 17773132 bytes, read in 7.67 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 216572 kB  RssAnon: 147804 kB  RssFile: 66740 kB  
+## static-regular-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.36 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-Regular.otf: 8331336 bytes, read in 3.79 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 198436 kB  RssAnon: 129668 kB  RssFile: 66740 kB  
+## static-three-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.35 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-Regular.otf: 8331336 bytes, read in 3.57 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+font NotoSansSC-Medium.otf: 8345436 bytes, read in 3.52 ms, registered in 0.01 ms as Noto Sans SC (1 fonts)
+font NotoSansSC-Bold.otf: 8543168 bytes, read in 3.65 ms, registered in 0.00 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 214948 kB  RssAnon: 146156 kB  RssFile: 66764 kB  
+## subset-variable-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.36 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-VF-gb2312.otf: 3183516 bytes, read in 1.10 ms, registered in 0.00 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 187912 kB  RssAnon: 119116 kB  RssFile: 66768 kB  
+## subset-regular-otf
+font Inter[opsz,wght].ttf: 876576 bytes, read in 0.30 ms, registered in 0.01 ms as Inter (1 fonts)
+font NotoSansSC-Regular-gb2312.otf: 1870968 bytes, read in 0.52 ms, registered in 0.00 ms as Noto Sans SC (1 fonts)
+first frame drawn in 2.0 ms; memory after it: VmRSS: 185504 kB  RssAnon: 116684 kB  RssFile: 66792 kB  
+
+# sizes
+    876576  Inter[opsz,wght].ttf
+  17772300  NotoSansSC[wght].ttf
+   8543168  NotoSansSC-Bold.otf
+   8345436  NotoSansSC-Medium.otf
+   8331336  NotoSansSC-Regular.otf
+  15054748  NotoSansSC-VF.otf
+  17773132  NotoSansSC-VF.ttf
+   1870968  NotoSansSC-Regular-gb2312.otf
+   3183516  NotoSansSC-VF-gb2312.otf

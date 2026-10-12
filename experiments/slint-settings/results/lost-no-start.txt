@@ -1,0 +1,10 @@
+# 2026-10-12, heyo, no-start
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+settings asked for: Heyo running; windows: "Heyo" 586,349,814,534; 
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+palette toggled after that: Heyo running; windows: 
+## what Heyo said
+heyo: the settings window cannot be shown in this run: HEYO_SLINT_NO_START asked for this
+ended heyo 2885307

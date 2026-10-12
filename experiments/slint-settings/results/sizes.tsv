@@ -1,0 +1,4 @@
+build	bytes	features
+aarch64-linux-gnu plain	13130272	none
+aarch64-linux-gnu slint	42754336	slint-settings
+aarch64-linux-gnu skia	51222568	slint-skia
