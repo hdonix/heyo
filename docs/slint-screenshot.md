@@ -99,8 +99,9 @@ interface does it and it has been seen to.
 - [ ] With the selection tool any annotation can be dragged (it comes to
   the front); with a drawing tool only text can. A rectangle is taken by
   its outline, lines within 7 px.
-- [ ] Annotations follow the selection when it moves or resizes without
-  jitter, and are cut off at its edge.
+- [ ] Annotations are where they were put on the screen, not on the
+  selection: the selection moved or resized leaves them there, and cuts
+  them off at its edge. Nothing jitters while it does.
 - [ ] Undo takes the last one away.
 
 ### Ways out
@@ -225,52 +226,77 @@ and "hello" typed after the trouble must (`results/screenshot-safe.txt`).
 
 | in the middle of a drag | the overlay was off the screen after | Heyo afterwards |
 |---|---|---|
-| Escape | 24 ms | runs; the next screenshot comes up |
+| Escape | 18 ms | runs; the next screenshot comes up |
 | Slint's thread panics | at once (within the 150 ms the test takes to look) | runs; the palette opens |
 | Slint's thread stops for a minute | 1.7 s | runs; the palette opens |
-| Heyo is killed | 49 ms | gone |
+| Heyo is killed | 48 ms | gone |
 
 ### How fast it is
 
 Measured from outside, the screen as the clock
 (`experiments/slint-settings/scripts/measure-screenshot.sh`,
-`results/screenshot.jsonl`): a program reads a pixel of the screen again
-and again and says when it changed. Xvfb at 3840x2160, scale 1, under GNOME
-Shell, which composites with software OpenGL there: part of every figure
-is the Shell's, the same part for both overlays. No graphics card is
-used by either. Milliseconds; where three are given they are the median,
-the 95th of a hundred and the worst.
+`results/screenshot.jsonl`, pooled by `measure-screenshot-pool.py`): a
+program reads a pixel of the screen again and again and says when it
+changed. Xvfb at 3840x2160, scale 1, under GNOME Shell, which composites
+with software OpenGL there: part of every figure is the Shell's, the same
+part for both overlays. No graphics card is used by either. Milliseconds;
+where three are given they are the median, the 95th of a hundred and the
+worst, of the run whose 95th is the middle one of two or three runs.
 
 | | Slint, 20 cores | web view, 20 cores | Slint, 4 small cores | web view, 4 small cores |
 |---|---|---|---|---|
-| asked for (`heyo --open heyo:screenshot` started) to the frozen screen: the median of 10 to 14 screenshots, and the least and most | 156 (111 to 221) | 237 (209 to 333) | 159 (129 to 274) | 231 (215 to 253) |
-| ... to ready to drag (the hint drawn) | the same frame | up to 77 later (40 or more in 5 of 13) | the same frame | up to 76 later (19 or more in 4 of 10) |
-| the pointer jumps, the selection has followed (about 1000 by 400) | 10 / 14 / 19 | 15 / 19 / 84 | 11 / 14 / 17 | 16 / 21 / 162 |
-| the pointer sweeps without pause, a movement every 8 ms | 20 / 32 / 33 | 26 / 39 / 39 | 23 / 34 / 36 | 29 / 42 / 44 |
-| the pointer jumps, a selection of most of the screen (3040 by 1800) | 24 / 30 / 32 | 53 / 64 / 121 | 28 / 33 / 36 | 54 / 61 / 191 |
-| the pointer sweeps, the same | 41 / 53 / 61 | 78 / 98 / 101 | 50 / 57 / 67 | 97 / 114 / 115 |
-| a frame of Slint's, drawn and handed over: small selection | 0.7 / 1.4 / 2.9 | | 1.2 / 1.6 / 3.2 | |
-| the same, most of the screen | 7.3 / 10.5 / 14.2 | | 11.9 / 14.6 / 21.0 | |
+| asked for (`heyo --open heyo:screenshot` started) to the frozen screen: the median of 14 to 16 screenshots, and the least and most | 177 (154 to 217) | 250 (231 to 287) | 183 (159 to 213) | 241 (220 to 322) |
+| ... to ready to drag (the hint drawn) | the same frame | up to 67 later (19 or more in 6 of 15) | the same frame | up to 88 later (19 or more in 6 of 14) |
+| the pointer jumps, the selection has followed (about 1000 by 400) | 11 / 15 / 16 | 15 / 20 / 79 | 11 / 15 / 19 | 15 / 20 / 213 |
+| the pointer sweeps without pause, a movement every 8 ms | 21 / 32 / 34 | 28 / 37 / 37 | 21 / 33 / 34 | 30 / 41 / 41 |
+| the pointer jumps, a selection of most of the screen (3040 by 1800) | 24 / 28 / 31 | 51 / 61 / 122 | 26 / 30 / 31 | 54 / 62 / 200 |
+| the pointer sweeps, the same | 38 / 55 / 56 | 85 / 103 / 104 | 50 / 65 / 66 | 96 / 110 / 111 |
+| a frame of Slint's, drawn and handed over: small selection | 0.9 / 1.4 / 3.1 | | 1.1 / 1.5 / 22.2 | |
+| the same, most of the screen | 6.6 / 10.1 / 15.7 | | 11.8 / 14.5 / 40.4 | |
 
-The selection of most of the screen was measured three times on 20
-cores, and the table has the middle one of the three for each overlay.
-One of Slint's three stood apart, with frames of up to 50 ms where the
-others had 14 (jumps 25 / 53 / 62, sweeps 65 / 108 / 129): something else
-had the processors then. One of the web view's had jumps of 58 / 102 /
-224. All of them are in `results/screenshot.jsonl`.
-
-Of the 156 ms to the frozen screen, about 50 are the second `heyo`
-process reaching the first, 40 reading the screen, 8 making the dimmed
-picture, 7 to 18 Slint's first frame, and the rest the Shell showing a
-new window of that size. The first screenshot after Heyo starts takes
-some 60 ms longer than the ones after it (about 195 against 135): the
-window grows to the monitor's size, and the renderer takes a picture of
-that size in for the first time.
+Of the 177 ms to the frozen screen, about 50 are the second `heyo`
+process reaching the first, 40 reading the screen, 17 making the dimmed
+picture, 20 to 35 Slint's first frame, and the rest the Shell showing a
+new window of that size.
 
 A selection of most of the screen costs Slint a frame of 7 ms (12 on a
 small core) because the whole selection is drawn again when its corner
 moves: the renderer redraws the rectangle that holds what an element was
 and what it has become, not only the difference.
+
+### What it holds in memory
+
+`experiments/slint-settings/scripts/screenshot-memory.sh`,
+`results/screenshot-memory.txt`: Heyo's own resident memory (not the web
+view's processes), a 4K screen.
+
+| | Slint | web view |
+|---|---|---|
+| before any screenshot | 177 MB | 176 MB |
+| the overlay up, something selected | 368 MB | 306 to 339 MB |
+| three seconds after it is closed | 209 MB | 275 to 307 MB |
+| 70 s later | 178 MB | 274 MB |
+
+While it is up the capture is there three times (as it was read, for the
+host to cut the selection from; as it was read and dimmed, for Slint to
+draw) and the renderer's own copies of the two it draws twice more; and
+the window has a buffer of its size. A 4K screen is 31.6 MB.
+
+Closed, it holds the window's buffer only, and after a minute not that:
+the window is given up and a small one made in its place (a window made
+smaller keeps the larger buffer).
+
+That the rest comes back had to be seen to. glibc keeps freed pieces of
+up to 32 MB in a heap of the thread that freed them once one such piece
+has been freed, and nothing gives the end of such a heap back,
+`malloc_trim` included: Heyo held 127 MB more after the first screenshot
+and 130 to 290 MB more after later ones, for good (the web view's path
+holds on to about 100 MB the same way). Heyo now sets glibc's threshold
+for giving a piece a mapping of its own when it starts (`lib.rs`,
+`give_large_memory_back`), which keeps glibc from moving it. The price is
+that such a piece is new memory each time, handed out page by page: the
+frozen screen is up some 35 ms later than it was without (177 ms against
+about 143).
 
 ### The pixels
 
