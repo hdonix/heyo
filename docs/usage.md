@@ -13,6 +13,8 @@ what](../README.md#where-it-runs) is in the README.
   The window also hides when it loses focus (Settings → General).
 - `Ctrl+K` opens the actions of the selected row.
 - `Ctrl+,` (or **Heyo Settings** in the search) opens the settings window.
+- **Restart Heyo** in the search quits Heyo and starts it again, as it was
+  started: for when something of it has stopped answering.
 - `Tab` with something typed asks the AI model about it (see
   [Ask AI](#ask-ai-and-ai-chat)); on a command that takes arguments, `Tab`
   moves into its fields.

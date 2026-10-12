@@ -17,6 +17,8 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
             palette::hide(app);
             toggle_keep_awake(app);
         }
+        // With the arguments and the environment it was started with.
+        root::RESTART_ID => app.restart(),
         root::PASTE_PLAIN_ID => {
             palette::hide(app);
             pasting::paste_plain();

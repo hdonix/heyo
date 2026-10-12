@@ -19,6 +19,7 @@ const SUGGESTIONS: usize = 8;
 /// Root search item that opens the settings window.
 pub const SETTINGS_ID: &str = "heyo:settings";
 pub const SCREENSHOT_ID: &str = "heyo:screenshot";
+pub const RESTART_ID: &str = "heyo:restart";
 pub const SCREENSHOT_TEXT_ID: &str = "heyo:screenshot-text";
 
 pub const KEEP_AWAKE_ID: &str = "heyo:keep-awake";
@@ -75,6 +76,14 @@ pub static NATIVE: LazyLock<Vec<Native>> = LazyLock::new(|| {
             &["caffeine", "sleep", "idle", "inhibit", "amphetamine"],
         ),
     ];
+    all.push(native(
+        RESTART_ID,
+        "Restart Heyo",
+        "arrow-clockwise-16",
+        "Heyo",
+        "Quit Heyo and start it again, as it was started.",
+        &["relaunch", "reload", "quit", "reset", "reopen"],
+    ));
     all.push(native(
         PASTE_PLAIN_ID,
         "Paste as Plain Text",
