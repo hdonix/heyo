@@ -1,0 +1,29 @@
+name	run	begins_ms	there_ms	pss_idle_mb	rss_idle_mb	threads_idle	pss_after_mb	rss_after_mb
+slint-ahead	1	56	138	297.9	183.9	79		
+slint-ahead	2	53	135	297.9	183.9	79		
+slint-ahead	3	52	132	297.9	183.9	79		
+slint-ahead	4	58	139	297.9	183.9	79		
+slint-ahead	5	41	122	297.9	183.9	79		
+slint-ahead	6	47	128	297.9	183.9	79		
+slint-ahead	after						836.4	184.3
+web	1	55	56	296.3	175.8	62		
+web	2	45	44	296.3	175.8	62		
+web	3	63	62	296.3	175.8	62		
+web	4	48	47	296.3	175.8	62		
+web	5	46	47	296.3	175.8	62		
+web	6	57	58	296.3	175.8	62		
+web	after						836.2	178.3
+slint-lazy	1	92	171	288.7	176.9	54		
+slint-lazy	2	55	136	288.7	176.9	54		
+slint-lazy	3	52	132	288.7	176.9	54		
+slint-lazy	4	44	123	288.7	176.9	54		
+slint-lazy	5	51	132	288.7	176.9	54		
+slint-lazy	6	44	124	288.7	176.9	54		
+slint-lazy	after						840.6	187.5
+slint	1	54	91	233.6	182.4	60		
+slint	2	55	103	233.6	182.4	60		
+slint	3	41	89	233.6	182.4	60		
+slint	4	42	89	233.6	182.4	60		
+slint	5	43	90	233.6	182.4	60		
+slint	6	53	100	233.6	182.4	60		
+slint	after						779.5	183.0

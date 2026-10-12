@@ -1,0 +1,22 @@
+# 2026-10-12, heyo, Slint lost in the middle
+before: the keyboard is with [Notes]; the pill's window: none
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+recording: the pill's window: 780 928 360 44; the text so far [Notes: ]
+after Slint's thread panicked: Heyo runs; the pill's window: none; windows of Heyo's on screen: 0
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+finished without a pill: the text is [Notes: The weather is nice today, so let us walk to the park. I will bring fortytwo sandwiches and some coffee. See who had 330.]
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+a recording begun after that: the pill's window: none; the text so far [Notes: The weather is nice today, so let us walk to the park. I will bring fortytwo sandwiches and some coffee. See who had 330.]
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+and finished: [Notes: The weather is nice today, so let us walk to the park. I will bring fortytwo sandwiches and some coffee. See who had 330.The weather is nice today, so let us.]
+## what Heyo said
+heyo: Slint draws with skia-software, in Inter and Noto Sans SC
+heyo: Slint began in 28 ms
+heyo: panicked at src/slint_windows/guard.rs:206:75 (thread heyo-slint, version 0.1.0): HEYO_SLINT_PANIC_AFTER asked for this panic
+heyo: Slint's thread panicked. Its windows are taken away; the settings and the dictation pill are not shown again until Heyo is restarted
+ended notes 3569534
+ended heyo 3569526

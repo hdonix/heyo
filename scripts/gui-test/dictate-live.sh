@@ -53,8 +53,9 @@
 # that what is written is not only ASCII. Uses the speech engine installed
 # for the real Heyo (read only); say.py needs Flite (libflite1); the second
 # half needs gnome-shell, ibus with ibus-libpinyin, gnome-terminal and, for
-# the hotkey, gsd-media-keys. The recordings named "clicked" and "cancelled"
-# need the interface (a debug build with HEYO_TEST_FRONTEND=none has none).
+# the hotkey, gsd-media-keys. The dictation window is the host's own (Slint
+# draws it), so the recordings named "clicked" and "cancelled" need no web
+# interface: a debug build with HEYO_TEST_FRONTEND=none has them too.
 #
 #   dictate-live.sh [pasted|composed]    one half only; the second compares
 #                                        with what the first left behind
@@ -79,8 +80,6 @@ unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
 export GTK_IM_MODULE=ibus QT_IM_MODULE=ibus XMODIFIERS=@im=ibus
 [ "$HALF" != composed ] && rm -f "$T"/live-*.json
 rm -f "$T"/composed-*.json "$T/term.txt"
-INTERFACE=yes
-[ "$BUILD" = debug ] && [ "$HEYO_TEST_FRONTEND" = none ] && INTERFACE=no
 
 # configure LIVE POLISH [HOLD-KEY]: the settings of the next Heyo.
 configure() {
@@ -192,10 +191,21 @@ time.sleep(2.0)
 during = engine()
 ended = None
 if what in ("click", "cancel"):
-    time.sleep(max(0, at - (time.time() - start)))
+    # The pill is in the middle of its window, which Slint draws: nothing in
+    # it can be asked where it is. Its X shows when the pointer is on the
+    # pill, at the right end of the pill as it then is ("Listening" and the
+    # X: 49 of the window's pixels right of the middle, the window being 360
+    # of them wide). So the pointer is on the pill a little ahead of the
+    # click, and the click still comes when it was asked for.
+    ahead = 0.7 if what == "cancel" else 0
+    time.sleep(max(0, at - ahead - (time.time() - start)))
     x, y, width, height = pill()
-    # The pill is in the middle of its window; its X is at the pill's right end.
-    run("xdotool", "mousemove", str(x + width // 2 + (57 if what == "cancel" else -20)), str(y + height // 2))
+    scale = width / 360
+    run("xdotool", "mousemove", str(x + width // 2 - int(20 * scale)), str(y + height // 2))
+    if what == "cancel":
+        time.sleep(0.4)
+        run("xdotool", "mousemove", str(x + width // 2 + int(49 * scale)), str(y + height // 2))
+        time.sleep(max(0, at - (time.time() - start)))
     ended = round(time.time() - start, 2)
     run("xdotool", "click", "1")
 elif what == "kill":
@@ -235,10 +245,8 @@ if [ "$HALF" != composed ]; then
   configure on off; "$HERE/up.sh"; notes
   record live-live
   record live-typed 3.2 '#'
-  if [ "$INTERFACE" = yes ]; then
-    record live-clicked 8.6 click
-    record live-cancelled 8.6 cancel
-  fi
+  record live-clicked 8.6 click
+  record live-cancelled 8.6 cancel
   grep "heyo: dictation" "$T/app.log" | tail -4 | cut -c1-160
   python3 "$HERE/down.py" > /dev/null
 
@@ -306,10 +314,8 @@ elif command -v gnome-shell > /dev/null && [ -f /usr/share/ibus/component/libpin
     record composed-tapped 8.6 finish tap
     record composed-held 8.6 finish hold
   fi
-  if [ "$INTERFACE" = yes ]; then
-    record composed-clicked 8.6 click
-    record composed-cancelled 8.6 cancel
-  fi
+  record composed-clicked 8.6 click
+  record composed-cancelled 8.6 cancel
   if command -v gnome-terminal > /dev/null; then
     start gnome-terminal --title=ProbeTerm -- "$HERE/term-sink.sh" "$T/term.txt" >/dev/null 2>&1; w 4
     front ProbeTerm

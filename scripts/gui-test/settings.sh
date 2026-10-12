@@ -10,7 +10,7 @@
 #
 #   settings.sh [light|dark]     both when not given
 #
-# The window is drawn by Slint (src-tauri/src/slint_settings/): nothing
+# The window is drawn by Slint (src-tauri/src/slint_windows/): nothing
 # in it can be asked where it is, so what is clicked is clicked where the
 # window's layout puts it, in the window's own pixels (924 by 704, which
 # includes the margin its shadow falls in), times the scale it is shown at.

@@ -150,7 +150,7 @@ for THEME in ${*:-light dark}; do
   shot live-activity
 
   # The settings window: 924 by 704 with the margin its shadow falls in
-  # (src-tauri/src/slint_settings/ui/settings.slint), here at twice that.
+  # (src-tauri/src/slint_windows/ui/settings.slint), here at twice that.
   away
   heyo --open heyo:settings; w 5
   [ "$(size '^Heyo Settings$')" = "1848 1408" ] || echo "settings: the window is $(size '^Heyo Settings$'), not 1848 by 1408" >&2

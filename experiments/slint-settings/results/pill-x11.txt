@@ -1,0 +1,24 @@
+# 2026-10-12, heyo
+before: the keyboard is with [Notes]; the pill's window: none
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+recording: the keyboard is with [Notes]; the pill's window: 780 928 360 44; the text so far [Notes: ]
+clicked on the pill: the keyboard is with [Notes]
+after the click: the pill's window: none; the text is [Notes: The weather is nice today, so let us walk to the park.]
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+a second recording: the text so far [Notes: The weather is nice today, so let us walk to the park.The weather is nice today, so let us walk to the park.]
+clicked on its button: the keyboard is with [Notes]
+after the button: the pill's window: none; the text is [Notes: The weather is nice today, so let us walk to the park.The weather is nice today, so let us walk to the park.]
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+over a fullscreen window [0 0 1920 1080]: the keyboard is with [Film]; the pill's window: 780 928 360 44
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+and its text is [Film: The weather is nice today, so let us watch.]
+ended film 3568382
+## what Heyo said
+heyo: Slint draws with skia-software, in Inter and Noto Sans SC
+heyo: Slint began in 44 ms
+ended notes 3566633
+ended heyo 3566625

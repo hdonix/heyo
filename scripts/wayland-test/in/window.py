@@ -14,7 +14,8 @@ method the session has.
 
 With WINDOW_INPUT_METHOD=none in the environment the text box takes no input
 method (only the toolkit's own handling of dead keys and Compose), as in a
-session whose applications are not set up for one.
+session whose applications are not set up for one. With WINDOW_FULLSCREEN
+set it fills the screen, as a film or a presentation does.
 """
 import os
 import signal
@@ -27,6 +28,8 @@ title, app_id = sys.argv[1], sys.argv[2]
 GLib.set_prgname(app_id)  # the Wayland app id, which GNOME reports as the class
 window = Gtk.Window(title=title)
 window.set_default_size(700, 450)
+if os.environ.get("WINDOW_FULLSCREEN"):
+    window.fullscreen()
 view = Gtk.TextView()
 view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
 if os.environ.get("WINDOW_INPUT_METHOD") == "none":

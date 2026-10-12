@@ -32,15 +32,16 @@ unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
 # What a GNOME session's settings tell the toolkits, and nothing here does.
 export GTK_IM_MODULE=ibus QT_IM_MODULE=ibus XMODIFIERS=@im=ibus
 
-# The dictation window is 420 by 52 at the bottom of the screen, in the
-# middle, a tenth of the screen's height up (dictation.rs), and the editor
-# is put where that is over the empty end of its page: its lower edge 160
+# The dictation window is 360 by 44 at the bottom of the screen, in the
+# middle, a tenth of the screen's height up (Slint draws it:
+# src-tauri/src/slint_windows/pill), and the editor
+# is put where that is over the empty end of its page: its lower edge 152
 # below the dictation window's upper one. It is as wide as the palette is
 # seen to be in the other pictures, with as much of the backdrop around it:
 # the palette's window has 64 of its own around it, for its shadow. In
 # pixels of the screen, which is twice the size.
 EDITOR_WIDTH=1500; EDITOR_HEIGHT=800
-EDITOR_X=$(((3840 - EDITOR_WIDTH) / 2)); EDITOR_Y=$((2160 - 216 - 104 + 160 - EDITOR_HEIGHT))
+EDITOR_X=$(((3840 - EDITOR_WIDTH) / 2)); EDITOR_Y=$((2160 - 216 - 88 + 152 - EDITOR_HEIGHT))
 AROUND=$((MARGIN + 64))
 
 # note: the note as it is before a word is spoken, with an empty line at

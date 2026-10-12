@@ -42,7 +42,12 @@ export HEYO_TEST_DIR="$T"
 start() {
   "$@" &
   STARTED=$!
-  echo "$STARTED $(sed 's/.*) //' "/proc/$STARTED/stat" 2>/dev/null | cut -d' ' -f20) $(basename "$1")" >> "$T/pids"
+  # One that cannot be written down is not left running: nothing would end it.
+  if ! echo "$STARTED $(sed 's/.*) //' "/proc/$STARTED/stat" 2>/dev/null | cut -d' ' -f20) $(basename "$1")" >> "$T/pids"; then
+    kill "$STARTED" 2>/dev/null
+    echo "gui-test: $T/pids cannot be written, so $1 was not started" >&2
+    exit 1
+  fi
 }
 # The build under test: debug (which loads the frontend from the dev server),
 # or with HEYO_TEST_BUILD another directory under src-tauri/target whose

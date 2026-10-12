@@ -10,7 +10,7 @@ import wave,sys
 w=wave.open(sys.argv[1],'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(b'\0\0'*16000*4); w.close()" "$T/silence.wav"
 export HEYO_DICTATION_WAV="$T/silence.wav"
 "$HERE/up.sh"
-# The window exists once it has been shown; then it says whether it is up.
+# The window is made when Heyo starts, and is on screen or not.
 state() {
   id=$(xwininfo -root -tree | grep '"Heyo Dictation"' | head -1 | awk '{print $1}')
   [ -n "$id" ] && xwininfo -id "$id" | grep "Map State" | awk '{print $3}' || echo none
