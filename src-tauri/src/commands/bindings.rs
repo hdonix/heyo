@@ -10,24 +10,18 @@
 //! are the host's own, so their TypeScript is ts-rs's. A test reads every
 //! `#[tauri::command]` out of the sources and holds the rows to them.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use regex::Regex;
 use ts_rs::{Config, Dependency, TypeVisitor, TS};
 
 use crate::activities::ActivityView;
-use crate::clipboard::{meaning, sources::Source};
-use crate::commands::media::OcrStatus;
-use crate::commands::settings::{HotkeyName, Hotkeys, SettingsView};
-use crate::extensions::{ExtensionInfo, PreferenceValues};
+use crate::commands::settings::SettingsView;
 use crate::helper::InstallProgress;
 use crate::open::Arguments;
-use crate::permissions::{Permission, Row};
-use crate::platform::Capabilities;
 use crate::root::Item;
 use crate::screenshot::Finish;
-use crate::settings::Settings;
 use crate::wire::WebviewMessage;
 use crate::{dictation, expand, screenshot};
 
