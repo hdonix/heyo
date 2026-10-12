@@ -352,6 +352,63 @@ fn one() -> f64 {
     1.0
 }
 
+/// The selected part of a capture, as it arrives to be finished: a PNG from
+/// the page, or pixels cut from the capture by an overlay the host draws.
+enum Selected {
+    Png(Vec<u8>),
+    #[cfg(any(test, feature = "native-overlay"))]
+    Pixels(image::RgbaImage),
+}
+
+impl Selected {
+    fn png(&self) -> Result<std::borrow::Cow<'_, [u8]>, String> {
+        match self {
+            Selected::Png(bytes) => Ok(bytes.into()),
+            #[cfg(any(test, feature = "native-overlay"))]
+            Selected::Pixels(pixels) => {
+                let mut png = Vec::new();
+                pixels.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png).map_err(|e| e.to_string())?;
+                Ok(png.into())
+            }
+        }
+    }
+
+    fn pixels(self) -> Result<image::RgbaImage, String> {
+        match self {
+            Selected::Png(bytes) => Ok(image::load(Cursor::new(&bytes), image::ImageFormat::Png).map_err(|e| e.to_string())?.into_rgba8()),
+            #[cfg(any(test, feature = "native-overlay"))]
+            Selected::Pixels(pixels) => Ok(pixels),
+        }
+    }
+}
+
+/// Where the selected part is on the screen, in logical pixels, and the
+/// scale of the monitor it is on.
+struct Place {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    scale: f64,
+}
+
+/// Part of a capture (`Shot::bgrx`, `width` pixels wide) as a picture, cut
+/// to what the capture has.
+#[cfg(any(test, feature = "native-overlay"))]
+fn cut(bgrx: &[u8], width: u32, area: selecting::Area) -> image::RgbaImage {
+    let height = (bgrx.len() / 4).checked_div(width as usize).unwrap_or(0) as u32;
+    let (x, y) = (area.x.min(width), area.y.min(height));
+    let (across, down) = (area.width.min(width - x), area.height.min(height - y));
+    let mut rgba = Vec::with_capacity((across * down * 4) as usize);
+    for row in y..y + down {
+        let from = ((row * width + x) * 4) as usize;
+        for pixel in bgrx[from..from + across as usize * 4].chunks_exact(4) {
+            rgba.extend_from_slice(&[pixel[2], pixel[1], pixel[0], 255]);
+        }
+    }
+    image::RgbaImage::from_raw(across, down, rgba).expect("as many bytes as the picture has pixels")
+}
+
 /// Completes a capture. Returns the recognized text for `text`.
 pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
     if request.action == "cancel" {
@@ -359,20 +416,35 @@ pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
         end_pick(Picked::Cancelled);
         return Ok(String::new());
     }
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&request.png).map_err(|e| e.to_string())?;
+    // A pinned image sits exactly where it was captured.
+    let place = Place {
+        x: request.origin_x as f64 / request.scale + request.x,
+        y: request.origin_y as f64 / request.scale + request.y,
+        width: request.width,
+        height: request.height,
+        scale: request.scale,
+    };
+    complete(app, &request.action, Selected::Png(bytes), place).await
+}
+
+/// Does with the selected part what was chosen. Returns the recognized text
+/// for `text`.
+async fn complete(app: AppHandle, action: &str, selected: Selected, place: Place) -> Result<String, String> {
     // Whatever else became of the selection, it is not the extension's.
-    if request.action != "pick" {
+    if action != "pick" {
         end_pick(Picked::Cancelled);
     }
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&request.png).map_err(|e| e.to_string())?;
-    match request.action.as_str() {
+    match action {
         "pick" => {
+            let png = selected.png();
             close_overlay(&app);
             let pick = PICK.lock().unwrap().take().ok_or("nothing is waiting for this selection")?;
-            let _ = pick.done.send(save_pick(&bytes, &pick.path));
+            let _ = pick.done.send(png.map_or_else(Picked::Failed, |png| save_pick(&png, &pick.path)));
             Ok(String::new())
         }
         "copy" => {
-            let image = image::load(Cursor::new(&bytes), image::ImageFormat::Png).map_err(|e| e.to_string())?.into_rgba8();
+            let image = selected.pixels()?;
             let (width, height) = image.dimensions();
             close_overlay(&app);
             app.clipboard()
@@ -385,7 +457,7 @@ pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
             let dir = pictures_dir();
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             let path = dir.join(format!("Screenshot {}.png", timestamp()));
-            std::fs::write(&path, &bytes).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
+            std::fs::write(&path, selected.png()?).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
             close_overlay(&app);
             notify("Screenshot saved", &path.to_string_lossy());
             Ok(path.to_string_lossy().into_owned())
@@ -393,11 +465,8 @@ pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
         "pin" => {
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let path = cache_dir().join(format!("pin-{n}.png"));
-            std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+            std::fs::write(&path, selected.png()?).map_err(|e| e.to_string())?;
             close_overlay(&app);
-            // The pinned image sits exactly where it was captured.
-            let x = request.origin_x as f64 / request.scale + request.x;
-            let y = request.origin_y as f64 / request.scale + request.y;
             let script = format!(
                 "window.__HEYO_VIEW__ = 'pin'; window.__HEYO_PIN__ = {};",
                 serde_json::to_string(&path.to_string_lossy()).map_err(|e| e.to_string())?
@@ -409,8 +478,8 @@ pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
                 .always_on_top(true)
                 .skip_taskbar(true)
                 .shadow(true)
-                .inner_size(request.width.max(24.0), request.height.max(24.0))
-                .position(x, y)
+                .inner_size(place.width.max(24.0), place.height.max(24.0))
+                .position(place.x, place.y)
                 .build()
                 .map_err(|e| e.to_string())?;
             Ok(String::new())
@@ -419,8 +488,8 @@ pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
             let path = cache_dir().join("text.png");
             std::fs::create_dir_all(cache_dir()).map_err(|e| e.to_string())?;
             // Small interface text is recognized much better enlarged.
-            let image = image::load(Cursor::new(&bytes), image::ImageFormat::Png).map_err(|e| e.to_string())?;
-            let factor = if request.scale < 1.5 { 2 } else { 1 };
+            let image = image::DynamicImage::ImageRgba8(selected.pixels()?);
+            let factor = if place.scale < 1.5 { 2 } else { 1 };
             image
                 .resize(image.width() * factor, image.height() * factor, image::imageops::FilterType::CatmullRom)
                 .save(&path)
@@ -492,6 +561,21 @@ mod tests {
         end_pick(Picked::Failed("late".into()));
         assert!(picked.try_recv().is_err());
         assert!(PICK.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn a_selection_is_cut_from_the_capture_with_its_colours_in_order() {
+        // Three by two pixels, each its own colour: blue first, as the screen is read.
+        let bgrx: Vec<u8> = (0..6u8).flat_map(|n| [n, 10 + n, 20 + n, 0]).collect();
+        let part = cut(&bgrx, 3, selecting::Area { x: 1, y: 0, width: 2, height: 2 });
+        assert_eq!(part.dimensions(), (2, 2));
+        assert_eq!(part.into_raw(), [21, 11, 1, 255, 22, 12, 2, 255, 24, 14, 4, 255, 25, 15, 5, 255]);
+        // What reaches past the capture is cut to it.
+        assert_eq!(cut(&bgrx, 3, selecting::Area { x: 2, y: 1, width: 40, height: 40 }).into_raw(), [25, 15, 5, 255]);
+        // Cut pixels and a PNG from the page end as the same picture.
+        let cut_out = Selected::Pixels(cut(&bgrx, 3, selecting::Area { x: 0, y: 0, width: 3, height: 2 }));
+        let through_png = Selected::Png(cut_out.png().unwrap().into_owned());
+        assert_eq!(through_png.pixels().unwrap(), cut_out.pixels().unwrap());
     }
 
     #[test]
