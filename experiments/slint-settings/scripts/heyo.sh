@@ -1,9 +1,8 @@
 #!/bin/sh
-# The real Heyo in the sandbox, with its settings drawn by Slint or by the
-# web view.
+# The real Heyo in the sandbox.
 #
-#   heyo.sh up [on|off|gnome]        the sandbox (experiments/overlay-bench/sandbox.sh)
-#   heyo.sh start [slint|web] [VAR=value…]   Heyo, hidden; its log is $S/heyo.log
+#   heyo.sh up [on|off|gnome]        the sandbox (sandbox.sh)
+#   heyo.sh start [VAR=value…]       Heyo, hidden; its log is $S/heyo.log
 #   heyo.sh seed [name=value…]       the settings Heyo will start with (seed.py)
 #   heyo.sh ibus                     an input method of the sandbox's own, with Pinyin
 #   heyo.sh dconf                    a settings service of the sandbox's own, for hotkeys to be kept in
@@ -15,16 +14,14 @@
 . "$(dirname "$0")/lib.sh"
 case "${1:-}" in
   up)
-    COMPOSITOR=${2:-on} "$OB/sandbox.sh" up
+    COMPOSITOR=${2:-on} "$HERE/sandbox.sh" up
     # Settings the tests start from: a window that stays when another is clicked.
     mkdir -p "$XDG_CONFIG_HOME/heyo"
     [ -f "$XDG_CONFIG_HOME/heyo/settings.json" ] || printf '{ "hideOnBlur": false }\n' > "$XDG_CONFIG_HOME/heyo/settings.json"
     ;;
   start)
-    by=${2:-slint}
-    shift; [ $# -gt 0 ] && shift
+    shift
     alive heyo && { echo "Heyo is running already" >&2; exit 1; }
-    [ "$by" = slint ] && export HEYO_SETTINGS=slint
     for assignment in "$@"; do export "$assignment"; done
     # PIN names the processors it may use (taskset's list), when it is to
     # be measured on fewer.
@@ -33,7 +30,7 @@ case "${1:-}" in
     # It reads the applications before it can open anything by name.
     for _ in $(seq 150); do grep -q "heyo: started" "$S/heyo.log" 2>/dev/null && break; sleep 0.1; done
     sleep "${HEYO_WARMUP:-6}"
-    echo "Heyo $(cut -d' ' -f1 "$D/pids/heyo") ($by)"
+    echo "Heyo $(cut -d' ' -f1 "$D/pids/heyo")"
     ;;
   dconf)
     # Settings of the desktop that stay (GNOME's shortcuts are kept there):
@@ -50,11 +47,14 @@ case "${1:-}" in
     alive heyo && { echo "Heyo is running: it would not read them" >&2; exit 1; }
     mkdir -p "$XDG_CONFIG_HOME/heyo"
     python3 -I "$HERE/seed.py" "$XDG_CONFIG_HOME/heyo/settings.json" "$@"
-    # Two extensions, so that an extension's page is among the pages: the
-    # ones the GUI tests install, one of them with something allowed.
+    # Three extensions, so that an extension's page is among the pages: the
+    # ones the GUI tests install, one of them with something allowed and
+    # one with a preference of every type.
     mkdir -p "$XDG_DATA_HOME/heyo/extensions"
-    rm -rf "$XDG_DATA_HOME/heyo/extensions/api-probe" "$XDG_DATA_HOME/heyo/extensions/view-probe"
-    cp -r "$W/scripts/gui-test/extensions/api-probe" "$W/scripts/gui-test/extensions/view-probe" "$XDG_DATA_HOME/heyo/extensions/"
+    for extension in api-probe prefs-probe view-probe; do
+      rm -rf "$XDG_DATA_HOME/heyo/extensions/$extension"
+      cp -r "$W/scripts/gui-test/extensions/$extension" "$XDG_DATA_HOME/heyo/extensions/"
+    done
     printf '{ "api-probe": ["windows", "screen.capture"] }\n' > "$XDG_CONFIG_HOME/heyo/permissions.json"
     ;;
   ibus)
@@ -87,14 +87,14 @@ case "${1:-}" in
     finish heyo
     ;;
   down)
-    "$OB/sandbox.sh" down
+    "$HERE/sandbox.sh" down
     ;;
   sh)
     shift
     "$@"
     ;;
   *)
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

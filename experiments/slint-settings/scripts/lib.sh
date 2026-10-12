@@ -1,5 +1,5 @@
 # Sourced by the scripts that try the Slint settings window. Everything runs
-# in a sandbox of its own (experiments/overlay-bench/sandbox.sh): an X server
+# in a sandbox of its own (sandbox.sh, beside this file): an X server
 # in memory, a private bus, and home directories that are not the user's.
 # Every process started is written down by its number, in the sandbox's own
 # pids/ (so `sandbox.sh down` ends it too) and in a ledger, and is ended by
@@ -12,13 +12,12 @@
 #   HEYO                     the build under test
 HERE=$(cd "$(dirname "$0")" && pwd)
 W=$(cd "$HERE/../../.." && pwd)
-OB=$W/experiments/overlay-bench
 RESULTS=$W/experiments/slint-settings/results
-export OVERLAY_BENCH_DISPLAY=${SLINT_SETTINGS_DISPLAY:-:82} OVERLAY_BENCH_DIR=${SLINT_SETTINGS_DIR:-/tmp/heyo-slint}
-D=$OVERLAY_BENCH_DIR
+export SLINT_SETTINGS_DISPLAY=${SLINT_SETTINGS_DISPLAY:-:82} SLINT_SETTINGS_DIR=${SLINT_SETTINGS_DIR:-/tmp/heyo-slint}
+D=$SLINT_SETTINGS_DIR
 S=${SLINT_SETTINGS_SCRATCH:-$D/scratch}
-eval "$("$OB/sandbox.sh" env)"
-[ "$DISPLAY" = "$OVERLAY_BENCH_DISPLAY" ] && [ "$DISPLAY" != ":0" ] || { echo "not the sandbox's display" >&2; exit 1; }
+eval "$("$HERE/sandbox.sh" env)"
+[ "$DISPLAY" = "$SLINT_SETTINGS_DISPLAY" ] && [ "$DISPLAY" != ":0" ] || { echo "not the sandbox's display" >&2; exit 1; }
 # Heyo's own files stay in the sandbox too. winit takes the scale from the
 # desktop's settings, which a bare X server has not: here it is said.
 export HOME="$D/home" WINIT_X11_SCALE_FACTOR="${GDK_SCALE:-2}"

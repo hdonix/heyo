@@ -1,0 +1,80 @@
+{
+  "name": "prefs-probe",
+  "title": "Preferences Probe",
+  "description": "A preference of every type, of the extension's own and of a command's, for the settings window to show and save in the sandbox tests.",
+  "author": "heyo",
+  "preferences": [
+    {
+      "name": "server",
+      "type": "textfield",
+      "title": "Server",
+      "description": "Where it asks.",
+      "placeholder": "https://example.org",
+      "required": true
+    },
+    {
+      "name": "token",
+      "type": "password",
+      "title": "Token",
+      "description": "Kept on this computer.",
+      "placeholder": "tok_…"
+    },
+    {
+      "name": "loud",
+      "type": "checkbox",
+      "title": "Sound",
+      "label": "Play a sound when it is done",
+      "default": false
+    },
+    {
+      "name": "tone",
+      "type": "dropdown",
+      "title": "Tone",
+      "description": "How it words what it says.",
+      "default": "warm",
+      "data": [
+        { "title": "Warm", "value": "warm" },
+        { "title": "Curt", "value": "curt" },
+        { "title": "Formal", "value": "formal" }
+      ]
+    },
+    {
+      "name": "editor",
+      "type": "appPicker",
+      "title": "Editor",
+      "description": "What files are opened with."
+    },
+    {
+      "name": "notes",
+      "type": "file",
+      "title": "Notes File"
+    },
+    {
+      "name": "folder",
+      "type": "directory",
+      "title": "Folder"
+    }
+  ],
+  "commands": [
+    {
+      "name": "show",
+      "title": "Probe Preferences",
+      "mode": "no-view",
+      "preferences": [
+        {
+          "name": "limit",
+          "type": "textfield",
+          "title": "Limit",
+          "description": "How many it lists.",
+          "default": "10"
+        },
+        {
+          "name": "all",
+          "type": "checkbox",
+          "label": "List hidden ones too",
+          "default": true
+        }
+      ]
+    }
+  ]
+}
