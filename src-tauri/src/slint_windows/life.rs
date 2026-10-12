@@ -1,0 +1,605 @@
+//! A window's life on Slint's thread, the same for every window: its
+//! making, its going on and off the screen, its drawing at once, its
+//! registration against the loss of Slint, and whether Slint is there to
+//! be asked. A window says what it is and what it shows; nothing of this
+//! is in the window.
+//!
+//! The interface (docs/architecture.md has it in full):
+//!
+//! - [`Slot`] is where the one window of a kind is kept on Slint's thread:
+//!   made the first time it is used (`with`), and if it cannot be made,
+//!   that is said once and not tried again. `there` never makes it, and
+//!   `again` makes it anew for a display that changed.
+//! - [`Life`] is one window: `ahead` has winit's window made before it is
+//!   wanted, `on` and `off` say whether it is to be on the screen, `draw`
+//!   has what changed seen now. A window never shows or hides Slint's
+//!   window itself, never waits for winit's, and never asks winit to draw.
+//! - [`ask`] and [`begin`] are how another thread has something done here:
+//!   what is asked when Slint is not there is dropped, and said to be.
+//!
+//! What is decided is decided as values ([`Stage`], [`reach`]), which is
+//! what the tests are of; Slint's window only carries the answers out.
+
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use std::thread::LocalKey;
+
+use slint::winit_030::winit::window::{Window, WindowId};
+use slint::winit_030::WinitWindowAccessor;
+use slint::ComponentHandle;
+use tauri::AppHandle;
+
+use super::guard::{self, State};
+use super::{pointer, thread};
+
+// --- On and off the screen, as values ---------------------------------------------
+
+/// What is to be done for a window to be where it is wanted.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Do {
+    Nothing,
+    /// Slint shows it, which has winit make its window; that is waited
+    /// for, and `Stage::made` says what follows.
+    Make,
+    /// winit puts its window on the screen, or takes it off.
+    PutOn,
+    TakeOff,
+    /// Slint shows it, or hides it.
+    Show,
+    Hide,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Made {
+    No,
+    Asked,
+    Yes,
+}
+
+/// Where a window is in its life.
+///
+/// A kept window is made once and then only put on and taken off the
+/// screen by winit: Slint, hiding a window, may make it anew when it is
+/// next shown, without what the desktop was told of it (that it floats,
+/// that it never has the keyboard). Any other window is left to Slint.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Stage {
+    kept: bool,
+    made: Made,
+    wanted: bool,
+}
+
+impl Stage {
+    pub(super) fn new(kept: bool) -> Self {
+        Self { kept, made: Made::No, wanted: false }
+    }
+
+    /// Whether it is to be on the screen.
+    pub(super) fn wanted(&self) -> bool {
+        self.wanted
+    }
+
+    /// Whether winit's window is there, for a kept window.
+    pub(super) fn made(&self) -> bool {
+        self.made == Made::Yes
+    }
+
+    /// It is to be made ahead of when it is wanted.
+    pub(super) fn ahead(&mut self) -> Do {
+        if self.kept && self.made == Made::No {
+            self.made = Made::Asked;
+            Do::Make
+        } else {
+            Do::Nothing
+        }
+    }
+
+    /// It is to be on the screen.
+    pub(super) fn on(&mut self) -> Do {
+        self.wanted = true;
+        match (self.kept, self.made) {
+            (false, _) => Do::Show,
+            (true, Made::Yes) => Do::PutOn,
+            // It comes on when it is made.
+            (true, Made::Asked) => Do::Nothing,
+            (true, Made::No) => {
+                self.made = Made::Asked;
+                Do::Make
+            }
+        }
+    }
+
+    /// It is to be off the screen.
+    pub(super) fn off(&mut self) -> Do {
+        self.wanted = false;
+        match (self.kept, self.made) {
+            (false, _) => Do::Hide,
+            (true, Made::Yes) => Do::TakeOff,
+            // Not there yet: it does not come on when it is.
+            (true, _) => Do::Nothing,
+        }
+    }
+
+    /// winit has made the window that `Do::Make` asked for. It was shown
+    /// to be made, so it is on the screen until it is taken off.
+    pub(super) fn arrived(&mut self) -> Do {
+        self.made = Made::Yes;
+        if self.wanted {
+            Do::PutOn
+        } else {
+            Do::TakeOff
+        }
+    }
+
+    /// It could not be made: it may be asked for again.
+    pub(super) fn failed(&mut self) {
+        self.made = Made::No;
+    }
+}
+
+// --- One window ----------------------------------------------------------------------
+
+/// How a kept window is put on the screen and taken off it by winit: what
+/// differs by desktop (without the keyboard, above the others).
+#[derive(Clone, Copy)]
+pub(super) struct Kept {
+    pub on: fn(&Window),
+    pub off: fn(&Window),
+}
+
+type Then = Box<dyn FnOnce(Result<(), String>)>;
+
+/// What a window is told of winit's window: each time it is about to be
+/// seen, and whether this is the first time for that window of winit's.
+type Arrive<C> = Rc<dyn Fn(&C, &Window, bool)>;
+
+/// One window of Slint's, through its life.
+pub(super) struct Life<C: ComponentHandle + 'static> {
+    window: C,
+    kept: Option<Kept>,
+    stage: Rc<Cell<Stage>>,
+    arrive: Arrive<C>,
+    /// winit's window that `arrive` was last told of.
+    known: Rc<Cell<Option<WindowId>>>,
+    /// What waits for the window to be made.
+    waiting: Rc<RefCell<Vec<Then>>>,
+}
+
+impl<C: ComponentHandle + 'static> Life<C> {
+    /// `kept` says how winit puts the window on and off the screen, for a
+    /// window that is kept; None leaves it to Slint. `arrive` is told of
+    /// winit's window each time it is about to be seen: the window's
+    /// place is its to say then.
+    pub(super) fn new(window: C, kept: Option<Kept>, arrive: impl Fn(&C, &Window, bool) + 'static) -> Self {
+        Self { window, kept, stage: Rc::new(Cell::new(Stage::new(kept.is_some()))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default() }
+    }
+
+    /// Slint's window: for what it shows, never to show or hide it.
+    pub(super) fn window(&self) -> &C {
+        &self.window
+    }
+
+    /// Whether it is to be on the screen.
+    pub(super) fn wanted(&self) -> bool {
+        self.stage.get().wanted()
+    }
+
+    fn step(&self, step: impl FnOnce(&mut Stage) -> Do) -> Do {
+        let mut stage = self.stage.get();
+        let what = step(&mut stage);
+        self.stage.set(stage);
+        what
+    }
+
+    /// Has winit's window made ahead of when it is wanted, off the
+    /// screen. `then` is done when it is there: at once if it is.
+    pub(super) fn ahead(&self, then: impl FnOnce() + 'static) {
+        if self.kept.is_none() || self.stage.get().made() {
+            return then();
+        }
+        self.waiting.borrow_mut().push(Box::new(move |made| {
+            if made.is_ok() {
+                then();
+            }
+        }));
+        if self.step(Stage::ahead) == Do::Make {
+            self.make();
+        }
+    }
+
+    /// Puts it on the screen: at once if winit's window is there, when it
+    /// is if not. `then` hears whether it came.
+    pub(super) fn on(&self, then: impl FnOnce(Result<(), String>) + 'static) {
+        match self.step(Stage::on) {
+            Do::Show => {
+                if let Err(e) = self.window.show() {
+                    return then(Err(e.to_string()));
+                }
+                self.waiting.borrow_mut().push(Box::new(then));
+                self.wait(false);
+            }
+            Do::Make => {
+                self.waiting.borrow_mut().push(Box::new(then));
+                self.make();
+            }
+            Do::PutOn => {
+                let (window, arrive, kept) = (&self.window, &self.arrive, self.kept);
+                window.window().with_winit_window(|made| {
+                    arrive(window, made, false);
+                    if let Some(kept) = kept {
+                        (kept.on)(made);
+                    }
+                    made.request_redraw();
+                });
+                then(Ok(()));
+            }
+            _ => self.waiting.borrow_mut().push(Box::new(then)),
+        }
+    }
+
+    /// Takes it off the screen.
+    pub(super) fn off(&self) {
+        match self.step(Stage::off) {
+            Do::Hide => {
+                let _ = self.window.hide();
+            }
+            Do::TakeOff => {
+                if let Some(kept) = self.kept {
+                    self.window.window().with_winit_window(kept.off);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Has what changed in the window drawn at the next turn of the
+    /// loop. Slint paces its drawing with a timer that first fires a
+    /// frame's time after something changed (on X11 and on Windows): what
+    /// a key, a click or the pointer did would be seen a frame late.
+    pub(super) fn draw(&self) {
+        if self.wanted() {
+            self.window.window().with_winit_window(|made| made.request_redraw());
+        }
+    }
+
+    /// Has Slint show the window, which makes winit's, and waits for it.
+    fn make(&self) {
+        if let Err(e) = self.window.show() {
+            self.step(|stage| {
+                stage.failed();
+                Do::Nothing
+            });
+            for then in self.waiting.take() {
+                then(Err(e.to_string()));
+            }
+            return;
+        }
+        self.wait(true);
+    }
+
+    /// Waits for winit's window, registers it, tells the window of it,
+    /// and puts it where the stage says: `making` when it was shown only
+    /// to be made.
+    fn wait(&self, making: bool) {
+        let (window, stage, arrive, known, waiting, kept) = (self.window.as_weak(), self.stage.clone(), self.arrive.clone(), self.known.clone(), self.waiting.clone(), self.kept);
+        let waited = slint::spawn_local(async move {
+            let heard = |outcome: Result<(), String>| {
+                for then in waiting.take() {
+                    then(outcome.clone());
+                }
+            };
+            let Some(window) = window.upgrade() else { return heard(Err("the window is gone".into())) };
+            // Held no longer than this: a window still referred to stays
+            // on the screen when Slint hides it.
+            let made = match window.window().winit_window().await {
+                Ok(made) => made,
+                Err(e) => return heard(Err(e.to_string())),
+            };
+            // So that it can be taken off the screen if Slint is lost,
+            // and its pointer follows the desktop's.
+            guard::remember(&made);
+            pointer::remember(&made);
+            let first = known.replace(Some(made.id())) != Some(made.id());
+            arrive(&window, &made, first);
+            if making {
+                let mut now = stage.get();
+                let what = now.arrived();
+                stage.set(now);
+                match (what, kept) {
+                    (Do::PutOn, Some(kept)) => {
+                        (kept.on)(&made);
+                        made.request_redraw();
+                    }
+                    (Do::TakeOff, Some(kept)) => (kept.off)(&made),
+                    _ => {}
+                }
+            }
+            drop(made);
+            heard(Ok(()));
+        });
+        if let Err(e) = waited {
+            eprintln!("heyo: slint could not wait for a window: {e}");
+        }
+    }
+}
+
+impl<C: ComponentHandle + 'static> Drop for Life<C> {
+    fn drop(&mut self) {
+        // Slint keeps a window it was asked to show until it is asked to
+        // hide it.
+        let _ = self.window.hide();
+    }
+}
+
+// --- The one window of a kind --------------------------------------------------------
+
+/// A window there is one of.
+pub(super) trait Lives: Sized + 'static {
+    /// What it is called when something is said of it.
+    const NAME: &'static str;
+    /// Makes it. On Slint's thread.
+    fn make() -> Result<Self, String>;
+}
+
+/// Where the one window of a kind is kept, on Slint's thread.
+pub(super) struct Slot<T> {
+    kept: RefCell<Option<T>>,
+    /// It could not be made: said once, and not tried again.
+    failed: Cell<bool>,
+}
+
+impl<T: Lives> Slot<T> {
+    pub(super) const fn new() -> Self {
+        Self { kept: RefCell::new(None), failed: Cell::new(false) }
+    }
+
+    /// Does `work` with the window, making it first if this is the first
+    /// time. None when there is none to do it with: it could not be made,
+    /// or it is in the middle of something else.
+    pub(super) fn with<R>(slot: &'static LocalKey<Self>, work: impl FnOnce(&mut T) -> R) -> Option<R> {
+        slot.with(|slot| {
+            let mut kept = slot.kept.try_borrow_mut().ok()?;
+            if kept.is_none() && !slot.failed.get() {
+                match T::make() {
+                    Ok(made) => *kept = Some(made),
+                    Err(reason) => {
+                        slot.failed.set(true);
+                        eprintln!("heyo: {} cannot be shown in this run: {reason}", T::NAME);
+                    }
+                }
+            }
+            kept.as_mut().map(work)
+        })
+    }
+
+    /// Does `work` with the window if it has been made, and never makes
+    /// it.
+    pub(super) fn there<R>(slot: &'static LocalKey<Self>, work: impl FnOnce(&mut T) -> R) -> Option<R> {
+        slot.with(|slot| slot.kept.try_borrow_mut().ok()?.as_mut().map(work))
+    }
+
+    /// Gives the window up, if `which` says so of it: the next use makes
+    /// another.
+    pub(super) fn give_up(slot: &'static LocalKey<Self>, which: impl FnOnce(&T) -> bool) -> Option<T> {
+        slot.with(|slot| {
+            let mut kept = slot.kept.try_borrow_mut().ok()?;
+            kept.as_ref().is_some_and(which).then(|| kept.take()).flatten()
+        })
+    }
+
+    /// Makes the window again, if there was one: `carry` takes what the
+    /// old one showed across to the new. One that was never made is left
+    /// to be made when it is first used.
+    pub(super) fn again(slot: &'static LocalKey<Self>, carry: impl FnOnce(T, &mut T)) {
+        let Some(old) = Self::give_up(slot, |_| true) else { return };
+        let mut old = Some(old);
+        Self::with(slot, |new| {
+            if let Some(old) = old.take() {
+                carry(old, new);
+            }
+        });
+    }
+}
+
+// --- From other threads --------------------------------------------------------------
+
+/// Whether something asked of Slint's thread can be done there.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Reach {
+    /// Its loop turns.
+    Now,
+    /// It has not begun, or is beginning: it is started, or waited for.
+    Started,
+    /// It is not there, and what was asked is dropped.
+    No,
+}
+
+/// What comes of asking Slint's thread for something, by the state it is
+/// in and whether the asker may start it. Something that only tells a
+/// window (a recording's level, a capture's windows) never starts Slint:
+/// the window it tells is not there to be told.
+pub(super) fn reach(state: State, may_start: bool) -> Reach {
+    match state {
+        State::Running => Reach::Now,
+        State::Idle | State::Starting if may_start => Reach::Started,
+        State::Idle | State::Starting | State::Gone => Reach::No,
+    }
+}
+
+/// Has `work` done on Slint's thread if Slint is there. From any thread;
+/// it does not wait. False when it was dropped.
+pub(super) fn ask(work: impl FnOnce() + Send + 'static) -> bool {
+    reach(guard::state(), false) == Reach::Now && thread::on(work)
+}
+
+/// Has `work` done on Slint's thread, starting Slint first if it has not
+/// begun (which is waited for). From any thread. False when Slint cannot
+/// be had, now or for the rest of this run.
+pub(super) fn begin(app: &AppHandle, work: impl FnOnce() + Send + 'static) -> bool {
+    match reach(guard::state(), true) {
+        Reach::No => false,
+        Reach::Now | Reach::Started => super::ensure(app) && thread::on(work),
+    }
+}
+
+/// Has a window drawn clear where it draws nothing, or opaque, as what
+/// draws it allows (`thread::seen_through`), and corrected when that is
+/// only learnt at its first frame.
+pub(super) fn seen_through(window: &slint::Window, renderer: &str, set_opaque: impl Fn(bool) + 'static) {
+    set_opaque(!thread::seen_through(renderer));
+    let set_opaque = Rc::new(set_opaque);
+    thread::watch(window, renderer, move |clear| {
+        // Not from inside the drawing it was learnt in.
+        let set_opaque = set_opaque.clone();
+        slint::Timer::single_shot(std::time::Duration::ZERO, move || set_opaque(!clear));
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_kept_window_is_made_once_and_then_put_on_and_taken_off_by_winit() {
+        let mut stage = Stage::new(true);
+        assert_eq!(stage.on(), Do::Make);
+        assert_eq!(stage.arrived(), Do::PutOn);
+        assert_eq!(stage.off(), Do::TakeOff);
+        assert_eq!(stage.on(), Do::PutOn);
+        assert_eq!(stage.off(), Do::TakeOff);
+        // Never by Slint, which would make it anew.
+        assert!(![stage.on(), stage.off(), stage.ahead()].iter().any(|what| matches!(what, Do::Show | Do::Hide | Do::Make)));
+    }
+
+    #[test]
+    fn a_window_made_ahead_stays_off_the_screen_until_it_is_wanted() {
+        let mut stage = Stage::new(true);
+        assert_eq!(stage.ahead(), Do::Make);
+        // Asked for again while winit is making it: not made twice.
+        assert_eq!(stage.ahead(), Do::Nothing);
+        assert_eq!(stage.arrived(), Do::TakeOff);
+        assert!(stage.made() && !stage.wanted());
+        assert_eq!(stage.ahead(), Do::Nothing);
+        assert_eq!(stage.on(), Do::PutOn);
+    }
+
+    #[test]
+    fn a_window_wanted_while_it_is_being_made_comes_on_when_it_is() {
+        let mut stage = Stage::new(true);
+        assert_eq!(stage.ahead(), Do::Make);
+        assert_eq!(stage.on(), Do::Nothing);
+        assert_eq!(stage.arrived(), Do::PutOn);
+    }
+
+    #[test]
+    fn a_window_no_longer_wanted_when_it_is_made_does_not_come_on() {
+        let mut stage = Stage::new(true);
+        assert_eq!(stage.on(), Do::Make);
+        assert_eq!(stage.off(), Do::Nothing);
+        assert_eq!(stage.arrived(), Do::TakeOff);
+    }
+
+    #[test]
+    fn a_window_that_could_not_be_made_may_be_asked_for_again() {
+        let mut stage = Stage::new(true);
+        assert_eq!(stage.on(), Do::Make);
+        stage.failed();
+        assert_eq!(stage.on(), Do::Make);
+    }
+
+    #[test]
+    fn a_window_that_is_not_kept_is_shown_and_hidden_by_slint() {
+        let mut stage = Stage::new(false);
+        assert_eq!(stage.ahead(), Do::Nothing);
+        assert_eq!(stage.on(), Do::Show);
+        assert!(stage.wanted());
+        assert_eq!(stage.off(), Do::Hide);
+        assert_eq!(stage.on(), Do::Show);
+    }
+
+    /// A stand-in for a window: it counts how often it was made, and can
+    /// be told not to be makeable.
+    struct Stand {
+        shows: &'static str,
+    }
+
+    thread_local! {
+        static STAND: Slot<Stand> = const { Slot::new() };
+        static MADE: Cell<u32> = const { Cell::new(0) };
+        static MAKEABLE: Cell<bool> = const { Cell::new(true) };
+    }
+
+    impl Lives for Stand {
+        const NAME: &'static str = "the stand-in";
+
+        fn make() -> Result<Self, String> {
+            MADE.set(MADE.get() + 1);
+            if MAKEABLE.get() {
+                Ok(Stand { shows: "" })
+            } else {
+                Err("it is not makeable".into())
+            }
+        }
+    }
+
+    // Each test has a thread of its own, and so a slot of its own.
+
+    #[test]
+    fn the_window_is_made_the_first_time_it_is_used_and_then_kept() {
+        assert_eq!(Slot::there(&STAND, |_| ()), None);
+        assert_eq!(MADE.get(), 0);
+        assert_eq!(Slot::with(&STAND, |stand| stand.shows = "a page"), Some(()));
+        assert_eq!(Slot::with(&STAND, |stand| stand.shows), Some("a page"));
+        assert_eq!(Slot::there(&STAND, |stand| stand.shows), Some("a page"));
+        assert_eq!(MADE.get(), 1);
+    }
+
+    #[test]
+    fn a_window_that_cannot_be_made_is_not_tried_again() {
+        MAKEABLE.set(false);
+        assert_eq!(Slot::with(&STAND, |_| ()), None);
+        MAKEABLE.set(true);
+        assert_eq!(Slot::with(&STAND, |_| ()), None);
+        assert_eq!(MADE.get(), 1);
+    }
+
+    #[test]
+    fn a_window_in_the_middle_of_something_is_not_done_another_thing_with() {
+        let inner = Slot::with(&STAND, |_| Slot::with(&STAND, |_| ()));
+        assert_eq!(inner, Some(None));
+    }
+
+    #[test]
+    fn a_window_made_again_is_another_that_shows_what_the_old_one_showed() {
+        // Never made: there is nothing to make again.
+        Slot::again(&STAND, |_, _| panic!("there was none"));
+        assert_eq!(MADE.get(), 0);
+        Slot::with(&STAND, |stand| stand.shows = "a page");
+        Slot::again(&STAND, |old, new| new.shows = old.shows);
+        assert_eq!(MADE.get(), 2);
+        assert_eq!(Slot::there(&STAND, |stand| stand.shows), Some("a page"));
+    }
+
+    #[test]
+    fn a_window_given_up_is_made_anew_when_it_is_next_used() {
+        Slot::with(&STAND, |stand| stand.shows = "a page");
+        assert!(Slot::give_up(&STAND, |stand| stand.shows == "another").is_none());
+        assert!(Slot::give_up(&STAND, |stand| stand.shows == "a page").is_some());
+        assert_eq!(Slot::there(&STAND, |_| ()), None);
+        assert_eq!(Slot::with(&STAND, |stand| stand.shows), Some(""));
+    }
+
+    #[test]
+    fn what_is_asked_of_slint_is_dropped_when_it_is_not_there() {
+        // Telling a window something never starts Slint.
+        assert_eq!(reach(State::Running, false), Reach::Now);
+        assert_eq!(reach(State::Idle, false), Reach::No);
+        assert_eq!(reach(State::Starting, false), Reach::No);
+        assert_eq!(reach(State::Gone, false), Reach::No);
+        // Showing one does, unless Slint is lost for this run.
+        assert_eq!(reach(State::Idle, true), Reach::Started);
+        assert_eq!(reach(State::Starting, true), Reach::Started);
+        assert_eq!(reach(State::Running, true), Reach::Now);
+        assert_eq!(reach(State::Gone, true), Reach::No);
+    }
+}

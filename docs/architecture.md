@@ -544,9 +544,36 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
 `.slint` files and the same Rust are the windows on Linux and on Windows.
 
 - `thread.rs` is Slint's thread ("heyo-slint"), beside Tauri's: one for
-  the life of Heyo, started when Heyo starts, with both windows on it.
-  What a window asks of the host is asked on another thread, so that
-  Slint's never waits for the host and never holds anything of its.
+  the life of Heyo, started when Heyo starts, with every one of these
+  windows on it. What a window asks of the host is asked on another
+  thread, so that Slint's never waits for the host and never holds
+  anything of its.
+- `life.rs` is a window's life on that thread, the same for every window.
+  A window says what it is (its name, how it is made, whether it is kept)
+  and what it shows, and nothing of the rest. Its interface:
+  - What a caller says: do this with the window (`with`, which makes it
+    the first time; `there`, which never makes it); have it made ahead of
+    when it is wanted (`ahead`); it is to be on the screen, or not (`on`,
+    `off`); what changed is to be seen now (`draw`); make it again, for a
+    display that changed (`again`). And from any other thread: do this on
+    Slint's thread if Slint is there (`ask`), or starting Slint first
+    (`begin`).
+  - What it is promised: the window is made the first time it is used,
+    and if it cannot be made that is said once and not tried again in the
+    run. Each time winit makes its window, that window is registered (with
+    the guard, which takes it off the screen if Slint is lost, and with
+    the pointer) and handed to the window once, before it can be seen. A
+    kept window is put on and taken off the screen by winit and never
+    hidden by Slint, which would make it anew without what the desktop was
+    told of it; any other is shown and hidden by Slint. A window wanted
+    before winit has made it comes on when it has, and one no longer
+    wanted by then does not. `draw` is at the next turn of the loop on
+    every platform, not at Slint's next tick. What is asked from another
+    thread when Slint is not there is dropped and said to be (`false`),
+    never queued.
+  - What a caller must never do: show or hide Slint's window itself, wait
+    for winit's window, ask winit to draw, or look at the guard's state or
+    at which desktop this is to decide any of the above.
 - `pill/` is the dictation pill. `model.rs` is what it shows of a
   recording as `dictation.rs` tells it (`Told`), and what a press on it
   means: that is what is tested. `native.rs` is what a desktop is told

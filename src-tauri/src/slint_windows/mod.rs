@@ -16,6 +16,8 @@
 //!   desktop must be told for it to float over everything unfocused.
 //! - `screenshot` is the screenshot overlay: its window, and what a
 //!   desktop must be told for it to cover a monitor and have every key.
+//! - `life` is a window's life on Slint's thread, the same for each: its
+//!   making, its going on and off the screen, its drawing at once.
 //! - `reach` is where in its window a window takes the pointer.
 //! - `pointer` keeps the pointer over them the size the desktop says.
 //!
@@ -30,6 +32,7 @@ mod guard;
 mod host;
 mod icons;
 mod keys;
+mod life;
 mod model;
 pub(crate) mod pill;
 mod pointer;

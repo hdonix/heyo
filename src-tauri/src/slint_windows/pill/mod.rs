@@ -5,9 +5,10 @@
 //!
 //! - `model` is what it shows of a recording and what a press on it means.
 //! - `native` is what a desktop is told for it to float unfocused.
-//! - This file is the window: made the first time it is shown, placed at
-//!   the bottom centre of the primary monitor, shown what the model says,
-//!   and what is done to it told to the host.
+//! - This file is the window: placed at the bottom centre of the primary
+//!   monitor, shown what the model says, and what is done to it told to
+//!   the host. Its making and its going on and off the screen are
+//!   `super::life`'s.
 //!
 //! The host calls `show`, `tell` and `hide` from its own threads. None of
 //! them waits for Slint, except the first `show` of a run when Slint was
@@ -18,17 +19,15 @@
 mod model;
 pub(super) mod native;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use slint::winit_030::winit::dpi::PhysicalPosition;
-use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, Model as _, ModelRc, VecModel};
 use tauri::AppHandle;
 
-use super::guard::{self, State};
+use super::life::{self, Kept, Life, Lives, Slot};
 use super::thread::{self, Job, Kind};
 use super::ui;
 use crate::dictation::Told;
@@ -40,67 +39,59 @@ use model::{Model, Phase};
 const LEAVING: Duration = Duration::from_millis(140);
 
 struct Pill {
-    window: ui::PillWindow,
+    life: Life<ui::PillWindow>,
     model: Model,
     bars: Rc<VecModel<f32>>,
     /// The host is told what was done to the pill on a thread kept for
     /// that alone: a press is said at once, whatever else is being asked.
     telling: mpsc::Sender<Job>,
-    /// Whether it is to be on screen. It leaves a moment after it is not.
+    /// Whether a recording has it up. It leaves the screen a moment after
+    /// it no longer has.
     wanted: bool,
     leaving: slint::Timer,
-    /// Its window has been made, which Slint does when it first shows it.
-    ready: bool,
 }
 
 thread_local! {
-    static PILL: RefCell<Option<Pill>> = const { RefCell::new(None) };
-    /// It could not be made: said once, and not tried again.
-    static FAILED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static PILL: Slot<Pill> = const { Slot::new() };
 }
 
 /// Does `work` with the pill, on Slint's thread, making it first if this
 /// is the first time.
 fn with(work: impl FnOnce(&mut Pill)) {
-    PILL.with(|slot| {
-        let Ok(mut slot) = slot.try_borrow_mut() else { return };
-        if slot.is_none() && !FAILED.with(std::cell::Cell::get) {
-            match make() {
-                Ok(pill) => *slot = Some(pill),
-                Err(reason) => {
-                    FAILED.with(|failed| failed.set(true));
-                    eprintln!("heyo: dictation has no window in this run: {reason}");
-                }
-            }
-        }
-        if let Some(pill) = slot.as_mut() {
-            work(pill);
-        }
-    });
+    Slot::with(&PILL, work);
 }
 
-fn make() -> Result<Pill, String> {
-    let shared = thread::shared().ok_or("Slint has not begun")?;
-    let telling = thread::asker("heyo-slint-pill", shared.host.clone())?;
-    let window = thread::making(Kind::Pill, ui::PillWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
-    window.set_opaque(!thread::seen_through(&shared.renderer));
-    let weak = window.as_weak();
-    thread::watch(window.window(), &shared.renderer, move |clear| {
-        let weak = weak.clone();
-        slint::Timer::single_shot(Duration::ZERO, move || {
+impl Lives for Pill {
+    const NAME: &'static str = "the dictation pill";
+
+    fn make() -> Result<Self, String> {
+        let shared = thread::shared().ok_or("Slint has not begun")?;
+        let telling = thread::asker("heyo-slint-pill", shared.host.clone())?;
+        let window = thread::making(Kind::Pill, ui::PillWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
+        let weak = window.as_weak();
+        life::seen_through(window.window(), &shared.renderer, move |opaque| {
             if let Some(window) = weak.upgrade() {
-                window.set_opaque(!clear);
+                window.set_opaque(opaque);
             }
         });
-    });
-    let bars = Rc::new(VecModel::from(vec![0.0_f32; 5]));
-    window.set_bars(ModelRc::from(bars.clone()));
-    window.on_pressed(|| with(|pill| pill.did(pill.model.pressed())));
-    window.on_clicked(|| with(|pill| pill.did(pill.model.clicked())));
-    window.on_cancel(|| with(|pill| pill.did(pill.model.cancelled())));
-    let mut pill = Pill { window, model: Model::new(), bars, telling, wanted: false, leaving: slint::Timer::default(), ready: false };
-    pill.push();
-    Ok(pill)
+        let bars = Rc::new(VecModel::from(vec![0.0_f32; 5]));
+        window.set_bars(ModelRc::from(bars.clone()));
+        window.on_pressed(|| with(|pill| pill.did(pill.model.pressed())));
+        window.on_clicked(|| with(|pill| pill.did(pill.model.clicked())));
+        window.on_cancel(|| with(|pill| pill.did(pill.model.cancelled())));
+        // Kept, where winit can take a window off the screen: Slint would
+        // make it anew without what `native` says of it.
+        let kept = native::kept().then_some(Kept { on: native::show, off: native::hide });
+        let life = Life::new(window, kept, |_, made, first| {
+            if first {
+                native::made(made);
+            }
+            place(made);
+        });
+        let mut pill = Pill { life, model: Model::new(), bars, telling, wanted: false, leaving: slint::Timer::default() };
+        pill.push();
+        Ok(pill)
+    }
 }
 
 impl Pill {
@@ -112,13 +103,14 @@ impl Pill {
 
     /// Shows what the model says.
     fn push(&mut self) {
+        let window = self.life.window();
         let (settled, changing) = self.model.words();
-        self.window.set_words(settled.into());
-        self.window.set_partial(changing.into());
-        self.window.set_saying(self.model.saying().into());
-        self.window.set_note(self.model.note().into());
-        self.window.set_recording(self.model.recording());
-        self.window.set_phase(
+        window.set_words(settled.into());
+        window.set_partial(changing.into());
+        window.set_saying(self.model.saying().into());
+        window.set_note(self.model.note().into());
+        window.set_recording(self.model.recording());
+        window.set_phase(
             match self.model.phase {
                 Phase::Loading => "loading",
                 Phase::Listening => "listening",
@@ -133,88 +125,35 @@ impl Pill {
                 self.bars.set_row_data(at, bar);
             }
         }
+        self.life.draw();
     }
 
-    /// Has Slint make the window, which it does by showing it: with
-    /// nothing drawn in it, and taken off the screen again at once, in its
-    /// place. `then` is done when it is there.
-    fn prepare(&mut self, then: impl FnOnce() + 'static) {
-        if let Err(e) = self.window.show() {
-            return eprintln!("heyo: the dictation window could not be made: {e}");
-        }
-        let window = self.window.as_weak();
-        let waiting = slint::spawn_local(async move {
-            let Some(window) = window.upgrade() else { return };
-            let Ok(made) = window.window().winit_window().await else { return };
-            // So that it can be taken off the screen if Slint is lost.
-            guard::remember(&made);
-            super::pointer::remember(&made);
-            native::made(&made);
-            place(&made);
-            // Not when it was wanted meanwhile: it is about to be shown.
-            let mut wanted = false;
-            with(|pill| {
-                pill.ready = true;
-                wanted = pill.wanted;
-            });
-            if !wanted {
-                native::hide(&made);
-            }
-            then();
-        });
-        if let Err(e) = waiting {
-            eprintln!("heyo: slint could not wait for the dictation window: {e}");
-        }
-    }
-
-    /// Puts it on screen. To Slint it is shown once and stays so (see
-    /// `native`): this is winit putting the window there.
-    fn show(&mut self, asked: Instant) {
+    /// Puts it on screen, arriving: said before it is there, so that its
+    /// first frame on screen has the pill in it.
+    fn show(&mut self) {
         self.wanted = true;
         self.leaving.stop();
-        if !native::kept() {
-            self.window.set_leaving(false);
-            self.window.set_shown(true);
-            if let Err(e) = self.window.show() {
-                eprintln!("heyo: the dictation window could not be shown: {e}");
+        self.life.window().set_leaving(false);
+        self.life.window().set_shown(true);
+        self.life.on(|came| {
+            if let Err(e) = came {
+                eprintln!("heyo: the dictation pill could not be shown: {e}");
             }
-            return;
-        }
-        if !self.ready {
-            return self.prepare(move || {
-                with(|pill| {
-                    if pill.wanted {
-                        pill.show(asked);
-                    }
-                })
-            });
-        }
-        // Said before it is on screen: its first frame there has the pill
-        // in it, arriving.
-        self.window.set_leaving(false);
-        self.window.set_shown(true);
-        self.window.window().with_winit_window(|made| {
-            place(made);
-            native::show(made);
-            made.request_redraw();
         });
     }
 
     /// Has it go, and takes it off the screen when it has gone.
     fn hide(&mut self) {
         self.wanted = false;
-        self.window.set_shown(false);
-        self.window.set_leaving(true);
+        self.life.window().set_shown(false);
+        self.life.window().set_leaving(true);
+        self.life.draw();
         self.leaving.start(slint::TimerMode::SingleShot, LEAVING, || {
             with(|pill| {
                 if !pill.wanted {
-                    if native::kept() {
-                        pill.window.window().with_winit_window(native::hide);
-                    } else {
-                        let _ = pill.window.hide();
-                    }
+                    pill.life.off();
                     // Off the screen, it is where it arrives from.
-                    pill.window.set_leaving(false);
+                    pill.life.window().set_leaving(false);
                 }
             });
         });
@@ -236,30 +175,21 @@ fn place(made: &slint::winit_030::winit::window::Window) {
 /// Has the pill's window made ahead of the first recording. On Slint's
 /// thread.
 pub(super) fn prepare() {
-    with(|pill| {
-        if !pill.ready && native::kept() {
-            pill.prepare(|| {});
-        }
-    });
+    with(|pill| pill.life.ahead(|| {}));
 }
 
 /// The display changed (`super::follow`): the window is made again, for
 /// the display as it is. What the pill shows is kept, and it is back on
 /// screen if a recording has it there. On Slint's thread.
 pub(super) fn remake() {
-    let old = PILL.with(|slot| slot.try_borrow_mut().ok().and_then(|mut slot| slot.take()));
-    // Never made: it will be, for the display as it is then.
-    let Some(Pill { window, model, wanted, .. }) = old else { return };
-    // Slint keeps a window it was asked to show until it is asked to hide it.
-    let _ = window.hide();
-    drop(window);
-    with(|pill| {
-        pill.model = model;
-        pill.push();
+    Slot::again(&PILL, |old, new| {
+        let wanted = old.wanted;
+        new.model = old.model;
+        new.push();
         if wanted {
-            pill.show(Instant::now());
-        } else if native::kept() {
-            pill.prepare(|| {});
+            new.show();
+        } else {
+            new.life.ahead(|| {});
         }
     });
 }
@@ -267,27 +197,23 @@ pub(super) fn remake() {
 /// Shows the pill. From any thread; it waits only for Slint to start, if
 /// it has not.
 pub(crate) fn show(app: &AppHandle) {
-    let asked = Instant::now();
-    if super::ensure(app) {
-        thread::on(move || with(|pill| pill.show(asked)));
-    }
+    life::begin(app, || with(Pill::show));
 }
 
 /// Tells the pill of the recording. From any thread; it does not wait.
 pub(crate) fn tell(told: Told) {
-    if guard::state() == State::Running {
-        thread::on(move || {
-            with(|pill| {
-                pill.model.told(&told);
-                pill.push();
-            })
-        });
-    }
+    life::ask(move || {
+        with(|pill| {
+            pill.model.told(&told);
+            pill.push();
+        })
+    });
 }
 
 /// Takes the pill away. From any thread; it does not wait.
 pub(crate) fn hide() {
-    if guard::state() == State::Running {
-        thread::on(|| with(Pill::hide));
-    }
+    // One that was never made is not made to be taken away.
+    life::ask(|| {
+        Slot::there(&PILL, Pill::hide);
+    });
 }
