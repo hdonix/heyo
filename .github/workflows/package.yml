@@ -27,7 +27,7 @@ defaults:
     shell: bash
 
 env:
-  TARGETS: x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-pc-windows-gnullvm aarch64-pc-windows-gnullvm
+  TARGETS: x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-pc-windows-msvc aarch64-pc-windows-msvc
 
 jobs:
   build:
@@ -57,9 +57,9 @@ jobs:
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
             libxdo-dev libssl-dev libxkbcommon-dev
 
-      # The compiler for Windows, which also compiles Linux for the other
-      # processor, and that processor's libraries: both are large and
-      # change only when the scripts that fetch them do.
+      # The compiler for Windows and for Linux on the other processor, and
+      # that processor's libraries: both are large and change only when the
+      # scripts that fetch them do.
       - uses: actions/cache@v6
         with:
           path: |
@@ -80,19 +80,38 @@ jobs:
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,x86_64-pc-windows-gnullvm,aarch64-pc-windows-gnullvm
+          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
           shared-key: package
+
+      # What a program for Windows is compiled and linked against, which
+      # only Microsoft has: kept apart from the compiler's cache, each
+      # fetched again only when its own script changes. (After the Rust
+      # toolchain: the program that fetches is built with it.)
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/heyo-build/xwin/splat
+          key: winsdk-${{ hashFiles('scripts/package/winsdk.sh') }}
+      - name: Fetch Microsoft's headers and libraries
+        env:
+          # Fetching these files accepts Microsoft's licence terms for them
+          # (https://go.microsoft.com/fwlink/?LinkId=2086102), and this is
+          # the answer given in advance. The acceptance is that of the
+          # project's owner (hdonix), who accepted the terms for Heyo's
+          # builds on 2026-10-12. Somebody who runs this workflow in a
+          # fork of their own accepts them for themselves by it.
+          XWIN_ACCEPT_LICENSE: 1
+        run: scripts/package/winsdk.sh
 
       - run: pnpm install --frozen-lockfile
 
       - name: Compile for every target
         run: scripts/package/build.sh $TARGETS
 
-      # The programs, what the Windows ones need beside them, and the
-      # runtime's scripts: all a package is made of.
+      # The programs and the runtime's scripts: all a package is made of,
+      # besides what the packaging fetches.
       - uses: actions/upload-artifact@v7
         with:
           name: programs
@@ -100,8 +119,6 @@ jobs:
           path: |
             src-tauri/target/*/release/heyo
             src-tauri/target/*/release/heyo.exe
-            src-tauri/target/*/release/WebView2Loader.dll
-            src-tauri/target/*/release/libunwind.dll
             runtime/dist/heyo-*.cjs
 
   package:
@@ -117,8 +134,8 @@ jobs:
           # An AppImage is made of the libraries of the machine that makes it.
           - { name: Linux arm64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
           # Tauri's installer script needs NSIS 3.09, which Ubuntu 22.04 does not have.
-          - { name: Windows x86_64, os: ubuntu-24.04, target: x86_64-pc-windows-gnullvm }
-          - { name: Windows arm64, os: ubuntu-24.04, target: aarch64-pc-windows-gnullvm }
+          - { name: Windows x86_64, os: ubuntu-24.04, target: x86_64-pc-windows-msvc }
+          - { name: Windows arm64, os: ubuntu-24.04, target: aarch64-pc-windows-msvc }
     steps:
       - uses: actions/checkout@v7
 
@@ -131,10 +148,11 @@ jobs:
             libxdo-dev libxkbcommon-dev patchelf file xdg-utils
 
       # Tauri's packager, run on Linux, looks for the tray library whatever
-      # it packages for.
+      # it packages for. llvm is for its llvm-objdump, which reads from the
+      # program which of Microsoft's runtime DLLs the installer must carry.
       - name: Install NSIS
         if: contains(matrix.target, 'windows')
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nsis libayatana-appindicator3-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nsis llvm libayatana-appindicator3-dev
 
       - uses: pnpm/action-setup@v6
         with:

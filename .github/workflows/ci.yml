@@ -39,6 +39,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Skia needs nothing installed for itself, here or on Windows below:
+      # the crate that binds it fetches a prebuilt library with curl while
+      # it is built (no clang, Python or ninja, which are for building Skia
+      # from source), and on Linux links fontconfig and freetype, whose
+      # development files come with WebKitGTK's.
       - name: Install system packages
         run: |
           sudo apt-get update
