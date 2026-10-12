@@ -119,8 +119,11 @@ impl Line {
         self
     }
 
-    fn password(mut self, placeholder: &str) -> Line {
-        (self.control, self.placeholder) = ("password", placeholder.to_string());
+    /// A field for something that is never shown again once it is said:
+    /// what was typed is taken out of it. (A "password" field is another
+    /// thing: it shows, as dots, what is stored.)
+    fn secret(mut self, placeholder: &str) -> Line {
+        (self.control, self.placeholder) = ("secret", placeholder.to_string());
         self
     }
 
@@ -757,7 +760,7 @@ impl Model {
             rows.push(Line::row("set:localModelName", "Model Name").says("Leave empty to use the first model the server offers.").field(self.chosen("localModelName"), "automatic"));
         } else {
             let saved = self.set("anthropicApiKeySet");
-            let key = Line::row("apikey", "API Key").says("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.").password(if saved { "Saved — type a new key to replace it" } else { "sk-ant-…" });
+            let key = Line::row("apikey", "API Key").says("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.").secret(if saved { "Saved — type a new key to replace it" } else { "sk-ant-…" });
             rows.push(if saved { key.more("Remove") } else { key });
         }
         page.card("AI", rows);
@@ -1523,7 +1526,7 @@ mod tests {
         model.page = "advanced".into();
         let lines = model.lines();
         assert!(row(&lines, "Node.js").danger && row(&lines, "Node.js").description == "node was not found HEYO_NODE overrides this setting. Extensions need Node.js 22 or newer.");
-        assert_eq!((row(&lines, "API Key").control, row(&lines, "API Key").more.as_str(), row(&lines, "API Key").value.as_str()), ("password", "Remove", ""));
+        assert_eq!((row(&lines, "API Key").control, row(&lines, "API Key").more.as_str(), row(&lines, "API Key").value.as_str()), ("secret", "Remove", ""));
         assert!(!has(&lines, "Server"));
         assert_eq!(asked(&model.acted("apikey", "sk-ant-1")), ("set_anthropic_api_key", json!({ "key": "sk-ant-1" })));
         assert!(model.acted("apikey", "  ").is_empty());
@@ -1572,7 +1575,7 @@ mod tests {
         model.extensions = vec![
             json!({ "id": "/data/zeta", "name": "zeta", "title": "Zeta Tools", "author": "someone", "icon": "icon.png", "builtin": false, "description": "Tools.",
                 "preferences": [{ "name": "token", "type": "password", "title": "Token", "required": true }, { "name": "mode", "type": "dropdown", "title": "Mode", "data": [{ "title": "Fast", "value": "fast" }, { "title": "Careful", "value": "careful" }] }],
-                "values": { "extension": { "mode": "careful" }, "commands": {} },
+                "values": { "extension": { "mode": "careful", "token": "tok_1" }, "commands": {} },
                 "commands": [{ "id": "cmd:zeta:one", "name": "one", "title": "First Thing", "description": null, "icon": "star-16", "preferences": [{ "name": "loud", "type": "checkbox", "title": "Sound", "label": "Play a sound", "default": true }] }, { "id": "cmd:zeta:two", "name": "two", "title": "Second Thing", "description": "Does more", "icon": null, "preferences": [] }] }),
             json!({ "id": BUILTIN, "name": BUILTIN, "title": "Heyo", "builtin": true, "icon": "store-16", "preferences": [], "values": { "extension": {}, "commands": {} }, "commands": [{ "id": "cmd:@heyo:clipboard-history", "name": "clipboard-history", "title": "Clipboard History", "description": "What was copied", "preferences": [] }, { "id": "cmd:@heyo:dictate", "name": "dictate", "title": "Dictate", "description": null, "preferences": [] }] }),
             json!({ "id": "/src/alpha", "name": "alpha", "title": "alpha Notes", "builtin": false, "development": "/src/alpha", "preferences": [], "values": { "extension": {}, "commands": {} }, "commands": [{ "id": "cmd:alpha:only", "name": "only", "title": "Only Command", "preferences": [] }] }),
@@ -1629,6 +1632,10 @@ mod tests {
         assert_eq!((lines[0].label.as_str(), lines[0].description.as_str(), lines[1].kind, lines[1].label.as_str()), ("Zeta Tools", "by someone", "note", "Tools."));
         // Preferences, of each kind the API has; a value stored, else the default.
         assert_eq!((row(&lines, "Token *").control, row(&lines, "Mode").control, row(&lines, "Mode").value.as_str(), titles(row(&lines, "Mode"))), ("password", "select", "careful", vec!["Fast", "Careful"]));
+        // A password that is stored stays in its field (as dots): the field
+        // is not one that forgets what was typed, or leaving it would save
+        // the nothing it then held.
+        assert_eq!(row(&lines, "Token *").value, "tok_1");
         let sound = row(&lines, "Sound");
         assert_eq!((sound.control, sound.on, sound.description.as_str()), ("switch", true, "Play a sound"));
         assert!(has(&lines, "First Thing Preferences"));
@@ -1643,7 +1650,7 @@ mod tests {
         assert_eq!(asked(&model.acted("activities:zeta", "false")).1, json!({ "changes": { "activitiesOff": ["zeta"] } }));
         // A preference is saved among the others of the extension.
         let saved = asked(&model.acted(&sound.id, "false"));
-        assert_eq!(saved, ("set_extension_preferences", json!({ "extension": "zeta", "values": { "extension": { "mode": "careful" }, "commands": { "one": { "loud": false } } } })));
+        assert_eq!(saved, ("set_extension_preferences", json!({ "extension": "zeta", "values": { "extension": { "mode": "careful", "token": "tok_1" }, "commands": { "one": { "loud": false } } } })));
         assert_eq!(asked(&model.acted(&row(&lines, "Token *").id, "secret")).1["values"]["extension"], json!({ "mode": "careful", "token": "secret" }));
         // Removal, after which the window is elsewhere.
         assert_eq!((row(&lines, "Uninstall Extension").control, row(&lines, "Uninstall Extension").placeholder.as_str()), ("confirm", "Click Again to Uninstall"));

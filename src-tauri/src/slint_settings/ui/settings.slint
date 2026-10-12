@@ -348,14 +348,14 @@ component LineView inherits VerticalLayout {
                 title: root.line.label;
                 keys: root.line.keys;
             }
-            if root.line.control == "field" || root.line.control == "password": LineField {
+            if root.line.control == "field" || root.line.control == "password" || root.line.control == "secret": LineField {
                 width: 220px;
                 name: root.line.id;
                 stored: root.line.value;
                 label: root.line.label;
                 placeholder: root.line.placeholder;
-                password: root.line.control == "password";
-                forget: root.line.control == "password";
+                password: root.line.control != "field";
+                forget: root.line.control == "secret";
             }
             if root.line.control == "select": Select {
                 label: root.line.label;
