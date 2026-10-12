@@ -163,7 +163,13 @@ and:
   it) and leaves the application out of `Shell.AppSystem.get_running()`
   (the Dash asks that) while all its windows are of that kind.
 
-The settings window is an ordinary window and is listed.
+The settings window is an ordinary window and is listed. It is not the
+web view's but Slint's ([slint-settings.md](slint-settings.md)), a Wayland
+client of its own beside GTK: it is drawn on the CPU, which on Wayland
+leaves it no transparency, so it has no shadow and square corners there;
+it cannot bring itself forward, so the extension does that (`ActivateOwn`,
+as for the web view's windows); and it is given Heyo's application id, by
+which the extension knows Heyo's windows.
 
 ### The lock screen
 

@@ -129,23 +129,54 @@ winit, its text stack and its own renderer 10.7, Skia 7.7.
 - **On Windows what is drawn beyond the screen's edge is lost**, and
   moving the window onto the screen does not bring it back: the window
   draws itself again whole when it is moved.
+- **A text stopped following its words** (Slint 1.18.1). A text is drawn
+  from shaped paragraphs Slint keeps, and only those depend on what the
+  text says. Once 1024 texts have been shaped it drops the paragraphs of
+  every text not drawn in the last two frames, which with only what
+  changed being drawn is nearly all of them, and a text whose words then
+  change is not drawn again: after a long page had been scrolled through,
+  the title kept the last page's name. Every text here is one component,
+  which makes the font it asks for depend on its words (`Line` in
+  `ui/widgets.slint`). To be taken out when Slint no longer needs it.
+- **A menu is as tall as what is in it**, and is cut off at the window's
+  edge: the menus here show ten rows and a half and scroll, and take the
+  keys while they are open.
+- **On Wayland a window drawn on the CPU cannot be seen through**
+  (softbuffer hands the compositor XRGB): the margin the shadow falls in
+  would be black, so there the window has none, and square corners. A
+  Wayland window is also made anew each time it is shown, and the second
+  time without the application id a hook gave the first: Slint is told
+  the id itself (`slint::set_xdg_app_id`).
 
 ## Not verified
 
-- Clicked by hand in the sandbox: General, Dictation (with Pinyin
-  composing in a field, in the vocabulary and in a list's search), the
-  applications, the Shortcuts groups, Tab and Space, moving, closing and
-  reopening the window, a screen of 800×600. The rest of what the pages
-  do is tested through the model only (`model.rs`, 38 tests): saving an
-  extension's preference, revoking a permission, uninstalling, the
-  clipboard's and snippets' cards, the API key, the filter menu, aliases,
-  the three downloads, updating.
+Clicked in the sandbox (GNOME Shell on X11, release build), and checked
+against the files Heyo wrote: every page; a preference of every type, of
+an extension and of a command; revoking a permission; uninstalling; the
+clipboard's and snippets' cards; the API key; the Shortcuts filter and
+aliases; Pinyin composing in a field, in the vocabulary and in a list's
+search; both kinds of menu by the keys alone; moving, closing and
+reopening the window; a screen of 800×600. In GNOME 50 on Wayland
+(`scripts/wayland-test/`): the window opens, comes forward from behind
+another window, keeps its class when shown again, and takes Pinyin with
+the candidates under the cursor.
+
+- The three downloads were tried with a stand-in for the helpers
+  (`scripts/gui-test/install-stub.cjs`), which reports progress and
+  fetches nothing: progress, the end, and a failure are shown. A real
+  download from this window was not made.
+- Updating was tried with a build that has the updater and a version
+  served from this computer
+  (`experiments/slint-settings/scripts/updates.sh`): checking, the offer,
+  being up to date, and no server answering. What was served is refused
+  for its signature, by design: an update being installed and Heyo
+  starting again was not seen.
 - Windows with every page; `x86_64-pc-windows-msvc` beyond `cargo check`.
-- Wayland: nothing. A window lost there would stay on screen as it was
-  last drawn.
+- Wayland: other compositors than GNOME's, and what happens to a window
+  lost there (it may stay on screen as it was last drawn).
 - A screen reader. AccessKit is compiled in and the controls say what
-  they are; a select's menu and the Shortcuts filter are not reachable
-  from the keyboard.
+  they are. A menu has no typing a letter to go to a choice, which a
+  `<select>` had.
 - Following the system's light and dark while the window is open, which
   on Linux needs the desktop's portal; without one the host's own answer
   is used each time the window is shown.
