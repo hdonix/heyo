@@ -15,6 +15,9 @@
 #                          architecture's libraries in a sysroot (sysroot.sh
 #                          lays one out), and llvm-mingw again, whose clang
 #                          compiles and links for any of them
+#
+# FEATURES names cargo features to build with, for trying what is behind
+# one (FEATURES=native-overlay). A package is built with none.
 set -eu
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$REPO"
@@ -62,7 +65,7 @@ for TARGET in "$@"; do
         ;;
       *) echo "$0: no way to build for $TARGET is written here" >&2; exit 2 ;;
     esac
-    pnpm tauri build --no-bundle --target "$TARGET" --config '{"build":{"beforeBuildCommand":""}}'
+    pnpm tauri build --no-bundle --target "$TARGET" ${FEATURES:+--features "$FEATURES"} --config '{"build":{"beforeBuildCommand":""}}'
   )
   case "$TARGET" in
     # What heyo.exe built this way needs beside it, besides WebView2Loader.dll
