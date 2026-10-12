@@ -17,8 +17,10 @@ python3 "$HERE/down.py" > /dev/null; w 1
 OUT="$REPO/docs/images"
 mkdir -p "$OUT"
 
-# Twice the size.
-export SCREEN=3840x2160 GDK_SCALE=2
+# Twice the size. The web view takes the scale from GTK; the settings
+# window is drawn by Slint, which on X11 takes it from the desktop's
+# settings, and a bare X server has none: it is told.
+export SCREEN=3840x2160 GDK_SCALE=2 WINIT_X11_SCALE_FACTOR=2
 # The backdrop kept around a window, in pixels of the picture, and the
 # radius the picture's corners are rounded to.
 MARGIN=16

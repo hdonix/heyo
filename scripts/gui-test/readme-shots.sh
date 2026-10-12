@@ -149,18 +149,12 @@ for THEME in ${*:-light dark}; do
   show; w 2
   shot live-activity
 
-  # The settings window: 924 by 704 is what Heyo asks for
-  # (commands/settings.rs), here at twice that. Under GNOME Shell it comes
-  # up taller more often than not, by the height of the title bar it does
-  # not have; it is then closed and opened again, so that the two themes
-  # match.
+  # The settings window: 924 by 704 with the margin its shadow falls in
+  # (src-tauri/src/slint_settings/ui/settings.slint), here at twice that.
   away
-  for _ in $(seq 12); do
-    heyo --open heyo:settings; w 5
-    [ "$(size 'Heyo Settings')" = "1848 1408" ] && break
-    xdotool key Escape; w 0.5; xdotool key Escape; w 1.5
-  done
-  shot settings 'Heyo Settings'
+  heyo --open heyo:settings; w 5
+  [ "$(size '^Heyo Settings$')" = "1848 1408" ] || echo "settings: the window is $(size '^Heyo Settings$'), not 1848 by 1408" >&2
+  shot settings '^Heyo Settings$'
 
   grep -v "EGL\|dbind\|heyo: started\|heyo: renderer" "$T/app.log" | tail -n 5 | cut -c1-200
   [ -n "$KEEP" ] || python3 "$HERE/down.py" > /dev/null
