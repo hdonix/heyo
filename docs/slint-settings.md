@@ -22,9 +22,10 @@ not taken up (`docs/gpui-evaluation.md` on the branch `gpui-settings`).
 Against the web settings as they were at `9a86c62`, release builds, in a
 sandbox (Xvfb 1920×1200 at 1×, GNOME Shell compositing in software), with
 the screen itself as the clock (`overlay-bench --watch` on pixels); 5 to 7
-runs each. The scripts and what they wrote are in
-`experiments/slint-settings/` (`results/open.tsv`, `react.tsv`,
-`scroll.tsv`).
+runs each. What they wrote is in `experiments/slint-settings/results/`
+(`open.tsv`, `react.tsv`, `scroll.tsv`); the scripts that measured, which
+need the web settings and the watching program of the overlay experiment,
+are on the branch `slint-settings` (`experiments/slint-settings/scripts/measure-*.sh`).
 
 | | Slint | web |
 |---|---|---|
@@ -76,7 +77,7 @@ because that needs nothing of the packaging.
 The same `.slint` and Rust; only taking a lost window away (`guard.rs`)
 and asking for the work area (`area.rs`) are Windows' own. Cross-compiled
 from Linux for `aarch64-pc-windows-msvc`
-(`experiments/slint-settings/scripts/windows-build.sh`), and run on a
+(`scripts/package/build.sh`), and run on a
 Windows 11 ARM machine with no graphics card: it draws with Skia on the
 CPU and with Slint's own renderer, and a panic on Slint's thread left
 Heyo running.

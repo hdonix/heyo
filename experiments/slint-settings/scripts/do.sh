@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
     wait) sleep "$2"; shift 2 ;;
     shot) mkdir -p "$(dirname "$RESULTS/$2")"; python3 -I "$HERE/shot.py" "$DISPLAY" "$RESULTS/$2.png" "$X" "$Y" "$Wd" "$Ht"; echo "$RESULTS/$2.png"; shift 2 ;;
     page)
-      case $2 in general) row=0 ;; shortcuts) row=1 ;; dictation) row=2 ;; screenshots) row=3 ;; advanced) row=4 ;; about) row=5 ;; list) row=6 ;; commands) row=7 ;; extension) row=8 ;; extension2) row=9 ;; *) echo "no page $2" >&2; exit 2 ;; esac
+      case $2 in general) row=0 ;; shortcuts) row=1 ;; dictation) row=2 ;; screenshots) row=3 ;; advanced) row=4 ;; about) row=5 ;; list) row=6 ;; commands) row=7 ;; extension) row=8 ;; extension2) row=9 ;; extension3) row=10 ;; *) echo "no page $2" >&2; exit 2 ;; esac
       at 152 $((32 + 8 + 58 + row * 34 + 17 + (row >= 6 ? 14 : 0))); xdotool click 1; at 560 12; shift 2 ;;
     *) echo "do.sh: what is $1?" >&2; exit 2 ;;
   esac

@@ -1,14 +1,14 @@
 #!/bin/sh
-# Pictures of the settings window's pages, the same way for the Slint one
-# and the web one: each is opened by clicking its entry in the sidebar.
+# Pictures of the settings window's pages: each is opened by clicking its
+# entry in the sidebar.
 #
 #   tour.sh NAME [PAGE…]     $RESULTS/NAME-<page>.png; all four when none is named
 #
 # Heyo must be running in the sandbox (heyo.sh start). The pages: general,
 # shortcuts, dictation, screenshots, advanced, about, list (the
-# applications), commands (Heyo's own), extension and extension2 (the first
-# two installed: heyo.sh seed puts two there). Only ever in the sandbox: it
-# clicks with xdotool.
+# applications), commands (Heyo's own), extension, extension2 and
+# extension3 (the installed ones: heyo.sh seed puts three there). Only ever
+# in the sandbox: it clicks with xdotool.
 . "$(dirname "$0")/lib.sh"
 name=$1; shift
 [ $# -gt 0 ] || set -- general dictation list about
@@ -40,6 +40,7 @@ for page in $pages; do
     commands) entry 7 ;;
     extension) entry 8 ;;
     extension2) entry 9 ;;
+    extension3) entry 10 ;;
     *) echo "no page $page" >&2; exit 2 ;;
   esac
   # Away from what it would hover over.
