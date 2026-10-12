@@ -29,7 +29,6 @@ mod marks;
 pub(super) mod native;
 pub(crate) mod pin;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
@@ -43,6 +42,7 @@ use slint::{ComponentHandle, Image, Model as _, ModelRc, Rgba8Pixel, SharedPixel
 use tauri::AppHandle;
 
 use super::guard::{self, State};
+use super::life::{self, Kept, Life, Lives, Slot};
 use super::thread::{self, Job, Kind};
 use super::ui;
 use crate::platform::capture::{Area, Shot};
@@ -96,12 +96,10 @@ struct Up {
 }
 
 struct Overlay {
-    window: ui::ScreenshotWindow,
+    life: Life<ui::ScreenshotWindow>,
     handles: Rc<VecModel<ui::Spot>>,
     /// The host is told what was decided on a thread kept for that.
     telling: mpsc::Sender<Job>,
-    /// Its window has been made, which Slint does when it first shows it.
-    ready: bool,
     up: Option<Up>,
     holding: slint::Timer,
     held_tries: u32,
@@ -143,106 +141,84 @@ fn symbol(name: &str) -> Image {
 }
 
 thread_local! {
-    static OVERLAY: RefCell<Option<Overlay>> = const { RefCell::new(None) };
-    /// It could not be made: said once, and not tried again.
-    static FAILED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static OVERLAY: Slot<Overlay> = const { Slot::new() };
 }
 
 /// Does `work` with the overlay, on Slint's thread, making it first if
 /// this is the first time.
 fn with(work: impl FnOnce(&mut Overlay)) {
-    OVERLAY.with(|slot| {
-        let Ok(mut slot) = slot.try_borrow_mut() else { return };
-        if slot.is_none() && !FAILED.with(std::cell::Cell::get) {
-            match make() {
-                Ok(overlay) => *slot = Some(overlay),
-                Err(reason) => {
-                    FAILED.with(|failed| failed.set(true));
-                    eprintln!("heyo: screenshots have no overlay in this run: {reason}");
-                }
-            }
-        }
-        if let Some(overlay) = slot.as_mut() {
-            work(overlay);
-        }
-    });
+    Slot::with(&OVERLAY, work);
 }
 
-fn make() -> Result<Overlay, String> {
-    let shared = thread::shared().ok_or("Slint has not begun")?;
-    let telling = thread::asker("heyo-slint-shot", shared.host.clone())?;
-    let window = thread::making(Kind::Screenshot, ui::ScreenshotWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
-    let handles = Rc::new(VecModel::default());
-    window.set_handles(ModelRc::from(handles.clone()));
-    let marks = Rc::new(VecModel::default());
-    window.set_marks(ModelRc::from(marks.clone()));
-    let item = |id: &str, icon: &str, tip: &str, primary: bool| ui::ToolItem { id: id.into(), icon: symbol(icon), tip: tip.into(), primary };
-    window.set_tools(ModelRc::new(VecModel::from(TOOLS.iter().map(|(_, id, icon, tip)| item(id, icon, tip, false)).collect::<Vec<_>>())));
-    window.set_actions(ModelRc::new(VecModel::from(ACTIONS.iter().map(|(action, id, icon, tip)| item(id, icon, tip, *action == Some(Action::Copy))).collect::<Vec<_>>())));
-    window.set_undo_icon(symbol("undo-2"));
-    window.set_colours(ModelRc::new(VecModel::from((0..selecting::COLOURS.len()).map(marks::colour).collect::<Vec<_>>())));
-    // The toolbar's buttons: each says what was pressed.
-    window.on_pick_tool(|id| {
-        if let Some((tool, ..)) = TOOLS.iter().find(|(_, name, ..)| *name == id.as_str()) {
-            with(|overlay| overlay.act(Event::Tool(*tool)));
-        }
-    });
-    window.on_pick_colour(|index| with(|overlay| overlay.act(Event::Colour(index.max(0) as usize))));
-    window.on_undo(|| with(|overlay| overlay.act(Event::Undo)));
-    window.on_act(|id| {
-        if let Some((action, ..)) = ACTIONS.iter().find(|(_, name, ..)| *name == id.as_str()) {
-            with(|overlay| overlay.act(action.map_or(Event::Cancel, Event::Do)));
-        }
-    });
-    // Off the screen and small until it is wanted.
-    window.window().set_position(slint::PhysicalPosition::new(-(IDLE as i32) * 4, -(IDLE as i32) * 4));
-    window.window().set_size(slint::PhysicalSize::new(IDLE, IDLE));
-    window.window().on_winit_window_event(|_, event| {
-        let mut result = EventResult::Propagate;
-        OVERLAY.with(|slot| {
-            if let Ok(mut slot) = slot.try_borrow_mut() {
-                if let Some(overlay) = slot.as_mut() {
-                    result = overlay.told(event);
-                }
+impl Lives for Overlay {
+    const NAME: &'static str = "the screenshot overlay";
+
+    fn make() -> Result<Self, String> {
+        let shared = thread::shared().ok_or("Slint has not begun")?;
+        let telling = thread::asker("heyo-slint-shot", shared.host.clone())?;
+        let window = thread::making(Kind::Screenshot, ui::ScreenshotWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
+        let handles = Rc::new(VecModel::default());
+        window.set_handles(ModelRc::from(handles.clone()));
+        let marks = Rc::new(VecModel::default());
+        window.set_marks(ModelRc::from(marks.clone()));
+        let item = |id: &str, icon: &str, tip: &str, primary: bool| ui::ToolItem { id: id.into(), icon: symbol(icon), tip: tip.into(), primary };
+        window.set_tools(ModelRc::new(VecModel::from(TOOLS.iter().map(|(_, id, icon, tip)| item(id, icon, tip, false)).collect::<Vec<_>>())));
+        window.set_actions(ModelRc::new(VecModel::from(ACTIONS.iter().map(|(action, id, icon, tip)| item(id, icon, tip, *action == Some(Action::Copy))).collect::<Vec<_>>())));
+        window.set_undo_icon(symbol("undo-2"));
+        window.set_colours(ModelRc::new(VecModel::from((0..selecting::COLOURS.len()).map(marks::colour).collect::<Vec<_>>())));
+        // The toolbar's buttons: each says what was pressed.
+        window.on_pick_tool(|id| {
+            if let Some((tool, ..)) = TOOLS.iter().find(|(_, name, ..)| *name == id.as_str()) {
+                with(|overlay| overlay.act(Event::Tool(*tool)));
             }
         });
-        result
-    });
-    Ok(Overlay {
-        window,
-        handles,
-        telling,
-        ready: false,
-        up: None,
-        holding: slint::Timer::default(),
-        held_tries: 0,
-        resting: slint::Timer::default(),
-        pointer: (0.0, 0.0),
-        pressed: false,
-        moved_pressed: 0,
-        ctrl: false,
-        alt: false,
-        cursor: None,
-        marks,
-        drawn: Vec::new(),
-        on_toolbar: false,
-        pressed_in_slint: false,
-        typing: None,
-    })
+        window.on_pick_colour(|index| with(|overlay| overlay.act(Event::Colour(index.max(0) as usize))));
+        window.on_undo(|| with(|overlay| overlay.act(Event::Undo)));
+        window.on_act(|id| {
+            if let Some((action, ..)) = ACTIONS.iter().find(|(_, name, ..)| *name == id.as_str()) {
+                with(|overlay| overlay.act(action.map_or(Event::Cancel, Event::Do)));
+            }
+        });
+        // Off the screen and small until it is wanted.
+        window.window().set_position(slint::PhysicalPosition::new(-(IDLE as i32) * 4, -(IDLE as i32) * 4));
+        window.window().set_size(slint::PhysicalSize::new(IDLE, IDLE));
+        window.window().on_winit_window_event(|_, event| Slot::there(&OVERLAY, |overlay| overlay.told(event)).unwrap_or(EventResult::Propagate));
+        // Kept, where winit can take a window off the screen: Slint would
+        // make it anew without what `native` says of it.
+        let kept = native::kept().then_some(Kept { on: native::show, off: native::hide });
+        let life = Life::new(window, kept, |_, made, first| {
+            if first {
+                WINDOW.store(native::id(made), Ordering::SeqCst);
+            }
+        });
+        Ok(Overlay {
+            life,
+            handles,
+            telling,
+            up: None,
+            holding: slint::Timer::default(),
+            held_tries: 0,
+            resting: slint::Timer::default(),
+            pointer: (0.0, 0.0),
+            pressed: false,
+            moved_pressed: 0,
+            ctrl: false,
+            alt: false,
+            cursor: None,
+            marks,
+            drawn: Vec::new(),
+            on_toolbar: false,
+            pressed_in_slint: false,
+            typing: None,
+        })
+    }
 }
 
 /// Gives up the window, which had grown to a monitor's size, and makes
 /// the small one that waits for the next screenshot. On Slint's thread,
 /// and not from anything of the overlay's own.
 fn rest() {
-    let resting = OVERLAY.with(|slot| {
-        let mut slot = slot.try_borrow_mut().ok()?;
-        slot.as_ref().is_some_and(|overlay| overlay.up.is_none() && overlay.ready).then(|| slot.take()).flatten()
-    });
-    if let Some(overlay) = resting {
-        // Slint keeps a window it was asked to show until it is asked to hide it.
-        let _ = overlay.window.hide();
-        drop(overlay);
+    if Slot::give_up(&OVERLAY, |overlay| overlay.up.is_none() && overlay.life.made()).is_some() {
         prepare();
     }
 }
@@ -252,11 +228,9 @@ fn rest() {
 /// capture that is up is of the screen as it was, and is given up as
 /// Escape gives it up. On Slint's thread.
 pub(super) fn remake() {
-    OVERLAY.with(|slot| {
-        if let Ok(mut slot) = slot.try_borrow_mut() {
-            if let Some(overlay) = slot.as_mut().filter(|overlay| overlay.up.is_some()) {
-                overlay.after(Some(Outcome::Cancel));
-            }
+    Slot::there(&OVERLAY, |overlay| {
+        if overlay.up.is_some() {
+            overlay.after(Some(Outcome::Cancel));
         }
     });
     rest();
@@ -310,51 +284,21 @@ fn icon(cursor: Cursor) -> CursorIcon {
 }
 
 impl Overlay {
-    /// Has Slint make the window, which it does by showing it: small, off
-    /// the screen, and taken off it again at once. `then` is done when it
-    /// is there.
-    fn prepare(&mut self, then: impl FnOnce() + 'static) {
-        if let Err(e) = self.window.show() {
-            return eprintln!("heyo: the screenshot overlay could not be made: {e}");
-        }
-        let window = self.window.as_weak();
-        let waiting = slint::spawn_local(async move {
-            let Some(window) = window.upgrade() else { return };
-            let Ok(made) = window.window().winit_window().await else { return };
-            // So that it can be taken off the screen if Slint is lost.
-            guard::remember(&made);
-            super::pointer::remember(&made);
-            WINDOW.store(native::id(&made), Ordering::SeqCst);
-            let mut wanted = false;
-            with(|overlay| {
-                overlay.ready = true;
-                wanted = overlay.up.is_some();
-            });
-            if !wanted {
-                made.set_visible(false);
-            }
-            then();
-        });
-        if let Err(e) = waiting {
-            eprintln!("heyo: slint could not wait for the screenshot overlay: {e}");
-        }
-    }
-
     /// Shows a monitor as it was read, over that monitor.
     fn show(&mut self, capture: Capture) {
-        if !self.ready && native::kept() {
-            return self.prepare(move || with(|overlay| overlay.show(capture)));
+        if !self.life.made() {
+            return self.life.ahead(move || with(|overlay| overlay.show(capture)));
         }
         let Capture { area, mode, dimmed, asked } = capture;
         self.resting.stop();
-        let scale = f64::from(self.window.window().scale_factor()).max(0.1);
-        self.window.set_dimmed(Image::from_rgba8_premultiplied(dimmed));
+        let scale = f64::from(self.life.window().window().scale_factor()).max(0.1);
+        self.life.window().set_dimmed(Image::from_rgba8_premultiplied(dimmed));
         let selecting = Selecting::new((area.width as f64 / scale, area.height as f64 / scale), (area.width, area.height), mode);
         self.up = Some(Up { selecting, scale, size: (area.width, area.height), mapped: false, asked, clear: None });
         (self.pressed, self.moved_pressed, self.ctrl, self.alt, self.cursor) = (false, 0, false, false, None);
         (self.on_toolbar, self.pressed_in_slint) = (false, false);
         self.push();
-        let window = self.window.window();
+        let window = self.life.window().window();
         window.set_position(slint::PhysicalPosition::new(area.x, area.y));
         window.set_size(slint::PhysicalSize::new(area.width, area.height));
         // It is put on screen when it has the monitor's size: at once if
@@ -377,7 +321,7 @@ impl Overlay {
     /// made now and not when a drag begins.
     fn cleared(&mut self, clear: SharedPixelBuffer<Rgba8Pixel>) {
         let Some(up) = self.up.as_mut() else { return };
-        self.window.set_clear(Image::from_rgba8_premultiplied(clear.clone()));
+        self.life.window().set_clear(Image::from_rgba8_premultiplied(clear.clone()));
         crate::screenshot::mark("the capture as it was read is in the overlay", up.asked);
         up.clear = Some(clear);
         self.push();
@@ -388,23 +332,19 @@ impl Overlay {
         let Some(up) = self.up.as_mut().filter(|up| !up.mapped) else { return };
         up.mapped = true;
         let asked = up.asked;
-        if !native::kept() {
-            if let Err(e) = self.window.show() {
+        self.life.on(|came| {
+            if let Err(e) = came {
                 eprintln!("heyo: the screenshot overlay could not be shown: {e}");
             }
-        }
-        self.window.window().with_winit_window(|made| {
-            native::show(made);
-            made.set_cursor(CursorIcon::Crosshair);
-            made.request_redraw();
         });
+        self.life.window().window().with_winit_window(|made| made.set_cursor(CursorIcon::Crosshair));
         crate::screenshot::mark("overlay put on screen", asked);
         self.held_tries = 0;
         self.hold();
     }
 
     fn hold(&mut self) {
-        let held = self.window.window().with_winit_window(native::hold).unwrap_or(true);
+        let held = self.life.window().window().with_winit_window(native::hold).unwrap_or(true);
         self.held_tries += 1;
         if held || self.held_tries >= HOLD_TIMES {
             if !held {
@@ -428,31 +368,27 @@ impl Overlay {
         if self.up.take().is_none() {
             return;
         }
-        if native::kept() {
-            self.window.window().with_winit_window(native::hide);
-        } else {
-            let _ = self.window.hide();
-        }
+        self.life.off();
         // The window keeps a buffer of its own size, a whole screen: when
         // no screenshot has followed for a while, it is given up with the
         // window, and a small one made in its place (`rest`).
         self.resting.start(slint::TimerMode::SingleShot, RESTING, || slint::Timer::single_shot(Duration::ZERO, rest));
         super::window::frames::write();
         // Tens of megabytes each.
-        self.window.set_clear(Image::default());
-        self.window.set_dimmed(Image::default());
-        self.window.set_loupe_picture(Image::default());
-        self.window.set_selected(false);
-        self.window.set_loupe(false);
-        self.window.set_hint("".into());
-        self.window.set_status("".into());
-        self.window.set_label("".into());
+        self.life.window().set_clear(Image::default());
+        self.life.window().set_dimmed(Image::default());
+        self.life.window().set_loupe_picture(Image::default());
+        self.life.window().set_selected(false);
+        self.life.window().set_loupe(false);
+        self.life.window().set_hint("".into());
+        self.life.window().set_status("".into());
+        self.life.window().set_label("".into());
         self.handles.set_vec(Vec::new());
         self.marks.set_vec(Vec::new());
         self.drawn.clear();
         self.typing = None;
-        self.window.set_typing(false);
-        self.window.set_toolbar(false);
+        self.life.window().set_typing(false);
+        self.life.window().set_toolbar(false);
     }
 
     /// A button of the toolbar was pressed. What was being typed is done
@@ -468,7 +404,7 @@ impl Overlay {
     /// typed, as it is.
     fn typed(&mut self) {
         let Some(up) = self.up.as_mut().filter(|up| up.selecting.typing().is_some()) else { return };
-        let (text, width) = (self.window.get_typed().to_string(), f64::from(self.window.get_typed_width()));
+        let (text, width) = (self.life.window().get_typed().to_string(), f64::from(self.life.window().get_typed_width()));
         up.selecting.handle(Event::Typed { text, width });
     }
 
@@ -498,9 +434,9 @@ impl Overlay {
             return None;
         }
         self.push();
-        self.window.set_exporting(true);
-        let taken = self.window.window().take_snapshot();
-        self.window.set_exporting(false);
+        self.life.window().set_exporting(true);
+        let taken = self.life.window().window().take_snapshot();
+        self.life.window().set_exporting(false);
         let taken = taken.map_err(|e| eprintln!("heyo: the annotations could not be drawn into the screenshot: {e}")).ok()?;
         let (width, height) = (taken.width(), taken.height());
         let (x, y) = (area.x.min(width), area.y.min(height));
@@ -575,7 +511,7 @@ impl Overlay {
                 // and that it has left when it has.
                 let on_toolbar = up.selecting.toolbar().is_some_and(|toolbar| toolbar.contains(to));
                 if self.on_toolbar && !on_toolbar {
-                    let _ = self.window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
+                    let _ = self.life.window().window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
                     // And had the pointer's shape meanwhile.
                     self.cursor = None;
                 }
@@ -606,7 +542,7 @@ impl Overlay {
                     MouseButton::Left => {
                         // A press on the toolbar is the toolbar's, and one in
                         // the line that is being typed is the line's.
-                        let line = typing.map(|line| selecting::Rect { x: line.0 - 4.0, y: line.1 - 3.0, width: (f64::from(self.window.get_typed_width()) + 2.0).max(120.0) + 8.0, height: selecting::TEXT_LINE + 6.0 });
+                        let line = typing.map(|line| selecting::Rect { x: line.0 - 4.0, y: line.1 - 3.0, width: (f64::from(self.life.window().get_typed_width()) + 2.0).max(120.0) + 8.0, height: selecting::TEXT_LINE + 6.0 });
                         if up.selecting.toolbar().is_some_and(|toolbar| toolbar.contains(place)) || line.is_some_and(|line| line.contains(place)) {
                             self.pressed_in_slint = true;
                             return EventResult::Propagate;
@@ -632,7 +568,7 @@ impl Overlay {
         let Some(up) = self.up.as_ref() else { return };
         let (look, scale) = (up.selecting.look(), up.scale);
         let spot = |point: selecting::Point| ui::Spot { x: point.0 as f32, y: point.1 as f32 };
-        let window = &self.window;
+        let window = self.life.window();
         window.set_selected(look.clear.is_some());
         // With nothing selected, one pixel in the middle, where the hint is
         // over it: see the markup for why it is never nothing.
@@ -702,15 +638,10 @@ impl Overlay {
         // refresh interval after it was asked for, by a timer
         // (`frame_throttle.rs` of Slint's winit backend): the selection
         // would follow the pointer that much later.
-        let mapped = up.mapped;
-        window.window().with_winit_window(|made| {
-            if changed {
-                made.set_cursor(icon(cursor));
-            }
-            if mapped {
-                made.request_redraw();
-            }
-        });
+        if changed {
+            window.window().with_winit_window(|made| made.set_cursor(icon(cursor)));
+        }
+        self.life.draw();
     }
 }
 
@@ -788,20 +719,13 @@ fn watch() {
 /// Has the overlay's window made ahead of the first screenshot. On
 /// Slint's thread.
 pub(super) fn prepare() {
-    with(|overlay| {
-        if !overlay.ready && native::kept() {
-            overlay.prepare(|| {});
-        }
-    });
+    with(|overlay| overlay.life.ahead(|| {}));
 }
 
 /// Shows `shot`, the monitor `area` as it was read, over that monitor, for
 /// part of it to be selected. From any thread; it does not wait for the
 /// overlay to be on screen. False when Slint cannot show it.
 pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: Instant) -> bool {
-    if !super::ensure(app) {
-        return false;
-    }
     UP.store(true, Ordering::SeqCst);
     // The dimmed picture is what is seen first: it is shown as soon as it
     // is made, while the other is being made beside it.
@@ -810,10 +734,11 @@ pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: 
         let dimmed = picture(shot, DIM);
         crate::screenshot::mark("dimmed picture made", asked);
         let capture = Capture { area, mode, dimmed, asked };
-        (thread::on(move || with(|overlay| overlay.show(capture))), clear.join())
+        (life::begin(app, move || with(|overlay| overlay.show(capture))), clear.join())
     });
-    let Ok(clear) = clear else { return false };
-    if !shown || !thread::on(move || with(|overlay| overlay.cleared(clear))) {
+    // (A picture that could not be made is a capture that came to nothing.)
+    let shown = shown && clear.is_ok_and(|clear| life::ask(move || with(|overlay| overlay.cleared(clear))));
+    if !shown {
         UP.store(false, Ordering::SeqCst);
         return false;
     }
@@ -824,26 +749,26 @@ pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: 
 /// The windows in the capture, the topmost first, in its pixels. They
 /// arrive after the overlay is up.
 pub(crate) fn windows(windows: Vec<selecting::Area>) {
-    thread::on(move || {
-        with(|overlay| {
+    life::ask(move || {
+        Slot::there(&OVERLAY, |overlay| {
             if let Some(up) = overlay.up.as_mut() {
                 up.selecting.windows(&windows);
                 overlay.push();
             }
-        })
+        });
     });
 }
 
 /// What was to become of the selection could not be done: the overlay
 /// says why, if it is still there.
 pub(crate) fn failed(message: String) {
-    thread::on(move || {
-        with(|overlay| {
+    life::ask(move || {
+        Slot::there(&OVERLAY, |overlay| {
             if let Some(up) = overlay.up.as_mut() {
                 up.selecting.failed(message);
                 overlay.push();
             }
-        })
+        });
     });
 }
 
@@ -854,17 +779,9 @@ pub(crate) fn up() -> bool {
 
 /// Takes the overlay off the screen. From any thread; it does not wait.
 pub(crate) fn hide() {
-    if guard::state() == State::Running {
-        thread::on(|| {
-            OVERLAY.with(|slot| {
-                if let Ok(mut slot) = slot.try_borrow_mut() {
-                    if let Some(overlay) = slot.as_mut() {
-                        overlay.close();
-                    }
-                }
-            })
-        });
-    }
+    life::ask(|| {
+        Slot::there(&OVERLAY, Overlay::close);
+    });
 }
 
 #[cfg(test)]

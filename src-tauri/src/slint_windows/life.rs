@@ -184,6 +184,12 @@ impl<C: ComponentHandle + 'static> Life<C> {
         self.stage.get().wanted()
     }
 
+    /// Whether winit's window is there to be put on the screen: for a
+    /// window that is not kept, Slint sees to that when it shows it.
+    pub(super) fn made(&self) -> bool {
+        self.kept.is_none() || self.stage.get().made()
+    }
+
     fn step(&self, step: impl FnOnce(&mut Stage) -> Do) -> Do {
         let mut stage = self.stage.get();
         let what = step(&mut stage);
@@ -194,7 +200,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// Has winit's window made ahead of when it is wanted, off the
     /// screen. `then` is done when it is there: at once if it is.
     pub(super) fn ahead(&self, then: impl FnOnce() + 'static) {
-        if self.kept.is_none() || self.stage.get().made() {
+        if self.made() {
             return then();
         }
         self.waiting.borrow_mut().push(Box::new(move |made| {
