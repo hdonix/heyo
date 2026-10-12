@@ -1,6 +1,6 @@
 #!/bin/sh
-# Fetches the DLLs of Microsoft's Visual C++ runtime that a Heyo built with
-# Skia (`--features slint-skia`, docs/slint-settings.md) needs beside
+# Fetches the DLLs of Microsoft's Visual C++ runtime that Heyo, built with
+# Skia for its settings window (docs/slint-settings.md), needs beside
 # heyo.exe, and writes them to a directory:
 #
 #   scripts/package/vcruntime.sh aarch64|x86_64 OUT-DIR
@@ -8,7 +8,7 @@
 # Skia comes prebuilt against the C++ library as a DLL (MSVCP140.dll), and
 # a Windows that never had the Visual C++ redistributable installed has
 # not got it: heyo.exe would not start there. With the DLLs in its own
-# directory it does. A Heyo built without Skia needs none of this.
+# directory it does.
 #
 # They are taken from the package of Visual Studio's own that holds them
 # (the "CRT.Redist" payload, a zip), at the release and by the hashes

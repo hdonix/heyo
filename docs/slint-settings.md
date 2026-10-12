@@ -10,8 +10,9 @@ built is said at the top of `src-tauri/src/slint_settings/mod.rs`.
 
 WebKit cannot use the GPU on the development machine (NVIDIA's driver
 with `nvidia-drm modeset=0`), and a web view takes most of a second to
-open a window. Slint was first measured on Heyo's overlay windows
-(`experiments/overlay-bench/results/frameworks/slint/NOTES.md`): drawn by
+open a window. Slint was first measured on Heyo's overlay windows (the
+notes are on the branch `slint-settings`,
+`experiments/overlay-bench/results/frameworks/slint/NOTES.md`): drawn by
 Skia on the CPU it kept up without a GPU, built for Windows from Linux,
 and took an input method. GPUI had been tried on the settings before and
 not taken up (`docs/gpui-evaluation.md` on the branch `gpui-settings`).
