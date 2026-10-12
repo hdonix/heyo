@@ -93,6 +93,9 @@ export component PillWindow inherits Window {
     callback pressed();
     callback clicked();
     callback cancel();
+    // How wide the pill is to be, which it settles to: the window takes
+    // the pointer where the pill is and nowhere else (`pill/mod.rs`).
+    out property <length> body-width: min(root.width - 12px, content.preferred-width);
     property <bool> has-words: words != "" || partial != "";
     property <bool> way-out: recording && (touch.has-hover || way-out-touch.has-hover);
     title: "Heyo Dictation";
@@ -106,8 +109,9 @@ export component PillWindow inherits Window {
     init => {
         Tokens.dark = true;
     }
-    // A press anywhere on the window is said at once, before the click it
-    // may become.
+    // Where the desktop cannot be told that only the pill takes the
+    // pointer, a press anywhere on the window is said at once, before the
+    // click it may become.
     TouchArea {
         pointer-event(event) => {
             if (event.kind == PointerEventKind.down) {
@@ -117,7 +121,7 @@ export component PillWindow inherits Window {
     }
 
     pill := Rectangle {
-        width: min(root.width - 12px, content.preferred-width);
+        width: root.body-width;
         height: 30px;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2 + (root.shown ? 0px : 5px);

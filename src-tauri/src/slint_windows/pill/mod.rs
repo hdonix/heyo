@@ -26,7 +26,8 @@ use slint::{ComponentHandle, Model as _, ModelRc, VecModel};
 use tauri::AppHandle;
 
 use super::life::{self, Life, Lives, Slot, Slotted};
-use super::standing::{Keyboard, Layer, Standing};
+use super::area::Rect;
+use super::standing::{self, Keyboard, Layer, Standing};
 use super::thread::{self, Job};
 use super::ui;
 use crate::dictation::Told;
@@ -38,6 +39,23 @@ use model::{Model, Phase};
 /// keyboard: not by appearing, not by being clicked. What is dictated
 /// goes to the window that has it.
 const STANDING: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::Never, listed: false, clear: true };
+
+/// The window, and how high the pill is in it, in logical pixels: as the
+/// markup has them. The window is wider than the pill, which grows with
+/// the words to at most the window's width.
+const WINDOW: (f32, f32) = (360.0, 44.0);
+const HIGH: f32 = 30.0;
+
+/// Where the pill is in its window, in the window's device pixels, when
+/// it is `wide` logical pixels wide: in the middle. That is where the
+/// window takes the pointer; the rest of it is seen through, and a press
+/// there belongs to what is seen there.
+fn body(wide: f32, scale: f32) -> Rect {
+    let wide = wide.clamp(0.0, WINDOW.0);
+    let (left, top) = (((WINDOW.0 - wide) / 2.0 * scale).floor(), ((WINDOW.1 - HIGH) / 2.0 * scale).floor());
+    let (right, bottom) = (((WINDOW.0 + wide) / 2.0 * scale).ceil(), ((WINDOW.1 + HIGH) / 2.0 * scale).ceil());
+    (left as i32, top as i32, (right - left) as u32, (bottom - top) as u32)
+}
 
 /// How long it takes to go: it is taken off the screen when it has.
 const LEAVING: Duration = Duration::from_millis(140);
@@ -52,6 +70,8 @@ struct Pill {
     /// Whether a recording has it up. It leaves the screen a moment after
     /// it no longer has.
     wanted: bool,
+    /// How wide the pill was when the desktop was last told where it is.
+    wide: Option<f32>,
     leaving: slint::Timer,
 }
 
@@ -71,7 +91,10 @@ impl Lives for Pill {
     fn make() -> Result<Self, String> {
         let shared = thread::shared().ok_or("Slint has not begun")?;
         let telling = thread::asker("heyo-slint-pill", shared.host.clone())?;
-        let life = Life::new(STANDING, ui::PillWindow::new, |_, made, _| place(made))?;
+        let life = Life::new(STANDING, ui::PillWindow::new, |window, made, _| {
+            place(made);
+            standing::reach(made, Some(body(window.get_body_width(), window.window().scale_factor())));
+        })?;
         let window = life.window();
         let weak = window.as_weak();
         life::seen_through(window.window(), &shared.renderer, move |opaque| {
@@ -84,7 +107,7 @@ impl Lives for Pill {
         window.on_pressed(|| with(|pill| pill.did(pill.model.pressed())));
         window.on_clicked(|| with(|pill| pill.did(pill.model.clicked())));
         window.on_cancel(|| with(|pill| pill.did(pill.model.cancelled())));
-        let mut pill = Pill { life, model: Model::new(), bars, telling, wanted: false, leaving: slint::Timer::default() };
+        let mut pill = Pill { life, model: Model::new(), bars, telling, wanted: false, wide: None, leaving: slint::Timer::default() };
         pill.push();
         Ok(pill)
     }
@@ -138,6 +161,13 @@ impl Pill {
             if self.bars.row_data(at) != Some(bar) {
                 self.bars.set_row_data(at, bar);
             }
+        }
+        // The pill is as wide as what it says: the pointer is the
+        // window's where the pill is.
+        let wide = window.get_body_width();
+        if self.wide != Some(wide) {
+            self.wide = Some(wide);
+            self.life.reach(Some(body(wide, window.window().scale_factor())));
         }
         self.life.draw();
     }
@@ -214,4 +244,21 @@ pub(crate) fn hide() {
     life::ask(|| {
         Slot::there(&PILL, Pill::hide);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_pill_takes_the_pointer_where_it_is_drawn_and_nowhere_else_in_its_window() {
+        // "Listening", about a third of the window, at scale 1 and at 2.
+        assert_eq!(body(110.0, 1.0), (125, 7, 110, 30));
+        assert_eq!(body(110.0, 2.0), (250, 14, 220, 60));
+        // Whole pixels that cover it, where it does not fall on them.
+        assert_eq!(body(111.0, 1.0), (124, 7, 112, 30));
+        assert_eq!(body(110.0, 1.25), (156, 8, 138, 39));
+        // Never wider than its window, whatever is said.
+        assert_eq!(body(500.0, 1.0), (0, 7, 360, 30));
+    }
 }
