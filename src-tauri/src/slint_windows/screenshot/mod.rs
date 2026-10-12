@@ -55,6 +55,9 @@ const UNSIZED: Duration = Duration::from_millis(150);
 /// is up, and how many times it may not answer.
 const BEAT: Duration = Duration::from_millis(250);
 const MISSED_BEATS: u32 = 6;
+/// How long after a screenshot the window is kept as it is, at the
+/// monitor's size, for the next one to be as quick as can be.
+const RESTING: Duration = Duration::from_secs(60);
 
 /// The overlay is on screen, or about to be.
 static UP: AtomicBool = AtomicBool::new(false);
@@ -96,6 +99,7 @@ struct Overlay {
     up: Option<Up>,
     holding: slint::Timer,
     held_tries: u32,
+    resting: slint::Timer,
     /// The pointer, in device pixels, and whether its button is down.
     pointer: (f64, f64),
     pressed: bool,
@@ -159,6 +163,7 @@ fn make() -> Result<Overlay, String> {
         up: None,
         holding: slint::Timer::default(),
         held_tries: 0,
+        resting: slint::Timer::default(),
         pointer: (0.0, 0.0),
         pressed: false,
         moved_pressed: 0,
@@ -166,6 +171,22 @@ fn make() -> Result<Overlay, String> {
         alt: false,
         cursor: None,
     })
+}
+
+/// Gives up the window, which had grown to a monitor's size, and makes
+/// the small one that waits for the next screenshot. On Slint's thread,
+/// and not from anything of the overlay's own.
+fn rest() {
+    let resting = OVERLAY.with(|slot| {
+        let mut slot = slot.try_borrow_mut().ok()?;
+        slot.as_ref().is_some_and(|overlay| overlay.up.is_none() && overlay.ready).then(|| slot.take()).flatten()
+    });
+    if let Some(overlay) = resting {
+        // Slint keeps a window it was asked to show until it is asked to hide it.
+        let _ = overlay.window.hide();
+        drop(overlay);
+        prepare();
+    }
 }
 
 /// For measuring how soon the overlay follows the pointer: with
@@ -248,6 +269,7 @@ impl Overlay {
             return self.prepare(move || with(|overlay| overlay.show(capture)));
         }
         let Capture { area, mode, dimmed, asked } = capture;
+        self.resting.stop();
         let scale = f64::from(self.window.window().scale_factor()).max(0.1);
         self.window.set_dimmed(Image::from_rgba8_premultiplied(dimmed));
         let selecting = Selecting::new((area.width as f64 / scale, area.height as f64 / scale), (area.width, area.height), mode);
@@ -320,6 +342,10 @@ impl Overlay {
             return;
         }
         self.window.window().with_winit_window(native::hide);
+        // The window keeps a buffer of its own size, a whole screen: when
+        // no screenshot has followed for a while, it is given up with the
+        // window, and a small one made in its place (`rest`).
+        self.resting.start(slint::TimerMode::SingleShot, RESTING, || slint::Timer::single_shot(Duration::ZERO, rest));
         super::window::frames::write();
         // Tens of megabytes each.
         self.window.set_clear(Image::default());
