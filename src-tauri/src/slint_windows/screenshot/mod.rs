@@ -247,6 +247,22 @@ fn rest() {
     }
 }
 
+/// The display changed (`super::follow`): the overlay's window is made
+/// again, for the display as it is, and the pinned captures with it. A
+/// capture that is up is of the screen as it was, and is given up as
+/// Escape gives it up. On Slint's thread.
+pub(super) fn remake() {
+    OVERLAY.with(|slot| {
+        if let Ok(mut slot) = slot.try_borrow_mut() {
+            if let Some(overlay) = slot.as_mut().filter(|overlay| overlay.up.is_some()) {
+                overlay.after(Some(Outcome::Cancel));
+            }
+        }
+    });
+    rest();
+    pin::remake();
+}
+
 /// For measuring how soon the overlay follows the pointer: with
 /// `HEYO_OVERLAY_TRACE` set, says what happened and when by the system's
 /// clock.
@@ -307,6 +323,7 @@ impl Overlay {
             let Ok(made) = window.window().winit_window().await else { return };
             // So that it can be taken off the screen if Slint is lost.
             guard::remember(&made);
+            super::pointer::remember(&made);
             WINDOW.store(native::id(&made), Ordering::SeqCst);
             let mut wanted = false;
             with(|overlay| {

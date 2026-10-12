@@ -27,7 +27,7 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 use super::keys::{self, Held};
 use super::model::{Ask, Line, Model, Then};
 use super::thread::{self, Job, Kind};
-use super::{area, guard, icons, reach, ui};
+use super::{area, guard, icons, pointer, reach, ui};
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
 /// frame took is written there when the window is closed, a line a frame:
@@ -407,6 +407,7 @@ impl Live {
             match window.window().winit_window().await {
                 Ok(made) => {
                     guard::remember(&made);
+                    pointer::remember(&made);
                     let monitor = made.current_monitor().or_else(|| made.primary_monitor()).or_else(|| made.available_monitors().next());
                     let whole = monitor.map(|monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height));
                     if let Some((x, y, width, height)) = area::work(whole) {
@@ -533,10 +534,9 @@ fn let_go() {
     let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
 }
 
-/// Makes the window, on Slint's thread, the first time it is asked for.
-fn make() -> Result<Live, String> {
-    let shared = thread::shared().ok_or("Slint has not begun")?;
-    let asking = thread::asker("heyo-slint-host", shared.host.clone())?;
+/// The window itself, with nothing in it yet but where its lines come
+/// from, and what is done in it said to `Live`.
+fn window(shared: &thread::Shared, lines: &Rc<Lines>) -> Result<ui::SettingsWindow, String> {
     let window = thread::making(Kind::Settings, ui::SettingsWindow::new).map_err(|e| format!("Slint could not make the window: {e}"))?;
     window.global::<ui::Theme>().set_plain(shared.renderer == "software");
     window.set_opaque(!thread::seen_through(&shared.renderer));
@@ -550,10 +550,18 @@ fn make() -> Result<Live, String> {
             }
         });
     });
-    let pictures = Rc::new(Pictures::default());
-    let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
     window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));
     wire(&window);
+    Ok(window)
+}
+
+/// Makes the window, on Slint's thread, the first time it is asked for.
+fn make() -> Result<Live, String> {
+    let shared = thread::shared().ok_or("Slint has not begun")?;
+    let asking = thread::asker("heyo-slint-host", shared.host.clone())?;
+    let pictures = Rc::new(Pictures::default());
+    let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
+    let window = window(&shared, &lines)?;
 
     // What the first page shows is read before the window is: it comes
     // up as it is, not empty and then filled.
@@ -586,6 +594,34 @@ fn make() -> Result<Live, String> {
         });
     }));
     Ok(live)
+}
+
+/// The display changed (`super::follow`): the window is made again, for
+/// the display as it is, showing what it showed, and put back on screen
+/// if it was there. On Slint's thread. What is not the model's goes with
+/// the old window: how far a page was scrolled, and what was being typed
+/// into a field.
+pub(super) fn remake() {
+    let Some(shared) = thread::shared() else { return };
+    let shown = with(|live| {
+        let made = match window(&shared, &live.lines) {
+            Ok(made) => made,
+            Err(reason) => {
+                eprintln!("heyo: the settings window stays as it was made: {reason}");
+                return false;
+            }
+        };
+        let shown = live.window.window().is_visible();
+        live.stop_recording();
+        made.set_system_dark(live.window.get_system_dark());
+        let _ = live.window.hide();
+        live.window = made;
+        live.push();
+        shown
+    });
+    if shown == Some(true) {
+        with(|live| live.reveal(Instant::now(), |_| {}));
+    }
 }
 
 /// Shows the window, made first if this is the first time, and brings it

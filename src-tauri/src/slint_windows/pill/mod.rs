@@ -148,6 +148,7 @@ impl Pill {
             let Ok(made) = window.window().winit_window().await else { return };
             // So that it can be taken off the screen if Slint is lost.
             guard::remember(&made);
+            super::pointer::remember(&made);
             native::made(&made);
             place(&made);
             // Not when it was wanted meanwhile: it is about to be shown.
@@ -237,6 +238,27 @@ fn place(made: &slint::winit_030::winit::window::Window) {
 pub(super) fn prepare() {
     with(|pill| {
         if !pill.ready && native::kept() {
+            pill.prepare(|| {});
+        }
+    });
+}
+
+/// The display changed (`super::follow`): the window is made again, for
+/// the display as it is. What the pill shows is kept, and it is back on
+/// screen if a recording has it there. On Slint's thread.
+pub(super) fn remake() {
+    let old = PILL.with(|slot| slot.try_borrow_mut().ok().and_then(|mut slot| slot.take()));
+    // Never made: it will be, for the display as it is then.
+    let Some(Pill { window, model, wanted, .. }) = old else { return };
+    // Slint keeps a window it was asked to show until it is asked to hide it.
+    let _ = window.hide();
+    drop(window);
+    with(|pill| {
+        pill.model = model;
+        pill.push();
+        if wanted {
+            pill.show(Instant::now());
+        } else if native::kept() {
             pill.prepare(|| {});
         }
     });

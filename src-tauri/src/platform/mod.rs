@@ -15,6 +15,7 @@ pub mod clipboard_watch;
 pub mod common;
 pub mod composing;
 pub mod desktop;
+pub mod display;
 pub mod focus;
 pub mod hotkeys;
 pub mod input;

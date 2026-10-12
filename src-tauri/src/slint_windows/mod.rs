@@ -17,6 +17,10 @@
 //! - `screenshot` is the screenshot overlay: its window, and what a
 //!   desktop must be told for it to cover a monitor and have every key.
 //! - `reach` is where in its window a window takes the pointer.
+//! - `pointer` keeps the pointer over them the size the desktop says.
+//!
+//! When the display changes while Heyo runs (a monitor connected, another
+//! scale), every one of these windows is made again (`display_changed`).
 //! - `fonts` gives Slint the fonts Heyo carries.
 //! - `guard` keeps a panic on Slint's thread from ending Heyo.
 
@@ -28,6 +32,7 @@ mod icons;
 mod keys;
 mod model;
 pub(crate) mod pill;
+mod pointer;
 mod reach;
 pub(crate) mod screenshot;
 mod thread;
@@ -40,6 +45,7 @@ mod ui {
     slint::include_modules!();
 }
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
@@ -92,6 +98,46 @@ pub(crate) fn warm(app: &AppHandle) {
             thread::on(screenshot::prepare);
         }
     });
+}
+
+/// How long the desktop is given to finish saying how the display changed:
+/// it says so piece by piece (the monitors, the scale, the pointer), each
+/// a moment after the other.
+const SETTLED: Duration = Duration::from_millis(400);
+
+/// The display changed in some way (`platform::display`). From any
+/// thread; it does not wait. What is done about it is done once, when
+/// nothing more has been said for a moment.
+pub(crate) fn display_changed() {
+    static SAID: AtomicU64 = AtomicU64::new(0);
+    let this = SAID.fetch_add(1, Ordering::SeqCst) + 1;
+    let _ = std::thread::Builder::new().name("heyo-slint-display".into()).spawn(move || {
+        std::thread::sleep(SETTLED);
+        // A Slint that has not begun has made nothing for the old display.
+        if SAID.load(Ordering::SeqCst) == this && guard::state() == State::Running {
+            thread::on(follow);
+        }
+    });
+}
+
+/// Makes Slint's windows again, for the display as it is now. On Slint's
+/// thread.
+///
+/// A window that was there through the change cannot be relied on to
+/// follow it. winit tells a window of another scale only if the monitor it
+/// was on still goes by the same name, and a window that is off the
+/// screen (the pill, the overlay) is on none: connect another monitor and
+/// it draws for the old one, a screenshot's whole interface at half its
+/// size. And a window that is told draws at the new scale in a window of
+/// the old size, which the window manager will not let it change: the
+/// settings showed a quarter of themselves, with nothing where it was
+/// drawn. A window made now finds the display as it is.
+fn follow() {
+    eprintln!("heyo: the display changed: Slint's windows are made again for it");
+    pointer::follow();
+    pill::remake();
+    screenshot::remake();
+    window::remake();
 }
 
 /// Sees to it that Slint's thread runs: starts it the first time, and

@@ -127,6 +127,11 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
         WindowEvent::Focused(false) if window.state::<SettingsState>().0.read().unwrap().hide_on_blur => {
             platform::focus::when_lost(window, |window| hide(window.app_handle()));
         }
+        // The display it is on became another. (Not on Linux, where the
+        // toolkit says so of a window only once it is shown: the desktop
+        // is asked there, `platform::display::watch`.)
+        #[cfg(not(target_os = "linux"))]
+        WindowEvent::ScaleFactorChanged { .. } => slint_windows::display_changed(),
         _ => {}
     }
 }

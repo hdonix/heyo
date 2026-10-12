@@ -255,6 +255,8 @@ pub fn run() {
             // dictation pill is wanted at once when it is wanted. Started
             // by the first recording instead it was 40 ms later, that once.
             slint_windows::warm(app.handle());
+            // And its windows follow the display when it changes.
+            platform::display::watch(slint_windows::display_changed);
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let index = Index::new(

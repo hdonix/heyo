@@ -47,16 +47,34 @@ thread_local! {
 /// screen's pixels. From any thread; it does not wait. False when Slint
 /// cannot show it.
 pub(crate) fn show(app: &AppHandle, picture: image::RgbaImage, at: (i32, i32)) -> bool {
-    super::super::ensure(app) && thread::on(move || add(picture, at))
+    super::super::ensure(app)
+        && thread::on(move || {
+            let (width, height) = picture.dimensions();
+            add(Image::from_rgba8_premultiplied(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(picture.as_raw(), width, height)), at)
+        })
 }
 
-fn add(picture: image::RgbaImage, at: (i32, i32)) {
+/// The display changed (`super::super::follow`): each pinned capture is
+/// put in a window made for the display as it is, where it was, and is as
+/// before the pixels it was read as. On Slint's thread.
+pub(super) fn remake() {
+    let old = PINNED.with(|pinned| pinned.try_borrow_mut().map(|mut pinned| std::mem::take(&mut *pinned)).unwrap_or_default());
+    for pin in old {
+        let at = pin.window.window().position();
+        let picture = pin.window.get_picture();
+        let _ = pin.window.hide();
+        drop(pin);
+        add(picture, (at.x, at.y));
+    }
+}
+
+fn add(picture: Image, at: (i32, i32)) {
     let window = match thread::making(Kind::Pinned, ui::PinWindow::new) {
         Ok(window) => window,
         Err(e) => return eprintln!("heyo: the capture could not be pinned: {e}"),
     };
-    let (width, height) = picture.dimensions();
-    window.set_picture(Image::from_rgba8_premultiplied(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(picture.as_raw(), width, height)));
+    let (width, height) = (picture.size().width, picture.size().height);
+    window.set_picture(picture);
     let least = (LEAST * window.window().scale_factor()).ceil() as u32;
     window.window().set_size(slint::PhysicalSize::new(width.max(least), height.max(least)));
     window.window().set_position(slint::PhysicalPosition::new(at.0, at.1));
