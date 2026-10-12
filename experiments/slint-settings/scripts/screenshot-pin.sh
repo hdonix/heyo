@@ -40,8 +40,10 @@ pin() {
   echo "pinned 600 by 400 from 1000,600: a window at $(place "$first")"
   xprop -id "$first" _NET_WM_WINDOW_TYPE _NET_WM_STATE | sed 's/^/  /'
   xdotool mousemove 300 1900; sleep 0.3
-  png "$S/pin-first.png" 1001 601 598 398
-  echo "what it shows inside its edge, against the desktop there: $($READ same "$S/pin-before.png" "$S/pin-first.png" 1001 601 598 398)"
+  # Its edge is one logical pixel.
+  set -- $((1000 + scale)) $((600 + scale)) $((600 - 2 * scale)) $((400 - 2 * scale))
+  png "$S/pin-first.png" "$@"
+  echo "what it shows inside its edge, against the desktop there: $($READ same "$S/pin-before.png" "$S/pin-first.png" "$@")"
   echo "its edge at its top left corner: $(/usr/bin/python3 -I -c 'import sys; from PIL import Image; print(Image.open(sys.argv[1]).convert("RGB").getpixel((0, 0)))' "$(png "$S/pin-edge.png" 1000 600 4 4; echo "$S/pin-edge.png")") (the accent at 70 % over the picture)"
   pin 1800 700 2100 900
   echo "a second, 300 by 200 from 1800,700: $(pins | wc -l) windows; the new one at $(place "$(pins | grep -v -x "$first" | tail -1)")"

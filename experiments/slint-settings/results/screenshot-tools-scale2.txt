@@ -1,0 +1,85 @@
+# 2026-10-13, heyo, 3840x2160 at scale 2
+## each tool
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+## saved with all of it drawn
+the overlay is gone; saved: Screenshot 2026-10-13 03-05-40.png
+the file is 1200 x 700
+where nothing is drawn (right of the pen, below the blur): the desktop, pixel for pixel
+the bottom strip: the desktop, pixel for pixel
+the rectangle's outline (red): (255, 69, 58)
+the arrow's shaft (red): (255, 69, 58)
+the pen's first stretch (green): (89, 212, 153)
+pixels of exactly the red in the rectangle's box: 5980; of exactly the blue where the text is: 1095
+the blurred part: differs from the desktop
+## undo, by key and by button
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+of three rectangles the first is left: [True, False, False]
+## an annotation moved, and one that goes past the selection's edge
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the rectangle's left side is where it was moved to: True and no longer where it was drawn: True
+the arrow inside the selection: True and past its edge the desktop dimmed, with no arrow: True
+## the cancel button
+the overlay is gone
+## saved with nothing drawn
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the overlay is gone; the file against the desktop there: 0 of 840000 pixels differ (by 0 at most)
+## copied with Enter
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the overlay is gone; on the clipboard: 1200 x 700
+the clipboard's picture against the desktop there: 8190 of 840000 pixels differ (by 125 at most)
+## copied with the button, something drawn on it
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the overlay is gone; on the clipboard: 1200 x 700
+the rectangle is in it: True
+## a click on a window
+the window is 1456 x 600 at 529,161
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+on the clipboard: 1456 x 600
+against the desktop where the window is: 0 of 873600 pixels differ (by 0 at most)
+## the pointer's shape
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the pointer with nothing selected: crosshair 48x48
+the pointer in the selection: move 48x48
+the pointer on its top left handle: nwse-resize 48x48
+the pointer on its top handle: ns-resize 48x48
+the pointer on its top right handle: nesw-resize 48x48
+the pointer on its right handle: ew-resize 48x48
+the pointer on the toolbar, between buttons: default 48x48
+the pointer on a button: pointer 48x48
+the pointer outside the selection: crosshair 48x48
+the pointer in the selection with the rectangle tool: crosshair 48x48
+the pointer on a rectangle that was drawn, with the selection tool: grab 48x48
+## Escape
+while text is typed, after the first Escape the overlay is up, after the second gone
+## a right click
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+in the selection: the overlay is gone
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+with nothing selected: gone
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+on the toolbar: gone
+## copy the text in it
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the overlay is up
+## asked for as "copy text from the screen"
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+after the selection was made the overlay is up, with no toolbar: the pointer where the toolbar would be is crosshair 48x48
+## pin
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the overlay is gone; the pinned window: 1000 600 1200 700
+heyo: screenshot failed: Text recognition is not set up yet. Download it in Heyo Settings → Screenshots.
+heyo: screenshot failed: Text recognition is not set up yet. Download it in Heyo Settings → Screenshots.

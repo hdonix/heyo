@@ -1,0 +1,14 @@
+# 2026-10-13, heyo, started at scale 2, then: same
+## before: scale 2, Xcursor.size 48, screen 3840x2160
+pointer over a GTK window: default 48x48
+settings: 1848x1408+1062+408 (860 by 640 and a margin of 32 is 1848x1408)
+  pointer over its middle: default 48x48; over a switch: pointer 48x48
+  a click on that switch: hideOnBlur False -> True
+palette, the first time: 1628x1068+1106+546 (the middle is +1106+546)
+palette, the second time: 1628x1068+1106+546 (the middle is +1106+546)
+screenshot: pointer in the selection: move 48x48; on a handle: nwse-resize 48x48; on the toolbar: pointer 48x48
+  toolbar: 976 px across where it was measured (499 logical is 998 at its widest), 28 px down to the next button
+  saved: 1200x700; against the screen there: 0 of 840000 pixels differ (by 0 at most)
+pinned 300x200 from 400,300: a window at 300x200+400+300; pointer over it: default 48x48
+pill: its window 720x88+1560+1856 (360 by 44 at the bottom centre, a tenth up, is 720x88+1560+1856); pointer over it: default 48x48
+## what Heyo said
