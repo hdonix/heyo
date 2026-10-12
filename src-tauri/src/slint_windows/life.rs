@@ -8,8 +8,9 @@
 //!
 //! - [`Slot`] is where the one window of a kind is kept on Slint's thread:
 //!   made the first time it is used (`with`), and if it cannot be made,
-//!   that is said once and not tried again. `there` never makes it, and
-//!   `again` makes it anew for a display that changed.
+//!   that is said once and not tried again. `there` never makes it.
+//!   When the display changes, every window there is is made again
+//!   ([`again`]), each saying what goes across to the new one.
 //! - [`Life`] is one window: `ahead` has winit's window made before it is
 //!   wanted, `on` and `off` say whether it is to be on the screen, `draw`
 //!   has what changed seen now. A window never shows or hides Slint's
@@ -345,6 +346,30 @@ pub(super) trait Lives: Sized + 'static {
     const NAME: &'static str;
     /// Makes it. On Slint's thread.
     fn make() -> Result<Self, String>;
+    /// It was made again, for a display that changed: what it showed goes
+    /// across to the new one, which is on the screen again if this one
+    /// was. On Slint's thread.
+    fn carry(self, new: &mut Self);
+}
+
+thread_local! {
+    /// How each slot that has had a window makes it again.
+    static AGAIN: RefCell<Vec<fn()>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Makes every window there is again, for the display as it is now: one
+/// made for another display cannot be relied on to follow it
+/// (`super::follow` says why). On Slint's thread.
+pub(super) fn again() {
+    let all = AGAIN.with(|all| all.borrow().clone());
+    for one in all {
+        one();
+    }
+}
+
+/// A slot of the windows of one kind: `again` is told of it once.
+pub(super) trait Slotted: Lives {
+    fn slot() -> &'static LocalKey<Slot<Self>>;
 }
 
 /// Where the one window of a kind is kept, on Slint's thread.
@@ -352,11 +377,13 @@ pub(super) struct Slot<T> {
     kept: RefCell<Option<T>>,
     /// Why it could not be made: said once, and not tried again.
     failed: RefCell<Option<String>>,
+    /// `again` knows of it.
+    known: Cell<bool>,
 }
 
-impl<T: Lives> Slot<T> {
+impl<T: Slotted> Slot<T> {
     pub(super) const fn new() -> Self {
-        Self { kept: RefCell::new(None), failed: RefCell::new(None) }
+        Self { kept: RefCell::new(None), failed: RefCell::new(None), known: Cell::new(false) }
     }
 
     /// Does `work` with the window, making it first if this is the first
@@ -367,7 +394,12 @@ impl<T: Lives> Slot<T> {
             let mut kept = slot.kept.try_borrow_mut().ok()?;
             if kept.is_none() && slot.failed.borrow().is_none() {
                 match T::make() {
-                    Ok(made) => *kept = Some(made),
+                    Ok(made) => {
+                        *kept = Some(made);
+                        if !slot.known.replace(true) {
+                            AGAIN.with(|all| all.borrow_mut().push(|| Slot::remake(T::slot())));
+                        }
+                    }
                     Err(reason) => {
                         eprintln!("heyo: {} cannot be shown in this run: {reason}", T::NAME);
                         *slot.failed.borrow_mut() = Some(reason);
@@ -398,15 +430,15 @@ impl<T: Lives> Slot<T> {
         })
     }
 
-    /// Makes the window again, if there was one: `carry` takes what the
-    /// old one showed across to the new. One that was never made is left
-    /// to be made when it is first used.
-    pub(super) fn again(slot: &'static LocalKey<Self>, carry: impl FnOnce(T, &mut T)) {
+    /// Makes the window again, if there is one, and has the old one carry
+    /// what it showed across to the new. One that was never made, or was
+    /// given up, is left to be made when it is next used.
+    fn remake(slot: &'static LocalKey<Self>) {
         let Some(old) = Self::give_up(slot, |_| true) else { return };
         let mut old = Some(old);
         Self::with(slot, |new| {
             if let Some(old) = old.take() {
-                carry(old, new);
+                old.carry(new);
             }
         });
     }
@@ -551,6 +583,16 @@ mod tests {
                 Err("it is not makeable".into())
             }
         }
+
+        fn carry(self, new: &mut Self) {
+            new.shows = self.shows;
+        }
+    }
+
+    impl Slotted for Stand {
+        fn slot() -> &'static LocalKey<Slot<Self>> {
+            &STAND
+        }
     }
 
     // Each test has a thread of its own, and so a slot of its own.
@@ -586,12 +628,25 @@ mod tests {
     #[test]
     fn a_window_made_again_is_another_that_shows_what_the_old_one_showed() {
         // Never made: there is nothing to make again.
-        Slot::again(&STAND, |_, _| panic!("there was none"));
+        again();
         assert_eq!(MADE.get(), 0);
         Slot::with(&STAND, |stand| stand.shows = "a page");
-        Slot::again(&STAND, |old, new| new.shows = old.shows);
+        again();
         assert_eq!(MADE.get(), 2);
         assert_eq!(Slot::there(&STAND, |stand| stand.shows), Some("a page"));
+        // And again, each time the display changes.
+        again();
+        assert_eq!(MADE.get(), 3);
+        assert_eq!(Slot::there(&STAND, |stand| stand.shows), Some("a page"));
+    }
+
+    #[test]
+    fn a_window_that_was_given_up_is_not_made_again_until_it_is_used() {
+        Slot::with(&STAND, |stand| stand.shows = "a page");
+        assert!(Slot::give_up(&STAND, |_| true).is_some());
+        again();
+        assert_eq!(MADE.get(), 1);
+        assert_eq!(Slot::there(&STAND, |_| ()), None);
     }
 
     #[test]

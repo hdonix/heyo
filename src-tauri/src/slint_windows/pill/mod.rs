@@ -27,7 +27,7 @@ use slint::winit_030::winit::dpi::PhysicalPosition;
 use slint::{ComponentHandle, Model as _, ModelRc, VecModel};
 use tauri::AppHandle;
 
-use super::life::{self, Kept, Life, Lives, Slot};
+use super::life::{self, Kept, Life, Lives, Slot, Slotted};
 use super::thread::{self, Job, Kind};
 use super::ui;
 use crate::dictation::Told;
@@ -91,6 +91,24 @@ impl Lives for Pill {
         let mut pill = Pill { life, model: Model::new(), bars, telling, wanted: false, leaving: slint::Timer::default() };
         pill.push();
         Ok(pill)
+    }
+
+    /// What the pill shows is kept, and it is back on screen if a
+    /// recording has it there.
+    fn carry(self, new: &mut Self) {
+        new.model = self.model;
+        new.push();
+        if self.wanted {
+            new.show();
+        } else {
+            new.life.ahead(|| {});
+        }
+    }
+}
+
+impl Slotted for Pill {
+    fn slot() -> &'static std::thread::LocalKey<Slot<Self>> {
+        &PILL
     }
 }
 
@@ -176,22 +194,6 @@ fn place(made: &slint::winit_030::winit::window::Window) {
 /// thread.
 pub(super) fn prepare() {
     with(|pill| pill.life.ahead(|| {}));
-}
-
-/// The display changed (`super::follow`): the window is made again, for
-/// the display as it is. What the pill shows is kept, and it is back on
-/// screen if a recording has it there. On Slint's thread.
-pub(super) fn remake() {
-    Slot::again(&PILL, |old, new| {
-        let wanted = old.wanted;
-        new.model = old.model;
-        new.push();
-        if wanted {
-            new.show();
-        } else {
-            new.life.ahead(|| {});
-        }
-    });
 }
 
 /// Shows the pill. From any thread; it waits only for Slint to start, if

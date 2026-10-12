@@ -42,7 +42,7 @@ use slint::{ComponentHandle, Image, Model as _, ModelRc, Rgba8Pixel, SharedPixel
 use tauri::AppHandle;
 
 use super::guard::{self, State};
-use super::life::{self, Kept, Life, Lives, Slot};
+use super::life::{self, Kept, Life, Lives, Slot, Slotted};
 use super::thread::{self, Job, Kind};
 use super::ui;
 use crate::platform::capture::{Area, Shot};
@@ -212,6 +212,22 @@ impl Lives for Overlay {
             typing: None,
         })
     }
+
+    /// A capture that is up is of the screen as it was: it is given up as
+    /// Escape gives it up. The new window waits off the screen as the old
+    /// one did.
+    fn carry(mut self, new: &mut Self) {
+        if self.up.is_some() {
+            self.after(Some(Outcome::Cancel));
+        }
+        new.life.ahead(|| {});
+    }
+}
+
+impl Slotted for Overlay {
+    fn slot() -> &'static std::thread::LocalKey<Slot<Self>> {
+        &OVERLAY
+    }
 }
 
 /// Gives up the window, which had grown to a monitor's size, and makes
@@ -221,20 +237,6 @@ fn rest() {
     if Slot::give_up(&OVERLAY, |overlay| overlay.up.is_none() && overlay.life.made()).is_some() {
         prepare();
     }
-}
-
-/// The display changed (`super::follow`): the overlay's window is made
-/// again, for the display as it is, and the pinned captures with it. A
-/// capture that is up is of the screen as it was, and is given up as
-/// Escape gives it up. On Slint's thread.
-pub(super) fn remake() {
-    Slot::there(&OVERLAY, |overlay| {
-        if overlay.up.is_some() {
-            overlay.after(Some(Outcome::Cancel));
-        }
-    });
-    rest();
-    pin::remake();
 }
 
 /// For measuring how soon the overlay follows the pointer: with

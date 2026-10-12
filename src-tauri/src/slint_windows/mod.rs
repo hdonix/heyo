@@ -138,9 +138,7 @@ pub(crate) fn display_changed() {
 fn follow() {
     eprintln!("heyo: the display changed: Slint's windows are made again for it");
     pointer::follow();
-    pill::remake();
-    screenshot::remake();
-    window::remake();
+    life::again();
 }
 
 /// Sees to it that Slint's thread runs: starts it the first time, and

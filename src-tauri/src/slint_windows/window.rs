@@ -27,7 +27,7 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 use super::keys::{self, Held};
 use super::model::{Ask, Line, Model, Then};
 use super::thread::{self, Job, Kind};
-use super::life::{self, Life, Lives, Slot};
+use super::life::{self, Life, Lives, Slot, Slotted};
 use super::{area, icons, reach, ui};
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
@@ -533,6 +533,25 @@ impl Lives for Live {
     fn make() -> Result<Self, String> {
         make()
     }
+
+    /// It shows what it showed, and is back on screen if it was there.
+    /// What is not the model's goes with the old window: how far a page
+    /// was scrolled, and what was being typed into a field.
+    fn carry(self, new: &mut Self) {
+        new.life.window().set_system_dark(self.life.window().get_system_dark());
+        let shown = self.life.wanted();
+        new.model = self.model;
+        new.push();
+        if shown {
+            new.reveal(Instant::now(), |_| {});
+        }
+    }
+}
+
+impl Slotted for Live {
+    fn slot() -> &'static std::thread::LocalKey<Slot<Self>> {
+        &LIVE
+    }
 }
 
 fn make() -> Result<Live, String> {
@@ -582,23 +601,6 @@ fn make() -> Result<Live, String> {
         }));
     }
     Ok(live)
-}
-
-/// The display changed (`super::follow`): the window is made again, for
-/// the display as it is, showing what it showed, and put back on screen
-/// if it was there. On Slint's thread. What is not the model's goes with
-/// the old window: how far a page was scrolled, and what was being typed
-/// into a field.
-pub(super) fn remake() {
-    Slot::again(&LIVE, |old, new| {
-        new.life.window().set_system_dark(old.life.window().get_system_dark());
-        let shown = old.life.wanted();
-        new.model = old.model;
-        new.push();
-        if shown {
-            new.reveal(Instant::now(), |_| {});
-        }
-    });
 }
 
 /// Shows the window, made first if this is the first time, and brings it
