@@ -21,9 +21,8 @@ use crate::commands::settings::SettingsView;
 use crate::helper::InstallProgress;
 use crate::open::Arguments;
 use crate::root::Item;
-use crate::screenshot::Finish;
 use crate::wire::WebviewMessage;
-use crate::{expand, screenshot};
+use crate::expand;
 
 commands! {
     search(query: String) -> Vec<Item>;
@@ -33,7 +32,6 @@ commands! {
     get_settings() -> SettingsView;
     open_settings();
     set_item_hotkey(id: String, title: String, accelerator: String);
-    screenshot_finish(request: Finish) -> String;
     show_window();
     get_item(id: String) -> Option<Item>;
     list_quicklinks() -> Vec<Item>;
@@ -61,7 +59,6 @@ events! {
     RUNTIME: RuntimeMessage;
     DICTATION_INSTALL: InstallProgress;
     OCR_INSTALL: InstallProgress;
-    SCREENSHOT: screenshot::Capture;
     EXPAND_SNIPPET: expand::ExpandSnippet;
     CLIPBOARD_MEANING_INSTALL: InstallProgress;
     ACTIVITIES: Vec<ActivityView>;
@@ -386,7 +383,7 @@ pub(crate) fn hide(window: WebviewWindow) {
     #[test]
     fn every_event_says_what_it_carries() {
         let (rows, declared) = (event_rows(), declared());
-        assert!(declared.len() > 10, "could not read the events out of wire.rs: {declared:?}");
+        assert!(declared.len() >= 8, "could not read the events out of wire.rs: {declared:?}");
         for name in &declared {
             assert_eq!(rows.iter().filter(|row| row.name == name).count(), 1, "{name} is an event in wire.rs: say in commands/bindings.rs what it carries (once)");
         }

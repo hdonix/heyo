@@ -138,7 +138,7 @@ component ToolButton inherits Rectangle {
         height: 21px;
         border-radius: 10.5px;
         border-width: 1.5px;
-        border-color: Tokens.text;
+        border-color: white;
     }
     if root.tipped && root.tip != "": Hud {
         x: (parent.width - self.width) / 2;
@@ -161,7 +161,6 @@ export component ScreenshotWindow inherits Window {
     // is a pixel of the screen.
     in property <image> clear;
     in property <image> dimmed;
-    in property <bool> dark;
     // The part shown as it is, here and in the capture, and whether it is
     // something selected (or a window that would be): it then has an outline.
     in property <bool> selected;
@@ -218,11 +217,10 @@ export component ScreenshotWindow inherits Window {
     always-on-top: true;
     background: black;
     default-font-size: Tokens.text-sm-size;
+    // Over other applications, not on Heyo's own surfaces: the toolbar is
+    // dark and the accent the dark theme's, whatever Heyo's theme is.
     init => {
-        Tokens.dark = self.dark;
-    }
-    changed dark => {
-        Tokens.dark = self.dark;
+        Tokens.dark = true;
     }
     Image {
         x: 0;

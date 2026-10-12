@@ -46,18 +46,17 @@ thread_local! {
 /// Pins a picture to the screen with its top left corner at `at`, in the
 /// screen's pixels. From any thread; it does not wait. False when Slint
 /// cannot show it.
-pub(crate) fn show(app: &AppHandle, picture: image::RgbaImage, at: (i32, i32), dark: bool) -> bool {
-    super::super::ensure(app) && thread::on(move || add(picture, at, dark))
+pub(crate) fn show(app: &AppHandle, picture: image::RgbaImage, at: (i32, i32)) -> bool {
+    super::super::ensure(app) && thread::on(move || add(picture, at))
 }
 
-fn add(picture: image::RgbaImage, at: (i32, i32), dark: bool) {
+fn add(picture: image::RgbaImage, at: (i32, i32)) {
     let window = match thread::making(Kind::Pinned, ui::PinWindow::new) {
         Ok(window) => window,
         Err(e) => return eprintln!("heyo: the capture could not be pinned: {e}"),
     };
     let (width, height) = picture.dimensions();
     window.set_picture(Image::from_rgba8_premultiplied(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(picture.as_raw(), width, height)));
-    window.set_dark(dark);
     let least = (LEAST * window.window().scale_factor()).ceil() as u32;
     window.window().set_size(slint::PhysicalSize::new(width.max(least), height.max(least)));
     window.window().set_position(slint::PhysicalPosition::new(at.0, at.1));

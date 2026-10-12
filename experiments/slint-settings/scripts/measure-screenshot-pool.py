@@ -19,6 +19,9 @@ for key, values in frozen.items():
     late = sorted(later[key])
     print(f"{key}: {len(values)} screenshots, frozen median {statistics.median(values)}, {min(values)} to {max(values)}; ready later by up to {late[-1]}, {sum(1 for v in late if v >= 19)} of {len(late)} by 19 or more")
 for (key, selection), rows in runs.items():
-    middle = sorted(rows, key=lambda row: row["jump_ms"][1])[len(rows) // 2]
-    frames = sorted((row for row in rows if row.get("frame_ms")), key=lambda row: row["frame_ms"][1])
-    print(f"{key}, {selection} ({len(rows)} runs): jump {middle['jump_ms']}  sweep {sorted(rows, key=lambda row: row['sweep_ms'][1])[len(rows) // 2]['sweep_ms']}  frame {frames[len(frames) // 2]['frame_ms'] if frames else None}")
+    def middle(of):
+        """The run whose 95th of that is the middle one, of the runs that have it."""
+        having = sorted((row for row in rows if row.get(of)), key=lambda row: row[of][1])
+        return having[len(having) // 2][of] if having else None
+
+    print(f"{key}, {selection} ({len(rows)} runs): jump {middle('jump_ms')}  sweep {middle('sweep_ms')}  frame {middle('frame_ms')}")

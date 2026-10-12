@@ -1,10 +1,11 @@
 //! Which window may invoke which command.
 //!
-//! Every window loads the same page, and the palette draws what extensions
-//! hand it. So a window is held to the commands its own view calls: a
-//! palette that was talked into something still cannot change the settings,
-//! and the screenshot overlay cannot open anything. A command that is not
-//! in the table is refused to every window; a test keeps the table complete.
+//! The palette draws what extensions hand it. So a window is held to the
+//! commands its own view calls: a palette that was talked into something
+//! still cannot change the settings. A command that is not in the table is
+//! refused to every window; a test keeps the table complete. (The windows
+//! that change things, and the screenshot overlay, are not web views: the
+//! host draws them, and they invoke nothing.)
 
 use tauri::ipc::Invoke;
 use tauri::Runtime;
@@ -14,23 +15,18 @@ use tauri::Runtime;
 pub(crate) enum Caller {
     /// `main`: the root search and the commands of extensions.
     Palette,
-    /// The overlay a capture is selected on.
-    Screenshot,
-    /// `pin-N`: a capture kept on screen. It asks nothing of the host.
-    Pin,
 }
 
 impl Caller {
     fn of(label: &str) -> Option<Caller> {
         match label {
             crate::palette::WINDOW => Some(Caller::Palette),
-            crate::screenshot::WINDOW => Some(Caller::Screenshot),
-            _ => label.strip_prefix("pin-").filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).map(|_| Caller::Pin),
+            _ => None,
         }
     }
 }
 
-use Caller::{Palette, Screenshot};
+use Caller::Palette;
 
 /// Each command and the windows whose view calls it (`call(` in `src/`).
 const TABLE: &[(&str, &[Caller])] = &[
@@ -60,8 +56,6 @@ const TABLE: &[(&str, &[Caller])] = &[
     // and both bind a hotkey to an item.
     ("get_settings", &[Palette]),
     ("set_item_hotkey", &[Palette]),
-    // Changing things is the settings window's alone.
-    ("screenshot_finish", &[Screenshot]),
 ];
 
 /// Whether the window of that label may invoke that command.
@@ -92,9 +86,7 @@ mod tests {
     #[test]
     fn a_window_is_known_by_its_label() {
         assert_eq!(Caller::of("main"), Some(Palette));
-        assert_eq!(Caller::of("screenshot"), Some(Screenshot));
-        assert_eq!(Caller::of("pin-3"), Some(Caller::Pin));
-        for stranger in ["", "Main", "pin-", "pin-x", "pin-3-settings", "settings", "dictation", "other"] {
+        for stranger in ["", "Main", "screenshot", "pin-3", "settings", "dictation", "other"] {
             assert_eq!(Caller::of(stranger), None, "{stranger}");
         }
     }
@@ -118,16 +110,13 @@ mod tests {
             ("main", "clear_clipboard_history", false),
             ("main", "local_models", false),
             ("main", "copy_diagnostics", false),
-            ("main", "screenshot_finish", false),
             // What an extension was allowed is the user's to take back, in the
             // settings; the palette, which extensions draw in, cannot.
             ("main", "revoke_extension_permission", false),
             ("main", "extension_permissions", false),
-            // The settings window runs nothing and pastes nothing.
-            ("screenshot", "screenshot_finish", true),
+            // No other window of Heyo's is a web view: none may call anything.
             ("screenshot", "launch", false),
-            ("screenshot", "change_settings", false),
-            ("pin-1", "screenshot_finish", false),
+            ("settings", "change_settings", false),
             ("pin-1", "hide", false),
             // Nothing for a window Heyo does not open, or a command it does not have.
             ("devtools", "search", false),
@@ -137,8 +126,6 @@ mod tests {
         for (window, command, expected) in cases {
             assert_eq!(allowed(window, command), expected, "{window} calling {command}");
         }
-        // A pinned capture may call nothing at all.
-        assert!(TABLE.iter().all(|(command, _)| !allowed("pin-1", command)));
     }
 
     /// A command added to `lib.rs` and forgotten here would be refused to

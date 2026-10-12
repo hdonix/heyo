@@ -1,14 +1,9 @@
-//! Commands for screenshots, text recognition and dictation.
+//! Commands for text recognition and dictation.
 
 use serde::Serialize;
 use tauri::AppHandle;
 
 use crate::*;
-
-#[tauri::command]
-pub(crate) async fn screenshot_finish(request: screenshot::Finish, app: AppHandle) -> Result<String, String> {
-    screenshot::finish(app, request).await
-}
 
 /// Whether text recognition can be used, for the settings page.
 #[derive(Serialize, ts_rs::TS)]

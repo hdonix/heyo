@@ -544,19 +544,6 @@ impl crate::platform::desktop::Desktop for Gnome {
         pointer_monitor()
     }
 
-    /// Fullscreen on the monitor that was captured: a Wayland window cannot
-    /// place itself, but it can say which monitor to fill.
-    fn place_overlay(&self, window: &gtk::ApplicationWindow, x: i32, y: i32, _width: i32, _height: i32) {
-        use gtk::prelude::*;
-        let display = WidgetExt::display(window);
-        let monitor = (0..display.n_monitors()).find(|&n| display.monitor(n).is_some_and(|m| (m.geometry().x(), m.geometry().y()) == (x, y)));
-        match (monitor, GtkWindowExt::screen(window)) {
-            (Some(monitor), Some(screen)) => window.fullscreen_on_monitor(&screen, monitor),
-            _ => window.fullscreen(),
-        }
-        window.show_all();
-        window.present();
-    }
 
     fn hotkeys(&self) -> Option<&dyn crate::platform::desktop::Hotkeys> {
         crate::platform::hotkeys::gsettings()

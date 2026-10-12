@@ -9,7 +9,6 @@ export const event = {
   runtime: "heyo://runtime",
   dictationInstall: "heyo://dictation-install",
   ocrInstall: "heyo://ocr-install",
-  screenshot: "heyo://screenshot",
   expandSnippet: "heyo://expand-snippet",
   clipboardMeaningInstall: "heyo://clipboard-meaning-install",
   activities: "heyo://activities",

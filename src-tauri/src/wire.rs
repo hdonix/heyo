@@ -38,8 +38,6 @@ events! {
     DICTATION_INSTALL = "heyo://dictation-install";
     /// Progress of installing the text-recognition engine.
     OCR_INSTALL = "heyo://ocr-install";
-    /// A capture is ready for the screenshot overlay.
-    SCREENSHOT = "heyo://screenshot";
     /// A snippet's keyword was typed in another application: the palette
     /// fills in the text's placeholders and answers with `snippet_expanded`.
     EXPAND_SNIPPET = "heyo://expand-snippet";

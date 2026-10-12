@@ -4,8 +4,6 @@ import type { ExpandSnippet } from "./ExpandSnippet";
 import type { InstallProgress } from "./InstallProgress";
 import type { Item } from "./Item";
 import type { RuntimeMessage } from "../wire";
-import type { ScreenshotCapture } from "./ScreenshotCapture";
-import type { ScreenshotFinish } from "./ScreenshotFinish";
 import type { SettingsView } from "./SettingsView";
 import type { WebviewMessage } from "./WebviewMessage";
 
@@ -27,7 +25,6 @@ export type Commands = {
   open_settings: { args: null; result: null };
   /** Binds a global hotkey to a root search item; an empty accelerator removes it. */
   set_item_hotkey: { args: { id: string; title: string; accelerator: string }; result: null };
-  screenshot_finish: { args: { request: ScreenshotFinish }; result: string };
   show_window: { args: null; result: null };
   get_item: { args: { id: string }; result: Item | null };
   /** Quicklinks, for offering the ones that take a query as fallbacks. */
@@ -91,7 +88,6 @@ export type Events = {
   runtime: RuntimeMessage;
   dictationInstall: InstallProgress;
   ocrInstall: InstallProgress;
-  screenshot: ScreenshotCapture;
   expandSnippet: ExpandSnippet;
   clipboardMeaningInstall: InstallProgress;
   activities: Array<ActivityView>;

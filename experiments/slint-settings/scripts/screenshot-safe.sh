@@ -17,8 +17,7 @@
 # and whether Heyo runs and its palette opens afterwards.
 #
 # In the sandbox only (heyo.sh up, the screen at least 2000 by 1300); Heyo
-# must not be running in it. Until the web view's overlay is removed, the
-# overlay Slint draws is asked for with HEYO_SCREENSHOT=slint.
+# must not be running in it.
 . "$(dirname "$0")/lib.sh"
 overlay() { xdotool search --name '^Heyo Screenshot$' 2>/dev/null | tail -1; }
 viewable() { [ -n "$1" ] && xwininfo -id "$1" 2>/dev/null | grep -q "Map State: IsViewable"; }
@@ -27,7 +26,7 @@ one() {
   case=$1; shift
   echo "== $case"
   alive heyo && { echo "Heyo is running already" >&2; exit 1; }
-  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start HEYO_SCREENSHOT=slint "$@" > /dev/null || { echo "FAIL: Heyo did not start"; return 1; }
+  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start "$@" > /dev/null || { echo "FAIL: Heyo did not start"; return 1; }
   # (Not `started`: the library's own functions use that name.)
   read -r heyo heyo_born < "$D/pids/heyo"
   # The other program: a text field that says what was typed into it.

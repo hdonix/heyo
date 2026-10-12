@@ -195,33 +195,6 @@ pub trait Desktop: Send + Sync {
         None
     }
 
-    /// Puts the screenshot overlay over a rectangle (logical pixels), above
-    /// everything, with the keyboard. The default is the best an ordinary
-    /// window can do: fullscreen on its monitor.
-    #[cfg(target_os = "linux")]
-    fn place_overlay(&self, window: &gtk::ApplicationWindow, x: i32, y: i32, _width: i32, _height: i32) {
-        use gtk::prelude::*;
-        window.move_(x, y);
-        window.fullscreen();
-        window.show_all();
-        window.present();
-    }
-
-    /// Shows the frozen capture in a window of its own under the overlay.
-    /// False: the overlay paints it itself.
-    #[cfg(target_os = "linux")]
-    fn overlay_backdrop(&self, _capture: gtk::cairo::ImageSurface, _x: i32, _y: i32, _width: i32, _height: i32) -> bool {
-        false
-    }
-
-    /// Before the overlay is hidden: gives back what `place_overlay` took.
-    #[cfg(target_os = "linux")]
-    fn release_overlay(&self, _window: &gtk::ApplicationWindow) {}
-
-    /// After the overlay is hidden.
-    #[cfg(target_os = "linux")]
-    fn close_overlay(&self) {}
-
     /// Where the monitor the pointer is on starts, in physical pixels as the
     /// toolkit gives monitors' positions. `None`: ask the toolkit, which on
     /// Wayland knows the pointer only while it is over one of Heyo's windows.

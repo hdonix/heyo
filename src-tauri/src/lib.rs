@@ -36,12 +36,12 @@ mod slint_windows;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager};
 
 use cli::*;
 use open::open_item;
 use clipboard::ClipboardHistory;
-use commands::{media::*, root::*, settings::*};
+use commands::{root::*, settings::*};
 use host::*;
 use platform::{hotkeys, windows};
 use platform::{common::*, focus::*, input::*};
@@ -219,7 +219,6 @@ pub fn run() {
             get_settings,
             open_settings,
             set_item_hotkey,
-            screenshot_finish,
             show_window,
             get_item,
             list_quicklinks,
@@ -239,7 +238,6 @@ pub fn run() {
         .setup(move |app| {
             // Extension icons and assets.
             let _ = app.asset_protocol_scope().allow_directory(paths::data(), true);
-            let _ = app.asset_protocol_scope().allow_directory(screenshot::asset_dir(), true);
             #[cfg(windows)]
             let _ = app.asset_protocol_scope().allow_directory(apps::icon_dir(), true);
             platform::clipboard_watch::attach(app.handle());
@@ -290,18 +288,6 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == palette::WINDOW {
                 return palette::on_window_event(window, event);
-            }
-            // A pinned capture is deleted with its window.
-            if let (WindowEvent::Destroyed, Some(n)) = (event, window.label().strip_prefix("pin-")) {
-                screenshot::unpinned(n);
-            }
-            // The screenshot overlay lives for as long as Heyo does, as
-            // the palette: closing it (Alt+F4) only hides it.
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == screenshot::WINDOW {
-                    api.prevent_close();
-                    screenshot::cancel(window.app_handle());
-                }
             }
         })
         .run(tauri::generate_context!())

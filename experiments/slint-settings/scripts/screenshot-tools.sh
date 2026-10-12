@@ -18,8 +18,7 @@
 # - "copy text" says what it does at the bottom, and "pin" leaves a window.
 #
 # In the sandbox only (SCREEN=3840x2160 heyo.sh up gnome, GDK_SCALE 1 or 2);
-# Heyo must not be running in it. Until the web view's overlay is removed,
-# the overlay Slint draws is asked for with HEYO_SCREENSHOT=slint.
+# Heyo must not be running in it.
 . "$(dirname "$0")/lib.sh"
 name=${1:-x11}; [ $# -gt 0 ] && shift
 out=$RESULTS/screenshot-tools-$name.txt
@@ -47,7 +46,7 @@ at() { xdotool mousemove "$1" "$2"; sleep 0.25; echo "the pointer $3: $($READ cu
 saved() { ls -t "$HOME/Pictures/Screenshots/"*.png 2>/dev/null | head -1; }
 {
   echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"
-  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start HEYO_SCREENSHOT=slint "$@" > /dev/null || exit 1
+  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start "$@" > /dev/null || exit 1
   rm -rf "$HOME/Pictures/Screenshots"
   # A window of another program, to be selected by a click.
   zenity --info --title "A window" --text "A window to select" --width 600 --height 300 > /dev/null 2>&1 &
@@ -111,6 +110,28 @@ before, drawn = Image.open(sys.argv[1]).convert("RGB").crop((1000, 600, 2200, 13
 red = (255, 69, 58)
 print("of three rectangles the first is left:", [drawn.getpixel(at) == red for at in ((100, 200), (500, 200), (100, 500))])
 PY
+
+  echo "## an annotation moved, and one that goes past the selection's edge"
+  select_it
+  B rect; drag 1100 700 1400 900
+  # The selection tool again: the rectangle is taken by its outline and moved by 300,200.
+  B rect; drag 1100 800 1400 1000
+  # An arrow from inside the selection to outside it.
+  B arrow; drag 2000 1000 2400 1000
+  xdotool mousemove 300 1900; sleep 0.3
+  png "$S/tools-moved.png"
+  /usr/bin/python3 -I - "$S/tools-before.png" "$S/tools-moved.png" <<'PY'
+import sys
+from PIL import Image
+before, screen = (Image.open(path).convert("RGB") for path in sys.argv[1:3])
+red = (255, 69, 58)
+print("the rectangle's left side is where it was moved to:", screen.getpixel((1400, 1000)) == red, "and no longer where it was drawn:", screen.getpixel((1100, 800)) == before.getpixel((1100, 800)))
+dimmed = tuple(value * 154 // 256 for value in before.getpixel((2300, 1000)))
+print("the arrow inside the selection:", screen.getpixel((2100, 1000)) == red, "and past its edge the desktop dimmed, with no arrow:", screen.getpixel((2300, 1000)) == dimmed)
+PY
+  echo "## the cancel button"
+  B cancel
+  echo "the overlay is $(up)"
 
   echo "## saved with nothing drawn"
   select_it
@@ -189,6 +210,15 @@ PY
   sleep 4
   png "$RESULTS/screenshot-tools-$name-read.png" $((1920 - 380 * scale)) $((2160 - 90 * scale)) $((760 * scale)) $((60 * scale))
   echo "the overlay is $(up)"
+  xdotool key Escape; sleep 0.4
+
+  echo "## asked for as \"copy text from the screen\""
+  "$HEYO" --open heyo:screenshot-text; sleep 1.3
+  png "$RESULTS/screenshot-tools-$name-text-hint.png" $((1920 - 250 * scale)) $((1080 - 30 * scale)) $((500 * scale)) $((60 * scale))
+  drag 1000 600 2200 1300
+  sleep 4
+  png "$RESULTS/screenshot-tools-$name-text-read.png" $((1920 - 380 * scale)) $((2160 - 90 * scale)) $((760 * scale)) $((60 * scale))
+  echo "after the selection was made the overlay is $(up), with no toolbar: the pointer where the toolbar would be is $(button copy; xdotool mousemove "$bx" "$by"; sleep 0.3; $READ cursor)"
   xdotool key Escape; sleep 0.4
 
   echo "## pin"

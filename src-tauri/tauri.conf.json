@@ -23,18 +23,6 @@
         "skipTaskbar": true,
         "visible": false,
         "center": true
-      },
-      {
-        "label": "screenshot",
-        "title": "Heyo Screenshot",
-        "transparent": true,
-        "width": 800,
-        "height": 600,
-        "decorations": false,
-        "resizable": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "visible": false
       }
     ],
     "security": {

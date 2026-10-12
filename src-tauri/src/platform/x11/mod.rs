@@ -8,7 +8,6 @@ mod field;
 pub mod hold_key;
 pub mod input_method;
 mod offer;
-pub mod overlay;
 pub mod typed;
 pub mod windows;
 mod writing;
@@ -108,21 +107,6 @@ impl Desktop for X11 {
         hold_key::watch(key, on).map_err(|e| e.to_string())
     }
 
-    fn place_overlay(&self, window: &gtk::ApplicationWindow, x: i32, y: i32, width: i32, height: i32) {
-        overlay::place(window, x, y, width, height);
-    }
-
-    fn overlay_backdrop(&self, capture: gtk::cairo::ImageSurface, x: i32, y: i32, width: i32, height: i32) -> bool {
-        overlay::backdrop(capture, x, y, width, height)
-    }
-
-    fn release_overlay(&self, window: &gtk::ApplicationWindow) {
-        overlay::release(window);
-    }
-
-    fn close_overlay(&self) {
-        overlay::close();
-    }
 
     fn hotkeys(&self) -> Option<&dyn Hotkeys> {
         super::hotkeys::gsettings()

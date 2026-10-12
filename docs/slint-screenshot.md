@@ -1,14 +1,14 @@
 # The screenshot interface, drawn by Slint
 
-The screenshot overlay and the pinned capture are to be drawn by Slint in
-place of their web views, as the settings and the dictation pill are
-(`docs/slint-settings.md`). This file begins as the list of everything
-the web interface does today, read from `src/Screenshot.tsx`,
+The screenshot overlay and the pinned capture are drawn by Slint, as the
+settings and the dictation pill are (`docs/slint-settings.md`); they were
+web views. This file begins with the list of everything the web interface
+did, read from it before it was removed (`src/Screenshot.tsx`,
 `src/screenshotWindows.ts`, `src/styles/components/_screenshot.scss`,
-`src-tauri/src/screenshot.rs` and `src-tauri/src/platform/` (`overlay.rs`,
-`capture.rs`, `x11/overlay.rs`, the `Desktop` trait). Nothing in it may be
-missing when the web interface is removed. A box is ticked when the Slint
-interface does it and it has been seen to.
+`src-tauri/src/screenshot.rs`, `src-tauri/src/platform/overlay.rs` and
+`x11/overlay.rs`, as they were at 71c7214). A box is ticked when the Slint
+interface does it and it has been seen to, on X11 at scale 1; what is not
+ticked says why not beside it.
 
 ## Inventory
 
@@ -16,7 +16,8 @@ interface does it and it has been seen to.
 
 - [ ] `heyo:screenshot`, `heyo:screenshot-text` (root search, their
   hotkeys) and an extension's `Screen.capture("selection")` start it:
-  modes `capture`, `text` and `pick`.
+  modes `capture`, `text` and `pick`. (The first two seen; an extension's
+  not tried yet, its rules are tested.)
 - [ ] The palette is hidden first and waited for, and an overlay that is
   still up is closed first: neither is in the capture.
 - [ ] One monitor is captured: the one the pointer is on (the desktop's
@@ -36,10 +37,10 @@ interface does it and it has been seen to.
   pixel, no scaling and no colour change, covering the whole monitor, the
   desktop's panels too, with no opening animation.
 - [x] Everything but the selection dimmed (154 of 256).
-- [ ] Before there is a selection: a hint in the middle, "Drag to select
+- [x] Before there is a selection: a hint in the middle, "Drag to select
   an area" (mode text: "Drag over the text to copy"), ", or click a
   window" when windows are known, " · Esc to cancel".
-- [ ] The window under the pointer, where a click would take it: shown
+- [x] The window under the pointer, where a click would take it: shown
   undimmed with the outline inside it (so that a window filling the screen
   has one). It changes when the pointer crosses into another window; not
   shown over the selection, a tool, an annotation, or while dragging.
@@ -48,11 +49,11 @@ interface does it and it has been seen to.
   label above its top left corner.
 - [x] Eight round handles (9 px, accent, white edge) on corners and
   sides, in mode capture with the selection tool, not while dragging.
-- [ ] The pointer: a crosshair; "move" over the selection; the resize
+- [x] The pointer: a crosshair; "move" over the selection; the resize
   arrows over each handle; a crosshair in the selection with a drawing
   tool; "grab" over an annotation that can be dragged; the default arrow
   over the toolbar.
-- [ ] A status line at the bottom ("Recognizing text…", or an error in
+- [x] A status line at the bottom ("Recognizing text…", or an error in
   red, e.g. "No text was found in the selection.").
 - [ ] Nothing of the last capture flashes when the next one opens.
 
@@ -60,7 +61,7 @@ interface does it and it has been seen to.
 
 - [x] A drag from outside the selection makes a new one (and drops the
   annotations and the tool).
-- [ ] A press and release without a drag (less than 6 px either way)
+- [x] A press and release without a drag (less than 6 px either way)
   takes the window pressed on, exactly; where there is none, the selection
   is dropped.
 - [x] A drag inside the selection moves it; it stays on the screen.
@@ -73,67 +74,72 @@ interface does it and it has been seen to.
 
 ### The toolbar (mode capture, a selection of at least 6 px, not while dragging)
 
-- [ ] Below the selection's right end, 8 px away; above it when there is
-  no room below (52 px); kept 8 px inside the screen's edges.
-- [ ] Tools, each a toggle back to selecting: Rectangle, Arrow, Pen,
+- [x] Below the selection's right end, 8 px away; above it when there is
+  no room below (52 px); kept 8 px inside the screen's edges. (The web
+  view's was placed by a width it had when it had fewer buttons, and
+  overhung the selection's end by 63 px; this one is where that says.)
+- [x] Tools, each a toggle back to selecting: Rectangle, Arrow, Pen,
   Text, Blur.
-- [ ] Four colours (red `#ff453a`, yellow `#ffc531`, green `#59d499`,
+- [x] Four colours (red `#ff453a`, yellow `#ffc531`, green `#59d499`,
   blue `#56c2ff`), the chosen one ringed.
-- [ ] Undo (off when there is nothing to undo).
-- [ ] After a separator: Copy text in the selection, Pin to screen,
+- [x] Undo (off when there is nothing to undo).
+- [x] After a separator: Copy text in the selection, Pin to screen,
   Save, Copy (the accent one), Cancel.
-- [ ] Tooltips: "Rectangle", "Arrow", "Pen", "Text", "Blur", "Color",
+- [x] Tooltips: "Rectangle", "Arrow", "Pen", "Text", "Blur", "Color",
   "Undo (Ctrl+Z)", "Copy text in the selection", "Pin to screen", "Save
   (Ctrl+S)", "Copy (Enter)", "Cancel (Esc)".
 
 ### Annotations (inside the selection, in the chosen colour)
 
-- [ ] Rectangle: an outline 3 px wide from press to release.
-- [ ] Arrow: a line 3 px wide with round ends and a filled head (14 px).
-- [ ] Pen: the pointer's path, 3 px, round joins.
+- [x] Rectangle: an outline 3 px wide from press to release.
+- [x] Arrow: a line 3 px wide with round ends and a filled head (14 px).
+- [x] Pen: the pointer's path, 3 px, round joins.
 - [ ] Text: a click opens a field there (18 px, weight 600, dashed
   outline, at least 120 px wide); Enter or leaving it adds the text (once,
   and not when empty), Esc drops it; an input method composes in it.
-- [ ] Blur: the rectangle dragged out, as blocks of 9 px sampled from the
+  (Done and seen, but for two things: the outline is a thin whole line,
+  not a dashed one, and an input method has not been tried in it.)
+- [x] Blur: the rectangle dragged out, as blocks of 9 px sampled from the
   capture.
-- [ ] With the selection tool any annotation can be dragged (it comes to
+- [x] With the selection tool any annotation can be dragged (it comes to
   the front); with a drawing tool only text can. A rectangle is taken by
   its outline, lines within 7 px.
-- [ ] Annotations are where they were put on the screen, not on the
+- [x] Annotations are where they were put on the screen, not on the
   selection: the selection moved or resized leaves them there, and cuts
   them off at its edge. Nothing jitters while it does.
-- [ ] Undo takes the last one away.
+- [x] Undo takes the last one away.
 
 ### Ways out
 
-- [ ] Copy: Enter, Ctrl+C, the button. The part with its annotations, at
+- [x] Copy: Enter, Ctrl+C, the button. The part with its annotations, at
   the screen's resolution, on the clipboard as an image; "Screenshot
   copied".
-- [ ] Save: Ctrl+S, the button. A PNG in Pictures/Screenshots
+- [x] Save: Ctrl+S, the button. A PNG in Pictures/Screenshots
   ("Screenshot 2026-10-12 21-30-00.png"); "Screenshot saved" with the path.
-- [ ] Pin: the button. See below.
+- [x] Pin: the button. See below.
 - [ ] Copy the text in it: the button, or the selection itself in mode
   text. The overlay stays and says "Recognizing text…"; the text goes to
   the clipboard ("Text copied" with its beginning); small text is read
   enlarged; none found, or no engine, is said in the status line and the
-  overlay stays.
+  overlay stays. (Seen without an engine, both ways in; with one, not yet:
+  the sandbox has none.)
 - [ ] Pick (an extension's): Enter, or the selection itself. The part is
   saved where the extension asked, never copied or shown.
-- [ ] Cancel: Esc, Alt+F4, a right click anywhere, the button. Always,
+- [x] Cancel: Esc, Alt+F4, a right click anywhere, the button. Always,
   also when the overlay has lost its capture.
-- [ ] Ctrl+Z undoes. Other keys do nothing.
-- [ ] Whatever was chosen, the overlay is gone before the result is used,
+- [x] Ctrl+Z undoes. Other keys do nothing.
+- [x] Whatever was chosen, the overlay is gone before the result is used,
   and the capture's file is deleted.
 
 ### The pinned capture ("Heyo Pinned Screenshot")
 
-- [ ] A window of its own exactly where the part was on the screen, at
+- [x] A window of its own exactly where the part was on the screen, at
   least 24 px either way, above other windows, not in the taskbar, with a
   thin accent edge and a shadow; several at once.
-- [ ] Drag to move (from 4 px of movement, so that a double click still
+- [x] Drag to move (from 4 px of movement, so that a double click still
   closes). Double click, right click or Esc closes it. Its picture is
   deleted with it.
-- [ ] The Shell extension keeps it out of the window lists (by title).
+- [x] The Shell extension keeps it out of the window lists (by title).
 
 ### Safety
 
@@ -149,11 +155,14 @@ interface does it and it has been seen to.
 
 - [ ] X11: the overlay goes past the window manager (above the panels, no
   animation, nothing moves it), at the monitor's exact pixels; the grab is
-  retried while the hotkey that started it is still held.
+  retried while the hotkey that started it is still held. (All but the
+  retry seen: nothing in the sandbox holds a hotkey's grab.)
 - [ ] GNOME on Wayland: the Shell extension captures; the overlay is a
   fullscreen window on the captured monitor, given the keyboard by the
-  Shell; each monitor has its own scale.
-- [ ] Windows: a fullscreen window over the monitor, focused.
+  Shell; each monitor has its own scale. (Written, not yet run: the
+  window fills a monitor, and which one is the compositor's choice.)
+- [ ] Windows: a fullscreen window over the monitor, focused. (Compiles;
+  not yet run.)
 - [ ] Several monitors, of different scales: the capture, the overlay and
   the windows are of the monitor the pointer is on.
 - [ ] Without a way to read the screen (`capture: none`), the commands are
@@ -167,10 +176,6 @@ edge will be, to the pixel.
 
 ## The overlay Slint draws
 
-So far on X11, with area selection, and beside the web view's: Heyo shows
-it where `HEYO_SCREENSHOT=slint` is in its environment. (The switch goes
-when the web view's overlay does.)
-
 - `src-tauri/src/screenshot/selecting.rs` decides what the overlay shows
   and how it answers the pointer and the keys. It knows no toolkit, and
   its rules are tested with numbers.
@@ -183,9 +188,20 @@ when the web view's overlay does.)
 - `src-tauri/src/slint_windows/screenshot/native.rs` is what differs by
   platform: on X11 the window goes past the window manager, and it grabs
   the keyboard on the connection it was made on.
+- `marks.rs` beside them turns what is drawn on the capture into what the
+  markup draws (a path, a small picture for a blurred part), and `pin.rs`
+  is a pinned capture's window.
+- The toolbar's buttons and the line text is typed in are Slint's own
+  elements. The window lets Slint hear of the pointer while it is over
+  them and of the keys while text is typed, and of nothing else; Escape
+  it reads itself whatever has the keyboard.
+- A selection with something drawn on it is a picture taken of the overlay
+  with only the capture and the drawing in it (`take_snapshot`): what is
+  copied, saved or pinned is what was seen. Without, it is cut from the
+  capture as it was read.
 - What was decided goes to `screenshot::decided`, on a thread of the
   host's: the selected part is cut from the capture there, which the
-  host keeps, and finished as a PNG from the web view's overlay is.
+  host keeps, and copied, saved, pinned or read.
 
 Three things in it are there for speed, each found by measuring:
 

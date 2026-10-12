@@ -1247,4 +1247,60 @@ mod tests {
         assert_eq!(pick.handle(Event::Do(Action::Copy)), None);
         assert_eq!((pick.toolbar(), pick.look().handles.len()), (None, 0));
     }
+
+    // What the web view's overlay was tested for in placing windows
+    // (`screenshotWindows.test.ts`), of this one.
+
+    #[test]
+    fn windows_that_touch_in_the_capture_touch_in_the_overlay() {
+        // At 150 %: two windows side by side, 1281 and 1279 pixels wide.
+        let mut overlay = Selecting::new((2560.0 / 1.5, 1440.0 / 1.5), (2560, 1440), Mode::Capture);
+        overlay.windows(&[Area { x: 0, y: 0, width: 1281, height: 1440 }, Area { x: 1281, y: 0, width: 1279, height: 1440 }]);
+        let (left, right) = (overlay.windows[0], overlay.windows[1]);
+        assert_eq!(left.right(), right.x);
+        assert!((right.right() - 2560.0 / 1.5).abs() < 1e-9);
+        // And at twice the pixels a window is half as large, from the same corner.
+        let mut twice = self::overlay(Mode::Capture);
+        twice.windows(&[Area { x: 160, y: 200, width: 1600, height: 1200 }, Area { x: 0, y: 0, width: 3840, height: 2160 }]);
+        assert_eq!(twice.windows, [rect(80.0, 100.0, 800.0, 600.0), rect(0.0, 0.0, 1920.0, 1080.0)]);
+    }
+
+    #[test]
+    fn a_window_that_was_clicked_is_handed_over_as_the_pixels_it_was_given_as() {
+        // At 125 %, where a window's edges are not whole logical pixels.
+        let window = Area { x: 37, y: 53, width: 1001, height: 777 };
+        let mut overlay = Selecting::new((1920.0 / 1.25, 1080.0 / 1.25), (1920, 1080), Mode::Capture);
+        overlay.windows(&[window]);
+        drag(&mut overlay, (100.0, 100.0), (100.0, 100.0));
+        assert_eq!(key(&mut overlay, Key::Enter), Some(Outcome::Finish { action: Action::Copy, area: window }));
+    }
+
+    #[test]
+    fn the_window_offered_is_the_topmost_under_the_pointer() {
+        let at_scale_one = || Selecting::new(SCREEN, (1920, 1080), Mode::Capture);
+        // Topmost first: a dialog over an editor over a maximized browser.
+        let mut overlay = at_scale_one();
+        overlay.windows(&[Area { x: 300, y: 300, width: 400, height: 300 }, Area { x: 100, y: 100, width: 800, height: 600 }, Area { x: 0, y: 0, width: 1920, height: 1080 }]);
+        // A window is found by the part of it that shows: under the dialog's
+        // rectangle the editor cannot be reached; beside it, it can.
+        for (at, offered) in [((350.0, 350.0), 0), ((150.0, 150.0), 1), ((1000.0, 900.0), 2), ((299.0, 350.0), 1), ((700.0, 350.0), 1)] {
+            move_to(&mut overlay, at);
+            assert_eq!(overlay.hover, Some(offered), "over {at:?}");
+        }
+        // The left and top edges are in, the right and bottom ones out.
+        let mut pair = at_scale_one();
+        pair.windows(&[Area { x: 0, y: 0, width: 960, height: 1080 }, Area { x: 960, y: 0, width: 960, height: 1080 }]);
+        for (at, offered) in [((959.5, 10.0), Some(0)), ((960.0, 10.0), Some(1)), ((1920.0, 10.0), None), ((10.0, 1080.0), None)] {
+            move_to(&mut pair, at);
+            assert_eq!(pair.hover, offered, "over {at:?}");
+        }
+        // Nothing over the bare desktop, with a window elsewhere or with none.
+        let mut one = at_scale_one();
+        one.windows(&[Area { x: 100, y: 100, width: 200, height: 200 }]);
+        move_to(&mut one, (50.0, 50.0));
+        assert_eq!(one.hover, None);
+        let mut none = at_scale_one();
+        move_to(&mut none, (50.0, 50.0));
+        assert_eq!(none.hover, None);
+    }
 }

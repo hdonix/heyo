@@ -12,8 +12,7 @@
 # must be the desktop again.
 #
 # In the sandbox only, at scale 1 (SCREEN=3840x2160 GDK_SCALE=1 heyo.sh up
-# gnome); Heyo must not be running in it. Until the web view's overlay is
-# removed, the overlay Slint draws is asked for with HEYO_SCREENSHOT=slint.
+# gnome); Heyo must not be running in it.
 . "$(dirname "$0")/lib.sh"
 name=${1:-x11}
 out=$RESULTS/screenshot-$name.txt
@@ -23,7 +22,7 @@ overlay() { xdotool search --name '^Heyo Screenshot$' 2>/dev/null | tail -1; }
 drag() { xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $((($1 + $3) / 2)) $((($2 + $4) / 2)); sleep 0.1; xdotool mousemove "$3" "$4"; sleep 0.3; }
 {
   echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale ${GDK_SCALE:-2}"
-  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start HEYO_SCREENSHOT=slint > /dev/null || exit 1
+  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start > /dev/null || exit 1
   xdotool mousemove 300 1900
   sleep 0.5
   png "$S/shot-before.png"

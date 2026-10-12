@@ -7,16 +7,14 @@ import { Tokens } from "tokens.slint";
 
 export component PinWindow inherits Window {
     in property <image> picture;
-    in property <bool> dark;
     title: "Heyo Pinned Screenshot";
     no-frame: true;
     always-on-top: true;
     background: Tokens.bg-solid;
+    // It sits over other applications, not on Heyo's own surfaces: its
+    // colours are the dark ones whatever the theme, like the overlay's.
     init => {
-        Tokens.dark = self.dark;
-    }
-    changed dark => {
-        Tokens.dark = self.dark;
+        Tokens.dark = true;
     }
     Image {
         x: 0;

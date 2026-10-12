@@ -1,48 +1,30 @@
-//! Screenshots: capture the screen, let the user select and annotate a
-//! region in a fullscreen overlay, then copy it, save it, pin it on screen or
-//! extract its text.
+//! Screenshots: the screen is read, part of it is selected and drawn on in
+//! an overlay that covers the monitor, and the part is copied, saved,
+//! pinned to the screen or has its text read.
 //!
-//! The screen is captured before the overlay appears and shown inside it, so
-//! the selection is made on a frozen image. The webview crops and draws
-//! annotations, and sends back the finished PNG.
-//!
-//! The frozen screen is painted by the overlay window itself, natively,
-//! straight from the captured pixels (`platform::overlay`); the webview on
-//! top of it is transparent and draws only the dimming, the selection and
-//! the tools.
-//! The overlay can therefore appear as soon as the screen has been read,
-//! without waiting for the webview to load a whole-screen image. The webview
-//! still gets the capture as a file, in the background, to crop from.
+//! The screen is read before the overlay appears and shown in it, so the
+//! selection is made on a frozen picture. The overlay is one of the windows
+//! Slint draws (`slint_windows::screenshot`); what it shows and how it
+//! answers the pointer and the keys is decided in `selecting`, which knows
+//! no toolkit. This file is the host's part: reading the screen, and doing
+//! with the selected part what was chosen.
 
-use std::io::Cursor;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use base64::Engine;
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::platform::capture::{grab, Area, Shot};
 use crate::platform::common::notify;
-use crate::platform::overlay;
 use crate::platform::windows::Rect;
+use selecting::{Action, Mode};
 
 pub(crate) mod selecting;
 
-pub const WINDOW: &str = "screenshot";
-
 static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-/// Whether the overlay is the one Slint draws (`slint_windows::screenshot`)
-/// and not the web view's. Until the web view's is removed, it is so where
-/// `HEYO_SCREENSHOT` says `slint`.
-pub(crate) fn drawn_by_slint() -> bool {
-    static ASKED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ASKED.get_or_init(|| std::env::var("HEYO_SCREENSHOT").is_ok_and(|by| by == "slint"))
-}
 
 /// For measuring how soon the overlay is up: with `HEYO_OVERLAY_DEBUG`
 /// set, says what happened, when by the system's clock, and how long after
@@ -55,51 +37,17 @@ pub(crate) fn mark(what: &str, asked: std::time::Instant) {
     }
 }
 
-/// The monitor that the overlay Slint draws is showing, as it was read:
-/// what is selected is cut from it here.
+/// The monitor that the overlay is showing, as it was read: what is
+/// selected is cut from it here.
 struct Frozen {
     shot: Shot,
     area: Area,
 }
 
 static FROZEN: std::sync::Mutex<Option<std::sync::Arc<Frozen>>> = std::sync::Mutex::new(None);
+
 fn cache_dir() -> PathBuf {
     crate::paths::cache().join("screenshot")
-}
-
-/// Directory the webview may load captures from.
-pub fn asset_dir() -> PathBuf {
-    cache_dir()
-}
-
-/// Writes the capture uncompressed, for the webview to crop from.
-/// Compressing a whole screen takes a noticeable fraction of a second; the
-/// file is read back once and deleted.
-fn write_bmp(shot: &Shot, path: &PathBuf) -> Result<(), String> {
-    use std::io::Write;
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    let (width, height) = (shot.width as usize, shot.height as usize);
-    // 24-bit rows, bottom-up, each padded to four bytes.
-    let stride = (width * 3).div_ceil(4) * 4;
-    let mut out = Vec::with_capacity(54 + stride * height);
-    out.extend_from_slice(b"BM");
-    out.extend_from_slice(&((54 + stride * height) as u32).to_le_bytes());
-    out.extend_from_slice(&[0; 4]);
-    out.extend_from_slice(&54u32.to_le_bytes());
-    out.extend_from_slice(&40u32.to_le_bytes());
-    out.extend_from_slice(&(width as i32).to_le_bytes());
-    out.extend_from_slice(&(height as i32).to_le_bytes());
-    out.extend_from_slice(&1u16.to_le_bytes());
-    out.extend_from_slice(&24u16.to_le_bytes());
-    out.extend_from_slice(&[0; 24]);
-    for y in (0..height).rev() {
-        let row = &shot.bgrx[y * width * 4..(y + 1) * width * 4];
-        for pixel in row.chunks_exact(4) {
-            out.extend_from_slice(&pixel[..3]);
-        }
-        out.resize(out.len() + stride - width * 3, 0);
-    }
-    std::fs::File::create(path).and_then(|mut file| file.write_all(&out)).map_err(|e| e.to_string())
 }
 
 /// An extension waiting for the area the user selects
@@ -128,13 +76,12 @@ fn end_pick(outcome: Picked) {
     }
 }
 
-/// Writes the selected area, a PNG as the overlay made it, where it was asked for.
-fn save_pick(png: &[u8], path: &std::path::Path) -> Picked {
+/// Writes the selected area where it was asked for, as a PNG.
+fn save_pick(picture: &image::RgbaImage, path: &std::path::Path) -> Picked {
     let saved = (|| {
-        let (width, height) = image::ImageReader::with_format(Cursor::new(png), image::ImageFormat::Png).into_dimensions().map_err(|e| e.to_string())?;
         std::fs::create_dir_all(path.parent().ok_or("the capture has no directory")?).map_err(|e| e.to_string())?;
-        std::fs::write(path, png).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
-        Ok::<_, String>(Picked::Saved { width, height })
+        picture.save_with_format(path, image::ImageFormat::Png).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
+        Ok::<_, String>(Picked::Saved { width: picture.width(), height: picture.height() })
     })();
     saved.unwrap_or_else(Picked::Failed)
 }
@@ -148,7 +95,7 @@ pub(crate) fn pick(app: &AppHandle, path: PathBuf) -> Picked {
     if let Some(previous) = previous {
         let _ = previous.done.send(Picked::Cancelled);
     }
-    start(app, "pick");
+    start(app, Mode::Pick);
     // An overlay that went away without a word must not be waited for for ever.
     picked.recv_timeout(Duration::from_secs(600)).unwrap_or(Picked::Cancelled)
 }
@@ -173,29 +120,6 @@ pub(crate) fn current_monitor(app: &AppHandle) -> Result<Area, String> {
         .ok_or("no monitor found")?;
     let (position, size) = (monitor.position(), monitor.size());
     Ok(Area { x: position.x, y: position.y, width: size.width, height: size.height, scale: monitor.scale_factor() })
-}
-
-/// The frozen screen, as the overlay is given it (`SCREENSHOT`).
-#[derive(Clone, Serialize, ts_rs::TS)]
-#[ts(export, export_to = "../../shared/bindings/", rename = "ScreenshotCapture")]
-pub(crate) struct Capture {
-    path: String,
-    /// `capture` shows the toolbar; `text` extracts text as soon as a region
-    /// is selected; `pick` is an extension asking for the area, and selecting
-    /// it is all there is to do.
-    #[ts(type = "\"capture\" | \"text\" | \"pick\"")]
-    mode: String,
-    /// Screen position of the overlay, in physical pixels.
-    x: i32,
-    y: i32,
-    scale: f64,
-    /// Size of the capture, in physical pixels: what the overlay's own
-    /// width and height stand for.
-    width: u32,
-    height: u32,
-    /// The windows in the capture, the topmost first, for selecting one with
-    /// a click: in physical pixels from the capture's top left corner.
-    windows: Vec<Rect>,
 }
 
 /// A window with less than this showing, either way, is not worth offering.
@@ -235,13 +159,14 @@ fn window_frames() -> Vec<Rect> {
     crate::platform::windows::shown().unwrap_or_default().into_iter().filter_map(|window| window.bounds).collect()
 }
 
-/// Captures the screen and opens the selection overlay.
-pub fn start(app: &AppHandle, mode: &str) {
+/// Reads the screen and opens the overlay on it: `Capture` for a
+/// screenshot of the user's own, `Text` to read the text in what is
+/// selected, `Pick` for an extension that asked for an area.
+pub fn start(app: &AppHandle, mode: Mode) {
     let asked = std::time::Instant::now();
     mark("screenshot asked for", asked);
     let app = app.clone();
-    let mode = mode.to_owned();
-    let picking = mode == "pick";
+    let picking = mode == Mode::Pick;
     // A capture of the user's own takes the overlay from an extension's.
     if !picking {
         end_pick(Picked::Cancelled);
@@ -249,14 +174,9 @@ pub fn start(app: &AppHandle, mode: &str) {
     std::thread::spawn(move || {
         // Neither the palette nor a previous overlay may end up in the capture.
         crate::palette::hide_until_gone(&app);
-        if drawn_by_slint() {
-            if crate::slint_windows::screenshot::up() {
-                close_overlay(&app);
-                std::thread::sleep(Duration::from_millis(60));
-            }
-        } else if app.get_webview_window(WINDOW).is_some_and(|w| w.is_visible().unwrap_or(false)) {
-            close_overlay(&app);
-            std::thread::sleep(Duration::from_millis(180));
+        if crate::slint_windows::screenshot::up() {
+            close_overlay();
+            std::thread::sleep(Duration::from_millis(60));
         }
         let result = (|| {
             let monitor = current_monitor(&app)?;
@@ -265,47 +185,15 @@ pub fn start(app: &AppHandle, mode: &str) {
             let shot = grab(monitor)?;
             mark("screen read", asked);
             let area = Area { width: shot.width, height: shot.height, ..monitor };
-            if drawn_by_slint() {
-                let mode = match mode.as_str() {
-                    "text" => selecting::Mode::Text,
-                    "pick" => selecting::Mode::Pick,
-                    _ => selecting::Mode::Capture,
-                };
-                let frozen = std::sync::Arc::new(Frozen { shot, area });
-                *FROZEN.lock().unwrap() = Some(frozen.clone());
-                let dark = crate::settings::Settings::load().dark();
-                if !crate::slint_windows::screenshot::show(&app, area, &frozen.shot, mode, dark, asked) {
-                    *FROZEN.lock().unwrap() = None;
-                    return Err(format!("the overlay cannot be shown: {}", crate::slint_windows::failure()));
-                }
-                let windows = fitted(windows_in(monitor, &frames.join().unwrap_or_default()), monitor, area.width);
-                let windows = windows.into_iter().map(|w| selecting::Area { x: w.x.max(0) as u32, y: w.y.max(0) as u32, width: w.width.max(0) as u32, height: w.height.max(0) as u32 });
-                crate::slint_windows::screenshot::windows(windows.collect());
-                return Ok(());
+            let frozen = std::sync::Arc::new(Frozen { shot, area });
+            *FROZEN.lock().unwrap() = Some(frozen.clone());
+            if !crate::slint_windows::screenshot::show(&app, area, &frozen.shot, mode, asked) {
+                *FROZEN.lock().unwrap() = None;
+                return Err(format!("the overlay cannot be shown: {}", crate::slint_windows::failure()));
             }
-            // A new name each time, so the webview never shows a stale capture.
-            let path = cache_dir().join(format!("capture-{}.bmp", COUNTER.fetch_add(1, Ordering::Relaxed)));
-            if let Ok(entries) = std::fs::read_dir(cache_dir()) {
-                for entry in entries.flatten().filter(|e| e.file_name().to_string_lossy().starts_with("capture-")) {
-                    let _ = std::fs::remove_file(entry.path());
-                }
-            }
-            // The window shows the frozen screen at once; the webview draws
-            // its tools over it and loads the file in the background.
-            overlay::show(&app, WINDOW, area, shot.bgrx.clone());
-            write_bmp(&shot, &path)?;
-            let window = app.get_webview_window(WINDOW).ok_or("screenshot window missing")?;
-            let capture = Capture {
-                path: path.to_string_lossy().into_owned(),
-                mode,
-                x: area.x,
-                y: area.y,
-                scale: area.scale,
-                width: area.width,
-                height: area.height,
-                windows: fitted(windows_in(monitor, &frames.join().unwrap_or_default()), monitor, shot.width),
-            };
-            window.emit(crate::wire::event::SCREENSHOT, capture).map_err(|e| e.to_string())?;
+            let windows = fitted(windows_in(monitor, &frames.join().unwrap_or_default()), monitor, area.width);
+            let windows = windows.into_iter().map(|w| selecting::Area { x: w.x.max(0) as u32, y: w.y.max(0) as u32, width: w.width.max(0) as u32, height: w.height.max(0) as u32 });
+            crate::slint_windows::screenshot::windows(windows.collect());
             Ok::<(), String>(())
         })();
         if let Err(e) = result {
@@ -319,30 +207,17 @@ pub fn start(app: &AppHandle, mode: &str) {
     });
 }
 
-/// A pinned capture's window closed: its image is no longer needed.
-pub fn unpinned(n: &str) {
-    let _ = std::fs::remove_file(cache_dir().join(format!("pin-{n}.png")));
-}
-
 /// Closes the overlay without doing anything with the capture.
-pub fn cancel(app: &AppHandle) {
-    close_overlay(app);
+pub fn cancel() {
+    close_overlay();
     end_pick(Picked::Cancelled);
 }
 
-fn close_overlay(app: &AppHandle) {
-    if drawn_by_slint() {
-        crate::slint_windows::screenshot::hide();
-        *FROZEN.lock().unwrap() = None;
-    } else {
-        overlay::hide(app, WINDOW);
-    }
-    // The capture shows the whole screen; do not keep it around.
-    if let Ok(entries) = std::fs::read_dir(cache_dir()) {
-        for entry in entries.flatten().filter(|e| e.file_name().to_string_lossy().starts_with("capture-")) {
-            let _ = std::fs::remove_file(entry.path());
-        }
-    }
+/// Takes the overlay off the screen, and lets go of the capture: it shows
+/// the whole screen, and is not kept.
+fn close_overlay() {
+    crate::slint_windows::screenshot::hide();
+    *FROZEN.lock().unwrap() = None;
 }
 
 fn pictures_dir() -> PathBuf {
@@ -368,82 +243,10 @@ fn timestamp() -> String {
         .unwrap_or_else(|| COUNTER.fetch_add(1, Ordering::Relaxed).to_string())
 }
 
-/// What the user chose to do with the selected region. Cancelling needs
-/// nothing but the action.
-#[derive(Deserialize, ts_rs::TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../shared/bindings/", rename = "ScreenshotFinish")]
-pub struct Finish {
-    /// `pick` is for the extension that asked for the selection.
-    #[ts(type = "\"copy\" | \"save\" | \"pin\" | \"text\" | \"pick\" | \"cancel\"")]
-    action: String,
-    /// The cropped, annotated region as base64 PNG.
-    #[serde(default)]
-    #[ts(optional, as = "Option<String>")]
-    png: String,
-    /// Selection in logical pixels, relative to the overlay.
-    #[serde(default)]
-    #[ts(optional, as = "Option<f64>")]
-    x: f64,
-    #[serde(default)]
-    #[ts(optional, as = "Option<f64>")]
-    y: f64,
-    #[serde(default)]
-    #[ts(optional, as = "Option<f64>")]
-    width: f64,
-    #[serde(default)]
-    #[ts(optional, as = "Option<f64>")]
-    height: f64,
-    /// Screen position of the overlay in physical pixels, and its scale.
-    #[serde(default)]
-    #[ts(optional, as = "Option<i32>")]
-    origin_x: i32,
-    #[serde(default)]
-    #[ts(optional, as = "Option<i32>")]
-    origin_y: i32,
-    #[serde(default = "one")]
-    #[ts(optional, as = "Option<f64>")]
-    scale: f64,
-}
-
-fn one() -> f64 {
-    1.0
-}
-
-/// The selected part of a capture, as it arrives to be finished: a PNG from
-/// the page, or pixels cut from the capture by an overlay the host draws.
-enum Selected {
-    Png(Vec<u8>),
-    Pixels(image::RgbaImage),
-}
-
-impl Selected {
-    fn png(&self) -> Result<std::borrow::Cow<'_, [u8]>, String> {
-        match self {
-            Selected::Png(bytes) => Ok(bytes.into()),
-            Selected::Pixels(pixels) => {
-                let mut png = Vec::new();
-                pixels.write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png).map_err(|e| e.to_string())?;
-                Ok(png.into())
-            }
-        }
-    }
-
-    fn pixels(self) -> Result<image::RgbaImage, String> {
-        match self {
-            Selected::Png(bytes) => Ok(image::load(Cursor::new(&bytes), image::ImageFormat::Png).map_err(|e| e.to_string())?.into_rgba8()),
-            Selected::Pixels(pixels) => Ok(pixels),
-        }
-    }
-}
-
-/// Where the selected part is on the screen, in logical pixels, and the
-/// scale of the monitor it is on.
+/// Where the selected part is on the screen, in the screen's pixels, and
+/// the scale of the monitor it is on.
 struct Place {
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
+    at: (i32, i32),
     scale: f64,
 }
 
@@ -463,36 +266,22 @@ fn cut(bgrx: &[u8], width: u32, area: selecting::Area) -> image::RgbaImage {
     image::RgbaImage::from_raw(across, down, rgba).expect("as many bytes as the picture has pixels")
 }
 
-/// What the overlay Slint draws was told to do with the capture: does it.
-/// `drawn` is the selected part as the overlay showed it, where something
-/// was drawn on it; without, the part is cut from the capture as it was
-/// read. What cannot be done is said in the overlay where that is still
-/// up, and in a notification where it is not.
+/// What the overlay was told to do with the capture: does it. `drawn` is
+/// the selected part as the overlay showed it, where something was drawn
+/// on it; without, the part is cut from the capture as it was read. What
+/// cannot be done is said in the overlay where that is still up, and in a
+/// notification where it is not.
 pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome, drawn: Option<image::RgbaImage>) {
-    let selecting::Outcome::Finish { action, area } = outcome else { return cancel(app) };
+    let selecting::Outcome::Finish { action, area } = outcome else { return cancel() };
     let Some(frozen) = FROZEN.lock().unwrap().clone() else { return };
-    let action = match action {
-        selecting::Action::Copy => "copy",
-        selecting::Action::Save => "save",
-        selecting::Action::Pin => "pin",
-        selecting::Action::Text => "text",
-        selecting::Action::Pick => "pick",
-    };
-    let scale = if frozen.area.scale > 0.0 { frozen.area.scale } else { 1.0 };
-    // A pinned image sits exactly where it was captured.
-    let place = Place {
-        x: (frozen.area.x as f64 + area.x as f64) / scale,
-        y: (frozen.area.y as f64 + area.y as f64) / scale,
-        width: area.width as f64 / scale,
-        height: area.height as f64 / scale,
-        scale,
-    };
-    let selected = Selected::Pixels(drawn.unwrap_or_else(|| cut(&frozen.shot.bgrx, frozen.shot.width, area)));
-    if let Err(e) = tauri::async_runtime::block_on(complete(app.clone(), action, selected, place)) {
+    // A pinned picture sits exactly where it was captured.
+    let place = Place { at: (frozen.area.x + area.x as i32, frozen.area.y + area.y as i32), scale: if frozen.area.scale > 0.0 { frozen.area.scale } else { 1.0 } };
+    let picture = drawn.unwrap_or_else(|| cut(&frozen.shot.bgrx, frozen.shot.width, area));
+    if let Err(e) = complete(app, action, picture, place) {
         eprintln!("heyo: screenshot failed: {e}");
         if crate::slint_windows::screenshot::up() {
             crate::slint_windows::screenshot::failed(e);
-        } else if action == "pick" {
+        } else if action == Action::Pick {
             end_pick(Picked::Failed(e));
         } else {
             notify("Screenshot failed", &e);
@@ -500,119 +289,63 @@ pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome, drawn: Optio
     }
 }
 
-/// Completes a capture. Returns the recognized text for `text`.
-pub async fn finish(app: AppHandle, request: Finish) -> Result<String, String> {
-    if request.action == "cancel" {
-        close_overlay(&app);
-        end_pick(Picked::Cancelled);
-        return Ok(String::new());
-    }
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&request.png).map_err(|e| e.to_string())?;
-    // A pinned image sits exactly where it was captured.
-    let place = Place {
-        x: request.origin_x as f64 / request.scale + request.x,
-        y: request.origin_y as f64 / request.scale + request.y,
-        width: request.width,
-        height: request.height,
-        scale: request.scale,
-    };
-    complete(app, &request.action, Selected::Png(bytes), place).await
-}
-
-/// Does with the selected part what was chosen. Returns the recognized text
-/// for `text`.
-async fn complete(app: AppHandle, action: &str, selected: Selected, place: Place) -> Result<String, String> {
+/// Does with the selected part what was chosen.
+fn complete(app: &AppHandle, action: Action, picture: image::RgbaImage, place: Place) -> Result<(), String> {
     // Whatever else became of the selection, it is not the extension's.
-    if action != "pick" {
+    if action != Action::Pick {
         end_pick(Picked::Cancelled);
     }
     match action {
-        "pick" => {
-            let png = selected.png();
-            close_overlay(&app);
+        Action::Pick => {
+            close_overlay();
             let pick = PICK.lock().unwrap().take().ok_or("nothing is waiting for this selection")?;
-            let _ = pick.done.send(png.map_or_else(Picked::Failed, |png| save_pick(&png, &pick.path)));
-            Ok(String::new())
+            let _ = pick.done.send(save_pick(&picture, &pick.path));
+            Ok(())
         }
-        "copy" => {
-            let image = selected.pixels()?;
-            let (width, height) = image.dimensions();
-            close_overlay(&app);
-            app.clipboard()
-                .write_image(&tauri::image::Image::new_owned(image.into_raw(), width, height))
-                .map_err(|e| e.to_string())?;
+        Action::Copy => {
+            let (width, height) = picture.dimensions();
+            close_overlay();
+            app.clipboard().write_image(&tauri::image::Image::new_owned(picture.into_raw(), width, height)).map_err(|e| e.to_string())?;
             notify("Screenshot copied", "The image is on the clipboard.");
-            Ok(String::new())
+            Ok(())
         }
-        "save" => {
+        Action::Save => {
             let dir = pictures_dir();
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             let path = dir.join(format!("Screenshot {}.png", timestamp()));
-            std::fs::write(&path, selected.png()?).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
-            close_overlay(&app);
+            picture.save_with_format(&path, image::ImageFormat::Png).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
+            close_overlay();
             notify("Screenshot saved", &path.to_string_lossy());
-            Ok(path.to_string_lossy().into_owned())
+            Ok(())
         }
-        "pin" if drawn_by_slint() => {
-            let picture = selected.pixels()?;
-            close_overlay(&app);
-            // Exactly where it was captured.
-            let at = ((place.x * place.scale).round() as i32, (place.y * place.scale).round() as i32);
-            if !crate::slint_windows::screenshot::pin::show(&app, picture, at, crate::settings::Settings::load().dark()) {
-                return Err(format!("the capture cannot be pinned: {}", crate::slint_windows::failure()));
+        Action::Pin => {
+            close_overlay();
+            if crate::slint_windows::screenshot::pin::show(app, picture, place.at) {
+                Ok(())
+            } else {
+                Err(format!("the capture cannot be pinned: {}", crate::slint_windows::failure()))
             }
-            Ok(String::new())
         }
-        "pin" => {
-            let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = cache_dir().join(format!("pin-{n}.png"));
-            std::fs::write(&path, selected.png()?).map_err(|e| e.to_string())?;
-            close_overlay(&app);
-            let script = format!(
-                "window.__HEYO_VIEW__ = 'pin'; window.__HEYO_PIN__ = {};",
-                serde_json::to_string(&path.to_string_lossy()).map_err(|e| e.to_string())?
-            );
-            WebviewWindowBuilder::new(&app, format!("pin-{n}"), WebviewUrl::default())
-                .title("Heyo Pinned Screenshot")
-                .initialization_script(&script)
-                .decorations(false)
-                .always_on_top(true)
-                .skip_taskbar(true)
-                .shadow(true)
-                .inner_size(place.width.max(24.0), place.height.max(24.0))
-                .position(place.x, place.y)
-                .build()
-                .map_err(|e| e.to_string())?;
-            Ok(String::new())
-        }
-        "text" => {
+        Action::Text => {
             let path = cache_dir().join("text.png");
             std::fs::create_dir_all(cache_dir()).map_err(|e| e.to_string())?;
             // Small interface text is recognized much better enlarged.
-            let image = image::DynamicImage::ImageRgba8(selected.pixels()?);
+            let picture = image::DynamicImage::ImageRgba8(picture);
             let factor = if place.scale < 1.5 { 2 } else { 1 };
-            image
-                .resize(image.width() * factor, image.height() * factor, image::imageops::FilterType::CatmullRom)
-                .save(&path)
-                .map_err(|e| e.to_string())?;
-            let worker = app.clone();
-            let recognized = {
-                let path = path.clone();
-                tauri::async_runtime::spawn_blocking(move || crate::ocr::recognize(&worker, &path)).await
-            };
+            picture.resize(picture.width() * factor, picture.height() * factor, image::imageops::FilterType::CatmullRom).save(&path).map_err(|e| e.to_string())?;
+            let recognized = crate::ocr::recognize(app, &path);
             // The selection may show anything; it is not kept once read.
             let _ = std::fs::remove_file(&path);
-            let text = recognized.map_err(|e| e.to_string())??;
+            let text = recognized?;
             if text.trim().is_empty() {
                 return Err("No text was found in the selection.".into());
             }
-            close_overlay(&app);
+            close_overlay();
             crate::platform::clipboard_watch::write_text(&text)?;
             let preview: String = text.chars().take(80).collect();
             notify("Text copied", &preview);
-            Ok(text)
+            Ok(())
         }
-        other => Err(format!("unknown screenshot action {other}")),
     }
 }
 
@@ -625,29 +358,16 @@ mod tests {
     }
 
     #[test]
-    fn what_the_overlay_decided_is_read_as_it_sends_it() {
-        let sent = serde_json::json!({ "action": "pin", "png": "iVBOR", "x": 12.5, "y": 40.0, "width": 300.0, "height": 200.0, "originX": 1920, "originY": -8, "scale": 2.0 });
-        let pin: Finish = serde_json::from_value(sent).unwrap();
-        assert_eq!((pin.action.as_str(), pin.png.as_str(), pin.x, pin.y, pin.width, pin.height), ("pin", "iVBOR", 12.5, 40.0, 300.0, 200.0));
-        assert_eq!((pin.origin_x, pin.origin_y, pin.scale), (1920, -8, 2.0));
-        // Cancelling needs nothing else, even from a page that lost its capture.
-        let cancel: Finish = serde_json::from_value(serde_json::json!({ "action": "cancel" })).unwrap();
-        assert_eq!((cancel.action.as_str(), cancel.png.as_str(), cancel.origin_x, cancel.scale), ("cancel", "", 0, 1.0));
-        assert!(serde_json::from_value::<Finish>(serde_json::json!({ "png": "" })).is_err());
-    }
-
-    #[test]
     fn a_selection_for_an_extension_is_saved_where_it_asked() {
         let dir = std::env::temp_dir().join(format!("heyo-pick-test-{}", std::process::id()));
         let path = dir.join("captures").join("capture-1.png");
-        let mut png = Vec::new();
-        image::RgbaImage::from_pixel(7, 3, image::Rgba([10, 20, 30, 255])).write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
-        assert_eq!(save_pick(&png, &path), Picked::Saved { width: 7, height: 3 });
-        assert_eq!(std::fs::read(&path).unwrap(), png);
-        // What is not a picture is not saved as one.
-        let other = dir.join("captures").join("capture-2.png");
-        assert!(matches!(save_pick(b"not a png", &other), Picked::Failed(_)));
-        assert!(!other.exists());
+        let picture = image::RgbaImage::from_fn(7, 3, |x, y| image::Rgba([10 * x as u8, 20 * y as u8, 30, 255]));
+        assert_eq!(save_pick(&picture, &path), Picked::Saved { width: 7, height: 3 });
+        // A PNG, and the picture it was given.
+        assert_eq!(image::open(&path).unwrap().into_rgba8(), picture);
+        // Where it cannot be written, whoever asked hears why.
+        std::fs::write(dir.join("a-file"), b"").unwrap();
+        assert!(matches!(save_pick(&picture, &dir.join("a-file").join("capture-2.png")), Picked::Failed(_)));
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -673,10 +393,6 @@ mod tests {
         assert_eq!(part.into_raw(), [21, 11, 1, 255, 22, 12, 2, 255, 24, 14, 4, 255, 25, 15, 5, 255]);
         // What reaches past the capture is cut to it.
         assert_eq!(cut(&bgrx, 3, selecting::Area { x: 2, y: 1, width: 40, height: 40 }).into_raw(), [25, 15, 5, 255]);
-        // Cut pixels and a PNG from the page end as the same picture.
-        let cut_out = Selected::Pixels(cut(&bgrx, 3, selecting::Area { x: 0, y: 0, width: 3, height: 2 }));
-        let through_png = Selected::Png(cut_out.png().unwrap().into_owned());
-        assert_eq!(through_png.pixels().unwrap(), cut_out.pixels().unwrap());
     }
 
     #[test]

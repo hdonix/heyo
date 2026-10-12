@@ -32,7 +32,7 @@ pin() {
 }
 {
   echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"
-  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start HEYO_SCREENSHOT=slint "$@" > /dev/null || exit 1
+  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start "$@" > /dev/null || exit 1
   xdotool mousemove 300 1900; sleep 0.4
   png "$S/pin-before.png"
   pin 1000 600 1600 1000

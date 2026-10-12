@@ -77,8 +77,6 @@ static BEATS: AtomicU64 = AtomicU64::new(0);
 struct Capture {
     area: Area,
     mode: Mode,
-    /// Whether Heyo is dark: the toolbar is then, and the accent lighter.
-    dark: bool,
     dimmed: SharedPixelBuffer<Rgba8Pixel>,
     asked: Instant,
 }
@@ -327,13 +325,12 @@ impl Overlay {
 
     /// Shows a monitor as it was read, over that monitor.
     fn show(&mut self, capture: Capture) {
-        if !self.ready {
+        if !self.ready && native::kept() {
             return self.prepare(move || with(|overlay| overlay.show(capture)));
         }
-        let Capture { area, mode, dark, dimmed, asked } = capture;
+        let Capture { area, mode, dimmed, asked } = capture;
         self.resting.stop();
         let scale = f64::from(self.window.window().scale_factor()).max(0.1);
-        self.window.set_dark(dark);
         self.window.set_dimmed(Image::from_rgba8_premultiplied(dimmed));
         let selecting = Selecting::new((area.width as f64 / scale, area.height as f64 / scale), (area.width, area.height), mode);
         self.up = Some(Up { selecting, scale, size: (area.width, area.height), mapped: false, asked, clear: None });
@@ -346,7 +343,11 @@ impl Overlay {
         // It is put on screen when it has the monitor's size: at once if
         // it has it already, else when winit says it has (`told`).
         let sized = window.with_winit_window(|made| made.inner_size()).is_some_and(|size| (size.width, size.height) == (area.width, area.height));
-        if sized {
+        if !native::kept() {
+            // Where a window cannot place itself, it fills a monitor.
+            window.set_fullscreen(true);
+            self.map();
+        } else if sized {
             self.map();
         } else {
             // And if winit never says so, it is shown all the same.
@@ -370,6 +371,11 @@ impl Overlay {
         let Some(up) = self.up.as_mut().filter(|up| !up.mapped) else { return };
         up.mapped = true;
         let asked = up.asked;
+        if !native::kept() {
+            if let Err(e) = self.window.show() {
+                eprintln!("heyo: the screenshot overlay could not be shown: {e}");
+            }
+        }
         self.window.window().with_winit_window(|made| {
             native::show(made);
             made.set_cursor(CursorIcon::Crosshair);
@@ -405,7 +411,11 @@ impl Overlay {
         if self.up.take().is_none() {
             return;
         }
-        self.window.window().with_winit_window(native::hide);
+        if native::kept() {
+            self.window.window().with_winit_window(native::hide);
+        } else {
+            let _ = self.window.hide();
+        }
         // The window keeps a buffer of its own size, a whole screen: when
         // no screenshot has followed for a while, it is given up with the
         // window, and a small one made in its place (`rest`).
@@ -726,12 +736,11 @@ fn picture(shot: &Shot, light: u16) -> SharedPixelBuffer<Rgba8Pixel> {
 /// While the overlay is up, asks Slint's thread whether it is there. When
 /// it is not, the overlay is taken off the screen from here, and the host
 /// told that the capture came to nothing.
-fn watch(app: &AppHandle) {
+fn watch() {
     static WATCHING: AtomicBool = AtomicBool::new(false);
     if WATCHING.swap(true, Ordering::SeqCst) {
         return;
     }
-    let app = app.clone();
     let watching = std::thread::Builder::new().name("heyo-slint-shot-watch".into()).spawn(move || {
         let mut missed = 0;
         let mut lost = false;
@@ -751,7 +760,7 @@ fn watch(app: &AppHandle) {
                 eprintln!("heyo: what draws the screenshot overlay does not answer; the overlay is taken off the screen");
                 native::take_down(WINDOW.load(Ordering::SeqCst));
             }
-            crate::screenshot::cancel(&app);
+            crate::screenshot::cancel();
         }
     });
     if watching.is_err() {
@@ -763,7 +772,7 @@ fn watch(app: &AppHandle) {
 /// Slint's thread.
 pub(super) fn prepare() {
     with(|overlay| {
-        if !overlay.ready {
+        if !overlay.ready && native::kept() {
             overlay.prepare(|| {});
         }
     });
@@ -772,7 +781,7 @@ pub(super) fn prepare() {
 /// Shows `shot`, the monitor `area` as it was read, over that monitor, for
 /// part of it to be selected. From any thread; it does not wait for the
 /// overlay to be on screen. False when Slint cannot show it.
-pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, dark: bool, asked: Instant) -> bool {
+pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: Instant) -> bool {
     if !super::ensure(app) {
         return false;
     }
@@ -783,7 +792,7 @@ pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, dark: b
         let clear = scope.spawn(|| picture(shot, 256));
         let dimmed = picture(shot, DIM);
         crate::screenshot::mark("dimmed picture made", asked);
-        let capture = Capture { area, mode, dark, dimmed, asked };
+        let capture = Capture { area, mode, dimmed, asked };
         (thread::on(move || with(|overlay| overlay.show(capture))), clear.join())
     });
     let Ok(clear) = clear else { return false };
@@ -791,7 +800,7 @@ pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, dark: b
         UP.store(false, Ordering::SeqCst);
         return false;
     }
-    watch(app);
+    watch();
     true
 }
 

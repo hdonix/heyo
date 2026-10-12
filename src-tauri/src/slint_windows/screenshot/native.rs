@@ -14,6 +14,9 @@
 //!   window: Slint would make it anew without what is said here.
 //! - Windows: a window over the monitor, not in the taskbar, given the
 //!   keyboard when it is shown and not when it is made.
+//! - Wayland: a window that fills a monitor, shown and hidden by Slint
+//!   (`kept`). Which monitor, and whether it has the keyboard, is the
+//!   compositor's to decide. Written, and not yet run.
 //!
 //! Everywhere the window is said to hide all that is behind it, which it
 //! does: a desktop that composites windows need not blend this one, and
@@ -81,6 +84,14 @@ impl OnX11 {
         let RawWindowHandle::Xlib(handle) = window.window_handle().ok()?.as_raw() else { return None };
         Some(Self { xlib: XLIB.with(|xlib| *xlib)?, display: display.display?.as_ptr().cast(), window: handle.window })
     }
+}
+
+/// Whether the window, once made, is kept and only put on and taken off
+/// the screen. Not on Wayland, where winit cannot take a window off the
+/// screen and a window cannot place itself: there Slint shows and hides
+/// it, making it anew each time, and it fills a monitor.
+pub(super) fn kept() -> bool {
+    !super::super::thread::wayland()
 }
 
 /// What the window is known by outside this thread, for `take_down`. 0

@@ -19,7 +19,6 @@ pub mod focus;
 pub mod hotkeys;
 pub mod input;
 pub mod keys;
-pub mod overlay;
 pub mod system;
 pub mod typed;
 pub mod windows;

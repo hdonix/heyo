@@ -13,11 +13,10 @@ the desktop.
 flowchart LR
   subgraph web["Web view: src/ (React)"]
     palette["Palette: root search, a command's view"]
-    windows["Screenshot overlay, pinned captures"]
   end
   subgraph host["Host: src-tauri/ (Rust, Tauri)"]
     core["Index, settings, clipboard history, permissions, live activities"]
-    settings["Settings window, dictation pill: slint_windows/ (Slint)"]
+    settings["Settings, dictation pill, screenshot overlay, pinned captures: slint_windows/ (Slint)"]
     platform["platform/: trait Desktop"]
   end
   subgraph node["Node.js: runtime/"]
@@ -45,12 +44,10 @@ flowchart LR
   have been given and everything that touches the desktop. It starts the
   other two parts and carries their messages.
 - **The web view** (`src/`, React 19, in WebKitGTK on Linux and WebView2 on
-  Windows) draws every window but two. Its windows load the same page;
-  `src/main.tsx` picks what to draw from the window's label: the palette
-  (`main`), the screenshot overlay, a pinned capture. It keeps nothing of
-  its own: what it shows it asked the host for, or was sent by the
-  runtime. The settings window and the dictation pill are the ones it
-  does not draw: those are the host's own, drawn with
+  Windows) draws the palette (`main`). It keeps nothing of its own: what
+  it shows it asked the host for, or was sent by the runtime. The settings
+  window, the dictation pill, the screenshot overlay and a pinned capture
+  it does not draw: those are the host's own, drawn with
   [Slint](https://slint.dev)
   ("[The windows Slint draws](#the-windows-slint-draws)" below).
 - **The runtime** (`runtime/`, Node.js 22 or newer) runs extensions: the
@@ -278,8 +275,9 @@ and keeps the list of applications current. The rest, by what it is for:
   the file carries out. The limits, the ordering and the timers are all
   tested without a window.
 - `screenshot.rs`, `ocr.rs` and `dictation.rs` are those features: the
-  capture and the overlay's outcome, the text-recognition helper, the
-  dictation helper with its progress window.
+  capture and what becomes of the part selected (`screenshot/selecting.rs`
+  is the overlay's rules, which know no toolkit), the text-recognition
+  helper, the dictation helper with its progress window.
 - A recording's words reach the application one of two ways, which
   `dictation.rs` chooses when the recording starts (`Way`, with a thread
   of the recording's own to go it). Each has a module that is told what
@@ -326,7 +324,7 @@ Anything that touches the desktop goes through it.
 
 Its modules of plain functions are what the rest of Heyo uses: `windows`
 (listing, switching, layouts), `input` (the paste keystroke, the selected
-text), `clipboard_watch`, `capture`, `overlay`, `keys` (hold to talk),
+text), `clipboard_watch`, `capture`, `keys` (hold to talk),
 `typed` (what is typed elsewhere, and replacing it there: for snippets,
 and for dictated words that are corrected as they come), `composing` (text
 composed in another application as an input method does: for dictated
@@ -485,7 +483,6 @@ Windows it registers them itself.
   action panel, the same one for an extension's actions and the root
   search's; `model.ts` reads the tree the runtime sends; `memory.ts`
   remembers what a view was showing when another was pushed over it.
-- `Screenshot.tsx` is the other windows: the overlay and a pinned capture.
 - `selection.ts` and `pointer.ts` are what every list shares: how the
   selection moves, and when a mouse event is the pointer really moving.
   `SelectionIndicator.tsx` is the one element that slides between rows.
@@ -539,9 +536,11 @@ whether the autostart entry exists.
 
 ### The windows Slint draws
 
-The settings window and the dictation pill are drawn by Slint, with Skia
-on the CPU, inside the host (`src-tauri/src/slint_windows/`); why, and
-what was measured, is in [slint-settings.md](slint-settings.md). The same
+The settings window, the dictation pill, the screenshot overlay and a
+pinned capture are drawn by Slint, with Skia on the CPU, inside the host
+(`src-tauri/src/slint_windows/`); why, and what was measured, is in
+[slint-settings.md](slint-settings.md) and, for the screenshot,
+[slint-screenshot.md](slint-screenshot.md). The same
 `.slint` files and the same Rust are the windows on Linux and on Windows.
 
 - `thread.rs` is Slint's thread ("heyo-slint"), beside Tauri's: one for
@@ -621,7 +620,8 @@ on the CPU (`scripts/window-shadow.py` draws the pictures); the icon at
 the start of a row is an application's own, a symbol on a tile, or an
 initial (`ItemIcon.tsx`); lists that are loading show skeleton rows; views,
 the action panel and dialogs arrive with a short animation. What floats
-over the screen (the screenshot tools, the dictation pill) stays dark.
+over the screen (the screenshot tools, the dictation pill, which Slint
+draws from the same tokens) stays dark.
 Colours that extensions name (`Color.Blue`, `{ light, dark }`) map to
 tokens too. More contrast and less motion are given where the system asks
 for them.

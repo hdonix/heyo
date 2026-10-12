@@ -87,9 +87,7 @@ pub(crate) fn warm(app: &AppHandle) {
             // The pill is the window that cannot wait to be made, and the
             // screenshot overlay the other.
             thread::on(pill::prepare);
-            if crate::screenshot::drawn_by_slint() {
-                thread::on(screenshot::prepare);
-            }
+            thread::on(screenshot::prepare);
         }
     });
 }

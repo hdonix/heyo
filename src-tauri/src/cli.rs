@@ -11,8 +11,8 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
         root::SETTINGS_ID => {
             tauri::async_runtime::spawn(open_settings(app.clone()));
         }
-        root::SCREENSHOT_ID => screenshot::start(app, "capture"),
-        root::SCREENSHOT_TEXT_ID => screenshot::start(app, "text"),
+        root::SCREENSHOT_ID => screenshot::start(app, screenshot::selecting::Mode::Capture),
+        root::SCREENSHOT_TEXT_ID => screenshot::start(app, screenshot::selecting::Mode::Text),
         root::KEEP_AWAKE_ID => {
             palette::hide(app);
             toggle_keep_awake(app);
