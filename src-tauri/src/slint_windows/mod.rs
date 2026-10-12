@@ -1,17 +1,18 @@
-//! The windows Slint draws, not the web view: the settings and the
-//! dictation pill. They are on a thread of their own in this process
-//! (`thread`), beside Tauri's loop on the main thread, from the first time
-//! one is wanted until Heyo ends. If that thread is lost, neither can be
-//! shown again in this run: the palette says so when the settings are asked
-//! for (`open_settings`), and dictation goes on without its pill.
+//! The windows Slint draws, not the web view: the settings, the dictation
+//! pill, the screenshot overlay and the pinned captures. They are on a
+//! thread of their own in this process (`thread`), beside Tauri's loop on
+//! the main thread, from when Heyo starts until it ends. If that thread is
+//! lost, none can be shown again in this run: the palette says so when the
+//! settings are asked for (`open_settings`), dictation goes on without its
+//! pill, and a screenshot comes to nothing.
 //!
-//! - `ui/` is the window, in Slint's language, drawn from the tokens of
+//! - `ui/` is the windows, in Slint's language, drawn from the tokens of
 //!   the web interface (`tokens`, written into it by `build.rs`).
-//! - `model` works out what it shows from what the host's commands answer,
-//!   and what to ask of the host when a control is used.
-//! - `icons` are the symbols it draws for the host's icon names.
+//! - `model` works out what the settings show from what the host's
+//!   commands answer, and what to ask of the host when a control is used.
+//! - `icons` are the symbols drawn for the host's icon names.
 //! - `host` is how those commands are called, and the list of them.
-//! - `window` puts the two together on Slint's thread.
+//! - `window` is the settings window: it puts the two together.
 //! - `pill` is the dictation pill: what it shows, its window, and what a
 //!   desktop must be told for it to float over everything unfocused.
 //! - `screenshot` is the screenshot overlay: its window, and what a
@@ -94,12 +95,12 @@ pub(crate) fn open(app: &AppHandle) -> bool {
 pub(crate) fn warm(app: &AppHandle) {
     let app = app.clone();
     let _ = std::thread::Builder::new().name("heyo-slint-warm".into()).spawn(move || {
-        if ensure(&app) {
-            // The pill is the window that cannot wait to be made, and the
-            // screenshot overlay the other.
-            thread::on(pill::prepare);
-            thread::on(screenshot::prepare);
-        }
+        // The pill is the window that cannot wait to be made, and the
+        // screenshot overlay the other.
+        life::begin(&app, || {
+            pill::prepare();
+            screenshot::prepare();
+        });
     });
 }
 
@@ -117,8 +118,8 @@ pub(crate) fn display_changed() {
     let _ = std::thread::Builder::new().name("heyo-slint-display".into()).spawn(move || {
         std::thread::sleep(SETTLED);
         // A Slint that has not begun has made nothing for the old display.
-        if SAID.load(Ordering::SeqCst) == this && guard::state() == State::Running {
-            thread::on(follow);
+        if SAID.load(Ordering::SeqCst) == this {
+            life::ask(follow);
         }
     });
 }

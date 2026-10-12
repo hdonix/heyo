@@ -554,10 +554,11 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
   - What a caller says: do this with the window (`with`, which makes it
     the first time; `there`, which never makes it); have it made ahead of
     when it is wanted (`ahead`); it is to be on the screen, or not (`on`,
-    `off`); what changed is to be seen now (`draw`); make it again, for a
-    display that changed (`again`). And from any other thread: do this on
-    Slint's thread if Slint is there (`ask`), or starting Slint first
-    (`begin`).
+    `off`); what changed is to be seen now (`draw`). And from any other
+    thread: do this on Slint's thread if Slint is there (`ask`), or
+    starting Slint first (`begin`). What a window says of itself, once:
+    its name, how it is made, and what goes across to its successor when
+    it is made again (`carry`).
   - What it is promised: the window is made the first time it is used,
     and if it cannot be made that is said once and not tried again in the
     run. Each time winit makes its window, that window is registered (with
@@ -570,7 +571,12 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
     wanted by then does not. `draw` is at the next turn of the loop on
     every platform, not at Slint's next tick. What is asked from another
     thread when Slint is not there is dropped and said to be (`false`),
-    never queued.
+    never queued. When the display changes, every window there is is made
+    again for it (`again`, which whoever hears of the change calls, and no
+    window does): a window made for another display cannot be relied on to
+    follow it. If a window could not be made, why is kept for whoever
+    asked for it (`why_not`), which is how it reaches the palette's
+    dialog.
   - What a caller must never do: show or hide Slint's window itself, wait
     for winit's window, ask winit to draw, or look at the guard's state or
     at which desktop this is to decide any of the above.
@@ -579,8 +585,18 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
   means: that is what is tested. `native.rs` is what a desktop is told
   for the window to float over everything without ever having the
   keyboard, the only part that differs by platform. `mod.rs` is the
-  window: made when Heyo starts, put on screen and taken off by winit
-  (Slint would make it anew, without what `native.rs` said).
+  window: what it shows, and where it is put. That it is made when Heyo
+  starts, and put on screen and taken off by winit (Slint would make it
+  anew, without what `native.rs` said), is `life.rs`'s doing.
+- `screenshot/` is the screenshot overlay and the pinned captures
+  ([slint-screenshot.md](slint-screenshot.md)): `mod.rs` is the overlay's
+  window, which shows what `screenshot/selecting.rs` (the rules, with no
+  toolkit in them) says is to be seen; `marks.rs` what is drawn on a
+  capture; `pin.rs` the pinned captures; `native.rs` what a desktop is
+  told for the overlay to cover a monitor and have every key.
+- `reach.rs` is where in its window a window takes the pointer: not in
+  the margin its shadow falls in. `pointer.rs` keeps the pointer over
+  these windows the size the desktop says, when that changes.
 
 The settings window:
 
