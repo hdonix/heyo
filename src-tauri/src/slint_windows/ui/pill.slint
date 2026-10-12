@@ -77,6 +77,8 @@ export component PillWindow inherits Window {
     // The words: what is settled, and after it what may still change.
     in property <string> words;
     in property <string> partial;
+    // In place of the words: how the recording ended, or what failed.
+    in property <string> note;
     in property <[float]> bars;
     // Whether it is on screen, and whether it is on its way off it: it
     // arrives and goes, it does not pop. It arrives from most of the way
@@ -188,7 +190,7 @@ export component PillWindow inherits Window {
                         TextSm {
                             text: root.words;
                             font-weight: Tokens.weight-medium;
-                            color: root.phase == "error" ? Tokens.danger : Tokens.text;
+                            color: Tokens.text;
                         }
 
                         TextSm {
@@ -209,7 +211,17 @@ export component PillWindow inherits Window {
                         background: @linear-gradient(90deg, rgba(10, 10, 11, 0.96) 0%, rgba(10, 10, 11, 0) 100%);
                     }
                 }
-                if !root.has-words && root.saying != "": TextSm {
+                // A note is read from its beginning: what does not fit is
+                // left off its end.
+                if root.note != "": TextSm {
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                    text: root.note;
+                    overflow: elide;
+                    font-weight: Tokens.weight-medium;
+                    color: root.phase == "error" ? Tokens.danger : Tokens.text;
+                }
+                if !root.has-words && root.note == "" && root.saying != "": TextSm {
                     text: root.saying;
                     font-weight: Tokens.weight-medium;
                 }

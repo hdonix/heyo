@@ -116,6 +116,7 @@ impl Pill {
         self.window.set_words(settled.into());
         self.window.set_partial(changing.into());
         self.window.set_saying(self.model.saying().into());
+        self.window.set_note(self.model.note().into());
         self.window.set_recording(self.model.recording());
         self.window.set_phase(
             match self.model.phase {

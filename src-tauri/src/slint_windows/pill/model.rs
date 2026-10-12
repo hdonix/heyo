@@ -111,16 +111,22 @@ impl Model {
 
     /// The words it shows: what is settled, and after it what may still
     /// change. Both empty when it has none to show: it then says what it
-    /// is doing (`saying`). The words are not shown while they are going
-    /// into the application as they are spoken: they are there to be read.
+    /// is doing (`saying`), or a note. The words are not shown while they
+    /// are going into the application as they are spoken: they are there
+    /// to be read.
     pub(crate) fn words(&self) -> (&str, &str) {
-        if !self.note.is_empty() {
-            (&self.note, "")
-        } else if self.live {
+        if !self.note.is_empty() || self.live {
             ("", "")
         } else {
             (&self.committed, &self.partial)
         }
+    }
+
+    /// What it says in place of the words: how the recording ended, or
+    /// what failed. Not words that were spoken: of those the newest are
+    /// what must be seen, of this the beginning.
+    pub(crate) fn note(&self) -> &str {
+        &self.note
     }
 
     /// What it says of itself when it has no words to show.
@@ -184,10 +190,13 @@ mod tests {
         }
     }
 
-    /// The words as they are read on the pill, or None when it says what
-    /// it is doing instead.
+    /// What is read on the pill, a note or the words, or None when it says
+    /// what it is doing instead.
     fn shown(model: &Model) -> Option<String> {
         let (settled, changing) = model.words();
+        if !model.note().is_empty() {
+            return Some(model.note().to_string());
+        }
         (!settled.is_empty() || !changing.is_empty()).then(|| format!("{settled}{changing}"))
     }
 
@@ -240,6 +249,22 @@ mod tests {
         assert_eq!(shown(&model).as_deref(), Some("Didn't catch anything"));
         told(&mut model, &[start("off"), Told::Error { message: "no microphone".into() }]);
         assert_eq!((shown(&model).as_deref(), model.phase), (Some("no microphone"), Phase::Error));
+    }
+
+    #[test]
+    fn a_note_is_not_shown_as_words_are() {
+        // Words are cut off at their beginning when there are too many, a
+        // note at its end: the pill is told which it has.
+        let mut model = Model::new();
+        let unready = "Dictation is not set up yet. Open Heyo Settings → Dictation to download it.";
+        told(&mut model, &[start("off"), Told::Error { message: unready.into() }]);
+        assert_eq!((model.note(), model.words()), (unready, ("", "")));
+        // Also when words were heard before it.
+        told(&mut model, &[start("off"), segment("Hello."), partial(" See"), Told::Result { text: String::new(), raw: String::new(), warning: None, cancelled: Some(true), kept: None }]);
+        assert_eq!((model.note(), model.words()), ("Cancelled", ("", "")));
+        // The next recording has none.
+        told(&mut model, &[start("off"), partial("Hello")]);
+        assert_eq!((model.note(), model.words()), ("", ("", "Hello")));
     }
 
     #[test]
