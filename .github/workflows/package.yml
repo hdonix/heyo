@@ -102,7 +102,7 @@ jobs:
           # project's owner (hdonix), who accepted the terms for Heyo's
           # builds on 2026-10-12. Somebody who runs this workflow in a
           # fork of their own accepts them for themselves by it.
-          XWIN_ACCEPT_LICENSE: 1
+          XWIN_ACCEPT_LICENSE: "true"
         run: scripts/package/winsdk.sh
 
       - run: pnpm install --frozen-lockfile

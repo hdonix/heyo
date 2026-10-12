@@ -83,7 +83,7 @@ only Microsoft has. `winsdk.sh` fetches them with
 
 **Fetching them accepts Microsoft's licence terms** for them, those of
 Visual Studio (<https://go.microsoft.com/fwlink/?LinkId=2086102>). xwin
-asks before it fetches anything, and `XWIN_ACCEPT_LICENSE=1` in the
+asks before it fetches anything, and `XWIN_ACCEPT_LICENSE=true` in the
 environment is the answer given beforehand; `winsdk.sh` does not answer
 for whoever runs it. The project's owner accepted the terms for Heyo's
 builds on 12 October 2026, which is what the workflow's setting of that

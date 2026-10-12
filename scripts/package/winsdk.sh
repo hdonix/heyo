@@ -8,7 +8,7 @@
 # FETCHING THEM ACCEPTS MICROSOFT'S LICENCE TERMS for them, those of Visual
 # Studio: https://go.microsoft.com/fwlink/?LinkId=2086102. xwin, the
 # program that fetches, asks for that before it does anything, and takes
-# XWIN_ACCEPT_LICENSE=1 in the environment as the answer. This script does
+# XWIN_ACCEPT_LICENSE=true in the environment as the answer. This script does
 # not answer for whoever runs it. For Heyo's own builds the project's owner
 # accepted the terms on 2026-10-12, and the packaging workflow says so
 # where it sets the variable; whoever runs this for themselves accepts them
