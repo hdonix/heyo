@@ -67,7 +67,39 @@ A package is made in two steps, which need not happen on the same machine:
 | Target | Packages | Compiled from Linux with |
 | --- | --- | --- |
 | `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` | deb, rpm, AppImage | the system's compiler; for the other processor, llvm-mingw's clang and that architecture's libraries in a sysroot (`scripts/package/sysroot.sh arm64`, or `amd64`) |
-| `x86_64-pc-windows-gnullvm`, `aarch64-pc-windows-gnullvm` | NSIS installer | llvm-mingw (`scripts/package/toolchain.sh` fetches a pinned release) |
+| `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc` | NSIS installer | llvm-mingw's clang and lld (`scripts/package/toolchain.sh` fetches a pinned release), against Microsoft's headers and libraries (`scripts/package/winsdk.sh` fetches them, pinned) |
+
+Windows is compiled as Microsoft's own tools would compile it (the `msvc`
+targets), because Skia, which Slint draws Heyo's settings with
+(`docs/slint-settings.md`), comes prebuilt for those and for no other kind
+of Windows target, and cannot be built for another.
+No tool of Microsoft's is run: llvm-mingw's clang compiles as Microsoft's
+compiler does when it is called `clang-cl`, and its lld links as
+Microsoft's linker does. What no compiler brings are the headers and
+libraries of Microsoft's C and C++ runtime and of the Windows SDK, which
+only Microsoft has. `winsdk.sh` fetches them with
+[xwin](https://github.com/Jake-Shadle/xwin) into
+`~/.cache/heyo-build/xwin` (1.1 GB laid out).
+
+**Fetching them accepts Microsoft's licence terms** for them, those of
+Visual Studio (<https://go.microsoft.com/fwlink/?LinkId=2086102>). xwin
+asks before it fetches anything, and `XWIN_ACCEPT_LICENSE=1` in the
+environment is the answer given beforehand; `winsdk.sh` does not answer
+for whoever runs it. The project's owner accepted the terms for Heyo's
+builds on 12 October 2026, which is what the workflow's setting of that
+variable stands on.
+
+What is fetched is the same every time: xwin at a version written in the
+script, and the files that one manifest of Visual Studio's names (Visual
+Studio 2022 17.14.41: the runtime 14.44, the Windows SDK 10.0.26100). A
+version number for the SDK and the runtime would not pin as much, because
+Microsoft publishes changed files under an unchanged number, and the
+manifest's usual address gives a new one every few weeks. So the script
+takes the manifest from the address of that one release and checks its
+SHA-256; checks the SHA-256 of the list of packages the manifest points
+to, which xwin itself does not; and xwin checks every file against the
+SHA-256 that list gives for it. The script's header says how to move to a
+newer manifest.
 
 Linux for the other processor is not compiled against libraries installed
 on the machine: Ubuntu's development packages for two architectures cannot
@@ -80,9 +112,10 @@ Ubuntu 22.04 whatever the machine runs; it needs no root.
 directory, so that what is compiled for the building machine itself (build
 scripts, macros) is compiled once for all, and one cache serves them all.
 It leaves each program in `src-tauri/target/<target>/release/`. `bundle.sh`
-needs only that directory's program (for Windows also the two libraries
-beside it) and `runtime/dist/heyo-*.cjs`: Tauri's `bundle` command packs
-what is already built. The packages are in
+needs only that directory's program and `runtime/dist/heyo-*.cjs`: Tauri's
+`bundle` command packs what is already built, and what a package carries
+besides (a Node.js, and for Windows the DLLs the program asks for) the
+script fetches. The packages are in
 `src-tauri/target/<target>/release/bundle/` and copied together to
 `src-tauri/target/packages/`.
 
@@ -108,9 +141,23 @@ The compiling job keeps one cache of the dependencies for all four targets.
 A run for a tag can read the cache of the default branch but not another
 tag's, so the job also runs, alone, for a push to master that changes
 `Cargo.lock` or the packaging scripts: the cache a release starts from is
-then never older than the dependencies.
+then never older than the dependencies. The compiler with the arm64
+libraries, and Microsoft's headers and libraries, are two caches more,
+each fetched again only when the script that fetches it changes. The step
+that fetches Microsoft's sets `XWIN_ACCEPT_LICENSE`, and says there whose
+acceptance of the terms that is: somebody who runs the workflow in a fork
+accepts them for themselves by it.
 
-Verified (11 October 2026): the workflow made all eight packages. The
+Skia's prebuilt library is fetched while compiling, by the build script of
+the crate that binds it, with `curl`, from a release of
+`rust-skia/skia-binaries` on GitHub named by the crate's version, the
+target and the features. Nothing has to be installed for it: no clang, no
+Python, no ninja (those are for building Skia from source, which is what
+the crate turns to if the download fails). It checks no hash of what it
+fetched.
+
+Verified (11 October 2026), when Windows was still compiled for
+`*-pc-windows-gnullvm`: the workflow made all eight packages. The
 compiling job took 21 minutes with no cache and 13 with one (what is left
 is each target's own final optimisation, which no cache holds); each
 packaging job one to three. Of what it made, on arm64 Ubuntu 24.04: the
@@ -118,9 +165,17 @@ program in the arm64 deb, which was compiled on x86_64, starts, shows the
 palette and runs a command in the runtime; the arm64 AppImage does the
 same through its own launcher and carries Node.js 24. The deb for x86_64
 has the control fields and the files it should. Not verified: starting
-anything for x86_64, and the Windows installers beyond their being made.
-Compiling Linux for x86_64 from arm64, the other way round, was done on the
-development machine with the same scripts.
+anything for x86_64.
+
+**Not run since Windows moved to the `msvc` targets** (12 October 2026):
+the workflow was changed for them and read through (`actionlint` finds
+nothing), and the same scripts made all four programs and both installers
+on the development machine, which is arm64. What only a run shows: that
+`winsdk.sh` fetches on a runner (it was not run to the end anywhere: the
+files on the development machine were fetched before the script was
+written, and are what it pins), that x86_64 llvm-mingw compiles for
+`msvc` as the arm64 one does, how large the cache of Microsoft's files is
+and whether the runner's disk holds everything, and how long it all takes.
 
 ## Linux packages
 
@@ -133,6 +188,22 @@ itself. `tauri.conf.json` adds `xdg-utils` (opening things, registering the
 sign-in link handler), and recommends, besides Node.js: `libnotify-bin`
 (`notify-send`), `curl` (listing a local model server's models) and
 `pulseaudio-utils` (`pactl`, choosing a microphone).
+
+With Skia compiled in, the program is linked with three libraries more:
+`libstdc++.so.6`, `libfontconfig.so.1` and `libfreetype.so.6`. No package
+names them; WebKitGTK's package, which Heyo's depends on, depends on all
+three (read on Ubuntu 24.04), so they are there where Heyo can be
+installed. Skia's prebuilt library asks for nothing newer than Ubuntu
+22.04 has (glibc 2.35, `GLIBCXX_3.4.30`): the newest symbols the programs
+with it need are `GLIBC_2.35`, `GLIBCXX_3.4.26` and `CXXABI_1.3.9`
+(`objdump -T`, 12 October 2026: the x86_64 program linked against the
+22.04 sysroot; the arm64 one linked on the development machine's Ubuntu
+24.04, where Rust's own library refers besides, weakly, to two symbols of
+`GLIBC_2.39`, `pidfd_spawnp` and `pidfd_getpid`, which a program linked
+against 22.04, as the packages are, does not). Both link with Skia in the
+arrangement above, the x86_64 one from arm64. With Skia and
+the fonts the arm64 deb is 28 MiB and the AppImage 139; what is said of
+their sizes below was measured before.
 
 Verified:
 
@@ -215,17 +286,40 @@ offer a Flatpak until launching and hotkeys go through portals.
 
 ## Windows installer
 
-    scripts/package/build.sh aarch64-pc-windows-gnullvm     # or x86_64-…
-    scripts/package/bundle.sh aarch64-pc-windows-gnullvm
+    scripts/package/toolchain.sh                         # once: the compiler
+    scripts/package/winsdk.sh                            # once: Microsoft's headers and libraries (see above for their terms)
+    scripts/package/build.sh aarch64-pc-windows-msvc     # or x86_64-…
+    scripts/package/bundle.sh aarch64-pc-windows-msvc
 
-(`INSTALLER=1 scripts/windows-test/build.sh` does both and copies the
-result where the test machine sees it.) Tauri makes an NSIS installer,
+(`INSTALLER=1 scripts/windows-test/build.sh` does the last two and copies
+the result where the test machine sees it.) Tauri makes an NSIS installer,
 `Heyo_<version>_<arch>-setup.exe`. It installs for the current user without
-administrator rights (`bundle.windows.nsis.installMode`), fetches WebView2
-if the machine lacks it, and carries `node.exe`, `libunwind.dll` and
-`WebView2Loader.dll` beside `heyo.exe` (`packaging/windows/installer.conf.json`,
-merged in only for this step because those files exist only once the
-scripts have fetched or built them; Tauri by itself packs none of the three).
+administrator rights (`bundle.windows.nsis.installMode`), into
+`%LOCALAPPDATA%\Heyo`, and fetches WebView2 if the machine lacks it.
+
+Beside `heyo.exe` it carries what Tauri packs by itself (the helper
+scripts) and what the scripts here fetch and name to it:
+
+- **`node.exe`**, always (`packaging/windows/installer.conf.json`, merged
+  in only for this step because the file exists only once
+  `scripts/package/node.mjs` has fetched it).
+- **The DLLs of Microsoft's Visual C++ runtime that this `heyo.exe` asks
+  for**: `msvcp140.dll` and `vcruntime140.dll`, and for x86_64
+  `vcruntime140_1.dll` as well, when Skia is compiled in; none when it is
+  not. Skia comes prebuilt against the C++ library as a DLL, a Windows
+  that never had the Visual C++ redistributable installed has not got it,
+  and a program finds a DLL in its own directory first. Which ones is not
+  said by a flag: `scripts/package/dlls.sh` reads it from the program
+  (`llvm-objdump -p`: what it imports, and what those import in turn;
+  `heyo.exe` itself imports only `msvcp140.dll`, having the C runtime
+  linked in), and `scripts/package/vcruntime.sh` fetches them from Visual
+  Studio's own package of redistributable files, at a release and by
+  hashes written there. They are Microsoft's files, distributed with Heyo
+  under the terms Microsoft gives for exactly that (`vcruntime.sh` names
+  them); `bundle.sh` hands their names to Tauri as resources.
+
+A program built for the `msvc` targets needs nothing else beside it: the
+WebView2 loader is linked in, and there is no unwinder's DLL.
 
 It needs `makensis` of NSIS 3.09 or newer on `PATH` (the script Tauri gives
 it includes a file older ones lack): `sudo apt install nsis` on Ubuntu 24.04;
@@ -235,22 +329,43 @@ with `dpkg-deb -x` into one directory, and put on `PATH` a two-line script
 named `makensis` that sets `NSISDIR` to that directory's `usr/share/nsis`
 and runs its `usr/bin/makensis` (setting `NSISDIR` in the environment is
 not enough: Tauri clears it before it runs `makensis`). Tauri downloads its
-own NSIS plugin (`nsis_tauri_utils.dll`) on the first build.
+own NSIS plugin (`nsis_tauri_utils.dll`) on the first build. `dlls.sh`
+needs `llvm-objdump`: llvm-mingw's where that is, or else one on `PATH`
+(`sudo apt install llvm`).
 
-Verified: `Heyo_0.1.0_arm64-setup.exe` (22 MiB) was built this way, from
-Linux, for `aarch64-pc-windows-gnullvm`, and the script NSIS was given
-lists `heyo.exe`, the three helper scripts, `node.exe`, `libunwind.dll` and
-`WebView2Loader.dll`. Not verified: running the installer, what it
-installs, its uninstaller, and an x86_64 build. Tauri calls building
-Windows installers from another system experimental. The installer is
-not signed.
+Verified (12 October 2026), with Skia compiled in
+(`FEATURES=slint-skia`), from arm64 Linux: both programs compile and link;
+`Heyo_0.1.0_arm64-setup.exe` (36 MiB) and `Heyo_0.1.0_x64-setup.exe`
+(41 MiB) were made, and the script NSIS was given for each lists
+`heyo.exe`, the five helper scripts, `node.exe`, `msvcp140.dll` and
+`vcruntime140.dll`, and for x64 `vcruntime140_1.dll`. Most of an
+installer's size is Node.js, and most of `heyo.exe`'s 45 MB the fonts in
+it. Built without Skia, the arm64 installer (23 MiB) lists no DLL, and
+those an earlier build had left in the directory they are gathered in
+were removed from it. Earlier the same day an arm64 `heyo.exe` built this way, with the two
+DLLs beside it and not installed, started on a Windows 11 without the
+Visual C++ redistributable
+(`experiments/overlay-bench/results/frameworks/slint/NOTES.md`). Not
+verified here: running an installer, what it installs, its uninstaller,
+and anything of x86_64 at run time: `scripts/windows-test/installer.sh`
+puts an installer in front of the test machine with a test that does the
+first three (`scripts/windows-test/in/installer/`). Tauri calls building
+Windows installers from another system experimental. The installer is not
+signed.
 
 Launch at login on Windows is a value named `Heyo` under
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 (`src-tauri/src/platform/win/autostart.rs`), in place of the autostart
 entry Linux uses. It compiles for Windows; it has not been run. The
-uninstaller does not remove that value yet (an NSIS hook,
-`bundle.windows.nsis.installerHooks`, would).
+uninstaller removes a value of that name there (it is in the script Tauri
+gives NSIS, for the product's name); that has not been run either.
+
+Known gap, by reading: the installer's directory, `%LOCALAPPDATA%\Heyo`,
+is the directory Heyo keeps its cache and its log in on Windows,
+`%LOCALAPPDATA%\heyo` (`src-tauri/src/paths.rs`; Windows does not tell the
+two names apart). The program's files and what it caches are then in one
+directory, and the uninstaller, which removes its own files and the
+directory only if it is empty, leaves it.
 
 Not done: code signing (unsigned installers meet SmartScreen), an MSI
 (needs WiX, which runs only on Windows).
