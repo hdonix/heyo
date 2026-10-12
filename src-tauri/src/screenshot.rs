@@ -30,6 +30,9 @@ use crate::platform::common::notify;
 use crate::platform::overlay;
 use crate::platform::windows::Rect;
 
+#[cfg(any(test, feature = "native-overlay"))]
+mod selecting;
+
 pub const WINDOW: &str = "screenshot";
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
