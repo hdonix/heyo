@@ -4,9 +4,9 @@
 //! done with, makes way for a capture, is needed for a question) and never
 //! has the window in hand: how each is done, and in what order, is in this
 //! one place. There is no way to try any of it without the window, so
-//! little of it is tested here (where the middle of a monitor is, is);
-//! what else can be decided without one is decided elsewhere
-//! (`cli::at_start`, `windows::LastWindow`).
+//! none of it is tested here; what can be decided without one is decided
+//! elsewhere (`cli::at_start`, `windows::LastWindow`, and where the middle
+//! of a monitor is, `platform::place`).
 //!
 //! The palette comes up in two ways. [`show`] is the user opening it: in
 //! the middle of the screen, its view told to start over, the window they
@@ -18,6 +18,7 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow, Window, WindowEvent};
 
+use crate::platform::place::{Display, Monitor, Which};
 use crate::*;
 
 /// The label of the palette's window.
@@ -74,22 +75,30 @@ pub(crate) fn show(app: &AppHandle) {
 /// showing after a monitor of another density was connected came up at
 /// twice the place, or half.
 fn centre(app: &AppHandle, window: &WebviewWindow) {
-    let monitor = window.current_monitor().ok().flatten().or_else(|| window.primary_monitor().ok().flatten());
     let declared = app.config().app.windows.iter().find(|declared| declared.label == WINDOW);
-    let (Some(monitor), Some(declared)) = (monitor, declared) else {
+    let (Some(monitor), Some(declared)) = (display(window).monitor(Which::Its), declared) else {
         let _ = window.center();
         return;
     };
-    let scale = monitor.scale_factor();
-    let (x, y) = centred((monitor.position().x, monitor.position().y), (monitor.size().width, monitor.size().height), (declared.width, declared.height), scale);
-    let _ = window.set_position(tauri::LogicalPosition::new(f64::from(x) / scale, f64::from(y) / scale));
+    let (x, y) = monitor.middle((declared.width, declared.height));
+    let _ = window.set_position(tauri::LogicalPosition::new(f64::from(x) / monitor.scale, f64::from(y) / monitor.scale));
 }
 
-/// Where a window of a size in logical pixels goes to be in the middle of
-/// a monitor given in its own pixels.
-fn centred(origin: (i32, i32), monitor: (u32, u32), size: (f64, f64), scale: f64) -> (i32, i32) {
-    let (width, height) = ((size.0 * scale).round() as i32, (size.1 * scale).round() as i32);
-    (origin.0 + (monitor.0 as i32 - width) / 2, origin.1 + (monitor.1 as i32 - height) / 2)
+/// The display as Tauri's toolkit has it at this moment, and the monitor
+/// the palette is on (none until it has been on one).
+fn display(window: &WebviewWindow) -> Display {
+    let whole = |monitor: &tauri::Monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height);
+    let (its, primary) = (window.current_monitor().ok().flatten(), window.primary_monitor().ok().flatten());
+    let mut all = window.available_monitors().unwrap_or_default();
+    // What the toolkit names is there, whatever its list says.
+    for named in [&its, &primary].into_iter().flatten() {
+        if !all.iter().any(|monitor| whole(monitor) == whole(named)) {
+            all.push(named.clone());
+        }
+    }
+    let primary = primary.as_ref().map(whole);
+    let monitors: Vec<Monitor> = all.iter().map(|monitor| Monitor::new(whole(monitor), monitor.scale_factor(), Some(whole(monitor)) == primary, None)).collect();
+    Display { its: its.and_then(|its| monitors.iter().position(|monitor| monitor.whole == whole(&its))), monitors }
 }
 
 /// Returns the palette as it was left, to the command that is in it.
@@ -140,9 +149,9 @@ pub(crate) fn on_window_event(window: &Window, event: &WindowEvent) {
         }
         // The display it is on became another. (Not on Linux, where the
         // toolkit says so of a window only once it is shown: the desktop
-        // is asked there, `platform::display::watch`.)
+        // is asked there, `platform::place::watch`.)
         #[cfg(not(target_os = "linux"))]
-        WindowEvent::ScaleFactorChanged { .. } => slint_windows::display_changed(),
+        WindowEvent::ScaleFactorChanged { .. } => platform::place::changed(),
         _ => {}
     }
 }
@@ -223,18 +232,4 @@ pub(crate) fn remember_window(app: &AppHandle) {
 /// was before the palette came up.
 pub(crate) fn working_window(app: &AppHandle) -> Option<windows::Window> {
     came_from(app).working()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::centred;
-
-    #[test]
-    fn the_middle_of_a_monitor_is_reckoned_in_its_own_pixels() {
-        // The palette as declared, on a 4K monitor at a scale of 2 and of 1.
-        assert_eq!(centred((0, 0), (3840, 2160), (814.0, 534.0), 2.0), (1106, 546));
-        assert_eq!(centred((0, 0), (3840, 2160), (814.0, 534.0), 1.0), (1513, 813));
-        // A second monitor to the right of the first, at a scale and a half.
-        assert_eq!(centred((3840, 0), (2560, 1440), (814.0, 534.0), 1.5), (3840 + 669, 319));
-    }
 }

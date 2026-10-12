@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use slint::winit_030::winit::window::{Window, WindowAttributes, WindowLevel};
 
-use super::area::Rect;
+use crate::platform::place::Rect;
 
 /// Where a window is among the others.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

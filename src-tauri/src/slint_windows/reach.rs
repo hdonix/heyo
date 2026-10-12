@@ -6,7 +6,7 @@
 //! which is whatever is underneath. This is where the panel is; having
 //! the desktop go by it is `standing::reach`.
 
-use super::area::Rect;
+use crate::platform::place::Rect;
 
 /// The panel in a window of `size` device pixels that keeps `margin`
 /// logical pixels round it, drawn at `scale`. None when the window keeps

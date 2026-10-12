@@ -29,7 +29,8 @@ use super::model::{Ask, Line, Model, Then};
 use super::thread::{self, Job};
 use super::life::{self, Life, Lives, Slot, Slotted};
 use super::standing::{self, Keyboard, Layer, Standing};
-use super::{area, icons, reach, ui};
+use super::{icons, reach, ui};
+use crate::platform::place::Which;
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
 /// frame took is written there when the window is closed, a line a frame:
@@ -202,6 +203,10 @@ impl slint::Model for Lines {
 /// An ordinary window, with a shadow: what is behind it shows round its
 /// panel.
 const STANDING: Standing = Standing { layer: Layer::Among, keyboard: Keyboard::Ordinary, listed: true, clear: true };
+
+/// The panel the window draws, in logical pixels, as the markup has it
+/// (`panel-width`, `panel-height`) where the screen has room for it.
+const PANEL: (f64, f64) = (860.0, 640.0);
 
 /// The window while Slint runs.
 struct Live {
@@ -505,16 +510,15 @@ fn furnish(window: &ui::SettingsWindow, shared: &thread::Shared, lines: &Rc<Line
 /// of the room the screen has for it, and no larger; taking the pointer
 /// where its panel is; and in front.
 fn arrived(window: &ui::SettingsWindow, made: &slint::winit_030::winit::window::Window, asking: &mpsc::Sender<Job>, asked: Option<Instant>) {
-    let monitor = made.current_monitor().or_else(|| made.primary_monitor()).or_else(|| made.available_monitors().next());
-    let whole = monitor.map(|monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height));
-    if let Some((x, y, width, height)) = area::work(whole) {
-        let scale = made.scale_factor() as f32;
-        window.set_room_width(width as f32 / scale);
-        window.set_room_height(height as f32 / scale);
-        // As large as it will be, which it may not be yet.
-        let margin = 2.0 * window.get_margin();
-        let (wide, high) = ((860.0_f32.min(width as f32 / scale) + margin) * scale, (640.0_f32.min(height as f32 / scale) + margin) * scale);
-        made.set_outer_position(PhysicalPosition::new(x + ((width as f32 - wide) / 2.0) as i32, y + ((height as f32 - high) / 2.0) as i32));
+    if let Some(monitor) = life::display(made, true).monitor(Which::Its) {
+        let (wide, high) = monitor.room_size();
+        window.set_room_width(wide as f32);
+        window.set_room_height(high as f32);
+        // As large as it will be, which it may not be yet: the panel the
+        // markup draws, no larger than the room, and its margin.
+        let margin = 2.0 * f64::from(window.get_margin());
+        let (x, y) = monitor.middle_of_room(((PANEL.0.min(wide) + margin) * monitor.scale, (PANEL.1.min(high) + margin) * monitor.scale));
+        made.set_outer_position(PhysicalPosition::new(x, y));
     }
     standing::reach(made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
     made.focus_window();

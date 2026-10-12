@@ -102,24 +102,26 @@ pub(crate) fn pick(app: &AppHandle, path: PathBuf) -> Picked {
 
 /// The monitor the pointer is on, else the primary one.
 pub(crate) fn current_monitor(app: &AppHandle) -> Result<Area, String> {
-    let cursor = app.cursor_position().ok();
-    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    use crate::platform::place::{Display, Monitor, Which};
+    let whole = |monitor: &tauri::Monitor| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height);
+    let primary = app.primary_monitor().map_err(|e| e.to_string())?;
+    let mut all = app.available_monitors().map_err(|e| e.to_string())?;
+    // The primary one is there, whatever the list says.
+    if let Some(primary) = primary.as_ref().filter(|primary| !all.iter().any(|monitor| whole(monitor) == whole(primary))) {
+        all.push(primary.clone());
+    }
+    let primary = primary.as_ref().map(whole);
+    let display = Display { monitors: all.iter().map(|monitor| Monitor::new(whole(monitor), monitor.scale_factor(), Some(whole(monitor)) == primary, None)).collect(), its: None };
     // The desktop's word first, where the toolkit cannot follow the pointer.
-    let pointed = crate::platform::desktop::desktop().pointer_monitor();
+    let pointed = crate::platform::desktop::desktop().pointer_monitor().and_then(|origin| display.monitors.iter().find(|monitor| (monitor.whole.0, monitor.whole.1) == origin).copied());
     let monitor = pointed
-        .and_then(|origin| monitors.iter().find(|m| (m.position().x, m.position().y) == origin))
-        .or_else(|| {
-            let c = cursor?;
-            monitors.iter().find(|m| {
-                let (p, s) = (m.position(), m.size());
-                c.x >= p.x as f64 && c.x < (p.x + s.width as i32) as f64 && c.y >= p.y as f64 && c.y < (p.y + s.height as i32) as f64
-            })
+        .or_else(|| match app.cursor_position() {
+            Ok(pointer) => display.at((pointer.x.floor() as i32, pointer.y.floor() as i32)),
+            Err(_) => display.monitor(Which::Primary),
         })
-        .cloned()
-        .or(app.primary_monitor().map_err(|e| e.to_string())?)
         .ok_or("no monitor found")?;
-    let (position, size) = (monitor.position(), monitor.size());
-    Ok(Area { x: position.x, y: position.y, width: size.width, height: size.height, scale: monitor.scale_factor() })
+    let (x, y, width, height) = monitor.whole;
+    Ok(Area { x, y, width, height, scale: monitor.scale })
 }
 
 /// A window with less than this showing, either way, is not worth offering.

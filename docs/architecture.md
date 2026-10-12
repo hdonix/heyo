@@ -607,6 +607,25 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
   - What a caller must never do: ask which desktop this is, take a
     window's native handle, or tell winit anything of a window's standing
     itself.
+- `platform/place.rs` is where a window is, for the palette and for
+  these windows alike. Its interface:
+  - What a caller says: give me the display as it is now (its toolkit's
+    adapter fills a `Display` in at that moment: `life::display` from
+    winit, the palette's own from Tauri); which monitor I mean (`Its`, the
+    one I am on or come up on, else the primary; `Primary`; or the one a
+    point is on, `at`); and where a window of this size goes on it
+    (`middle`, `middle_of_room`, `bottom_centre`). And once, what is to be
+    done when the display changes (`when_changed`).
+  - What it is promised: the answers are of the display at the moment of
+    asking, in the screen's device pixels, with the monitor's scale and
+    the room the desktop leaves on it; all of it is arithmetic on values,
+    tested with a stand-in display that changes (a monitor replaced by one
+    of another density, one taken away). The desktop is asked to say when
+    the display changes (`watch`), what it says piece by piece is heard as
+    one change, and then whoever asked is called: Slint's windows are made
+    again for it by the life module, and the pointer over them follows.
+  - What a caller must never do: keep a monitor, a scale or a room from
+    one asking to the next, or choose a monitor for itself.
 - `pill/` is the dictation pill. `model.rs` is what it shows of a
   recording as `dictation.rs` tells it (`Told`), and what a press on it
   means: that is what is tested. `mod.rs` is the
@@ -645,8 +664,7 @@ The settings window:
   is a command a web view could call.
 - `fonts.rs` puts Inter and Noto Sans SC, which Heyo carries
   (`src-tauri/fonts/`), before the system's fonts; `keys.rs` names keys by
-  where they are, as the palette's hotkey recorder does; `area.rs` asks
-  the screen for the room the window has, so that it is no larger.
+  where they are, as the palette's hotkey recorder does.
 - `guard.rs` is what happens when Slint cannot start or its thread
   panics: Heyo goes on without it and its windows are taken off the
   screen. Asking for the settings then shows the palette saying that they

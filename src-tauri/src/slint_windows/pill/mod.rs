@@ -26,7 +26,7 @@ use slint::{ComponentHandle, Model as _, ModelRc, VecModel};
 use tauri::AppHandle;
 
 use super::life::{self, Life, Lives, Slot, Slotted};
-use super::area::Rect;
+use crate::platform::place::{Rect, Which};
 use super::standing::{self, Keyboard, Layer, Standing};
 use super::thread::{self, Job};
 use super::ui;
@@ -207,11 +207,9 @@ impl Pill {
 /// At the bottom centre of the primary monitor, a tenth of the monitor's
 /// height above its bottom.
 fn place(made: &slint::winit_030::winit::window::Window) {
-    let monitor = made.primary_monitor().or_else(|| made.current_monitor()).or_else(|| made.available_monitors().next());
-    if let Some(monitor) = monitor {
-        let (origin, area, size) = (monitor.position(), monitor.size(), made.outer_size());
-        let x = origin.x + (area.width as i32 - size.width as i32) / 2;
-        let y = origin.y + area.height as i32 - size.height as i32 - area.height as i32 / 10;
+    if let Some(monitor) = life::display(made, false).monitor(Which::Primary) {
+        let size = made.outer_size();
+        let (x, y) = monitor.bottom_centre((size.width, size.height));
         made.set_outer_position(PhysicalPosition::new(x, y));
     }
 }

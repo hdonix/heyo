@@ -43,7 +43,7 @@ use slint::winit_030::WinitWindowAccessor;
 use slint::ComponentHandle;
 use tauri::AppHandle;
 
-use super::area::Rect;
+use crate::platform::place::{self, Display, Monitor, Rect};
 use super::guard::{self, State};
 use super::standing::{self, Standing, Told};
 use super::{pointer, thread};
@@ -513,6 +513,19 @@ pub(super) fn begin(app: &AppHandle, work: impl FnOnce() + Send + 'static) -> bo
         Reach::No => false,
         Reach::Now | Reach::Started => super::ensure(app) && thread::on(work),
     }
+}
+
+/// The display as winit has it at this moment, and the monitor the
+/// window is on, for the window to pick its monitor from and ask where it
+/// goes (`platform::place`). `rooms` says whether the room each monitor
+/// has is wanted, which the desktop is asked for: without it a monitor's
+/// room is all of it.
+pub(super) fn display(made: &Window, rooms: bool) -> Display {
+    let whole = |monitor: &slint::winit_030::winit::monitor::MonitorHandle| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height);
+    let free = if rooms { place::kept_free() } else { None };
+    let (its, primary) = (made.current_monitor().map(|monitor| whole(&monitor)), made.primary_monitor().map(|monitor| whole(&monitor)));
+    let monitors: Vec<Monitor> = made.available_monitors().map(|monitor| Monitor::new(whole(&monitor), monitor.scale_factor(), Some(whole(&monitor)) == primary, free)).collect();
+    Display { its: its.and_then(|its| monitors.iter().position(|monitor| monitor.whole == its)), monitors }
 }
 
 /// Has a window drawn clear where it draws nothing, or opaque, as what

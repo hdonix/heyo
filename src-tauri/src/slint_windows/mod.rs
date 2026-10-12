@@ -24,11 +24,11 @@
 //! - `pointer` keeps the pointer over them the size the desktop says.
 //!
 //! When the display changes while Heyo runs (a monitor connected, another
-//! scale), every one of these windows is made again (`display_changed`).
+//! scale), every one of these windows is made again (`follow`, which
+//! `platform::place` has called).
 //! - `fonts` gives Slint the fonts Heyo carries.
 //! - `guard` keeps a panic on Slint's thread from ending Heyo.
 
-mod area;
 mod fonts;
 mod guard;
 mod host;
@@ -51,7 +51,6 @@ mod ui {
     slint::include_modules!();
 }
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
@@ -107,25 +106,10 @@ pub(crate) fn warm(app: &AppHandle) {
             screenshot::prepare();
         });
     });
-}
-
-/// How long the desktop is given to finish saying how the display changed:
-/// it says so piece by piece (the monitors, the scale, the pointer), each
-/// a moment after the other.
-const SETTLED: Duration = Duration::from_millis(400);
-
-/// The display changed in some way (`platform::display`). From any
-/// thread; it does not wait. What is done about it is done once, when
-/// nothing more has been said for a moment.
-pub(crate) fn display_changed() {
-    static SAID: AtomicU64 = AtomicU64::new(0);
-    let this = SAID.fetch_add(1, Ordering::SeqCst) + 1;
-    let _ = std::thread::Builder::new().name("heyo-slint-display".into()).spawn(move || {
-        std::thread::sleep(SETTLED);
-        // A Slint that has not begun has made nothing for the old display.
-        if SAID.load(Ordering::SeqCst) == this {
-            life::ask(follow);
-        }
+    // When the display changes, the windows are made again for it. (A
+    // Slint that has not begun has made nothing for the old display.)
+    crate::platform::place::when_changed(|| {
+        life::ask(follow);
     });
 }
 
