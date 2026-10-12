@@ -94,20 +94,14 @@ pub(super) fn remember(window: &winit::window::Window) {
 
 #[cfg(target_os = "linux")]
 fn native(window: &winit::window::Window) -> Option<i64> {
-    use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
     // Xlib's connection number is the socket. (On Wayland there is none.)
-    let RawDisplayHandle::Xlib(handle) = window.display_handle().ok()?.as_raw() else { return None };
-    let xlib = x11_dl::xlib::Xlib::open().ok()?;
-    Some(unsafe { (xlib.XConnectionNumber)(handle.display?.as_ptr().cast()) } as i64)
+    let x11 = super::standing::x11::of(window)?;
+    Some(unsafe { (x11.xlib.XConnectionNumber)(x11.display) } as i64)
 }
 
 #[cfg(windows)]
 fn native(window: &winit::window::Window) -> Option<i64> {
-    use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    match window.window_handle().ok()?.as_raw() {
-        RawWindowHandle::Win32(handle) => Some(handle.hwnd.get() as i64),
-        _ => None,
-    }
+    super::standing::windows::handle(window).map(|handle| handle as i64)
 }
 
 #[cfg(not(any(target_os = "linux", windows)))]

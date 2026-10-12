@@ -580,23 +580,48 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
   - What a caller must never do: show or hide Slint's window itself, wait
     for winit's window, ask winit to draw, or look at the guard's state or
     at which desktop this is to decide any of the above.
+- `standing.rs` is what a desktop is told of a window. A window says its
+  standing once, as data, and nothing of how any desktop is told. Its
+  interface:
+  - What a caller says: the window's `Standing` when it is made: its
+    layer (among the other windows; above them; over everything, a
+    fullscreen window too, where the desktop neither places nor animates
+    it), what it has of the keyboard (as any window; never; every key
+    while it is on the screen), whether it is listed (a taskbar, a window
+    switcher), and whether what is behind it shows where it draws
+    nothing. And, when it changes, where in itself it takes the pointer
+    (`reach`).
+  - What it is promised: `told` says everything that is done about a
+    standing on a desktop, as a value, which is what is tested; one
+    adapter for each desktop (X11, Wayland, Windows) carries that out,
+    before winit makes the window, once it is there, and each time it
+    goes on or off the screen. Whether winit keeps the window or Slint
+    shows and hides it follows from the standing and the desktop, and the
+    life module asks here. What a desktop has no way to be told is said in
+    `told` too (Wayland: no window places itself or refuses the keyboard),
+    not found out by a window. A window that has every key has its ways
+    out with them: the adapter that takes the keys gives them back when
+    the window goes off the screen, and takes that window down from any
+    thread when Slint's does not answer (`take_down`, which the overlay's
+    watcher calls without knowing how).
+  - What a caller must never do: ask which desktop this is, take a
+    window's native handle, or tell winit anything of a window's standing
+    itself.
 - `pill/` is the dictation pill. `model.rs` is what it shows of a
   recording as `dictation.rs` tells it (`Told`), and what a press on it
-  means: that is what is tested. `native.rs` is what a desktop is told
-  for the window to float over everything without ever having the
-  keyboard, the only part that differs by platform. `mod.rs` is the
+  means: that is what is tested. `mod.rs` is the
   window: what it shows, and where it is put. That it is made when Heyo
   starts, and put on screen and taken off by winit (Slint would make it
-  anew, without what `native.rs` said), is `life.rs`'s doing.
+  anew, without what the desktop was told of it), is `life.rs`'s doing.
 - `screenshot/` is the screenshot overlay and the pinned captures
   ([slint-screenshot.md](slint-screenshot.md)): `mod.rs` is the overlay's
   window, which shows what `screenshot/selecting.rs` (the rules, with no
   toolkit in them) says is to be seen; `marks.rs` what is drawn on a
-  capture; `pin.rs` the pinned captures; `native.rs` what a desktop is
-  told for the overlay to cover a monitor and have every key.
-- `reach.rs` is where in its window a window takes the pointer: not in
-  the margin its shadow falls in. `pointer.rs` keeps the pointer over
-  these windows the size the desktop says, when that changes.
+  capture; `pin.rs` the pinned captures.
+- `reach.rs` is where in its window the settings window takes the
+  pointer: in its panel, not in the margin its shadow falls in.
+  `pointer.rs` keeps the pointer over these windows the size the desktop
+  says, when that changes.
 
 The settings window:
 

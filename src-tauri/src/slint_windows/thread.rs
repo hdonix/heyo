@@ -14,6 +14,7 @@ use std::sync::{mpsc, Arc};
 
 use super::guard;
 use super::host::Host;
+use super::standing::{self, Keyboard, Layer, Standing};
 
 /// The renderer the windows are drawn with unless `HEYO_SETTINGS_RENDERER`
 /// names another of Slint's: Skia, on the CPU. Except on Wayland, where a
@@ -33,19 +34,12 @@ pub(super) struct Shared {
     pub renderer: String,
 }
 
-/// Which window is being made: winit is told things of a window before it
-/// exists, through one hook for all of them, which is not told which.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum Kind {
-    Settings,
-    Pill,
-    Screenshot,
-    Pinned,
-}
-
 thread_local! {
     static SHARED: RefCell<Option<Rc<Shared>>> = const { RefCell::new(None) };
-    static MAKING: Cell<Kind> = const { Cell::new(Kind::Settings) };
+    /// The standing of the window that is being made: winit is told
+    /// things of a window before it exists, through one hook for all of
+    /// them, which is not told which.
+    static MAKING: Cell<Standing> = const { Cell::new(ORDINARY) };
     /// Whether the windows are seen through, once a window has been drawn
     /// and it is known what draws them.
     static CLEAR: Cell<Option<bool>> = const { Cell::new(None) };
@@ -56,11 +50,16 @@ pub(super) fn shared() -> Option<Rc<Shared>> {
     SHARED.with(|shared| shared.borrow().clone())
 }
 
-/// Makes a window of that kind: winit is told what such a window is.
-pub(super) fn making<T>(kind: Kind, make: impl FnOnce() -> T) -> T {
-    MAKING.with(|making| making.set(kind));
+/// A window the desktop is told nothing of: what Slint makes of its own
+/// accord (a menu, a tip) is one.
+const ORDINARY: Standing = Standing { layer: Layer::Among, keyboard: Keyboard::Ordinary, listed: true, clear: true };
+
+/// Makes a window of that standing: winit is told what the desktop is to
+/// be told of it. (`life` makes every window through here.)
+pub(super) fn making<T>(standing: Standing, make: impl FnOnce() -> T) -> T {
+    MAKING.set(standing);
     let made = make();
-    MAKING.with(|making| making.set(Kind::Settings));
+    MAKING.set(ORDINARY);
     made
 }
 
@@ -143,12 +142,7 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
                 // on X11, the application's id on Wayland.
                 WindowAttributesExtWayland::with_name(WindowAttributesExtX11::with_name(attributes, "Heyo", "heyo"), "heyo", "heyo")
             };
-            match MAKING.with(Cell::get) {
-                Kind::Settings => attributes,
-                Kind::Pill => super::pill::native::attributes(attributes),
-                Kind::Screenshot => super::screenshot::native::attributes(attributes),
-                Kind::Pinned => super::screenshot::native::pinned(attributes),
-            }
+            standing::attributes(standing::here(MAKING.get()), attributes)
         });
         let selector = if super::window::frames::wanted().is_some() { selector.with_winit_custom_application_handler(super::window::frames::Timing) } else { selector };
         selector.select().map_err(|e| format!("Slint has no backend: {e}"))?;

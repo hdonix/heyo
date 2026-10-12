@@ -18,6 +18,19 @@
 //! - [`ask`] and [`begin`] are how another thread has something done here:
 //!   what is asked when Slint is not there is dropped, and said to be.
 //!
+//! That is the interface every window uses. Four more exist for one
+//! window each, and are not to be taken for it:
+//!
+//! - `Life::made` and `Slot::give_up` are the overlay's. It comes on the
+//!   screen only once its window has the monitor's size, so it must know
+//!   whether winit's window is there to be sized; and it gives its window
+//!   up a minute after a screenshot, because the window keeps a buffer of
+//!   a whole screen.
+//! - `Life::wanted` is read by the settings when they are made again, to
+//!   be back on the screen if they were there.
+//! - `Slot::why_not` is the settings' too: whoever asked for them is told
+//!   why they cannot be had, which the palette then shows.
+//!
 //! What is decided is decided as values ([`Stage`], [`reach`]), which is
 //! what the tests are of; Slint's window only carries the answers out.
 
@@ -30,7 +43,9 @@ use slint::winit_030::WinitWindowAccessor;
 use slint::ComponentHandle;
 use tauri::AppHandle;
 
+use super::area::Rect;
 use super::guard::{self, State};
+use super::standing::{self, Standing, Told};
 use super::{pointer, thread};
 
 // --- On and off the screen, as values ---------------------------------------------
@@ -140,14 +155,6 @@ impl Stage {
 
 // --- One window ----------------------------------------------------------------------
 
-/// How a kept window is put on the screen and taken off it by winit: what
-/// differs by desktop (without the keyboard, above the others).
-#[derive(Clone, Copy)]
-pub(super) struct Kept {
-    pub on: fn(&Window),
-    pub off: fn(&Window),
-}
-
 type Then = Box<dyn FnOnce(Result<(), String>)>;
 
 /// What a window is told of winit's window: each time it is about to be
@@ -157,7 +164,9 @@ type Arrive<C> = Rc<dyn Fn(&C, &Window, bool)>;
 /// One window of Slint's, through its life.
 pub(super) struct Life<C: ComponentHandle + 'static> {
     window: C,
-    kept: Option<Kept>,
+    /// What the desktop is told of it (`standing`), which also says
+    /// whether winit keeps it.
+    told: Told,
     stage: Rc<Cell<Stage>>,
     arrive: Arrive<C>,
     /// winit's window that `arrive` was last told of.
@@ -167,12 +176,33 @@ pub(super) struct Life<C: ComponentHandle + 'static> {
 }
 
 impl<C: ComponentHandle + 'static> Life<C> {
-    /// `kept` says how winit puts the window on and off the screen, for a
-    /// window that is kept; None leaves it to Slint. `arrive` is told of
-    /// winit's window each time it is about to be seen: the window's
+    /// Makes a window of that standing: the desktop is told of it
+    /// whatever its standing asks, here and from now on. `arrive` is told
+    /// of winit's window each time it is about to be seen: the window's
     /// place is its to say then.
-    pub(super) fn new(window: C, kept: Option<Kept>, arrive: impl Fn(&C, &Window, bool) + 'static) -> Self {
-        Self { window, kept, stage: Rc::new(Cell::new(Stage::new(kept.is_some()))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default() }
+    pub(super) fn new(standing: Standing, make: impl FnOnce() -> Result<C, slint::PlatformError>, arrive: impl Fn(&C, &Window, bool) + 'static) -> Result<Self, String> {
+        let window = thread::making(standing, make).map_err(|e| format!("Slint could not make it: {e}"))?;
+        let told = standing::here(standing);
+        Ok(Self { window, told, stage: Rc::new(Cell::new(Stage::new(told.kept))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default() })
+    }
+
+    /// What the desktop is told of it here, and what it cannot be told.
+    pub(super) fn told(&self) -> Told {
+        self.told
+    }
+
+    /// Takes every key for a window whose standing has it have them, now
+    /// that it is on the screen. False when it was not given them yet: it
+    /// is to be asked again. (They are given back when it goes off.)
+    pub(super) fn hold(&self) -> bool {
+        let told = self.told;
+        self.window.window().with_winit_window(|made| standing::hold(told, made)).unwrap_or(true)
+    }
+
+    /// Has the window take the pointer in `within` only, in its own
+    /// device pixels, or everywhere (`standing::reach`).
+    pub(super) fn reach(&self, within: Option<Rect>) {
+        self.window.window().with_winit_window(|made| standing::reach(made, within));
     }
 
     /// Slint's window: for what it shows, never to show or hide it.
@@ -188,7 +218,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// Whether winit's window is there to be put on the screen: for a
     /// window that is not kept, Slint sees to that when it shows it.
     pub(super) fn made(&self) -> bool {
-        self.kept.is_none() || self.stage.get().made()
+        !self.told.kept || self.stage.get().made()
     }
 
     fn step(&self, step: impl FnOnce(&mut Stage) -> Do) -> Do {
@@ -230,12 +260,10 @@ impl<C: ComponentHandle + 'static> Life<C> {
                 self.make();
             }
             Do::PutOn => {
-                let (window, arrive, kept) = (&self.window, &self.arrive, self.kept);
+                let (window, arrive, told) = (&self.window, &self.arrive, self.told);
                 window.window().with_winit_window(|made| {
                     arrive(window, made, false);
-                    if let Some(kept) = kept {
-                        (kept.on)(made);
-                    }
+                    standing::on(told, made);
                     made.request_redraw();
                 });
                 then(Ok(()));
@@ -251,9 +279,8 @@ impl<C: ComponentHandle + 'static> Life<C> {
                 let _ = self.window.hide();
             }
             Do::TakeOff => {
-                if let Some(kept) = self.kept {
-                    self.window.window().with_winit_window(kept.off);
-                }
+                let told = self.told;
+                self.window.window().with_winit_window(|made| standing::off(told, made));
             }
             _ => {}
         }
@@ -288,7 +315,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// and puts it where the stage says: `making` when it was shown only
     /// to be made.
     fn wait(&self, making: bool) {
-        let (window, stage, arrive, known, waiting, kept) = (self.window.as_weak(), self.stage.clone(), self.arrive.clone(), self.known.clone(), self.waiting.clone(), self.kept);
+        let (window, stage, arrive, known, waiting, told) = (self.window.as_weak(), self.stage.clone(), self.arrive.clone(), self.known.clone(), self.waiting.clone(), self.told);
         let waited = slint::spawn_local(async move {
             let heard = |outcome: Result<(), String>| {
                 for then in waiting.take() {
@@ -307,17 +334,20 @@ impl<C: ComponentHandle + 'static> Life<C> {
             guard::remember(&made);
             pointer::remember(&made);
             let first = known.replace(Some(made.id())) != Some(made.id());
+            if first {
+                standing::made(told, &made);
+            }
             arrive(&window, &made, first);
             if making {
                 let mut now = stage.get();
                 let what = now.arrived();
                 stage.set(now);
-                match (what, kept) {
-                    (Do::PutOn, Some(kept)) => {
-                        (kept.on)(&made);
+                match what {
+                    Do::PutOn => {
+                        standing::on(told, &made);
                         made.request_redraw();
                     }
-                    (Do::TakeOff, Some(kept)) => (kept.off)(&made),
+                    Do::TakeOff => standing::off(told, &made),
                     _ => {}
                 }
             }

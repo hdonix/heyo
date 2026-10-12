@@ -13,13 +13,14 @@
 //! - `icons` are the symbols drawn for the host's icon names.
 //! - `host` is how those commands are called, and the list of them.
 //! - `window` is the settings window: it puts the two together.
-//! - `pill` is the dictation pill: what it shows, its window, and what a
-//!   desktop must be told for it to float over everything unfocused.
-//! - `screenshot` is the screenshot overlay: its window, and what a
-//!   desktop must be told for it to cover a monitor and have every key.
+//! - `pill` is the dictation pill: what it shows, and its window.
+//! - `screenshot` is the screenshot overlay and the pinned captures.
+//! - `standing` is what a desktop is told of each of them (that it floats
+//!   over everything, that it never has the keyboard), said by the window
+//!   as data and carried out once for each desktop.
 //! - `life` is a window's life on Slint's thread, the same for each: its
 //!   making, its going on and off the screen, its drawing at once.
-//! - `reach` is where in its window a window takes the pointer.
+//! - `reach` is where in its window the settings take the pointer.
 //! - `pointer` keeps the pointer over them the size the desktop says.
 //!
 //! When the display changes while Heyo runs (a monitor connected, another
@@ -39,6 +40,7 @@ pub(crate) mod pill;
 mod pointer;
 mod reach;
 pub(crate) mod screenshot;
+mod standing;
 mod thread;
 #[cfg(test)]
 mod tokens;
@@ -79,7 +81,10 @@ pub(crate) fn open(app: &AppHandle) -> bool {
     match if asked_on { heard(&outcome, asked) } else { Some("its thread ended".into()) } {
         None => true,
         Some(reason) => {
-            eprintln!("heyo: the settings window cannot be shown in this run: {reason}");
+            // Said once: a window that could not be made was said by its slot.
+            if !window::unmade_said() {
+                eprintln!("heyo: the settings window cannot be shown in this run: {reason}");
+            }
             guard::gone_because(&reason);
             // With it goes whatever else Slint had on screen.
             thread::on(|| {

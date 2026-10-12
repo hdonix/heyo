@@ -26,8 +26,9 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 
 use super::keys::{self, Held};
 use super::model::{Ask, Line, Model, Then};
-use super::thread::{self, Job, Kind};
+use super::thread::{self, Job};
 use super::life::{self, Life, Lives, Slot, Slotted};
+use super::standing::{self, Keyboard, Layer, Standing};
 use super::{area, icons, reach, ui};
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
@@ -197,6 +198,10 @@ impl slint::Model for Lines {
         self
     }
 }
+
+/// An ordinary window, with a shadow: what is behind it shows round its
+/// panel.
+const STANDING: Standing = Standing { layer: Layer::Among, keyboard: Keyboard::Ordinary, listed: true, clear: true };
 
 /// The window while Slint runs.
 struct Live {
@@ -371,11 +376,9 @@ impl Live {
     /// Has the window take the pointer where its panel is, and not in the
     /// margin its shadow falls in (`reach`).
     fn reach(&self) {
-        let (margin, scale) = (self.life.window().get_margin(), self.life.window().window().scale_factor());
-        self.life.window().window().with_winit_window(|made| {
-            let size = made.inner_size();
-            reach::limit(made, reach::panel((size.width, size.height), margin, scale));
-        });
+        let window = self.life.window();
+        let (margin, scale, size) = (window.get_margin(), window.window().scale_factor(), window.window().size());
+        self.life.reach(reach::panel((size.width, size.height), margin, scale));
     }
 
     /// Puts the window on screen, in front, and reads again what may have
@@ -484,10 +487,9 @@ fn let_go() {
     let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
 }
 
-/// The window itself, with nothing in it yet but where its lines come
-/// from, and what is done in it said to `Live`.
-fn window(shared: &thread::Shared, lines: &Rc<Lines>) -> Result<ui::SettingsWindow, String> {
-    let window = thread::making(Kind::Settings, ui::SettingsWindow::new).map_err(|e| format!("Slint could not make the window: {e}"))?;
+/// What the window is given when it is made: where its lines come from,
+/// and what is done in it said to `Live`.
+fn furnish(window: &ui::SettingsWindow, shared: &thread::Shared, lines: &Rc<Lines>) {
     window.global::<ui::Theme>().set_plain(shared.renderer == "software");
     let weak = window.as_weak();
     life::seen_through(window.window(), &shared.renderer, move |opaque| {
@@ -496,8 +498,7 @@ fn window(shared: &thread::Shared, lines: &Rc<Lines>) -> Result<ui::SettingsWind
         }
     });
     window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));
-    wire(&window);
-    Ok(window)
+    wire(window);
 }
 
 /// Where winit's window goes when it is about to be seen: in the middle
@@ -515,7 +516,7 @@ fn arrived(window: &ui::SettingsWindow, made: &slint::winit_030::winit::window::
         let (wide, high) = ((860.0_f32.min(width as f32 / scale) + margin) * scale, (640.0_f32.min(height as f32 / scale) + margin) * scale);
         made.set_outer_position(PhysicalPosition::new(x + ((width as f32 - wide) / 2.0) as i32, y + ((height as f32 - high) / 2.0) as i32));
     }
-    reach::limit(made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
+    standing::reach(made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
     made.focus_window();
     // Which on Wayland a window may not do for itself: the desktop is
     // asked to.
@@ -559,7 +560,14 @@ fn make() -> Result<Live, String> {
     let asking = thread::asker("heyo-slint-host", shared.host.clone())?;
     let pictures = Rc::new(Pictures::default());
     let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
-    let window = window(&shared, &lines)?;
+    let asked = Rc::new(Cell::new(None));
+    // Left to Slint to show and hide: it is an ordinary window.
+    let life = Life::new(STANDING, ui::SettingsWindow::new, {
+        let (asking, asked) = (asking.clone(), asked.clone());
+        move |window, made, _| arrived(window, made, &asking, asked.take())
+    })?;
+    let window = life.window();
+    furnish(window, &shared, &lines);
 
     // What the first page shows is read before the window is: it comes
     // up as it is, not empty and then filled.
@@ -577,12 +585,6 @@ fn make() -> Result<Live, String> {
     let poll = slint::Timer::default();
     poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
         with(|live| live.ask(live.model.poll()));
-    });
-    let asked = Rc::new(Cell::new(None));
-    // Left to Slint to show and hide: it is an ordinary window.
-    let life = Life::new(window, None, {
-        let (asking, asked) = (asking.clone(), asked.clone());
-        move |window, made, _| arrived(window, made, &asking, asked.take())
     });
     let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: (0.0, 0.0), _poll: poll };
     live.push();
@@ -613,9 +615,19 @@ pub(super) fn reveal(asked: Instant, then: impl FnOnce(Result<(), String>) + 'st
         }
     });
     if let Some(then) = then {
-        then(Err(Slot::why_not(&LIVE).unwrap_or_else(|| "the settings window was busy".into())));
+        let unmade = Slot::why_not(&LIVE);
+        UNMADE_SAID.store(unmade.is_some(), std::sync::atomic::Ordering::SeqCst);
+        then(Err(unmade.unwrap_or_else(|| "the settings window was busy".into())));
     }
 }
+
+/// Whether the reason the window last gave for not coming up was that it
+/// could not be made, which its slot has said in the log already.
+pub(super) fn unmade_said() -> bool {
+    UNMADE_SAID.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+static UNMADE_SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[cfg(test)]
 mod tests {

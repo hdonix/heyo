@@ -61,7 +61,6 @@ mod x11 {
     use std::cell::Cell;
     use std::ffi::{c_ulong, CString};
 
-    use slint::winit_030::winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
     use slint::winit_030::winit::window::Window;
     use x11_dl::xcursor::Xcursor;
     use x11_dl::xlib::{self, Xlib};
@@ -74,10 +73,8 @@ mod x11 {
     }
 
     pub(super) fn remember(window: &Window) {
-        let Some(RawDisplayHandle::Xlib(display)) = window.display_handle().ok().map(|handle| handle.as_raw()) else { return };
-        let Some(RawWindowHandle::Xlib(handle)) = window.window_handle().ok().map(|handle| handle.as_raw()) else { return };
-        if let Some(display) = display.display {
-            WINIT.set(Some((display.as_ptr().cast(), handle.window)));
+        if let Some(x11) = super::super::standing::x11::of(window) {
+            WINIT.set(Some((x11.display, x11.window)));
         }
     }
 

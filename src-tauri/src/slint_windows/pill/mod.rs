@@ -4,7 +4,6 @@
 //! is lost, dictation goes on without it.
 //!
 //! - `model` is what it shows of a recording and what a press on it means.
-//! - `native` is what a desktop is told for it to float unfocused.
 //! - This file is the window: placed at the bottom centre of the primary
 //!   monitor, shown what the model says, and what is done to it told to
 //!   the host. Its making and its going on and off the screen are
@@ -17,7 +16,6 @@
 //! there, placed, with the pill drawn in it from its first frame.
 
 mod model;
-pub(super) mod native;
 
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -27,13 +25,19 @@ use slint::winit_030::winit::dpi::PhysicalPosition;
 use slint::{ComponentHandle, Model as _, ModelRc, VecModel};
 use tauri::AppHandle;
 
-use super::life::{self, Kept, Life, Lives, Slot, Slotted};
-use super::thread::{self, Job, Kind};
+use super::life::{self, Life, Lives, Slot, Slotted};
+use super::standing::{Keyboard, Layer, Standing};
+use super::thread::{self, Job};
 use super::ui;
 use crate::dictation::Told;
 
 pub(crate) use model::Did;
 use model::{Model, Phase};
+
+/// It floats over everything, a fullscreen window too, and never has the
+/// keyboard: not by appearing, not by being clicked. What is dictated
+/// goes to the window that has it.
+const STANDING: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::Never, listed: false, clear: true };
 
 /// How long it takes to go: it is taken off the screen when it has.
 const LEAVING: Duration = Duration::from_millis(140);
@@ -67,7 +71,8 @@ impl Lives for Pill {
     fn make() -> Result<Self, String> {
         let shared = thread::shared().ok_or("Slint has not begun")?;
         let telling = thread::asker("heyo-slint-pill", shared.host.clone())?;
-        let window = thread::making(Kind::Pill, ui::PillWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
+        let life = Life::new(STANDING, ui::PillWindow::new, |_, made, _| place(made))?;
+        let window = life.window();
         let weak = window.as_weak();
         life::seen_through(window.window(), &shared.renderer, move |opaque| {
             if let Some(window) = weak.upgrade() {
@@ -79,15 +84,6 @@ impl Lives for Pill {
         window.on_pressed(|| with(|pill| pill.did(pill.model.pressed())));
         window.on_clicked(|| with(|pill| pill.did(pill.model.clicked())));
         window.on_cancel(|| with(|pill| pill.did(pill.model.cancelled())));
-        // Kept, where winit can take a window off the screen: Slint would
-        // make it anew without what `native` says of it.
-        let kept = native::kept().then_some(Kept { on: native::show, off: native::hide });
-        let life = Life::new(window, kept, |_, made, first| {
-            if first {
-                native::made(made);
-            }
-            place(made);
-        });
         let mut pill = Pill { life, model: Model::new(), bars, telling, wanted: false, leaving: slint::Timer::default() };
         pill.push();
         Ok(pill)

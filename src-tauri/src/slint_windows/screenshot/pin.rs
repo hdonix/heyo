@@ -17,8 +17,12 @@ use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
 use tauri::AppHandle;
 
 use super::super::life::{self, Life, Lives, Slot, Slotted};
-use super::super::thread::{self, Kind};
+use super::super::standing::{Keyboard, Layer, Standing};
 use super::super::ui;
+
+/// Above the other windows, and still one the desktop arranges; in no
+/// taskbar; and hiding what is behind it, being a picture.
+const STANDING: Standing = Standing { layer: Layer::Above, keyboard: Keyboard::Ordinary, listed: false, clear: false };
 
 /// The smallest a pinned capture's window is, either way.
 const LEAST: f32 = 24.0;
@@ -86,10 +90,11 @@ impl Slotted for Pins {
 
 impl Pins {
     fn add(&mut self, picture: Image, at: (i32, i32)) {
-        let window = match thread::making(Kind::Pinned, ui::PinWindow::new) {
-            Ok(window) => window,
+        let life = match Life::new(STANDING, ui::PinWindow::new, |_, _, _| {}) {
+            Ok(life) => life,
             Err(e) => return eprintln!("heyo: the capture could not be pinned: {e}"),
         };
+        let window = life.window();
         let (width, height) = (picture.size().width, picture.size().height);
         window.set_picture(picture);
         let least = (LEAST * window.window().scale_factor()).ceil() as u32;
@@ -101,14 +106,6 @@ impl Pins {
         window.window().on_close_requested(move || {
             close(id);
             slint::CloseRequestResponse::KeepWindowShown
-        });
-        // Left to Slint to show and hide: it is an ordinary window. Above the
-        // other windows: the markup says so too, but the window manager was
-        // not told of it on X11, so winit is asked once its window is there.
-        let life = Life::new(window, None, |_, made, first| {
-            if first {
-                made.set_window_level(slint::winit_030::winit::window::WindowLevel::AlwaysOnTop);
-            }
         });
         life.on(|came| {
             if let Err(e) = came {

@@ -26,7 +26,6 @@
 //! - If Heyo ends, however, the display does the same.
 
 mod marks;
-pub(super) mod native;
 pub(crate) mod pin;
 
 use std::rc::Rc;
@@ -42,8 +41,9 @@ use slint::{ComponentHandle, Image, Model as _, ModelRc, Rgba8Pixel, SharedPixel
 use tauri::AppHandle;
 
 use super::guard::{self, State};
-use super::life::{self, Kept, Life, Lives, Slot, Slotted};
-use super::thread::{self, Job, Kind};
+use super::life::{self, Life, Lives, Slot, Slotted};
+use super::standing::{self, Keyboard, Layer, Standing};
+use super::thread::{self, Job};
 use super::ui;
 use crate::platform::capture::{Area, Shot};
 use crate::screenshot::selecting::{self, Action, Button, Cursor, Event, Key, Mode, Outcome, Selecting, Shape, Tool};
@@ -65,10 +65,13 @@ const MISSED_BEATS: u32 = 6;
 /// monitor's size, for the next one to be as quick as can be.
 const RESTING: Duration = Duration::from_secs(60);
 
+/// It covers a monitor over everything, the desktop's panels too, with
+/// nothing animating it; it has every key while it is up, whoever has the
+/// focus; and it hides all that is behind it.
+const STANDING: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::All, listed: false, clear: false };
+
 /// The overlay is on screen, or about to be.
 static UP: AtomicBool = AtomicBool::new(false);
-/// What its window is known by outside Slint's thread (`native::id`).
-static WINDOW: AtomicU64 = AtomicU64::new(0);
 /// Counts answers from Slint's thread, for `watch`.
 static BEATS: AtomicU64 = AtomicU64::new(0);
 
@@ -156,7 +159,8 @@ impl Lives for Overlay {
     fn make() -> Result<Self, String> {
         let shared = thread::shared().ok_or("Slint has not begun")?;
         let telling = thread::asker("heyo-slint-shot", shared.host.clone())?;
-        let window = thread::making(Kind::Screenshot, ui::ScreenshotWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
+        let life = Life::new(STANDING, ui::ScreenshotWindow::new, |_, _, _| {})?;
+        let window = life.window();
         let handles = Rc::new(VecModel::default());
         window.set_handles(ModelRc::from(handles.clone()));
         let marks = Rc::new(VecModel::default());
@@ -183,14 +187,6 @@ impl Lives for Overlay {
         window.window().set_position(slint::PhysicalPosition::new(-(IDLE as i32) * 4, -(IDLE as i32) * 4));
         window.window().set_size(slint::PhysicalSize::new(IDLE, IDLE));
         window.window().on_winit_window_event(|_, event| Slot::there(&OVERLAY, |overlay| overlay.told(event)).unwrap_or(EventResult::Propagate));
-        // Kept, where winit can take a window off the screen: Slint would
-        // make it anew without what `native` says of it.
-        let kept = native::kept().then_some(Kept { on: native::show, off: native::hide });
-        let life = Life::new(window, kept, |_, made, first| {
-            if first {
-                WINDOW.store(native::id(made), Ordering::SeqCst);
-            }
-        });
         Ok(Overlay {
             life,
             handles,
@@ -306,7 +302,7 @@ impl Overlay {
         // It is put on screen when it has the monitor's size: at once if
         // it has it already, else when winit says it has (`told`).
         let sized = window.with_winit_window(|made| made.inner_size()).is_some_and(|size| (size.width, size.height) == (area.width, area.height));
-        if !native::kept() {
+        if self.life.told().unplaced {
             // Where a window cannot place itself, it fills a monitor.
             window.set_fullscreen(true);
             self.map();
@@ -346,7 +342,7 @@ impl Overlay {
     }
 
     fn hold(&mut self) {
-        let held = self.life.window().window().with_winit_window(native::hold).unwrap_or(true);
+        let held = self.life.hold();
         self.held_tries += 1;
         if held || self.held_tries >= HOLD_TIMES {
             if !held {
@@ -708,7 +704,7 @@ fn watch() {
             // A thread that panicked has had its windows taken away already (`guard`).
             if guard::state() == State::Running {
                 eprintln!("heyo: what draws the screenshot overlay does not answer; the overlay is taken off the screen");
-                native::take_down(WINDOW.load(Ordering::SeqCst));
+                standing::take_down();
             }
             crate::screenshot::cancel();
         }
