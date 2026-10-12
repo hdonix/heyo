@@ -21,7 +21,7 @@ interface does it and it has been seen to.
   still up is closed first: neither is in the capture.
 - [ ] One monitor is captured: the one the pointer is on (the desktop's
   word where the toolkit cannot follow the pointer), else the primary.
-- [ ] The frozen screen is on display as soon as it has been read, before
+- [x] The frozen screen is on display as soon as it has been read, before
   anything else is ready. The windows on the screen are asked for
   meanwhile and arrive after.
 - [ ] A capture that fails is said in a notification ("Screenshot
@@ -32,10 +32,10 @@ interface does it and it has been seen to.
 
 ### What is on the screen
 
-- [ ] The frozen picture of the monitor, one of its pixels a device
+- [x] The frozen picture of the monitor, one of its pixels a device
   pixel, no scaling and no colour change, covering the whole monitor, the
   desktop's panels too, with no opening animation.
-- [ ] Everything but the selection dimmed (154 of 256).
+- [x] Everything but the selection dimmed (154 of 256).
 - [ ] Before there is a selection: a hint in the middle, "Drag to select
   an area" (mode text: "Drag over the text to copy"), ", or click a
   window" when windows are known, " · Esc to cancel".
@@ -43,10 +43,10 @@ interface does it and it has been seen to.
   undimmed with the outline inside it (so that a window filling the screen
   has one). It changes when the pointer crosses into another window; not
   shown over the selection, a tool, an annotation, or while dragging.
-- [ ] The selection: undimmed, outlined 1.5 px in the accent.
-- [ ] Its size in the capture's pixels ("2600 × 1400") in a small dark
+- [x] The selection: undimmed, outlined 1.5 px in the accent.
+- [x] Its size in the capture's pixels ("2600 × 1400") in a small dark
   label above its top left corner.
-- [ ] Eight round handles (9 px, accent, white edge) on corners and
+- [x] Eight round handles (9 px, accent, white edge) on corners and
   sides, in mode capture with the selection tool, not while dragging.
 - [ ] The pointer: a crosshair; "move" over the selection; the resize
   arrows over each handle; a crosshair in the selection with a drawing
@@ -58,13 +58,13 @@ interface does it and it has been seen to.
 
 ### Selecting
 
-- [ ] A drag from outside the selection makes a new one (and drops the
+- [x] A drag from outside the selection makes a new one (and drops the
   annotations and the tool).
 - [ ] A press and release without a drag (less than 6 px either way)
   takes the window pressed on, exactly; where there is none, the selection
   is dropped.
-- [ ] A drag inside the selection moves it; it stays on the screen.
-- [ ] A drag on a handle resizes by that handle's sides; never smaller
+- [x] A drag inside the selection moves it; it stays on the screen.
+- [x] A drag on a handle resizes by that handle's sides; never smaller
   than 6 px, never past the screen's edge.
 - [ ] In modes text and pick, making the selection finishes it.
 - [ ] Windows: other applications' only, topmost first, cut to the
@@ -136,11 +136,12 @@ interface does it and it has been seen to.
 
 ### Safety
 
-- [ ] The overlay holds the keyboard (a grab on X11: the focus stays
+- [x] The overlay holds the keyboard (a grab on X11: the focus stays
   where it was). Esc always reaches it.
-- [ ] If Heyo stops answering while it is up, the keyboard is let go
-  within a few seconds (today: Heyo ends itself).
-- [ ] If Heyo is killed, nothing is left on screen and the keyboard is
+- [x] If Heyo stops answering while it is up, the keyboard is let go
+  within a few seconds (the web view's overlay: Heyo ends itself. Slint's:
+  the overlay is taken off the screen and Heyo goes on).
+- [x] If Heyo is killed, nothing is left on screen and the keyboard is
   free.
 
 ### Platforms
@@ -162,3 +163,121 @@ interface does it and it has been seen to.
 A loupe. The selection's logic written for a host-drawn overlay
 (`screenshot/selecting.rs`) has one, and it is kept: it shows where an
 edge will be, to the pixel.
+
+## The overlay Slint draws
+
+So far on X11, with area selection, and beside the web view's: Heyo shows
+it where `HEYO_SCREENSHOT=slint` is in its environment. (The switch goes
+when the web view's overlay does.)
+
+- `src-tauri/src/screenshot/selecting.rs` decides what the overlay shows
+  and how it answers the pointer and the keys. It knows no toolkit, and
+  its rules are tested with numbers.
+- `src-tauri/src/slint_windows/ui/screenshot.slint` draws what that says.
+- `src-tauri/src/slint_windows/screenshot/mod.rs` is the window, one of
+  those on Slint's thread: made when Heyo starts, small, off the screen
+  and hidden; put over the monitor that was read when a screenshot is
+  asked for. It hears of the pointer and the keys from winit, not from
+  elements in the markup.
+- `src-tauri/src/slint_windows/screenshot/native.rs` is what differs by
+  platform: on X11 the window goes past the window manager, and it grabs
+  the keyboard on the connection it was made on.
+- What was decided goes to `screenshot::decided`, on a thread of the
+  host's: the selected part is cut from the capture there, which the
+  host keeps, and finished as a PNG from the web view's overlay is.
+
+Three things in it are there for speed, each found by measuring:
+
+- **The capture is there twice, as it was read and dimmed**, and the
+  selection is the first drawn over the second. A drag then changes the
+  selection's part of the screen and not all of it.
+- **Each of the two pictures is drawn by one element.** Slint's Skia
+  renderer copies a picture the first time an element draws it
+  (`i-slint-renderer-skia`, `cached_image.rs`), and a 4K one takes it 10
+  to 35 ms. The dimmed picture is shown as soon as it is made, in the
+  first frame; the other follows a few milliseconds later and is drawn at
+  once (one pixel of it, under the hint), so that its copy is made before
+  a drag can begin. The loupe has a picture of its own, of 15 by 15
+  pixels.
+- **A frame is drawn when the overlay changes, not when Slint would.** On
+  X11 Slint's winit backend draws a frame one refresh interval after it
+  was asked for, by a timer (`frame_throttle.rs`): the selection followed
+  the pointer 16 ms later than it had to. The window asks winit for the
+  redraw itself.
+
+### That it cannot trap whoever uses it
+
+The overlay covers the screen and holds the keyboard.
+
+- Escape is read from winit's event before anything else is looked at.
+- If Slint's thread panics, `guard` ends its connection to the display,
+  and the display drops the window and the grab with it.
+- If Slint's thread stops answering, a thread that asks it every 250 ms
+  while the overlay is up unmaps the window after six unanswered, from a
+  connection of its own. The display lets a grab go when the window that
+  holds it leaves the screen. Heyo goes on.
+- If Heyo is killed, the display does the same.
+
+`experiments/slint-settings/scripts/screenshot-safe.sh` tries each in the
+middle of a drag, with a text field of another program having the
+keyboard: a key typed while the overlay is up must not reach the field,
+and "hello" typed after the trouble must (`results/screenshot-safe.txt`).
+
+| in the middle of a drag | the overlay was off the screen after | Heyo afterwards |
+|---|---|---|
+| Escape | 24 ms | runs; the next screenshot comes up |
+| Slint's thread panics | at once (within the 150 ms the test takes to look) | runs; the palette opens |
+| Slint's thread stops for a minute | 1.7 s | runs; the palette opens |
+| Heyo is killed | 49 ms | gone |
+
+### How fast it is
+
+Measured from outside, the screen as the clock
+(`experiments/slint-settings/scripts/measure-screenshot.sh`,
+`results/screenshot.jsonl`): a program reads a pixel of the screen again
+and again and says when it changed. Xvfb at 3840x2160, scale 1, under GNOME
+Shell, which composites with software OpenGL there: part of every figure
+is the Shell's, the same part for both overlays. No graphics card is
+used by either. Milliseconds; where three are given they are the median,
+the 95th of a hundred and the worst.
+
+| | Slint, 20 cores | web view, 20 cores | Slint, 4 small cores | web view, 4 small cores |
+|---|---|---|---|---|
+| asked for (`heyo --open heyo:screenshot` started) to the frozen screen: the median of 10 to 14 screenshots, and the least and most | 156 (111 to 221) | 237 (209 to 333) | 159 (129 to 274) | 231 (215 to 253) |
+| ... to ready to drag (the hint drawn) | the same frame | up to 77 later (40 or more in 5 of 13) | the same frame | up to 76 later (19 or more in 4 of 10) |
+| the pointer jumps, the selection has followed (about 1000 by 400) | 10 / 14 / 19 | 15 / 19 / 84 | 11 / 14 / 17 | 16 / 21 / 162 |
+| the pointer sweeps without pause, a movement every 8 ms | 20 / 32 / 33 | 26 / 39 / 39 | 23 / 34 / 36 | 29 / 42 / 44 |
+| the pointer jumps, a selection of most of the screen (3040 by 1800) | 24 / 30 / 32 | 53 / 64 / 121 | 28 / 33 / 36 | 54 / 61 / 191 |
+| the pointer sweeps, the same | 41 / 53 / 61 | 78 / 98 / 101 | 50 / 57 / 67 | 97 / 114 / 115 |
+| a frame of Slint's, drawn and handed over: small selection | 0.7 / 1.4 / 2.9 | | 1.2 / 1.6 / 3.2 | |
+| the same, most of the screen | 7.3 / 10.5 / 14.2 | | 11.9 / 14.6 / 21.0 | |
+
+The selection of most of the screen was measured three times on 20
+cores, and the table has the middle one of the three for each overlay.
+One of Slint's three stood apart, with frames of up to 50 ms where the
+others had 14 (jumps 25 / 53 / 62, sweeps 65 / 108 / 129): something else
+had the processors then. One of the web view's had jumps of 58 / 102 /
+224. All of them are in `results/screenshot.jsonl`.
+
+Of the 156 ms to the frozen screen, about 50 are the second `heyo`
+process reaching the first, 40 reading the screen, 8 making the dimmed
+picture, 7 to 18 Slint's first frame, and the rest the Shell showing a
+new window of that size. The first screenshot after Heyo starts takes
+some 60 ms longer than the ones after it (about 195 against 135): the
+window grows to the monitor's size, and the renderer takes a picture of
+that size in for the first time.
+
+A selection of most of the screen costs Slint a frame of 7 ms (12 on a
+small core) because the whole selection is drawn again when its corner
+moves: the renderer redraws the rectangle that holds what an element was
+and what it has become, not only the difference.
+
+### The pixels
+
+`experiments/slint-settings/scripts/screenshot.sh` reads the screen with a
+selection on it, and again after the selection was moved and resized: of
+the pixels inside the selection none differs from the desktop as it was
+before, and of those outside it (30 px away from its outline, handles
+and label) none differs from the desktop dimmed to 154 of 256, rounded
+down (`results/screenshot-x11.txt`). The window is 24 bits deep: it is
+said to hide what is behind it, so a compositor has nothing to blend.
