@@ -9,11 +9,10 @@
 
 The system's Python: it has the bindings to GTK.
 """
-import ctypes
 import os
 import sys
 
-if os.environ.get("DISPLAY") != os.environ.get("SLINT_SETTINGS_DISPLAY") or os.environ.get("DISPLAY") in (None, "", ":0"):
+if os.environ.get("DISPLAY") != os.environ.get("HEYO_TEST_DISPLAY") or os.environ.get("DISPLAY") in (None, "", ":0", ":1"):
     sys.exit("not the sandbox's display")
 what = sys.argv[1]
 if what == "clipboard":
@@ -29,31 +28,12 @@ if what == "clipboard":
     picture.savev(sys.argv[2], "png", [], [])
     print(f"{picture.get_width()} x {picture.get_height()}")
 elif what == "cursor":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import session
 
-    class CursorImage(ctypes.Structure):
-        _fields_ = [
-            ("x", ctypes.c_short),
-            ("y", ctypes.c_short),
-            ("width", ctypes.c_ushort),
-            ("height", ctypes.c_ushort),
-            ("xhot", ctypes.c_ushort),
-            ("yhot", ctypes.c_ushort),
-            ("serial", ctypes.c_ulong),
-            ("pixels", ctypes.POINTER(ctypes.c_ulong)),
-            ("atom", ctypes.c_ulong),
-            ("name", ctypes.c_char_p),
-        ]
-
-    x11 = ctypes.CDLL("libX11.so.6")
-    xfixes = ctypes.CDLL("libXfixes.so.3")
-    x11.XOpenDisplay.restype = ctypes.c_void_p
-    display = ctypes.c_void_p(x11.XOpenDisplay(os.environ["DISPLAY"].encode()))
-    xfixes.XFixesGetCursorImage.restype = ctypes.POINTER(CursorImage)
-    xfixes.XFixesGetCursorImage.argtypes = [ctypes.c_void_p]
-    image = xfixes.XFixesGetCursorImage(display)
-    name = image.contents.name.decode() if image and image.contents.name else ""
     # Its name, and the size of its picture: a pointer of 24 is a picture of 24 or a little more.
-    print(f"{name or '(unnamed)'} {image.contents.width}x{image.contents.height}")
+    name, width, height = session.pointer()
+    print(f"{name or '(unnamed)'} {width}x{height}")
 elif what == "same":
     from PIL import Image, ImageChops
 

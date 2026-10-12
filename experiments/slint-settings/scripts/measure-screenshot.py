@@ -3,7 +3,8 @@
 
     measure-screenshot.py LABEL RUNS small|large|open|pen|blur
 
-Run by measure-screenshot.sh, which starts Heyo in the sandbox: a screen of
+Run by measure-screenshot.sh, which starts Heyo in the sandbox of
+scripts/gui-test ($GUI, whose layout.py and ledger.py it uses): a screen of
 3840x2160 at scale 1 under GNOME Shell, showing the desktop's own
 background.
 
@@ -49,11 +50,13 @@ import subprocess
 import sys
 import time
 
-DISPLAY = os.environ.get("SLINT_SETTINGS_DISPLAY", "")
-if not DISPLAY or DISPLAY == ":0" or os.environ.get("DISPLAY") != DISPLAY:
+DISPLAY = os.environ.get("HEYO_TEST_DISPLAY", "")
+if not DISPLAY or DISPLAY in (":0", ":1") or os.environ.get("DISPLAY") != DISPLAY:
     sys.exit("not the sandbox's display")
 label, runs, size = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-HEYO, WATCH, OUT = os.environ["HEYO"], os.environ["WATCH"], os.environ["MEASURE_OUT"]
+HEYO, WATCH, OUT, GUI = os.environ["HEYO"], os.environ["WATCH"], os.environ["MEASURE_OUT"], os.environ["GUI"]
+sys.path.insert(0, GUI)
+import layout  # noqa: E402
 os.makedirs(OUT, exist_ok=True)
 WATCHED, MIDDLE = (3040, 1080), (1920, 1080)
 # Where the button goes down, and the two places the pointer goes between:
@@ -105,8 +108,8 @@ def drag(start, end):
 
 
 def tool(index, selection_end):
-    """A click on the toolbar's button of that place (at scale 1)."""
-    move(selection_end[0] - 499 + 20 + 32 * index, selection_end[1] + 28)
+    """A click on the toolbar's button of that place (at scale 1; where it is, is layout.py's to say)."""
+    move(*layout.toolbar_button(index, selection_end[0], selection_end[1], 1))
     time.sleep(0.15)
     button(True)
     button(False)
@@ -149,7 +152,9 @@ for run in range(1, runs + 1):
         points = [WATCHED, MIDDLE]
     log = f"{OUT}/{label}-{size}-{run}.watch".replace(" ", "-").replace(",", "")
     watching = [WATCH, "--watch", ":".join(f"{x},{y}" for x, y in points), {"open": "4.5", "pen": "20", "blur": "16"}.get(size, "26")]
-    watcher = subprocess.Popen(watching, stdout=open(log, "w"), stderr=subprocess.DEVNULL, env={**os.environ, "GDK_SCALE": "1", "GDK_BACKEND": "x11"})
+    watcher = subprocess.Popen(watching, stdout=open(log, "w"), stderr=subprocess.DEVNULL)
+    # Written down like every process started in the sandbox.
+    subprocess.run([sys.executable, os.path.join(GUI, "ledger.py"), "note", str(watcher.pid), "watch"], check=False)
     time.sleep(1.2)
     asked = now()
     subprocess.run([HEYO, "--open", "heyo:screenshot"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

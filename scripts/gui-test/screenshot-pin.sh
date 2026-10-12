@@ -11,30 +11,28 @@
 # must not move it. Then each is closed its own way: a double click, a
 # right click, Escape.
 #
-# In the sandbox only (SCREEN=3840x2160 GDK_SCALE=1 heyo.sh up gnome); Heyo
-# must not be running in it.
-. "$(dirname "$0")/lib.sh"
+# In the session that runs, or one of its own (GNOME Shell, 3840x2160), at
+# the scale it publishes; Heyo must not be running in it.
+. "$(dirname "$0")/env.sh"
 name=${1:-x11}; [ $# -gt 0 ] && shift
+export SCREEN=${SCREEN:-3840x2160}
+session_for gnome
 out=$RESULTS/screenshot-pin-$name.txt
-scale=$SCALE
+scale=$(scale)
 wait=${WAIT:-1.5}
-alive heyo && { echo "Heyo is running already" >&2; exit 1; }
-READ="/usr/bin/python3 -I $HERE/screen-read.py"
-png() { python3 -I "$HERE/shot.py" "$DISPLAY" "$1" ${2:+$2 $3 $4 $5}; }
+READ="/usr/bin/python3 $GUI/screen-read.py"
 pins() { xdotool search --onlyvisible --name '^Heyo Pinned Screenshot$' 2>/dev/null; }
 # pin X Y X Y: selects that part and presses the toolbar's pin button.
 pin() {
-  "$HEYO" --open heyo:screenshot; sleep 1.3
+  heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3
   xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $((($1 + $3) / 2)) $((($2 + $4) / 2)); sleep 0.1; xdotool mousemove "$3" "$4"; sleep 0.2; xdotool mouseup 1; sleep 0.3
-  # The toolbar's right end is at the selection's, or as far left as the screen lets it be; pin is its twelfth button.
-  left=$(($3 / scale - 499)); [ "$left" -lt 8 ] && left=8
-  xdotool mousemove $(((left + 20 + 32 * 11 + 11) * scale)) $((($4 / scale + 28) * scale)); sleep 0.15; xdotool click 1; sleep "$wait"
+  xdotool mousemove $(toolbar pin "$3" "$4"); sleep 0.15; xdotool click 1; sleep "$wait"
 }
 {
-  echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"
-  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start "$@" > /dev/null || exit 1
+  echo "# $(date +%F), $BUILD, $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"
+  HEYO_TEST_WARMUP=${HEYO_TEST_WARMUP:-4} "$GUI/sandbox.sh" heyo "$@" || exit 1
   xdotool mousemove 300 1900; sleep 0.4
-  png "$S/pin-before.png"
+  png "$T/pin-before.png"
   pin 1000 600 1600 1000
   first=$(pins | tail -1)
   echo "pinned 600 by 400 from 1000,600: a window at $(place "$first")"
@@ -42,9 +40,9 @@ pin() {
   xdotool mousemove 300 1900; sleep 0.3
   # Its edge is one logical pixel.
   set -- $((1000 + scale)) $((600 + scale)) $((600 - 2 * scale)) $((400 - 2 * scale))
-  png "$S/pin-first.png" "$@"
-  echo "what it shows inside its edge, against the desktop there: $($READ same "$S/pin-before.png" "$S/pin-first.png" "$@")"
-  echo "its edge at its top left corner: $(/usr/bin/python3 -I -c 'import sys; from PIL import Image; print(Image.open(sys.argv[1]).convert("RGB").getpixel((0, 0)))' "$(png "$S/pin-edge.png" 1000 600 4 4; echo "$S/pin-edge.png")") (the accent at 70 % over the picture)"
+  png "$T/pin-first.png" "$@"
+  echo "what it shows inside its edge, against the desktop there: $($READ same "$T/pin-before.png" "$T/pin-first.png" "$@")"
+  echo "its edge at its top left corner: $(/usr/bin/python3 -c 'import sys; from PIL import Image; print(Image.open(sys.argv[1]).convert("RGB").getpixel((0, 0)))' "$(png "$T/pin-edge.png" 1000 600 4 4; echo "$T/pin-edge.png")") (the accent at 70 % over the picture)"
   pin 1800 700 2100 900
   echo "a second, 300 by 200 from 1800,700: $(pins | wc -l) windows; the new one at $(place "$(pins | grep -v -x "$first" | tail -1)")"
   second=$(pins | grep -v -x "$first" | tail -1)
@@ -66,6 +64,7 @@ pin() {
   xdotool mousemove 1300 800 click 1; sleep 0.4
   xdotool key Escape; sleep 0.6
   echo "a third, clicked and then Escape: $(pins | wc -l)"
-  grep -E "heyo: (screenshot failed|the capture|panicked)" "$S/heyo.log"
-  "$HERE/heyo.sh" stop > /dev/null
+  grep -E "heyo: (screenshot failed|the capture|panicked)" "$T/app.log"
+  stop heyo > /dev/null
 } 2>&1 | tee "$out"
+leave

@@ -11,29 +11,34 @@
 # one more screenshot after that. (results/screenshot-memory.txt has the
 # same of the web view's overlay, from when there was one.)
 #
-# In the sandbox only (SCREEN=3840x2160 GDK_SCALE=1 heyo.sh up gnome);
-# Heyo must not be running in it.
-. "$(dirname "$0")/lib.sh"
+# In the sandbox of scripts/gui-test, in a session that runs
+# (SCREEN=3840x2160 scripts/gui-test/sandbox.sh session gnome, scale 1);
+# Heyo must not be running in it. It stays here, with what it measured
+# (../results/screenshot-memory.txt): it is the record of how the overlay
+# was chosen, not a trial of Heyo.
+GUI=$(cd "$(dirname "$0")/../../../scripts/gui-test" && pwd)
+. "$GUI/env.sh"
 count=${1:-6}
+alive Xvfb || { echo "no sandbox runs on $DISPLAY" >&2; exit 1; }
 alive heyo && { echo "Heyo is running already" >&2; exit 1; }
-HEYO_WARMUP=${HEYO_WARMUP:-6} "$HERE/heyo.sh" start > /dev/null 2>&1 || exit 1
-read -r heyo heyo_born < "$D/pids/heyo"
+"$GUI/sandbox.sh" heyo || exit 1
+heyo=$(pid heyo)
 held() {
   awk '/VmRSS|RssAnon|RssShmem/{printf "%s %d MB  ", $1, $2 / 1024}' "/proc/$heyo/status"
   awk '/^[0-9a-f]+-[0-9a-f]+ /{name=$6} /^Rss:/{if ($2 >= 28000 && name !~ /\.so|heyo$/) {n++; all = all " " int($2 / 1024)}} END{printf "| %d large:%s\n", n, all}' "/proc/$heyo/smaps"
 }
 one() {
-  "$HEYO" --open heyo:screenshot 2> /dev/null; sleep 1.5
+  heyo --open heyo:screenshot 2> /dev/null; sleep 1.5
   xdotool mousemove 1000 600 mousedown 1; sleep 0.1; xdotool mousemove 1500 900; sleep 0.1; xdotool mousemove 2200 1300; sleep 0.3; xdotool mouseup 1; sleep 0.3
   echo "$1 up, a selection made: $(held)"
   xdotool key Escape; sleep 3
   echo "$1 closed, 3 s later:    $(held)"
 }
-echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}')"
+echo "# $(date +%F), $BUILD, $(xdpyinfo | awk '/dimensions/{print $2}')"
 xdotool mousemove 300 1900
 echo "before any:                $(held)"
 for n in $(seq "$count"); do one "$n"; done
 sleep 70
 echo "70 s later:                $(held)"
 one "one more"
-"$HERE/heyo.sh" stop > /dev/null
+stop heyo > /dev/null

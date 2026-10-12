@@ -9,40 +9,41 @@
 #     they need Heyo to be restarted (pictured, to be looked at);
 #   - the palette must still answer afterwards.
 #
-#   panic.sh panic|no-start [NAME]    what was seen goes to $RESULTS/lost-NAME.txt
+#   settings-lost.sh panic|no-start [NAME]    what was seen goes to $RESULTS/lost-NAME.txt
 #
-# In the sandbox only; Heyo must not be running in it.
-. "$(dirname "$0")/lib.sh"
+# In the session that runs, or one of its own; Heyo must not be running in it.
+. "$(dirname "$0")/env.sh"
 how=${1:-panic}; name=${2:-$how}
+session_for gnome
 out=$RESULTS/lost-$name.txt
-alive heyo && { echo "Heyo is running already" >&2; exit 1; }
 windows() { for id in $(xdotool search --onlyvisible --name '^Heyo' 2>/dev/null); do printf '"%s" %s; ' "$(xdotool getwindowname "$id")" "$(place "$id" | tr ' ' ',')"; done; echo; }
 running() { if alive heyo; then echo "running"; else echo "NOT RUNNING"; fi; }
+seed > /dev/null
 {
-  echo "# $(date +%F), $(basename "$HEYO"), $how"
-  if [ "$how" = panic ]; then export HEYO_SLINT_PANIC_AFTER=6000; else export HEYO_SLINT_NO_START=1; fi
-  "$HEYO" --hidden > "$S/heyo.log" 2>&1 &
-  note heyo $!
-  sleep "${HEYO_WARMUP:-6}"
-  timeout 10 "$HEYO" --open heyo:settings
+  echo "# $(date +%F), $BUILD, $how"
+  # The panic comes nine seconds after Slint began: with the settings up.
+  if [ "$how" = panic ]; then lever=HEYO_SLINT_PANIC_AFTER=9000; else lever=HEYO_SLINT_NO_START=1; fi
+  HEYO_TEST_WARMUP=4 "$GUI/sandbox.sh" heyo "$lever" || exit 1
+  heyo --open heyo:settings > /dev/null 2>&1
   sleep 3
   echo "settings asked for: Heyo $(running); windows: $(windows)"
-  python3 -I "$HERE/shot.py" "$DISPLAY" "$RESULTS/lost-$name-1.png"
+  png "$RESULTS/lost-$name-1.png"
   if [ "$how" = panic ]; then
     sleep 6
     echo "after the panic: Heyo $(running); windows: $(windows)"
-    timeout 10 "$HEYO" --open heyo:settings
+    heyo --open heyo:settings > /dev/null 2>&1
     sleep 3
     echo "settings asked for again: Heyo $(running); windows: $(windows)"
-    python3 -I "$HERE/shot.py" "$DISPLAY" "$RESULTS/lost-$name-2.png"
+    png "$RESULTS/lost-$name-2.png"
   fi
   xdotool key Escape; sleep 1; xdotool key Escape; sleep 1
-  timeout 10 "$HEYO"
+  heyo > /dev/null 2>&1
   sleep 2
   echo "palette toggled after that: Heyo $(running); windows: $(windows)"
   xdotool key Escape; sleep 1
   echo "## what Heyo said"
-  grep -v '^ \|^$' "$S/heyo.log" | grep -i "slint\|panic\|settings" | cut -c1-200
-  finish heyo
+  grep -v '^ \|^$' "$T/app.log" | grep -i "slint\|panic\|settings" | cut -c1-200
 } > "$out" 2>&1
 cat "$out"
+stop heyo > /dev/null
+leave

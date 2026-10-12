@@ -17,43 +17,45 @@
 # - the pointer's shape over each thing;
 # - "copy text" says what it does at the bottom, and "pin" leaves a window.
 #
-# In the sandbox only (SCREEN=3840x2160 heyo.sh up gnome, GDK_SCALE 1 or 2);
-# Heyo must not be running in it.
-. "$(dirname "$0")/lib.sh"
+# In the session that runs, or one of its own (GNOME Shell, 3840x2160), at
+# the scale it publishes; Heyo must not be running in it.
+. "$(dirname "$0")/env.sh"
 name=${1:-x11}; [ $# -gt 0 ] && shift
+export SCREEN=${SCREEN:-3840x2160}
+session_for gnome
 out=$RESULTS/screenshot-tools-$name.txt
-scale=$SCALE
+scale=$(scale)
 # How long a save or a copy is given (a debug build needs longer).
 wait=${WAIT:-1.5}
-alive heyo && { echo "Heyo is running already" >&2; exit 1; }
-READ="/usr/bin/python3 -I $HERE/screen-read.py"
-png() { python3 -I "$HERE/shot.py" "$DISPLAY" "$1" ${2:+$2 $3 $4 $5}; }
+READ="/usr/bin/python3 $GUI/screen-read.py"
 overlay() { xdotool search --name '^Heyo Screenshot$' 2>/dev/null | tail -1; }
-up() { if xwininfo -id "$(overlay)" 2>/dev/null | grep -q IsViewable; then echo up; else echo gone; fi; }
+up() { if viewable "$(overlay)"; then echo up; else echo gone; fi; }
 drag() { xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $((($1 + $3) / 2)) $((($2 + $4) / 2 + 20)); sleep 0.1; xdotool mousemove "$3" "$4"; sleep 0.2; xdotool mouseup 1; sleep 0.25; }
 # The selection every case makes, in the screen's pixels, and a button of
-# its toolbar by its place in it: the toolbar is 499 logical pixels wide,
-# its right end at the selection's, 8 below it; a button every 32.
-select_it() { "$HEYO" --open heyo:screenshot; sleep 1.3; drag 1000 600 2200 1300; }
-button() {
-  case $1 in rect) i=0 ;; arrow) i=1 ;; pen) i=2 ;; text) i=3 ;; blur) i=4 ;; red) i=5 ;; yellow) i=6 ;; green) i=7 ;; blue) i=8 ;; undo) i=9 ;; ocr) i=10 ;; pin) i=11 ;; save) i=12 ;; copy) i=13 ;; cancel) i=14 ;; esac
-  # After the separator the buttons are 11 further on.
-  [ "$i" -ge 10 ] && extra=11 || extra=0
-  bx=$(((2200 / scale - 499 + 20 + 32 * i + extra) * scale)); by=$(((1300 / scale + 28) * scale))
-}
+# its toolbar by its name (rect arrow pen text blur red yellow green blue
+# undo ocr pin save copy cancel): where it is, is layout.py's to say.
+select_it() { heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3; drag 1000 600 2200 1300; }
+button() { set -- $(toolbar "$1" 2200 1300); bx=$1; by=$2; }
 B() { button "$1"; xdotool mousemove "$bx" "$by"; sleep 0.15; xdotool click 1; sleep 0.25; }
 at() { xdotool mousemove "$1" "$2"; sleep 0.25; echo "the pointer $3: $($READ cursor)"; }
 saved() { ls -t "$HOME/Pictures/Screenshots/"*.png 2>/dev/null | head -1; }
 {
-  echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"
-  HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start "$@" > /dev/null || exit 1
+  echo "# $(date +%F), $BUILD, $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"
+  HEYO_TEST_WARMUP=${HEYO_TEST_WARMUP:-4} "$GUI/sandbox.sh" heyo "$@" || exit 1
   rm -rf "$HOME/Pictures/Screenshots"
+  # What is copied and saved is compared with the screen: the Shell's
+  # banner saying so is kept off it.
+  banners off
   # A window of another program, to be selected by a click.
-  zenity --info --title "A window" --text "A window to select" --width 600 --height 300 > /dev/null 2>&1 &
-  note window $!
+  start_as window zenity --info --title "A window" --text "A window to select" --width 600 --height 300 > /dev/null 2>&1
   sleep 1.5
+  # Clear of the selection the other cases make, at any scale: its button
+  # is drawn differently from one moment to the next, and would be in
+  # what is compared with the screen.
+  xdotool search --name '^A window$' | tail -1 | xargs -I{} xdotool windowmove {} 2330 1400
+  sleep 0.5
   xdotool mousemove 300 1900; sleep 0.4
-  png "$S/tools-before.png"
+  png "$T/tools-before.png"
 
   echo "## each tool"
   select_it
@@ -74,8 +76,8 @@ saved() { ls -t "$HOME/Pictures/Screenshots/"*.png 2>/dev/null | head -1; }
   echo "## saved with all of it drawn"
   xdotool key ctrl+s; sleep "$wait"
   echo "the overlay is $(up); saved: $(basename "$(saved)")"
-  cp "$(saved)" "$S/tools-drawn.png"
-  /usr/bin/python3 -I - "$S/tools-before.png" "$S/tools-drawn.png" <<'PY'
+  cp "$(saved)" "$T/tools-drawn.png"
+  /usr/bin/python3 - "$T/tools-before.png" "$T/tools-drawn.png" <<'PY'
 import sys
 from PIL import Image, ImageChops
 before, drawn = Image.open(sys.argv[1]).convert("RGB").crop((1000, 600, 2200, 1300)), Image.open(sys.argv[2]).convert("RGB")
@@ -103,7 +105,7 @@ PY
   xdotool key ctrl+z; sleep 0.2; B undo
   xdotool mousemove 300 1900; sleep 0.2
   xdotool key ctrl+s; sleep "$wait"
-  /usr/bin/python3 -I - "$S/tools-before.png" "$(saved)" <<'PY'
+  /usr/bin/python3 - "$T/tools-before.png" "$(saved)" <<'PY'
 import sys
 from PIL import Image
 before, drawn = Image.open(sys.argv[1]).convert("RGB").crop((1000, 600, 2200, 1300)), Image.open(sys.argv[2]).convert("RGB")
@@ -119,8 +121,8 @@ PY
   # An arrow from inside the selection to outside it.
   B arrow; drag 2000 1000 2400 1000
   xdotool mousemove 300 1900; sleep 0.3
-  png "$S/tools-moved.png"
-  /usr/bin/python3 -I - "$S/tools-before.png" "$S/tools-moved.png" <<'PY'
+  png "$T/tools-moved.png"
+  /usr/bin/python3 - "$T/tools-before.png" "$T/tools-moved.png" <<'PY'
 import sys
 from PIL import Image
 before, screen = (Image.open(path).convert("RGB") for path in sys.argv[1:3])
@@ -137,21 +139,21 @@ PY
   select_it
   xdotool mousemove 300 1900; sleep 0.2
   xdotool key ctrl+s; sleep "$wait"
-  echo "the overlay is $(up); the file against the desktop there: $($READ same "$S/tools-before.png" "$(saved)" 1000 600 1200 700)"
+  echo "the overlay is $(up); the file against the desktop there: $($READ same "$T/tools-before.png" "$(saved)" 1000 600 1200 700)"
 
   echo "## copied with Enter"
   select_it
   xdotool mousemove 300 1900; sleep 0.2
   xdotool key Return; sleep "$wait"
-  echo "the overlay is $(up); on the clipboard: $($READ clipboard "$S/tools-copied.png")"
-  echo "the clipboard's picture against the desktop there: $($READ same "$S/tools-before.png" "$S/tools-copied.png" 1000 600 1200 700)"
+  echo "the overlay is $(up); on the clipboard: $($READ clipboard "$T/tools-copied.png")"
+  echo "the clipboard's picture against the desktop there: $($READ same "$T/tools-before.png" "$T/tools-copied.png" 1000 600 1200 700)"
 
   echo "## copied with the button, something drawn on it"
   select_it
   B rect; drag 1100 700 1400 900
   B copy; sleep "$wait"
-  echo "the overlay is $(up); on the clipboard: $($READ clipboard "$S/tools-copied-drawn.png")"
-  /usr/bin/python3 -I -c 'import sys; from PIL import Image; print("the rectangle is in it:", Image.open(sys.argv[1]).convert("RGB").getpixel((100, 200)) == (255, 69, 58))' "$S/tools-copied-drawn.png"
+  echo "the overlay is $(up); on the clipboard: $($READ clipboard "$T/tools-copied-drawn.png")"
+  /usr/bin/python3 -c 'import sys; from PIL import Image; print("the rectangle is in it:", Image.open(sys.argv[1]).convert("RGB").getpixel((100, 200)) == (255, 69, 58))' "$T/tools-copied-drawn.png"
 
   echo "## a click on a window"
   win=$(xdotool search --name '^A window$' | tail -1)
@@ -159,17 +161,17 @@ PY
   # What is seen of it: its frame without the shadow's margin.
   set -- $(xprop -id "$win" _GTK_FRAME_EXTENTS | awk -F'[=,]' -v x="$1" -v y="$2" -v w="$3" -v h="$4" '{print x + $2, y + $4, w - $2 - $3, h - $4 - $5}')
   echo "the window is $3 x $4 at $1,$2"
-  "$HEYO" --open heyo:screenshot; sleep 1.3
+  heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3
   xdotool mousemove $(($1 + $3 / 2)) $(($2 + $4 / 2)); sleep 0.4
   png "$RESULTS/screenshot-tools-$name-window.png" 0 0 $(($1 + $3 + 300)) $(($2 + $4 + 200))
   xdotool click 1; sleep 0.4
   xdotool mousemove 300 1900; sleep 0.2
   xdotool key Return; sleep "$wait"
-  echo "on the clipboard: $($READ clipboard "$S/tools-window.png")"
-  echo "against the desktop where the window is: $($READ same "$S/tools-before.png" "$S/tools-window.png" "$1" "$2" "$3" "$4")"
+  echo "on the clipboard: $($READ clipboard "$T/tools-window.png")"
+  echo "against the desktop where the window is: $($READ same "$T/tools-before.png" "$T/tools-window.png" "$1" "$2" "$3" "$4")"
 
   echo "## the pointer's shape"
-  "$HEYO" --open heyo:screenshot; sleep 1.3
+  heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3
   at 300 1900 "with nothing selected"
   drag 1000 600 2200 1300
   at 1500 900 "in the selection"
@@ -177,7 +179,8 @@ PY
   at 1600 600 "on its top handle"
   at 2200 600 "on its top right handle"
   at 2200 950 "on its right handle"
-  button undo; at $((bx + 21 * scale)) "$by" "on the toolbar, between buttons"
+  # Half way from undo to the button after the separator.
+  button undo; undo=$bx; button ocr; at $(((undo + bx) / 2)) "$by" "on the toolbar, between buttons"
   button rect; at "$bx" "$by" "on a button"
   at 500 500 "outside the selection"
   B rect
@@ -196,7 +199,7 @@ PY
   select_it
   xdotool mousemove 1500 900 click 3; sleep 0.4
   echo "in the selection: the overlay is $(up)"
-  "$HEYO" --open heyo:screenshot; sleep 1.3
+  heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3
   xdotool mousemove 500 500 click 3; sleep 0.4
   echo "with nothing selected: $(up)"
   select_it
@@ -213,7 +216,7 @@ PY
   xdotool key Escape; sleep 0.4
 
   echo "## asked for as \"copy text from the screen\""
-  "$HEYO" --open heyo:screenshot-text; sleep 1.3
+  heyo --open heyo:screenshot-text > /dev/null 2>&1; sleep 1.3
   png "$RESULTS/screenshot-tools-$name-text-hint.png" $((1920 - 250 * scale)) $((1080 - 30 * scale)) $((500 * scale)) $((60 * scale))
   drag 1000 600 2200 1300
   sleep 4
@@ -226,7 +229,8 @@ PY
   B pin; sleep "$wait"
   pinned=$(xdotool search --name '^Heyo Pinned Screenshot$' | tail -1)
   echo "the overlay is $(up); the pinned window: $(place "$pinned")"
-  grep -E "heyo: (screenshot failed|the annotations|panicked|the screenshot overlay)" "$S/heyo.log"
-  finish window > /dev/null
-  "$HERE/heyo.sh" stop > /dev/null
+  grep -E "heyo: (screenshot failed|the annotations|panicked|the screenshot overlay)" "$T/app.log"
+  banners on
+  stop window heyo > /dev/null
 } 2>&1 | tee "$out"
+leave

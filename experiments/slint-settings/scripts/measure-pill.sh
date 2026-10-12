@@ -4,7 +4,7 @@
 #
 #   measure-pill.sh NAME [RUNS] [VAR=value…]     appends to $RESULTS/pill.tsv
 #
-# Heyo (the build $HEYO) is started hidden in the sandbox, with spoken
+# Heyo (the build under test) is started hidden in the sandbox, with spoken
 # sentences in place of a microphone (scripts/gui-test/say.py) and the
 # speech engine installed for the Heyo of whoever runs this (read, never
 # written). Then, RUNS times (five unless said): a recording is asked for
@@ -22,31 +22,33 @@
 # page counted by the share of it they have (Pss), and Heyo's own resident
 # memory: after it has started and before any recording, and after the last.
 #
-# The screen must be 1920x1080 at scale 1 (heyo.sh up, GDK_SCALE=1).
-. "$(dirname "$0")/lib.sh"
+# In the sandbox of scripts/gui-test, in a session that runs: the screen
+# must be 1920x1080 at scale 1 (scripts/gui-test/sandbox.sh session gnome).
+# It stays here, with what it measured (../results/pill.tsv): it is the
+# record of how the pill was chosen, not a trial of Heyo.
+GUI=$(cd "$(dirname "$0")/../../../scripts/gui-test" && pwd)
+. "$GUI/env.sh"
+RESULTS=${HEYO_TEST_RESULTS:-$REPO/experiments/slint-settings/results}
 name=$1; runs=${2:-5}
 shift; [ $# -gt 0 ] && shift
-WATCH=${WATCH:-$W/experiments/overlay-bench/target/release/overlay-bench}
+WATCH=${WATCH:-$REPO/experiments/overlay-bench/target/release/overlay-bench}
 [ -x "$WATCH" ] || { echo "no $WATCH: name the watching program with WATCH" >&2; exit 1; }
+alive Xvfb || { echo "no sandbox runs on $DISPLAY" >&2; exit 1; }
 alive heyo && { echo "Heyo is running already" >&2; exit 1; }
 out=$RESULTS/pill.tsv
 [ -f "$out" ] || printf 'name\trun\tbegins_ms\tthere_ms\tpss_idle_mb\trss_idle_mb\tthreads_idle\tpss_after_mb\trss_after_mb\n' > "$out"
 
-mkdir -p "$XDG_DATA_HOME/heyo"
-ln -sfn "$(getent passwd "$(id -u)" | cut -d: -f6)/.local/share/heyo/dictation" "$XDG_DATA_HOME/heyo/dictation"
-"$HERE/heyo.sh" seed dictationLive=false dictationPolish=off dictationLanguage=en > /dev/null
-/usr/bin/python3 "$W/scripts/gui-test/say.py" "$D/spoken.wav" "The weather is nice today, so let us walk to the park." > /dev/null || exit 1
-export HEYO_DICTATION_WAV="$D/spoken.wav"
-for assignment in "$@"; do export "$assignment"; done
-"$HEYO" --hidden > "$S/heyo.log" 2>&1 &
-note heyo $!
-heyo=$(cut -d' ' -f1 "$D/pids/heyo")
-sleep "${HEYO_WARMUP:-10}"
+speech
+seed dictationLive=false dictationPolish=off dictationLanguage=en > /dev/null
+/usr/bin/python3 "$GUI/say.py" "$T/spoken.wav" "The weather is nice today, so let us walk to the park." > /dev/null || exit 1
+export HEYO_DICTATION_WAV="$T/spoken.wav"
+HEYO_TEST_WARMUP=${HEYO_TEST_WARMUP:-10} "$GUI/sandbox.sh" heyo "$@" || exit 1
+heyo=$(pid heyo)
 
 pss() {
   total=0
-  for pid in $heyo $(family "$heyo" | cut -d: -f1); do
-    part=$(awk '/^Pss:/ {print $2}' "/proc/$pid/smaps_rollup" 2>/dev/null)
+  for member in $(python3 "$GUI/ledger.py" family heyo); do
+    part=$(awk '/^Pss:/ {print $2}' "/proc/$member/smaps_rollup" 2>/dev/null)
     total=$((total + ${part:-0}))
   done
   awk -v kb="$total" 'BEGIN { printf "%.1f", kb / 1024 }'
@@ -59,22 +61,22 @@ set -- $(xdotool getdisplaygeometry)
 PX=$(($1 / 2)); PY=$(($2 - 44 - $2 / 10 + 7 + 2)); MY=$(($2 - 44 - $2 / 10 + 22))
 idle_pss=$(pss); idle_rss=$(rss); idle_threads=$(ls "/proc/$heyo/task" | wc -l)
 for run in $(seq "$runs"); do
-  "$WATCH" --watch "$PX,$MY:$PX,$PY" 5 > "$S/watch.log" 2>/dev/null &
-  watcher=$!; note watch $watcher
+  start_as watch "$WATCH" --watch "$PX,$MY:$PX,$PY" 5 > "$T/watch.log" 2>/dev/null
+  watcher=$STARTED
   sleep 1
   asked=$(now)
-  timeout 10 "$HEYO" --dictate
+  heyo --dictate
   sleep 2.5
-  timeout 10 "$HEYO" --dictate
-  wait "$watcher" 2>/dev/null; rm -f "$D/pids/watch"
+  heyo --dictate
+  wait "$watcher" 2>/dev/null
   # What the pixel was before it was asked for is the desktop's.
-  begins=$(awk -v t="$asked" '$2 != 0 { next } $1 < t { r = $3; g = $4; b = $5 } $1 >= t && (($3 - r) ^ 2 + ($4 - g) ^ 2 + ($5 - b) ^ 2 > 144) { print $1 - t; exit }' "$S/watch.log")
-  there=$(awk -v t="$asked" '$2 == 1 && $1 >= t && $3 < 40 && $4 < 40 && $5 < 40 { print $1 - t; exit }' "$S/watch.log")
-  cp "$S/watch.log" "$S/watch-pill-$name-$run.log"
+  begins=$(awk -v t="$asked" '$2 != 0 { next } $1 < t { r = $3; g = $4; b = $5 } $1 >= t && (($3 - r) ^ 2 + ($4 - g) ^ 2 + ($5 - b) ^ 2 > 144) { print $1 - t; exit }' "$T/watch.log")
+  there=$(awk -v t="$asked" '$2 == 1 && $1 >= t && $3 < 40 && $4 < 40 && $5 < 40 { print $1 - t; exit }' "$T/watch.log")
+  cp "$T/watch.log" "$T/watch-pill-$name-$run.log"
   sleep 4
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\n' "$name" "$run" "${begins:--}" "${there:--}" "$idle_pss" "$idle_rss" "$idle_threads" >> "$out"
 done
 printf '%s\tafter\t\t\t\t\t\t%s\t%s\n' "$name" "$(pss)" "$(rss)" >> "$out"
-grep -i "slint\|dictation window" "$S/heyo.log" | cut -c1-160
-finish heyo
+grep -i "slint\|dictation window" "$T/app.log" | cut -c1-160
+stop heyo watch > /dev/null
 tail -n "$((runs + 1))" "$out"

@@ -1,16 +1,18 @@
 """How large the screenshot's toolbar is drawn.
 
-    toolbar.py PNG X Y SCALE
+    toolbar.py PNG X Y
 
 X, Y is a place inside it in the picture of the screen, in its padding. It
-is measured as far as its own colour goes from there, across and down.
+is measured as far as its own colour goes from there, across and down:
+prints the two, in the picture's pixels. Across is the toolbar's width but
+for its round corners; down is as far as the next button.
 """
 import sys
 
 from PIL import Image
 
 picture = Image.open(sys.argv[1]).convert("RGB")
-x, y, scale = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+x, y = int(sys.argv[2]), int(sys.argv[3])
 own = picture.getpixel((x, y))
 
 
@@ -28,4 +30,4 @@ while top > 0 and alike((x, top - 1)):
     top -= 1
 while bottom < picture.height - 1 and alike((x, bottom + 1)):
     bottom += 1
-print(f"  toolbar: {right - left + 1} px across where it was measured (499 logical is {499 * scale} at its widest), {bottom - top + 1} px down to the next button")
+print(right - left + 1, bottom - top + 1)

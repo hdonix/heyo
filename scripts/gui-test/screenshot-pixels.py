@@ -1,26 +1,34 @@
 #!/usr/bin/env python3
 """Checks the overlay's pixels against the desktop it froze.
 
-    screenshot-pixels.py BEFORE.png SELECTED.png X Y W H
+    screenshot-pixels.py BEFORE.png SELECTED.png X Y W H [SCALE]
 
 BEFORE is the screen before the screenshot was asked for, SELECTED the
 screen with the overlay up and X Y W H selected (handles, outline and label
 round it, the toolbar below its right end). Inside the selection every
 pixel must be the desktop's; outside it, away from what the overlay draws
 round the selection, every pixel must be the desktop's dimmed to 154 of
-256, rounded down. Where the toolbar is, and its shadow falls (40 px round
-it, a little of that on the selection), is not looked at.
+256, rounded down. Where the toolbar is (layout.py), and its shadow falls
+(40 logical pixels round it, a little of that on the selection), is not
+looked at.
 """
+import os
 import sys
 
 from PIL import Image, ImageChops
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import layout  # noqa: E402
+
 before = Image.open(sys.argv[1]).convert("RGB")
 shown = Image.open(sys.argv[2]).convert("RGB")
 x, y, w, h = map(int, sys.argv[3:7])
+scale = int(sys.argv[7]) if len(sys.argv) > 7 else 1
 assert before.size == shown.size, (before.size, shown.size)
-# The toolbar, 499 by 40 at scale 1, 8 below the selection's right end, and its shadow.
-toolbar = (x + w - 499 - 40, y + h - 32, x + w + 40, y + h + 8 + 40 + 48)
+left, top, width, height = layout.toolbar_box(x + w, y + h, scale)
+shadow = layout.TOOLBAR_SHADOW * scale
+# Its shadow is cast 8 down.
+toolbar = (left - shadow, top - shadow, left + width + shadow, top + height + shadow + 8 * scale)
 for picture in (before, shown):
     picture.paste((0, 0, 0), toolbar)
 
@@ -33,20 +41,22 @@ def differing(a, b):
     return count, worst
 
 
-# Inside, away from the handles on the edge (they reach 5 px in).
-inside = (x + 6, y + 6, x + w - 6, y + h - 6)
+# Inside, away from the handles on the edge (they reach 5 logical pixels in).
+edge = 6 * scale
+inside = (x + edge, y + edge, x + w - edge, y + h - edge)
 count, worst = differing(before.crop(inside), shown.crop(inside))
-print(f"inside the selection: {count} of {(w - 12) * (h - 12)} pixels differ from the desktop (by {worst} at most)")
+print(f"inside the selection: {count} of {(w - 2 * edge) * (h - 2 * edge)} pixels differ from the desktop (by {worst} at most)")
 failed = count > 0
 dimmed = before.point(lambda value: value * 154 // 256)
-# Outside: four bands that keep 30 px away from the selection (outline,
-# handles, the size label above it).
+# Outside: four bands that keep 30 logical pixels away from the selection
+# (outline, handles, the size label above it).
+away = 30 * scale
 width, height = before.size
 bands = {
-    "above": (0, 0, width, max(0, y - 30)),
-    "below": (0, min(height, y + h + 30), width, height),
-    "left": (0, max(0, y - 30), max(0, x - 30), min(height, y + h + 30)),
-    "right": (min(width, x + w + 30), max(0, y - 30), width, min(height, y + h + 30)),
+    "above": (0, 0, width, max(0, y - away)),
+    "below": (0, min(height, y + h + away), width, height),
+    "left": (0, max(0, y - away), max(0, x - away), min(height, y + h + away)),
+    "right": (min(width, x + w + away), max(0, y - away), width, min(height, y + h + away)),
 }
 for name, box in bands.items():
     if box[2] <= box[0] or box[3] <= box[1]:
