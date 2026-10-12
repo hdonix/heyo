@@ -1,8 +1,12 @@
 #!/bin/sh
-# Fetches llvm-mingw, the compiler Heyo is built for Windows with from
-# Linux, into $LLVM_MINGW (default ~/.local/share/llvm-mingw) unless it is
-# there. The release and what its archive must hash to are written here;
-# an archive that hashes differently is not unpacked.
+# Fetches llvm-mingw into $LLVM_MINGW (default ~/.local/share/llvm-mingw)
+# unless it is there: a clang and an lld that compile and link for other
+# systems and processors than this machine's, built to run on Ubuntu 22.04
+# and newer. build.sh compiles Heyo with them for Windows (with Microsoft's
+# headers and libraries, which winsdk.sh fetches) and for Linux on the
+# other processor (with that one's libraries, which sysroot.sh lays out).
+# The release and what its archive must hash to are written here; an
+# archive that hashes differently is not unpacked.
 set -eu
 RELEASE=20261006
 case "$(uname -m)" in
@@ -11,7 +15,7 @@ case "$(uname -m)" in
   *) echo "no llvm-mingw is pinned for $(uname -m)" >&2; exit 1 ;;
 esac
 MINGW=${LLVM_MINGW:-$HOME/.local/share/llvm-mingw}
-if [ -x "$MINGW/bin/x86_64-w64-mingw32-clang" ]; then
+if [ -x "$MINGW/bin/clang" ] && [ -x "$MINGW/bin/lld-link" ]; then
   echo "llvm-mingw is in $MINGW"
   exit 0
 fi

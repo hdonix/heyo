@@ -155,7 +155,6 @@ Windows yet; watch the log for `push-to-talk:` lines.)
 
 ## Compile warnings
 
-- [ ] None of this needs the machine: `cargo check --target
-      aarch64-pc-windows-gnullvm` reports two, both in `src/clipboard.rs`
-      (`private`: its arguments are unused where there are no Unix
-      permissions).
+- [ ] None of this needs the machine: the build for Windows
+      (`scripts/package/build.sh aarch64-pc-windows-msvc`) reports none in
+      Heyo's own code.

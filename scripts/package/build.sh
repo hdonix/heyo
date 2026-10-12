@@ -2,7 +2,7 @@
 # Compiles Heyo for each target named, from this machine, without making a
 # package of it (bundle.sh does that, and need not run where this did):
 #
-#   scripts/package/build.sh x86_64-unknown-linux-gnu aarch64-pc-windows-gnullvm …
+#   scripts/package/build.sh x86_64-unknown-linux-gnu aarch64-pc-windows-msvc …
 #
 # All in one target directory, so that what is compiled for the building
 # machine itself (build scripts, macros) is compiled once for all of them.
@@ -10,7 +10,12 @@
 #
 # Needs each target's standard library (rustup target add <target>) and:
 #
-#   *-pc-windows-gnullvm   llvm-mingw in $LLVM_MINGW (toolchain.sh fetches it)
+#   *-pc-windows-msvc      llvm-mingw in $LLVM_MINGW (toolchain.sh fetches
+#                          it): its clang compiles as Microsoft's compiler
+#                          does when it is called clang-cl, and its lld
+#                          links as Microsoft's linker does. And Microsoft's
+#                          own headers and libraries for Windows, which no
+#                          compiler brings (winsdk.sh fetches them)
 #   *-unknown-linux-gnu    for another processor than this machine's: that
 #                          architecture's libraries in a sysroot (sysroot.sh
 #                          lays one out), and llvm-mingw again, whose clang
@@ -34,10 +39,23 @@ for TARGET in "$@"; do
   UPPER=$(echo "$VAR" | tr a-z A-Z)
   (
     case "$TARGET" in
-      *-pc-windows-gnullvm)
-        export PATH="$MINGW/bin:$PATH"
-        export "CARGO_TARGET_${UPPER}_LINKER=$ARCH-w64-mingw32-clang"
-        export "CC_$VAR=$ARCH-w64-mingw32-clang" "CXX_$VAR=$ARCH-w64-mingw32-clang++" "AR_$VAR=llvm-ar"
+      *-pc-windows-msvc)
+        SDK=${HEYO_WINSDK:-${XDG_CACHE_HOME:-$HOME/.cache}/heyo-build/xwin}/splat
+        [ -f "$SDK/.complete" ] || { echo "$0: Microsoft's headers and libraries are not in $SDK: run scripts/package/winsdk.sh" >&2; exit 1; }
+        # clang reads its command line as Microsoft's compiler does only
+        # when it is called clang-cl, a name llvm-mingw has no file of; and
+        # what compiles the program's icon into it looks for llvm-rc on PATH.
+        TOOLS=$REPO/src-tauri/target/cross/msvc
+        mkdir -p "$TOOLS"
+        ln -sfn "$MINGW/bin/clang" "$TOOLS/clang-cl"
+        for tool in lld-link llvm-lib llvm-rc; do ln -sfn "$MINGW/bin/$tool" "$TOOLS/$tool"; done
+        export PATH="$TOOLS:$PATH"
+        INCLUDES="/imsvc$SDK/crt/include /imsvc$SDK/sdk/include/ucrt /imsvc$SDK/sdk/include/um /imsvc$SDK/sdk/include/shared"
+        export "CC_$VAR=clang-cl" "CXX_$VAR=clang-cl" "AR_$VAR=llvm-lib"
+        export "CFLAGS_$VAR=--target=$TARGET -Wno-unused-command-line-argument -fuse-ld=lld-link $INCLUDES"
+        export "CXXFLAGS_$VAR=--target=$TARGET -Wno-unused-command-line-argument -fuse-ld=lld-link $INCLUDES"
+        export "CARGO_TARGET_${UPPER}_LINKER=lld-link"
+        export "CARGO_TARGET_${UPPER}_RUSTFLAGS=-Lnative=$SDK/crt/lib/$ARCH -Lnative=$SDK/sdk/lib/um/$ARCH -Lnative=$SDK/sdk/lib/ucrt/$ARCH"
         ;;
       *-unknown-linux-gnu)
         if [ "$ARCH" != "${HOST%%-*}" ]; then
@@ -67,10 +85,4 @@ for TARGET in "$@"; do
     esac
     pnpm tauri build --no-bundle --target "$TARGET" ${FEATURES:+--features "$FEATURES"} --config '{"build":{"beforeBuildCommand":""}}'
   )
-  case "$TARGET" in
-    # What heyo.exe built this way needs beside it, besides WebView2Loader.dll
-    # which the build leaves there. Replaced rather than written over: a
-    # test machine may be running the last build.
-    *-pc-windows-gnullvm) cp --remove-destination "$MINGW/$ARCH-w64-mingw32/bin/libunwind.dll" "src-tauri/target/$TARGET/release/" ;;
-  esac
 done
