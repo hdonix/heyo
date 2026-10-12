@@ -40,6 +40,7 @@ pub(super) enum Kind {
     Settings,
     Pill,
     Screenshot,
+    Pinned,
 }
 
 thread_local! {
@@ -146,6 +147,7 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
                 Kind::Settings => attributes,
                 Kind::Pill => super::pill::native::attributes(attributes),
                 Kind::Screenshot => super::screenshot::native::attributes(attributes),
+                Kind::Pinned => super::screenshot::native::pinned(attributes),
             }
         });
         let selector = if super::window::frames::wanted().is_some() { selector.with_winit_custom_application_handler(super::window::frames::Timing) } else { selector };

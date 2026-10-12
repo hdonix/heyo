@@ -553,6 +553,16 @@ async fn complete(app: AppHandle, action: &str, selected: Selected, place: Place
             notify("Screenshot saved", &path.to_string_lossy());
             Ok(path.to_string_lossy().into_owned())
         }
+        "pin" if drawn_by_slint() => {
+            let picture = selected.pixels()?;
+            close_overlay(&app);
+            // Exactly where it was captured.
+            let at = ((place.x * place.scale).round() as i32, (place.y * place.scale).round() as i32);
+            if !crate::slint_windows::screenshot::pin::show(&app, picture, at, crate::settings::Settings::load().dark()) {
+                return Err(format!("the capture cannot be pinned: {}", crate::slint_windows::failure()));
+            }
+            Ok(String::new())
+        }
         "pin" => {
             let n = COUNTER.fetch_add(1, Ordering::Relaxed);
             let path = cache_dir().join(format!("pin-{n}.png"));

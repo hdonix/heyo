@@ -40,6 +40,26 @@ pub(in super::super) fn attributes(attributes: WindowAttributes) -> WindowAttrib
     attributes.with_transparent(false)
 }
 
+/// What winit is told of a pinned capture's window before it makes it:
+/// one that is kept out of a taskbar. (That it is above the others, and
+/// has no frame, the markup says.)
+#[cfg(target_os = "linux")]
+pub(in super::super) fn pinned(attributes: WindowAttributes) -> WindowAttributes {
+    use slint::winit_030::winit::platform::x11::{WindowAttributesExtX11, WindowType};
+    attributes.with_x11_window_type(vec![WindowType::Utility]).with_transparent(false)
+}
+
+#[cfg(windows)]
+pub(in super::super) fn pinned(attributes: WindowAttributes) -> WindowAttributes {
+    use slint::winit_030::winit::platform::windows::WindowAttributesExtWindows;
+    attributes.with_skip_taskbar(true).with_transparent(false)
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
+pub(in super::super) fn pinned(attributes: WindowAttributes) -> WindowAttributes {
+    attributes.with_transparent(false)
+}
+
 /// The window on winit's own connection to the X server.
 #[cfg(target_os = "linux")]
 struct OnX11 {

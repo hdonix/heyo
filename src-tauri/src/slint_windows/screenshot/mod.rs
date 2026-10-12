@@ -6,6 +6,7 @@
 //! - `native` is what a desktop is told for the window to cover a monitor
 //!   and have every key.
 //! - `marks` is what is drawn on the capture, as the markup is given it.
+//! - `pin` is a capture kept on the screen in a window of its own.
 //! - This file is the window: made ahead, put over the monitor that was
 //!   read, told of the pointer and the keys by winit (not by Slint's own
 //!   elements: no element can then stand between a key and the overlay),
@@ -26,6 +27,7 @@
 
 mod marks;
 pub(super) mod native;
+pub(crate) mod pin;
 
 use std::cell::RefCell;
 use std::rc::Rc;

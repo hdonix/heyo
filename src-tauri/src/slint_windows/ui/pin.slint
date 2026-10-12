@@ -1,0 +1,37 @@
+// A pinned capture: part of a screenshot kept on the screen in a window of
+// its own, a pixel of it a pixel of the screen, with a thin edge in the
+// accent. The window is moved and closed by the pointer and the keys,
+// which it hears of in Rust (`screenshot/pin.rs`).
+
+import { Tokens } from "tokens.slint";
+
+export component PinWindow inherits Window {
+    in property <image> picture;
+    in property <bool> dark;
+    title: "Heyo Pinned Screenshot";
+    no-frame: true;
+    always-on-top: true;
+    background: Tokens.bg-solid;
+    init => {
+        Tokens.dark = self.dark;
+    }
+    changed dark => {
+        Tokens.dark = self.dark;
+    }
+    Image {
+        x: 0;
+        y: 0;
+        width: root.picture.width * 1phx;
+        height: root.picture.height * 1phx;
+        source: root.picture;
+    }
+
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        border-width: 1px;
+        border-color: Tokens.accent.with-alpha(0.7);
+    }
+}
