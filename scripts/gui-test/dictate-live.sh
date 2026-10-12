@@ -96,7 +96,7 @@ PY
 }
 # notes [none]: the field to dictate into; "none" for one that takes no input method.
 notes() {
-  (WINDOW_INPUT_METHOD=$1 /usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes "Notes: " >/dev/null 2>&1 &); w 2
+  start env WINDOW_INPUT_METHOD="$1" /usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes "Notes: " >/dev/null 2>&1; w 2
   front '^Notes$'
 }
 front() { xdotool search --name "$1" | tail -1 | xargs xdotool windowactivate; w 1; }
@@ -150,16 +150,36 @@ def talk_key():
     return next(line.split()[1] for line in run("xmodmap", "-pke").splitlines() if line.split()[3:4] == ["Alt_R"])
 held = hotkey if begun == "hold" else talk_key() if begun == "talk" else None
 def kill():
-    """The sandbox's Heyo, as nothing it could prepare for: its display says which it is."""
-    display = os.environ["DISPLAY"].encode()
-    for pid in filter(str.isdigit, os.listdir("/proc")):
+    """The sandbox's Heyo, as nothing it could prepare for: the one written
+    down when it was started ($HEYO_TEST_DIR/pids, env.sh's `start`). What
+    it had started itself is written down first: with Heyo gone, nothing
+    would say afterwards that those are the sandbox's, for down.py to end."""
+    ledger = os.path.join(os.environ["HEYO_TEST_DIR"], "pids")
+    def born(pid):
         try:
-            args = open(f"/proc/{pid}/cmdline", "rb").read().split(b"\0")
-            inside = b"DISPLAY=" + display + b"\0" in open(f"/proc/{pid}/environ", "rb").read() + b"\0"
+            return open(f"/proc/{pid}/stat").read().rsplit(") ", 1)[1].split()[19]
         except OSError:
-            continue
-        if inside and os.path.basename(args[0]) == b"heyo" and b"--hidden" in args:
-            os.kill(int(pid), signal.SIGKILL)
+            return None
+    def parent(pid):
+        try:
+            return open(f"/proc/{pid}/stat").read().rsplit(") ", 1)[1].split()[1]
+        except OSError:
+            return None
+    heyo = None
+    for line in open(ledger).read().splitlines():
+        pid, started, what = line.split(" ", 2)
+        if what == "heyo" and born(pid) == started:
+            heyo = pid
+    if heyo is None:
+        return
+    family, found = [heyo], True
+    while found:
+        found = [pid for pid in filter(str.isdigit, os.listdir("/proc")) if pid not in family and parent(pid) in family]
+        family += found
+    with open(ledger, "a") as file:
+        for pid in family[1:]:
+            file.write(f"{pid} {born(pid)} started-by-heyo\n")
+    os.kill(int(heyo), signal.SIGKILL)
 # The field as it is before every recording: some text of the user's own.
 # (Not typed: that would go through the user's input method.)
 if not terminal:
@@ -223,7 +243,7 @@ if [ "$HALF" != composed ]; then
   python3 "$HERE/down.py" > /dev/null
 
   configure on clean; "$HERE/up.sh"; notes
-  (python3 "$HERE/llm-stub.py" "$PORT" &); w 1
+  start python3 "$HERE/llm-stub.py" "$PORT"; w 1
   record live-polished
   grep "heyo: dictation" "$T/app.log" | tail -3 | cut -c1-160
   python3 "$HERE/down.py" > /dev/null
@@ -247,9 +267,9 @@ session() {
   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K command "$REPO/src-tauri/target/$BUILD/heyo --dictate"
   gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$K binding '<Control><Alt><Shift>F9'
   # It takes its shortcuts a while after it starts, longer on a busy machine.
-  (/usr/libexec/gsd-media-keys > "$T/media-keys.log" 2>&1 &); w 8
+  start /usr/libexec/gsd-media-keys > "$T/media-keys.log" 2>&1; w 8
   /usr/bin/python3 "$HERE/clip.py" "the user's own"; w 1.5
-  (/usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Other org.test.Other >/dev/null 2>&1 &); w 2
+  start /usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Other org.test.Other >/dev/null 2>&1; w 2
   notes
 }
 # leave: the sandbox as the scripts after this one expect it, with no input
@@ -291,7 +311,7 @@ elif command -v gnome-shell > /dev/null && [ -f /usr/share/ibus/component/libpin
     record composed-cancelled 8.6 cancel
   fi
   if command -v gnome-terminal > /dev/null; then
-    (gnome-terminal --title=ProbeTerm -- "$HERE/term-sink.sh" "$T/term.txt" >/dev/null 2>&1 &); w 4
+    start gnome-terminal --title=ProbeTerm -- "$HERE/term-sink.sh" "$T/term.txt" >/dev/null 2>&1; w 4
     front ProbeTerm
     record composed-terminal 0 '' cli "$T/term.txt"
     xdotool search --name ProbeTerm | tail -1 | xargs xdotool windowclose; w 1
@@ -313,7 +333,7 @@ elif command -v gnome-shell > /dev/null && [ -f /usr/share/ibus/component/libpin
   # Heyo is killed while it composes, and started again.
   record composed-killed 3.2 kill
   LEFT=$(engine)
-  ("$REPO/src-tauri/target/$BUILD/heyo" --hidden >> "$T/app.log" 2>&1 &)
+  start "$REPO/src-tauri/target/$BUILD/heyo" --hidden >> "$T/app.log" 2>&1
   BACK=$(python3 - "$ENGINE" <<'PY'
 import subprocess, sys, time
 start = time.time()
@@ -335,7 +355,7 @@ PY
   leave
 
   configure on clean; session
-  (python3 "$HERE/llm-stub.py" "$PORT" &); w 1
+  start python3 "$HERE/llm-stub.py" "$PORT"; w 1
   record composed-polished
   FACTS=polished facts engineAfter "$(engine)" clipboardAfter "$(clipboard)"
   grep "heyo: dictation" "$T/app.log" | tail -3 | cut -c1-160

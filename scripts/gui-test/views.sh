@@ -72,7 +72,7 @@ xdotool key Escape; w 1
 
 # --- Typing: local-first, and a pushed view come back from ---
 open typing
-(xdotool type --delay 70 "the quick brown fox jumps" &); w 0.9; shot typing-mid 120; w 2.5; shot typing-settled 120
+start xdotool type --delay 70 "the quick brown fox jumps"; w 0.9; shot typing-mid 120; w 2.5; shot typing-settled 120
 show typing
 xdotool key Down; w 0.5; xdotool key Return; w 2; shot typing-pushed 160; xdotool key Escape; w 1.5; shot typing-back 120
 xdotool key Escape; w 1

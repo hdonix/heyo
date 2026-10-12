@@ -22,7 +22,7 @@ shot() {
 }
 terminal() { xdotool search --onlyvisible --name ProbeTerm | tail -1 | xargs xdotool windowactivate; w 1; }
 
-(gnome-terminal --title=ProbeTerm -- "$HERE/term-sink.sh" "$T/term.txt" >/dev/null 2>&1 &); w 4
+start gnome-terminal --title=ProbeTerm -- "$HERE/term-sink.sh" "$T/term.txt" >/dev/null 2>&1; w 4
 terminal
 /usr/bin/python3 "$HERE/clip.py" "echo one
 echo two

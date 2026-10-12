@@ -119,7 +119,7 @@ for THEME in ${*:-light dark}; do
   # The sandbox's own IBus, never the one of the desktop this is run from.
   case "$(ibus address)" in *"$H/"*) ;; *) echo "readme-dictation: IBus is at $(ibus address), which is not the sandbox's" >&2; python3 "$HERE/down.py" > /dev/null; exit 1 ;; esac
 
-  (gedit --standalone "$NOTE" > /dev/null 2>&1 & echo $! > "$T/editor.pid")
+  start gedit --standalone "$NOTE" > /dev/null 2>&1; echo "$STARTED" > "$T/editor.pid"
   id=
   for _ in $(seq 40); do id=$(xdotool search --onlyvisible --class gedit 2> /dev/null | tail -1); [ -n "$id" ] && break; w 0.5; done
   w 2

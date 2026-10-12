@@ -30,6 +30,20 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$H/run/bus" XDG_RUNTIME_DIR="$H/run"
 # the environment names one: which would be the one of the desktop in use.
 unset IBUS_ADDRESS IBUS_ADDRESS_FILE
 w() { python3 -c "import time; time.sleep($1)"; }
+# The scripts this one starts are told the directory too (down.py reads it).
+export HEYO_TEST_DIR="$T"
+# start COMMAND…: runs it in the background. Every process the scripts here
+# start in the sandbox is started this way: its number is written down in
+# $T/pids, with when it was started (which tells it from a later process
+# given the same number) and what it is, and down.py ends the processes
+# written down there and what those started themselves. It ends nothing
+# else: no process is ever looked for by its name or by its environment.
+# STARTED is the number, for a script that ends one itself.
+start() {
+  "$@" &
+  STARTED=$!
+  echo "$STARTED $(sed 's/.*) //' "/proc/$STARTED/stat" 2>/dev/null | cut -d' ' -f20) $(basename "$1")" >> "$T/pids"
+}
 # The build under test: debug (which loads the frontend from the dev server),
 # or with HEYO_TEST_BUILD another directory under src-tauri/target whose
 # build carries its own: release, or one made for the purpose.

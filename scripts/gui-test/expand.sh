@@ -19,7 +19,7 @@ json.dump(settings, open(path, "w"))
 PY
 export HEYO_TYPED_SYNTHETIC=1
 "$HERE/up.sh"
-(/usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes >/dev/null 2>&1 &); w 2
+start /usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes >/dev/null 2>&1; w 2
 xdotool search --name '^Notes$' | tail -1 | xargs xdotool windowactivate; w 2
 type() { xdotool type --delay 60 "$1"; w 1.5; }
 type "a ;sig"; type " b addr "; type "c addresses d"

@@ -40,14 +40,14 @@ PY
 # open does (a copy whose owner goes away is handed to the desktop, and is
 # then counted twice).
 copies() {
-  (gnome-text-editor > /dev/null 2>&1 & echo $! > "$T/editor.pid")
-  (eog "$REPO/src-tauri/icons/icon.png" > /dev/null 2>&1 & echo $! > "$T/viewer.pid")
+  start gnome-text-editor > /dev/null 2>&1; echo "$STARTED" > "$T/editor.pid"
+  start eog "$REPO/src-tauri/icons/icon.png" > /dev/null 2>&1; echo "$STARTED" > "$T/viewer.pid"
   # The terminal's own program ends, and its window with it, when the
   # copies are made.
   rm -f "$T/copied"
-  (gnome-terminal -- sh -c 'while [ ! -f "$0" ]; do sleep 0.3; done' "$T/copied" > /dev/null 2>&1 &)
+  start gnome-terminal -- sh -c 'while [ ! -f "$0" ]; do sleep 0.3; done' "$T/copied" > /dev/null 2>&1
   w 6
-  (/usr/bin/python3 - "$REPO/src-tauri/icons/icon.png" "$T/copied" <<'PY' > /dev/null 2>&1 &
+  cat > "$T/copies.py" <<'PY'
 import subprocess, sys
 import gi
 gi.require_version("Gtk", "3.0")
@@ -86,7 +86,7 @@ def copy():
 GLib.idle_add(focus)
 Gtk.main()
 PY
-  )
+  start /usr/bin/python3 "$T/copies.py" "$REPO/src-tauri/icons/icon.png" "$T/copied" > /dev/null 2>&1
   for _ in $(seq 40); do [ -f "$T/copied" ] && break; w 0.5; done
   # The applications go, so that none is behind the palette.
   kill "$(cat "$T/editor.pid")" "$(cat "$T/viewer.pid")" 2> /dev/null

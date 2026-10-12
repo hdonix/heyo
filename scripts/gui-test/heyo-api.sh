@@ -20,7 +20,7 @@ show() { printf '%s: ' "$1"; tr -d '\n' < "$T/probe-$1.json" 2>/dev/null | sed '
 shot() { python3 "$HERE/grab.py" "$T/shots/api-$1.png"; }
 copy() { /usr/bin/python3 "$HERE/clip.py" "$1"; w 1.2; }
 notes() {
-  (/usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes >/dev/null 2>&1 &); w 2
+  start /usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes >/dev/null 2>&1; w 2
   xdotool search --name '^Notes$' | tail -1 | xargs xdotool windowactivate; w 2
 }
 

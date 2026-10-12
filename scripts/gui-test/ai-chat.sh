@@ -41,7 +41,7 @@ python3 "$HERE/down.py" > /dev/null
 # --- A local model: the stub. ---
 configure local
 "$HERE/up.sh"
-(python3 "$HERE/llm-stub.py" "$PORT" &); w 1
+start python3 "$HERE/llm-stub.py" "$PORT"; w 1
 ask "What is a launcher?"; w 1.5; shot streaming; w 6; shot answered
 xdotool key Return; w 3; shot chat
 xdotool type --delay 20 "And a palette?"; w 0.5; xdotool key Return; w 8; shot followup

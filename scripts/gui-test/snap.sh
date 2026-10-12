@@ -3,7 +3,7 @@
 # with a click: pictures in $HEYO_TEST_DIR/shots/snap-*.png.
 . "$(dirname "$0")/env.sh"
 "$HERE/up.sh"
-(/usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes >/dev/null 2>&1 &); w 2
+start /usr/bin/python3 "$REPO/scripts/wayland-test/in/window.py" Notes org.test.Notes >/dev/null 2>&1; w 2
 id=$(xdotool search --name '^Notes$' | tail -1)
 xdotool windowmove "$id" 300 200; xdotool windowactivate "$id"; w 1
 echo "Notes is at: $(xwininfo -id "$id" | grep -E 'Absolute|Width|Height' | xargs)"
