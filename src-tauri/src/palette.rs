@@ -4,8 +4,9 @@
 //! done with, makes way for a capture, is needed for a question) and never
 //! has the window in hand: how each is done, and in what order, is in this
 //! one place. There is no way to try any of it without the window, so
-//! none of it is tested here; what can be decided without one is decided
-//! elsewhere (`cli::at_start`, `windows::LastWindow`).
+//! little of it is tested here (where the middle of a monitor is, is);
+//! what else can be decided without one is decided elsewhere
+//! (`cli::at_start`, `windows::LastWindow`).
 //!
 //! The palette comes up in two ways. [`show`] is the user opening it: in
 //! the middle of the screen, its view told to start over, the window they
@@ -43,10 +44,41 @@ pub(crate) fn show(app: &AppHandle) {
     // For commands that act on that window.
     remember_window(app);
     let window = window(app);
-    let _ = window.center();
+    centre(app, &window);
     let _ = window.show();
     focus(&window);
     let _ = tell(app, event::SHOWN, ());
+}
+
+/// Puts the palette in the middle of its monitor (the primary one until it
+/// has been on one).
+///
+/// Reckoned here, from the size the window is declared with: the toolkit's
+/// own centring goes by the size the window says it has, and a window that
+/// has never been on the screen does not have its size yet, so the first
+/// showing of a run came up off the middle (by a quarter of the window, at
+/// a scale of 2).
+fn centre(app: &AppHandle, window: &WebviewWindow) {
+    let monitor = window.current_monitor().ok().flatten().or_else(|| window.primary_monitor().ok().flatten());
+    let declared = app.config().app.windows.iter().find(|declared| declared.label == WINDOW);
+    let (Some(monitor), Some(declared)) = (monitor, declared) else {
+        let _ = window.center();
+        return;
+    };
+    let (x, y) = centred(
+        (monitor.position().x, monitor.position().y),
+        (monitor.size().width, monitor.size().height),
+        (declared.width, declared.height),
+        monitor.scale_factor(),
+    );
+    let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+}
+
+/// Where a window of a size in logical pixels goes to be in the middle of
+/// a monitor given in its own pixels.
+fn centred(origin: (i32, i32), monitor: (u32, u32), size: (f64, f64), scale: f64) -> (i32, i32) {
+    let (width, height) = ((size.0 * scale).round() as i32, (size.1 * scale).round() as i32);
+    (origin.0 + (monitor.0 as i32 - width) / 2, origin.1 + (monitor.1 as i32 - height) / 2)
 }
 
 /// Returns the palette as it was left, to the command that is in it.
@@ -175,4 +207,18 @@ pub(crate) fn remember_window(app: &AppHandle) {
 /// was before the palette came up.
 pub(crate) fn working_window(app: &AppHandle) -> Option<windows::Window> {
     came_from(app).working()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::centred;
+
+    #[test]
+    fn the_middle_of_a_monitor_is_reckoned_in_its_own_pixels() {
+        // The palette as declared, on a 4K monitor at a scale of 2 and of 1.
+        assert_eq!(centred((0, 0), (3840, 2160), (814.0, 534.0), 2.0), (1106, 546));
+        assert_eq!(centred((0, 0), (3840, 2160), (814.0, 534.0), 1.0), (1513, 813));
+        // A second monitor to the right of the first, at a scale and a half.
+        assert_eq!(centred((3840, 0), (2560, 1440), (814.0, 534.0), 1.5), (3840 + 669, 319));
+    }
 }
