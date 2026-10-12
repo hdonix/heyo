@@ -16,8 +16,13 @@ use super::guard;
 use super::host::Host;
 
 /// The renderer the windows are drawn with unless `HEYO_SETTINGS_RENDERER`
-/// names another of Slint's: Skia, on the CPU.
+/// names another of Slint's: Skia, on the CPU. Except on Wayland, where a
+/// window drawn on the CPU cannot be seen through (softbuffer hands the
+/// compositor XRGB) and the pill would be a black box: there it is Skia as
+/// Slint chooses, which is OpenGL where the session has it and the CPU
+/// where it has not.
 const RENDERER: &str = "skia-software";
+const RENDERER_ON_WAYLAND: &str = "skia";
 
 /// Something asked of the host, away from Slint's thread.
 pub(super) type Job = Box<dyn FnOnce(&dyn Host) + Send>;
@@ -39,6 +44,9 @@ pub(super) enum Kind {
 thread_local! {
     static SHARED: RefCell<Option<Rc<Shared>>> = const { RefCell::new(None) };
     static MAKING: Cell<Kind> = const { Cell::new(Kind::Settings) };
+    /// Whether the windows are seen through, once a window has been drawn
+    /// and it is known what draws them.
+    static CLEAR: Cell<Option<bool>> = const { Cell::new(None) };
 }
 
 /// What the windows share, on Slint's thread once it has begun.
@@ -70,11 +78,40 @@ pub(super) fn asker(name: &str, host: Arc<dyn Host>) -> Result<mpsc::Sender<Job>
 }
 
 /// Whether what is behind a window shows where the window draws nothing,
-/// which a margin for a shadow needs. Not on Wayland with a renderer on
-/// the CPU: what such a window is drawn into there has no transparency
-/// (softbuffer hands Wayland XRGB), and the margin would be black.
+/// which a margin for a shadow needs, and the pill its corners. Not on
+/// Wayland when it is drawn on the CPU. Which it is there is known for
+/// certain only once a window has been drawn (`watch`); until then it is
+/// what was asked for.
 pub(super) fn seen_through(renderer: &str) -> bool {
-    !(wayland() && renderer.ends_with("software"))
+    !wayland() || CLEAR.with(Cell::get).unwrap_or(!renderer.ends_with("software"))
+}
+
+/// Finds out, when the window is first drawn, whether it is drawn through
+/// OpenGL, and has `then` done with whether it is seen through if that is
+/// not what was assumed. For a window made on Wayland.
+pub(super) fn watch(window: &slint::Window, renderer: &str, then: impl Fn(bool) + 'static) {
+    if !wayland() {
+        return;
+    }
+    let assumed = seen_through(renderer);
+    let learnt = Rc::new(move |clear: bool| {
+        CLEAR.with(|known| known.set(Some(clear)));
+        if clear != assumed {
+            then(clear);
+        }
+    });
+    let told = window.set_rendering_notifier({
+        let learnt = learnt.clone();
+        move |state, api| {
+            if matches!(state, slint::RenderingState::RenderingSetup) {
+                learnt(matches!(api, slint::GraphicsAPI::NativeOpenGL { .. }));
+            }
+        }
+    });
+    // A renderer that cannot say is one on the CPU.
+    if told.is_err() {
+        learnt(false);
+    }
 }
 
 /// Whether the windows are Wayland ones, told as winit tells it.
@@ -84,7 +121,7 @@ pub(super) fn wayland() -> bool {
 
 /// Which of Slint's renderers draws the windows.
 fn renderer() -> String {
-    std::env::var("HEYO_SETTINGS_RENDERER").ok().filter(|name| !name.is_empty()).unwrap_or_else(|| RENDERER.to_string())
+    std::env::var("HEYO_SETTINGS_RENDERER").ok().filter(|name| !name.is_empty()).unwrap_or_else(|| if wayland() { RENDERER_ON_WAYLAND } else { RENDERER }.to_string())
 }
 
 /// Runs Slint on this thread until Heyo ends, and says through `begun`

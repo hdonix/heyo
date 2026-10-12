@@ -83,6 +83,16 @@ fn make() -> Result<Pill, String> {
     let shared = thread::shared().ok_or("Slint has not begun")?;
     let telling = thread::asker("heyo-slint-pill", shared.host.clone())?;
     let window = thread::making(Kind::Pill, ui::PillWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
+    window.set_opaque(!thread::seen_through(&shared.renderer));
+    let weak = window.as_weak();
+    thread::watch(window.window(), &shared.renderer, move |clear| {
+        let weak = weak.clone();
+        slint::Timer::single_shot(Duration::ZERO, move || {
+            if let Some(window) = weak.upgrade() {
+                window.set_opaque(!clear);
+            }
+        });
+    });
     let bars = Rc::new(VecModel::from(vec![0.0_f32; 5]));
     window.set_bars(ModelRc::from(bars.clone()));
     window.on_pressed(|| with(|pill| pill.did(pill.model.pressed())));
@@ -160,6 +170,14 @@ impl Pill {
     fn show(&mut self, asked: Instant) {
         self.wanted = true;
         self.leaving.stop();
+        if !native::kept() {
+            self.window.set_leaving(false);
+            self.window.set_shown(true);
+            if let Err(e) = self.window.show() {
+                eprintln!("heyo: the dictation window could not be shown: {e}");
+            }
+            return;
+        }
         if !self.ready {
             return self.prepare(move || {
                 with(|pill| {
@@ -188,7 +206,11 @@ impl Pill {
         self.leaving.start(slint::TimerMode::SingleShot, LEAVING, || {
             with(|pill| {
                 if !pill.wanted {
-                    pill.window.window().with_winit_window(native::hide);
+                    if native::kept() {
+                        pill.window.window().with_winit_window(native::hide);
+                    } else {
+                        let _ = pill.window.hide();
+                    }
                     // Off the screen, it is where it arrives from.
                     pill.window.set_leaving(false);
                 }
@@ -213,7 +235,7 @@ fn place(made: &slint::winit_030::winit::window::Window) {
 /// thread.
 pub(super) fn prepare() {
     with(|pill| {
-        if !pill.ready {
+        if !pill.ready && native::kept() {
             pill.prepare(|| {});
         }
     });

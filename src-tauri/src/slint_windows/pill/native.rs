@@ -14,6 +14,10 @@
 //!   is shown and hidden here, by its handle), and not by a click (a style
 //!   winit has no name for, set on the handle once the window is made).
 //!   It is above the taskbar as every topmost window is.
+//! - Wayland: a window can say none of this of itself, and winit cannot
+//!   hide one there. Slint hides and shows it (`kept`), making it anew
+//!   each time; where it is put and whether it is given the keyboard is
+//!   the compositor's to decide.
 
 use slint::winit_030::winit::window::{Window, WindowAttributes};
 
@@ -42,6 +46,12 @@ fn handle(window: &Window) -> Option<windows_sys::Win32::Foundation::HWND> {
         RawWindowHandle::Win32(handle) => Some(handle.hwnd.get() as windows_sys::Win32::Foundation::HWND),
         _ => None,
     }
+}
+
+/// Whether the window, once made, is kept and only put on and taken off
+/// the screen (`show`, `hide`). Where it is not, Slint shows and hides it.
+pub(super) fn kept() -> bool {
+    !super::super::thread::wayland()
 }
 
 /// What can only be said of the window once it is there.

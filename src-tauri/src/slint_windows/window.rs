@@ -495,6 +495,16 @@ fn make() -> Result<Live, String> {
     let window = thread::making(Kind::Settings, ui::SettingsWindow::new).map_err(|e| format!("Slint could not make the window: {e}"))?;
     window.global::<ui::Theme>().set_plain(shared.renderer == "software");
     window.set_opaque(!thread::seen_through(&shared.renderer));
+    let weak = window.as_weak();
+    thread::watch(window.window(), &shared.renderer, move |clear| {
+        // Not from inside the drawing it was learnt in.
+        let weak = weak.clone();
+        slint::Timer::single_shot(Duration::ZERO, move || {
+            if let Some(window) = weak.upgrade() {
+                window.set_opaque(!clear);
+            }
+        });
+    });
     let pictures = Rc::new(Pictures::default());
     let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
     window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));

@@ -85,6 +85,9 @@ export component PillWindow inherits Window {
     // for. It goes to nothing.
     in property <bool> shown;
     in property <bool> leaving;
+    // Nothing behind the window shows through it (Wayland without OpenGL):
+    // it is then a black box with the pill in it, and not a hole.
+    in property <bool> opaque;
     callback pressed();
     callback clicked();
     callback cancel();
@@ -93,7 +96,7 @@ export component PillWindow inherits Window {
     title: "Heyo Dictation";
     no-frame: true;
     always-on-top: true;
-    background: transparent;
+    background: root.opaque ? #0a0a0b : transparent;
     // Wider than the pill, which grows with the words to at most this.
     width: 360px;
     height: 44px;
