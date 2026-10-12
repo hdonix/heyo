@@ -28,7 +28,9 @@ pub(crate) fn focus(window: &WebviewWindow) {
         // Shell extension does it.
         if let Some(title) = gtk_window.title() {
             let title = title.to_string();
-            std::thread::spawn(move || super::desktop::desktop().activate_own(&title));
+            std::thread::spawn(move || {
+                super::desktop::desktop().activate_own(&title);
+            });
         }
     });
 }

@@ -532,8 +532,8 @@ impl crate::platform::desktop::Desktop for Gnome {
         watch_hold(key, on)
     }
 
-    fn activate_own(&self, title: &str) {
-        activate_own(title);
+    fn activate_own(&self, title: &str) -> bool {
+        activate_own(title)
     }
 
     fn own_focused(&self) -> Option<bool> {

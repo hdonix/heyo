@@ -181,9 +181,13 @@ pub trait Desktop: Send + Sync {
     // --- Heyo's own windows ---------------------------------------------------------
 
     /// Brings Heyo's window of that title to the front, where the window
-    /// cannot do so itself.
+    /// cannot do so itself. False when the desktop knows no such window
+    /// (yet: a window is one a moment after it is asked to be shown); true
+    /// also where there is nothing for the desktop to do.
     #[cfg(target_os = "linux")]
-    fn activate_own(&self, _title: &str) {}
+    fn activate_own(&self, _title: &str) -> bool {
+        true
+    }
 
     /// Whether one of Heyo's windows has the focus, where the desktop knows
     /// better than the toolkit. `None`: believe the toolkit.

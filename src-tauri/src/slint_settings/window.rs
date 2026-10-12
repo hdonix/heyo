@@ -384,6 +384,7 @@ impl Live {
             return then(Err(e.to_string()));
         }
         let window = self.window.as_weak();
+        let asking = self.asking.clone();
         let waiting = slint::spawn_local(async move {
             let Some(window) = window.upgrade() else { return then(Err("the settings window is gone".into())) };
             // Held no longer than this: a window still referred to stays
@@ -403,6 +404,10 @@ impl Live {
                         made.set_outer_position(PhysicalPosition::new(x + ((width as f32 - wide) / 2.0) as i32, y + ((height as f32 - high) / 2.0) as i32));
                     }
                     made.focus_window();
+                    // Which on Wayland a window may not do for itself: the
+                    // desktop is asked to.
+                    let title = made.title();
+                    let _ = asking.send(Box::new(move |host| host.forward(title)));
                     eprintln!("heyo: settings up {} ms after they were asked for", asked.elapsed().as_millis());
                     then(Ok(()));
                 }
@@ -492,6 +497,20 @@ fn wire(window: &ui::SettingsWindow) {
     window.window().on_winit_window_event(|_, event| with(|live| live.told(event)).unwrap_or(EventResult::Propagate));
 }
 
+/// Whether what is behind the window shows where the window draws nothing,
+/// which the margin its shadow falls in needs. Not on Wayland with a
+/// renderer on the CPU: what such a window is drawn into there has no
+/// transparency (softbuffer hands Wayland XRGB), and the margin would be
+/// black.
+fn seen_through(renderer: &str) -> bool {
+    !(wayland() && renderer.ends_with("software"))
+}
+
+/// Whether the window is a Wayland one, told as winit tells it.
+fn wayland() -> bool {
+    cfg!(target_os = "linux") && ["WAYLAND_DISPLAY", "WAYLAND_SOCKET"].iter().any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
+}
+
 /// Which of Slint's renderers draws the window.
 fn renderer() -> String {
     std::env::var("HEYO_SETTINGS_RENDERER").ok().filter(|name| !name.is_empty()).unwrap_or_else(|| RENDERER.to_string())
@@ -515,6 +534,15 @@ pub(super) fn run(host: Arc<dyn Host>, asked: Instant, started: mpsc::Sender<Res
         });
         let selector = if frames::wanted().is_some() { selector.with_winit_custom_application_handler(frames::Timing) } else { selector };
         selector.select().map_err(|e| format!("Slint has no backend: {e}"))?;
+        // A Wayland window is made anew each time it is shown, and the
+        // second time Slint leaves out what the hook above gave the first:
+        // the window had no application to belong to, and the Shell did
+        // not know it for Heyo's. What Slint is told itself it gives every
+        // time. (Not on X11, where it would take the instance's name away
+        // and the window is named either way.)
+        if wayland() {
+            slint::set_xdg_app_id("heyo").map_err(|e| format!("Slint took no application id: {e}"))?;
+        }
         let fonts = super::fonts::register();
         eprintln!("heyo: settings drawn by Slint with {renderer}, in {}", if fonts.is_empty() { "the system's fonts".to_string() } else { fonts.join(" and ") });
 
@@ -532,6 +560,7 @@ pub(super) fn run(host: Arc<dyn Host>, asked: Instant, started: mpsc::Sender<Res
 
         let window = ui::SettingsWindow::new().map_err(|e| format!("Slint could not make the window: {e}"))?;
         window.global::<ui::Theme>().set_plain(renderer == "software");
+        window.set_opaque(!seen_through(&renderer));
         let pictures = Rc::new(Pictures::default());
         let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
         window.global::<ui::Host>().set_lines(ModelRc::from(lines.clone() as Rc<dyn slint::Model<Data = ui::Line>>));

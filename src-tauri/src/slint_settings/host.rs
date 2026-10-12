@@ -28,6 +28,9 @@ pub(crate) trait Host: Send + Sync + 'static {
     fn listen(&self, hear: Box<dyn Fn(&str, Value) + Send + Sync>);
     /// Whether the desktop shows applications dark.
     fn system_dark(&self) -> bool;
+    /// Has the desktop bring Heyo's window of that title to the front,
+    /// where a window cannot do so itself (Wayland). It does not wait.
+    fn forward(&self, title: String);
 }
 
 /// The commands this window calls: each is answered in `call` below.
@@ -127,6 +130,23 @@ impl Host for Running {
 
     fn system_dark(&self) -> bool {
         crate::platform::system::dark().unwrap_or(false)
+    }
+
+    fn forward(&self, title: String) {
+        // The desktop knows the window a moment after it was asked to be
+        // shown, not at once: it is asked until it does, for half a second.
+        #[cfg(target_os = "linux")]
+        std::thread::spawn(move || {
+            let desktop = crate::platform::desktop::desktop();
+            for _ in 0..10 {
+                if desktop.activate_own(&title) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        });
+        #[cfg(not(target_os = "linux"))]
+        let _ = title;
     }
 }
 

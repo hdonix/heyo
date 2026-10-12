@@ -127,6 +127,21 @@ def lists():
         state = run(lists)
         check(f"{how}: the settings window is an ordinary one", bool(settings) and not settings["skip"] and "Heyo Settings" in state["switcher"]
               and any(map(is_heyo, state["running"])), state)
+        # Asked for with another window in front, it comes forward: which
+        # on Wayland the Shell does for it, through Heyo's extension.
+        focused = lambda: run("global.display.focus_window?.get_title() ?? ''")
+        run("Main.activateWindow(global.get_window_actors().map(a => a.meta_window).find(w => w.get_title() === 'An Application')) ?? null")
+        wait(lambda: focused() == "An Application")
+        heyo("--open", "heyo:settings")
+        check(f"{how}: the settings window comes forward from behind another", bool(wait(lambda: focused() == "Heyo Settings")), focused())
+        close("Heyo Settings")
+        wait(lambda: not window("Heyo Settings"))
+        # Shown again it is a new window to the Shell, and must still be
+        # Heyo's: by its class the extension knows its own.
+        heyo("--open", "heyo:settings")
+        wait(lambda: window("Heyo Settings"))
+        own = lambda: run("global.get_window_actors().map(a => a.meta_window).find(w => w.get_title() === 'Heyo Settings')?.get_wm_class() ?? ''")
+        check(f"{how}: shown again, the settings window is still Heyo's", bool(wait(lambda: own().lower() == "heyo")), own())
         close("Heyo Settings")
         wait(lambda: not window("Heyo Settings"))
         if window("Heyo"):

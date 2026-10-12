@@ -723,9 +723,12 @@ export component SettingsWindow inherits Window {
     in-out property <bool> fresh;
     // Counted up when the window has been moved: see below.
     in-out property <int> moved;
+    // Nothing behind the window shows through it: see `seen_through` in
+    // window.rs.
+    in property <bool> opaque;
     // The shadow needs a margin to fall in, which a screen too small for
-    // the window with it has not.
-    out property <length> margin: Theme.plain || room-width < 924px || room-height < 704px ? 0px : Tokens.window-margin;
+    // the window with it has not, nor a window that cannot be seen through.
+    out property <length> margin: Theme.plain || opaque || room-width < 924px || room-height < 704px ? 0px : Tokens.window-margin;
     property <length> panel-width: min(860px, room-width);
     property <length> panel-height: min(640px, room-height);
     property <bool> dark: appearance == "dark" || (appearance == "system" && (Palette.color-scheme == ColorScheme.dark || (Palette.color-scheme == ColorScheme.unknown && system-dark)));
