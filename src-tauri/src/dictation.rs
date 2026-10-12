@@ -51,8 +51,8 @@ use onscreen::{OnScreen, Shortfall, Standing, Step};
 pub const WINDOW: &str = "dictation";
 const EVENT: &str = crate::wire::event::DICTATION;
 /// Logical size of the dictation window.
-const WIDTH: f64 = 420.0;
-const HEIGHT: f64 = 52.0;
+const WIDTH: f64 = 360.0;
+const HEIGHT: f64 = 44.0;
 
 #[derive(Default)]
 pub struct Dictation(Mutex<State>);

@@ -10,22 +10,23 @@
   height: 100%;
 }
 
+/* A small black pill, whatever the theme: it sits over other applications,
+   not on Heyo's own surfaces. Its colours are the dark ones of the scales. */
 .dictation {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 8px);
-  height: 36px;
-  padding: 0 8px 0 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  background: var(--color-bg);
+  gap: 7px;
+  max-width: calc(100% - 12px);
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 15px;
+  background: rgba(10, 10, 11, 0.94);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+  color: var(--color-text);
+  color-scheme: dark;
   cursor: default;
   user-select: none;
-}
-
-.dictation:not(.loading, .listening) {
-  padding-right: 14px;
 }
 
 .waveform {
@@ -33,7 +34,7 @@
   flex: none;
   align-items: center;
   gap: 2px;
-  height: 22px;
+  height: 14px;
 }
 
 .waveform span {
@@ -41,7 +42,7 @@
   min-height: 2.5px;
   border-radius: 2px;
   background: var(--color-accent);
-  transition: height 0.06s linear;
+  transition: height 0.08s linear;
 }
 
 .dictation.loading .waveform span,
@@ -49,29 +50,27 @@
   background: var(--color-text-muted);
 }
 
-.dictation.error .waveform span {
-  background: var(--color-danger);
+/* While the text is polished, the sparkle breathes. */
+.dictation-sparkle {
+  flex: none;
+  animation: breathe 1.4s ease-in-out infinite;
 }
 
-/* While Claude polishes, the bars ripple. */
-.dictation.polishing .waveform span {
-  height: 30% !important;
-  background: var(--color-text-muted);
-  animation: ripple 0.9s ease-in-out infinite;
-}
-
-.dictation.polishing .waveform span:nth-child(3n + 1) {
-  animation-delay: 0.15s;
-}
-
-.dictation.polishing .waveform span:nth-child(3n + 2) {
-  animation-delay: 0.3s;
-}
-
-@keyframes ripple {
+@keyframes breathe {
   50% {
-    transform: scaleY(2.6);
+    opacity: 0.55;
+    transform: scale(0.9);
   }
+}
+
+.dictation-saying,
+.dictation-text {
+  @include text(sm, medium);
+  white-space: nowrap;
+}
+
+.dictation-saying:empty {
+  display: none;
 }
 
 .dictation-text {
@@ -79,8 +78,6 @@
   justify-content: flex-end;
   min-width: 0;
   overflow: hidden;
-  @include text(md);
-  white-space: nowrap;
 }
 
 .dictation-text > span {
@@ -95,9 +92,16 @@
   color: var(--color-danger);
 }
 
+/* The way out of a recording shows when the pointer is on the pill. */
 .dictation .icon-button {
+  display: none;
   flex: none;
-  padding: 4px;
+  margin-right: -5px;
+  padding: 3px;
+}
+
+.dictation:hover .icon-button {
+  display: inline-flex;
 }
 
 .st-badge {

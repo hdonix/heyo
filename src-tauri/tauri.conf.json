@@ -27,8 +27,8 @@
       {
         "label": "dictation",
         "title": "Heyo Dictation",
-        "width": 420,
-        "height": 52,
+        "width": 360,
+        "height": 44,
         "decorations": false,
         "transparent": true,
         "resizable": true,
