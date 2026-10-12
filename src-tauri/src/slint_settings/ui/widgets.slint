@@ -38,6 +38,16 @@ component Line inherits Text {
     overflow: wrapped ? clip : elide;
     line-height-factor: wrapped ? line / (self.font-size * Theme.natural-line) : 1;
     min-height: line;
+    // Never italic; said this way so that how the text is drawn depends
+    // on what it says. Slint 1.18.1 draws a text from shaped paragraphs it
+    // keeps, and only the kept ones know what the text says. Once a
+    // thousand texts have been shaped (one long page scrolled through), it
+    // drops those not drawn in the last two frames, which is nearly all of
+    // them when only what changed is drawn again, and with them goes the
+    // only thing that would have said "draw this again" when the words
+    // change: a title kept the last page's name. The font is read each
+    // time a text is drawn, so through this it is told.
+    font-italic: self.text == "\u{1}";
 }
 
 export component TextXs inherits Line {
