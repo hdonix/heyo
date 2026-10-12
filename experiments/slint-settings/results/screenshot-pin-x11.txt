@@ -1,0 +1,20 @@
+# 2026-10-13, heyo, 3840x2160 at scale 1
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+pinned 600 by 400 from 1000,600: a window at 1000 600 600 400
+  _NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_UTILITY
+  _NET_WM_STATE(ATOM) = _NET_WM_STATE_SKIP_PAGER, _NET_WM_STATE_SKIP_TASKBAR, _NET_WM_STATE_ABOVE
+what it shows inside its edge, against the desktop there: 0 of 238004 pixels differ (by 0 at most)
+its edge at its top left corner: (53, 110, 178) (the accent at 70 % over the picture)
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+a second, 300 by 200 from 1800,700: 2 windows; the new one at 1800 700 300 200
+## moved by dragging
+dragged by 200,100: now at 1190 695 600 400
+after a click that goes nowhere: at 1190 695 600 400, 2 windows
+## closed
+after a double click on the first: 1 window(s)
+after a right click on the second: 0
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+a third, clicked and then Escape: 0

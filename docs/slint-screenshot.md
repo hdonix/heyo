@@ -242,10 +242,10 @@ and "hello" typed after the trouble must (`results/screenshot-safe.txt`).
 
 | in the middle of a drag | the overlay was off the screen after | Heyo afterwards |
 |---|---|---|
-| Escape | 18 ms | runs; the next screenshot comes up |
+| Escape | 24 ms | runs; the next screenshot comes up |
 | Slint's thread panics | at once (within the 150 ms the test takes to look) | runs; the palette opens |
 | Slint's thread stops for a minute | 1.7 s | runs; the palette opens |
-| Heyo is killed | 48 ms | gone |
+| Heyo is killed | 47 ms | gone |
 
 ### How fast it is
 
@@ -279,6 +279,25 @@ A selection of most of the screen costs Slint a frame of 7 ms (12 on a
 small core) because the whole selection is drawn again when its corner
 moves: the renderer redraws the rectangle that holds what an element was
 and what it has become, not only the difference.
+
+That table is of the overlay before it had its tools, beside the web
+view's. With the tools, and the web view's overlay gone, one more round
+(the lines labelled "as replaced"): to the frozen screen 160 (150 to 264)
+on 20 cores and 198 (156 to 249) on four small ones; a jump 10 / 13 / 15
+and 22 / 27 / 29 for the two selections, a sweep 21 / 32 / 33 and 37 /
+55 / 63; on small cores 11 / 14 / 16, 26 / 30 / 31, 21 / 31 / 32 and
+48 / 62 / 64. And drawing on it:
+
+| | 20 cores | 4 small cores |
+|---|---|---|
+| a pen stroke of 400 places, one every 8 ms: a place passed is the pen's colour after | 22 / 38 / 39 | 22 / 37 / 37 |
+| a frame of Slint's while the pen draws | 0.2 / 0.7 / 5.1 | 0.2 / 0.8 / 6.4 |
+| a blurred part of 3400 by 1600 whose corner jumps: the screen has followed after | 32 / 40 / 41 | 35 / 41 / 41 |
+| a frame of Slint's with that blurred part in it | 2.3 / 23.7 / 23.9 | 2.3 / 23.7 / 23.8 |
+
+A pen stroke costs nothing to speak of. A blurred part of most of a 4K
+screen costs 24 ms a frame while its corner moves: its blocks are made
+anew and drawn over all of it.
 
 ### What it holds in memory
 
@@ -321,5 +340,9 @@ selection on it, and again after the selection was moved and resized: of
 the pixels inside the selection none differs from the desktop as it was
 before, and of those outside it (30 px away from its outline, handles
 and label) none differs from the desktop dimmed to 154 of 256, rounded
-down (`results/screenshot-x11.txt`). The window is 24 bits deep: it is
+down (`results/screenshot-x11.txt`). Where the toolbar is, and where its
+shadow falls (a little of it on the selection's bottom edge, on the
+screen only), is not looked at there. What is saved and what is copied is
+compared with the desktop too, by `screenshot-tools.sh`: pixel for pixel
+when nothing is drawn on it (`results/screenshot-tools-x11.txt`). The window is 24 bits deep: it is
 said to hide what is behind it, so a compositor has nothing to blend.

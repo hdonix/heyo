@@ -1,21 +1,21 @@
-# 2026-10-13, heyo, the overlay of slint, 3840x2160
+# 2026-10-13, heyo, 3840x2160
 before any:                VmRSS: 177 MB  RssAnon: 36 MB  RssShmem: 0 MB  | 0 large:
-1 up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
-1 closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-2 up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 5 large: 31 31 31 31 63
-2 closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-3 up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
-3 closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-4 up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
-4 closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-5 up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
-5 closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-6 up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
-6 closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-70 s later:                VmRSS: 178 MB  RssAnon: 36 MB  RssShmem: 0 MB  | 0 large:
-one more up, a selection made: VmRSS: 368 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
-one more closed, 3 s later:    VmRSS: 209 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
-# 2026-10-13, heyo, the overlay of web, 3840x2160
+1 up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+1 closed, 3 s later:    VmRSS: 211 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
+2 up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+2 closed, 3 s later:    VmRSS: 211 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
+3 up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+3 closed, 3 s later:    VmRSS: 211 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
+4 up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+4 closed, 3 s later:    VmRSS: 211 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
+5 up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+5 closed, 3 s later:    VmRSS: 211 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
+6 up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+6 closed, 3 s later:    VmRSS: 211 MB  RssAnon: 36 MB  RssShmem: 31 MB  | 1 large: 31
+70 s later:                VmRSS: 179 MB  RssAnon: 36 MB  RssShmem: 0 MB  | 0 large:
+one more up, a selection made: VmRSS: 369 MB  RssAnon: 195 MB  RssShmem: 31 MB  | 4 large: 31 31 63 63
+one more closed, 3 s later:    VmRSS: 211 MB  RssAnon: 37 MB  RssShmem: 31 MB  | 1 large: 31
+# the web view's overlay, as it was at 2ad6947:
 before any:                VmRSS: 176 MB  RssAnon: 36 MB  RssShmem: 0 MB  | 0 large:
 1 up, a selection made: VmRSS: 306 MB  RssAnon: 100 MB  RssShmem: 63 MB  | 3 large: 63 31 31
 1 closed, 3 s later:    VmRSS: 275 MB  RssAnon: 68 MB  RssShmem: 63 MB  | 2 large: 63 31
