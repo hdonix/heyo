@@ -4,7 +4,7 @@ The settings were a web view's window. They are now drawn by
 [Slint](https://slint.dev) with Skia on the CPU, inside the host, and the
 web ones are gone. This is the record of that decision: what was
 measured, what it rests on, and what was not verified. How the window is
-built is said at the top of `src-tauri/src/slint_settings/mod.rs`.
+built is said at the top of `src-tauri/src/slint_windows/mod.rs`.
 
 ## Why
 
@@ -57,7 +57,7 @@ Two things about these figures.
 Slint's text stack asks the system for fonts, and an English Windows
 answered with one that has no 发, 这 or 议. So Heyo carries its own, in
 the program, put before the system's (`src-tauri/fonts/`, each with its
-licence; `slint_settings/fonts.rs`): Inter variable (876,576 bytes, SIL
+licence; `slint_windows/fonts.rs`): Inter variable (876,576 bytes, SIL
 OFL 1.1) and Noto Sans SC variable, CFF2 outlines (15,054,748 bytes, SIL
 OFL 1.1 with the reserved name "Source", which it does not use).
 
@@ -99,6 +99,54 @@ legal advice. The installer does not carry them yet.
 
 heyo.exe for ARM went from 10.3 MB to 44.5 MB: the fonts 15.9, Slint with
 winit, its text stack and its own renderer 10.7, Skia 7.7.
+
+## The dictation pill
+
+The second window Slint draws, in place of a web view kept for a strip of
+black with five bars in it (`slint_windows/pill/`). It looks as it did
+and follows the rules its web tests held it to, which are tests of
+`pill/model.rs` now; it also arrives and goes, grows with a spring, and
+fades words that are clipped.
+
+Measured as the settings were (GNOME Shell on Xvfb at 1×, release
+builds, the screen as the clock, six recordings each), from `heyo
+--dictate` being started, which is what the hotkey does:
+
+| | Slint | web |
+|---|---|---|
+| First pixels of the pill | 41–55 ms | 44–63 ms |
+| Fully arrived | 89–103 ms | the same as its first pixels: it popped |
+| First recording of a run, Slint not started ahead | 92 ms | |
+| Heyo and all it starts, idle | 234 MB | 296 MB |
+| Heyo's own process, idle | 182 MB | 176 MB |
+
+It is no faster than the web pill was: nearly all of the 50 ms is the
+second process handing over and the compositor. What it saves is the
+web view's process. Slint's thread is started when Heyo starts, and the
+pill's window made then, so that the first recording is like the rest;
+that is where the 6 MB go. The numbers and how they were taken are in
+`experiments/slint-settings/` (`results/pill.tsv`, `scripts/measure-pill.sh`,
+which needs the watching program of the overlay experiment).
+
+What the window took:
+
+- **Above everything and never focused is not something `.slint` can
+  say.** On X11 the window goes past the window manager
+  (override-redirect), told to winit through a hook that is not told
+  which window it is for.
+- **Slint makes a hidden window anew when it shows it**, without what the
+  hook said. So to Slint the pill is shown once and stays shown, and
+  winit takes it off the screen and puts it back.
+- **A window that fades in from nothing is seen late**: its first frames
+  are too faint. The pill arrives from 60%.
+
+Checked in the sandbox (`experiments/slint-settings/scripts/pill.sh`, and
+`scripts/gui-test/dictate-live.sh`, which passes): the keyboard stays
+with the application when the pill appears and when it is clicked; a
+click finishes; the button, which shows when the pointer is on the pill,
+cancels; it is above a fullscreen window; and with Slint's thread lost in
+the middle of a recording the pill is gone from the screen, the words
+still arrive, and the next recording works without one.
 
 ## What Slint made hard
 

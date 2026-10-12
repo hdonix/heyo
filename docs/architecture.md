@@ -13,11 +13,11 @@ the desktop.
 flowchart LR
   subgraph web["Web view: src/ (React)"]
     palette["Palette: root search, a command's view"]
-    windows["Dictation pill, screenshot overlay"]
+    windows["Screenshot overlay, pinned captures"]
   end
   subgraph host["Host: src-tauri/ (Rust, Tauri)"]
     core["Index, settings, clipboard history, permissions, live activities"]
-    settings["Settings window: slint_settings/ (Slint)"]
+    settings["Settings window, dictation pill: slint_windows/ (Slint)"]
     platform["platform/: trait Desktop"]
   end
   subgraph node["Node.js: runtime/"]
@@ -45,13 +45,14 @@ flowchart LR
   have been given and everything that touches the desktop. It starts the
   other two parts and carries their messages.
 - **The web view** (`src/`, React 19, in WebKitGTK on Linux and WebView2 on
-  Windows) draws every window but one. Its windows load the same page;
+  Windows) draws every window but two. Its windows load the same page;
   `src/main.tsx` picks what to draw from the window's label: the palette
-  (`main`), the dictation pill, the screenshot overlay, a pinned capture.
-  It keeps nothing of its own: what it shows it asked the host for, or was
-  sent by the runtime. The settings window is the one it does not draw:
-  that is the host's own, drawn with [Slint](https://slint.dev)
-  ("[The settings window](#the-settings-window)" below).
+  (`main`), the screenshot overlay, a pinned capture. It keeps nothing of
+  its own: what it shows it asked the host for, or was sent by the
+  runtime. The settings window and the dictation pill are the ones it
+  does not draw: those are the host's own, drawn with
+  [Slint](https://slint.dev)
+  ("[The windows Slint draws](#the-windows-slint-draws)" below).
 - **The runtime** (`runtime/`, Node.js 22 or newer) runs extensions: the
   builds the Raycast Store hands out, loaded as they are. It gives them
   `@raycast/api`, `@heyo/api` and React, renders their components with a
@@ -484,7 +485,7 @@ Windows it registers them itself.
   action panel, the same one for an extension's actions and the root
   search's; `model.ts` reads the tree the runtime sends; `memory.ts`
   remembers what a view was showing when another was pushed over it.
-- `Dictation.tsx` and `Screenshot.tsx` are the other windows.
+- `Screenshot.tsx` is the other windows: the overlay and a pinned capture.
 - `selection.ts` and `pointer.ts` are what every list shares: how the
   selection moves, and when a mouse event is the pointer really moving.
   `SelectionIndicator.tsx` is the one element that slides between rows.
@@ -536,12 +537,26 @@ rest (`Settings::changed`), saves, does what the change calls for
 field, its default and its control. "Launch at login" is not stored: it is
 whether the autostart entry exists.
 
-### The settings window
+### The windows Slint draws
 
-The settings window is drawn by Slint, with Skia on the CPU, inside the
-host (`src-tauri/src/slint_settings/`); why, and what was measured, is in
-[slint-settings.md](slint-settings.md). The same `.slint` files and the
-same Rust are the window on Linux and on Windows.
+The settings window and the dictation pill are drawn by Slint, with Skia
+on the CPU, inside the host (`src-tauri/src/slint_windows/`); why, and
+what was measured, is in [slint-settings.md](slint-settings.md). The same
+`.slint` files and the same Rust are the windows on Linux and on Windows.
+
+- `thread.rs` is Slint's thread ("heyo-slint"), beside Tauri's: one for
+  the life of Heyo, started when Heyo starts, with both windows on it.
+  What a window asks of the host is asked on another thread, so that
+  Slint's never waits for the host and never holds anything of its.
+- `pill/` is the dictation pill. `model.rs` is what it shows of a
+  recording as `dictation.rs` tells it (`Told`), and what a press on it
+  means: that is what is tested. `native.rs` is what a desktop is told
+  for the window to float over everything without ever having the
+  keyboard, the only part that differs by platform. `mod.rs` is the
+  window: made when Heyo starts, put on screen and taken off by winit
+  (Slint would make it anew, without what `native.rs` said).
+
+The settings window:
 
 - `model.rs` is the window without anything drawn: what each page shows,
   as a list of lines (a heading, a note, a row with its control, …), and
@@ -558,20 +573,19 @@ same Rust are the window on Linux and on Windows.
   `src/styles/abstracts/_scales.scss` and writes them as a Slint global
   (`tokens.rs` is the reading, and is tested).
 - `window.rs` shows what the model says and passes on what is done in the
-  window. It runs Slint on a thread of its own ("heyo-slint"), beside
-  Tauri's; what the model asks is answered on a third, so that Slint's
-  thread never waits for the host. `host.rs` is the list of the host's
-  functions the window may call, by name; a test holds that none of the
-  ones that change settings is a command a web view could call.
+  window. `host.rs` is the list of the host's functions the window may
+  call, by name; a test holds that none of the ones that change settings
+  is a command a web view could call.
 - `fonts.rs` puts Inter and Noto Sans SC, which Heyo carries
   (`src-tauri/fonts/`), before the system's fonts; `keys.rs` names keys by
   where they are, as the palette's hotkey recorder does; `area.rs` asks
   the screen for the room the window has, so that it is no larger.
 - `guard.rs` is what happens when Slint cannot start or its thread
-  panics: Heyo goes on without it, and asking for the settings then shows
-  the palette saying that they need Heyo restarted, with the button that
-  does it. A process has one event loop of Slint's and it cannot be
-  started twice.
+  panics: Heyo goes on without it and its windows are taken off the
+  screen. Asking for the settings then shows the palette saying that they
+  need Heyo restarted, with the button that does it; dictation goes on
+  without its pill. A process has one event loop of Slint's and it cannot
+  be started twice.
 
 ## Styles and themes
 
@@ -637,7 +651,7 @@ stand-in:
 |---|---|---|
 | the desktop (`platform::desktop::Desktop`) | `X11`, `Gnome`, `Windows`, `Generic` | `desktop::fake::Fake` |
 | the host, as a window calls it (`Bridge` in `src/host.ts`) | Tauri | `fakeHost` (`src/host.fake.ts`) |
-| the settings window, as what it shows and asks (`slint_settings/model.rs`) | drawn by `window.rs`, answered through `host.rs` | the model by itself: its lines and what it asks are values |
+| the settings window, as what it shows and asks (`slint_windows/model.rs`) | drawn by `window.rs`, answered through `host.rs` | the model by itself: its lines and what it asks are values |
 | what carries the runtime's conversation (`Transport` in `runtime/src/transport.ts`) | stdin and stdout | a pair in memory, with `testhost.ts` as the host |
 | the running application, as `ext/answer.rs` sees it (`Running`) | the Tauri side of `ext.rs` | tables and a port made by the test |
 

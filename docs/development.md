@@ -38,9 +38,10 @@ again when `src-tauri/` changes. A debug build loads the runtime's scripts
 from `runtime/dist/` in the repository: after changing anything under
 `runtime/`, run `pnpm build:runtime` and start Heyo again.
 
-The settings window is not part of the web view: Slint draws it, from
-`src-tauri/src/slint_settings/ui/*.slint`, which the host's build compiles
-in. A change there is a build of the host, like any change to
+The settings window and the dictation pill are not part of the web view:
+Slint draws them, from `src-tauri/src/slint_windows/ui/*.slint`, which the
+host's build compiles in. A change there is a build of the host, like any
+change to
 `src-tauri/`. The first build also fetches Skia, prebuilt for the target,
 from the releases of `rust-skia/skia-binaries`: the build script of the
 crate that binds it does, with `curl`
