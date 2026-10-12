@@ -18,7 +18,7 @@
 name=$1; lost=${2:-}
 out=$RESULTS/pill-$name.txt
 alive heyo && { echo "Heyo is running already" >&2; exit 1; }
-scale=${GDK_SCALE:-1}
+scale=$SCALE
 mkdir -p "$XDG_DATA_HOME/heyo"
 ln -sfn "$(getent passwd "$(id -u)" | cut -d: -f6)/.local/share/heyo/dictation" "$XDG_DATA_HOME/heyo/dictation"
 "$HERE/heyo.sh" seed dictationLive=true dictationPolish=off dictationLanguage=en > /dev/null

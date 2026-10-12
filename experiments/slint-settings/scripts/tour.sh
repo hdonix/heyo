@@ -12,7 +12,7 @@
 . "$(dirname "$0")/lib.sh"
 name=$1; shift
 [ $# -gt 0 ] || set -- general dictation list about
-scale=${GDK_SCALE:-2}
+scale=$SCALE
 id=$(settings_window)
 if [ -z "$id" ]; then
   timeout 10 "$HEYO" --open heyo:settings

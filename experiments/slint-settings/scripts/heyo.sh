@@ -8,6 +8,7 @@
 #   heyo.sh dconf                    a settings service of the sandbox's own, for hotkeys to be kept in
 #   heyo.sh open                     asks for the settings, as the palette does
 #   heyo.sh shot NAME                the settings window as $RESULTS/NAME.png
+#   heyo.sh scale N                  the session's scale becomes N, as when another monitor is connected
 #   heyo.sh stop                     ends Heyo
 #   heyo.sh down                     ends the sandbox and all it started
 #   heyo.sh sh CMD…                  runs a command in the sandbox's environment
@@ -82,6 +83,16 @@ case "${1:-}" in
     mkdir -p "$(dirname "$RESULTS/$1")"
     python3 -I "$HERE/shot.py" "$DISPLAY" "$RESULTS/$1.png" "$2" "$3" "$4" "$5"
     echo "$RESULTS/$1.png ${4}x${5}"
+    ;;
+  scale)
+    # Only where the session publishes its scale (sandbox.sh, GNOME Shell).
+    [ -f "$D/pids/xsettings" ] || { echo "this sandbox has no settings daemon: its scale is in the environment" >&2; exit 1; }
+    # Asked of the Shell, as the desktop's own settings ask it: a change of
+    # the setting alone is not followed by a session that is running.
+    /usr/bin/python3 -I "$HERE/session-scale.py" "$2" || exit 1
+    for _ in $(seq 50); do xrdb -query | grep -q "^Xft.dpi:[[:space:]]*$((96 * $2))$" && break; sleep 0.1; done
+    sleep 1
+    echo "the session says: $(xrdb -query | grep -E "^(Xft.dpi|Xcursor)" | tr -s '\t\n' '  ')"
     ;;
   stop)
     finish heyo

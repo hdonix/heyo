@@ -21,7 +21,7 @@ png() { python3 -I "$HERE/shot.py" "$DISPLAY" "$1" ${2:+$2 $3 $4 $5}; }
 overlay() { xdotool search --name '^Heyo Screenshot$' 2>/dev/null | tail -1; }
 drag() { xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $((($1 + $3) / 2)) $((($2 + $4) / 2)); sleep 0.1; xdotool mousemove "$3" "$4"; sleep 0.3; }
 {
-  echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale ${GDK_SCALE:-2}"
+  echo "# $(date +%F), $(basename "$HEYO"), $(xdpyinfo | awk '/dimensions/{print $2}') at scale $SCALE"
   HEYO_WARMUP=${HEYO_WARMUP:-4} "$HERE/heyo.sh" start > /dev/null || exit 1
   xdotool mousemove 300 1900
   sleep 0.5

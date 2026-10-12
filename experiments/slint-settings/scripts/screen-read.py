@@ -2,7 +2,7 @@
 """Reads things off the sandbox's display that a picture of it does not show.
 
     screen-read.py clipboard OUT.png   the picture on the clipboard, saved; fails if there is none
-    screen-read.py cursor              the name of the pointer's shape as it is now
+    screen-read.py cursor              the name of the pointer's shape as it is now, and its picture's size
     screen-read.py same A.png B.png [X Y W H]
                                        whether B is pixel for pixel A (or that part of A): says
                                        how many pixels differ and by how much at most
@@ -52,7 +52,8 @@ elif what == "cursor":
     xfixes.XFixesGetCursorImage.argtypes = [ctypes.c_void_p]
     image = xfixes.XFixesGetCursorImage(display)
     name = image.contents.name.decode() if image and image.contents.name else ""
-    print(name or f"(unnamed, {image.contents.width}x{image.contents.height})")
+    # Its name, and the size of its picture: a pointer of 24 is a picture of 24 or a little more.
+    print(f"{name or '(unnamed)'} {image.contents.width}x{image.contents.height}")
 elif what == "same":
     from PIL import Image, ImageChops
 

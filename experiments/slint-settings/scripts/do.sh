@@ -15,7 +15,7 @@
 #
 # Several may be given in one call. Only ever in the sandbox.
 . "$(dirname "$0")/lib.sh"
-scale=${GDK_SCALE:-2}
+scale=$SCALE
 id=$(settings_window); [ -n "$id" ] || { echo "no settings window" >&2; exit 1; }
 set -- "$@" -- $(place "$id")
 todo=

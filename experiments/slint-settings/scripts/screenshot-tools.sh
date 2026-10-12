@@ -22,7 +22,7 @@
 . "$(dirname "$0")/lib.sh"
 name=${1:-x11}; [ $# -gt 0 ] && shift
 out=$RESULTS/screenshot-tools-$name.txt
-scale=${GDK_SCALE:-2}
+scale=$SCALE
 # How long a save or a copy is given (a debug build needs longer).
 wait=${WAIT:-1.5}
 alive heyo && { echo "Heyo is running already" >&2; exit 1; }

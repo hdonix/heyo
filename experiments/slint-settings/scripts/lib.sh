@@ -18,9 +18,19 @@ D=$SLINT_SETTINGS_DIR
 S=${SLINT_SETTINGS_SCRATCH:-$D/scratch}
 eval "$("$HERE/sandbox.sh" env)"
 [ "$DISPLAY" = "$SLINT_SETTINGS_DISPLAY" ] && [ "$DISPLAY" != ":0" ] || { echo "not the sandbox's display" >&2; exit 1; }
-# Heyo's own files stay in the sandbox too. winit takes the scale from the
-# desktop's settings, which a bare X server has not: here it is said.
-export HOME="$D/home" WINIT_X11_SCALE_FACTOR="${GDK_SCALE:-2}"
+# Heyo's own files stay in the sandbox too.
+export HOME="$D/home"
+# The scale: what the session publishes, where it has a settings daemon
+# (sandbox.sh); a program then finds it as on a real desktop, and nothing
+# says it in the environment. A bare X server publishes none: there it is
+# said to GTK and to winit, each its own way.
+if [ -f "$D/pids/xsettings" ]; then
+  SCALE=$(xrdb -query 2>/dev/null | awk '/^Xft.dpi/{print int($2 / 96 + 0.5)}')
+  SCALE=${SCALE:-1}
+else
+  SCALE=${GDK_SCALE:-2}
+  export WINIT_X11_SCALE_FACTOR="$SCALE"
+fi
 unset IBUS_ADDRESS IBUS_ADDRESS_FILE
 HEYO=${HEYO:-$W/src-tauri/target/release/heyo}
 LEDGER=$S/pids.log

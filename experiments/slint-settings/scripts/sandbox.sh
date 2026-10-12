@@ -17,6 +17,16 @@
 #   SLINT_SETTINGS_DIR       where it keeps its files, /tmp/heyo-slint
 #   SCREEN                   the screen's size, 3840x2160
 #   GDK_SCALE                pixels per logical pixel, 2
+#
+# Under GNOME Shell the scale is said as a desktop says it, and nowhere
+# else: the session's own settings (a dconf of the sandbox's) have
+# `scaling-factor`, and GNOME's settings daemon publishes it (XSETTINGS,
+# and Xft.dpi and Xcursor.size in the resource database). Nothing of it is
+# in the environment of what runs there, so a program finds the scale as
+# it would on a real desktop, and `heyo.sh scale N` changes it under a
+# running program as connecting another monitor does. Under xfwm4 there is
+# no such daemon: there the scale is in the environment (GDK_SCALE, and
+# WINIT_X11_SCALE_FACTOR for Slint's windows).
 #   COMPOSITOR               on (xfwm4 compositing, the default), off (xfwm4
 #                            not compositing) or gnome (GNOME Shell, drawing
 #                            with Mesa's software OpenGL: the compositor Heyo
@@ -27,7 +37,8 @@ X=${SLINT_SETTINGS_DISPLAY:-:82}
 SOCKET=/tmp/.X11-unix/X${X#:}
 
 environment() {
-  echo "export DISPLAY=$X GDK_BACKEND=x11 GDK_SCALE=${GDK_SCALE:-2}"
+  if [ -f "$D/pids/xsettings" ]; then echo "export DISPLAY=$X GDK_BACKEND=x11"; echo "unset GDK_SCALE WINIT_X11_SCALE_FACTOR"
+  else echo "export DISPLAY=$X GDK_BACKEND=x11 GDK_SCALE=${GDK_SCALE:-2}"; fi
   echo "export DBUS_SESSION_BUS_ADDRESS=unix:path=$D/home/run/bus XDG_RUNTIME_DIR=$D/home/run"
   echo "export XDG_CONFIG_HOME=$D/home/config XDG_CACHE_HOME=$D/home/cache XDG_DATA_HOME=$D/home/data"
   # Neither the desktop's settings service, nor its accessibility bus, nor
@@ -97,9 +108,19 @@ EOF
     for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$D/home/run/bus" ] && break; sleep 0.3; done
     [ -e "$D/home/run/bus" ] || { echo "$0: the bus did not start: $(cat "$D/dbus.log")" >&2; exit 1; }
     if [ "${COMPOSITOR:-on}" = gnome ]; then
+      # The session's settings, kept as a desktop keeps them, and the scale
+      # among them: the Shell and the settings daemon read it from there.
+      wanted=${GDK_SCALE:-2}
+      unset GDK_SCALE
+      GSETTINGS_BACKEND=dconf start dconf /usr/libexec/dconf-service
+      sleep 0.5
+      GSETTINGS_BACKEND=dconf gsettings set org.gnome.desktop.interface scaling-factor "$wanted"
       # With a home of its own: its extensions read the home directory.
-      HOME="$D/home" XDG_SESSION_TYPE=x11 LIBGL_ALWAYS_SOFTWARE=1 start shell gnome-shell --x11
+      HOME="$D/home" XDG_SESSION_TYPE=x11 LIBGL_ALWAYS_SOFTWARE=1 GSETTINGS_BACKEND=dconf start shell gnome-shell --x11
       sleep 9
+      HOME="$D/home" GSETTINGS_BACKEND=dconf start xsettings /usr/libexec/gsd-xsettings
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do xrdb -query 2>/dev/null | grep -q "^Xft.dpi" && break; sleep 0.3; done
+      echo "the session says: $(xrdb -query | grep -E "^(Xft.dpi|Xcursor)" | tr -s '\t\n' '  ')"
       # Out of the overview it starts in.
       xdotool key Escape
       sleep 1.5
