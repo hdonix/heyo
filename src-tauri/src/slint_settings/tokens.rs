@@ -241,7 +241,7 @@ mod tests {
         let global = slint_global(&scales).unwrap();
         for line in [
             "out property <color> text: self.dark ? #f4f3f2ff : #1a1918ff;",
-            "out property <color> accent: self.dark ? #ff6b3dff : #d9471fff;",
+            "out property <color> accent: self.dark ? #4c9dffff : #1a73e8ff;",
             "out property <color> fill-2: self.dark ? #fffaf511 : #1e140f0e;",
             "out property <color> raycast-blue: self.dark ? #56c2ffff : #0a7fd6ff;",
             "out property <length> text-row-size: 15px;",

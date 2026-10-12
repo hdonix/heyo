@@ -34,8 +34,9 @@ $colors: (
   // Between the rows of a list: barely there.
   "divider": (rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.06)),
 
-  "accent": (#d9471f, #ff6b3d),
-  "on-accent": (#fff, #1c1210),
+  // The blue of Heyo's icon, a little deeper on paper so that white reads on it.
+  "accent": (#1a73e8, #4c9dff),
+  "on-accent": (#fff, #0d1626),
   "danger": (#d92d20, #ff453a),
   "success": (#188a52, #59d499),
   "warning": (#a86a00, #ffc531),
