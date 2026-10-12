@@ -3,7 +3,8 @@
 //
 // What it shows is decided in Rust (`screenshot::selecting`, which is told
 // of the pointer and the keys by the window itself: `screenshot/mod.rs`)
-// and set here. Nothing here answers the pointer or a key.
+// and set here. Nothing here answers the pointer or a key but the toolbar's
+// buttons, which say what was pressed, and the line text is typed in.
 //
 // The picture is here twice, as it was read and dimmed, and the selection
 // is the first drawn over the second. So what a drag changes on the screen
@@ -18,7 +19,7 @@
 // the hint), and the loupe has a small picture of its own.
 
 import { Tokens } from "tokens.slint";
-import { TextXs, TextSm } from "widgets.slint";
+import { Theme, TextXs, TextSm, Icon } from "widgets.slint";
 
 // A part of the overlay, in its logical pixels.
 export struct Part {
@@ -41,9 +42,118 @@ export struct Spot {
     y: length,
 }
 
+// Something drawn on the capture, as it is drawn: its box on the screen
+// (which for a line holds all of it, with room to spare), and what is in
+// the box.
+export struct Mark {
+    // rect, arrow, pen, text or blur.
+    kind: string,
+    colour: color,
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+    // The pen's path or an arrow's shaft, and an arrow's head, as path
+    // commands within the box.
+    path: string,
+    head: string,
+    text: string,
+    // A blurred part: the capture there, a pixel a block.
+    picture: image,
+}
+
+// A button of the toolbar that is not a colour's.
+export struct ToolItem {
+    id: string,
+    icon: image,
+    tip: string,
+    primary: bool,
+}
+
 // A dark label over the screen.
 component Hud inherits Rectangle {
     background: rgba(20, 20, 22, 0.9);
+}
+
+// A button of the toolbar: a symbol, or a colour's dot. It says what it is
+// for when the pointer rests on it.
+component ToolButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> tip;
+    in property <bool> active;
+    in property <bool> primary;
+    in property <bool> enabled: true;
+    in property <bool> is-colour;
+    in property <color> dot;
+    // The tip goes above where there is no room below.
+    in property <bool> tip-above;
+    property <bool> tipped;
+    callback clicked();
+    width: 30px;
+    height: 30px;
+    border-radius: Tokens.radius-md;
+    background: root.primary ? Tokens.accent : (root.active || (touch.has-hover && root.enabled)) ? Theme.selected : transparent;
+    opacity: root.enabled ? 1 : 0.35;
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+        changed has-hover => {
+            if (!self.has-hover) {
+                root.tipped = false;
+            }
+        }
+    }
+
+    Timer {
+        interval: 600ms;
+        running: touch.has-hover && !root.tipped;
+        triggered => {
+            root.tipped = true;
+        }
+    }
+
+    if !root.is-colour: Icon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        source: root.icon;
+        size: 16px;
+        tint: root.primary ? white : root.active ? Tokens.accent : Tokens.text;
+    }
+    if root.is-colour: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: root.dot;
+    }
+    // The chosen colour has a ring round it.
+    if root.is-colour && root.active: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 21px;
+        height: 21px;
+        border-radius: 10.5px;
+        border-width: 1.5px;
+        border-color: Tokens.text;
+    }
+    if root.tipped && root.tip != "": Hud {
+        x: (parent.width - self.width) / 2;
+        y: root.tip-above ? -self.height - 10px : parent.height + 10px;
+        width: said.preferred-width + 16px;
+        height: 24px;
+        border-radius: Tokens.radius-sm;
+        said := TextXs {
+            x: 8px;
+            height: parent.height;
+            vertical-alignment: center;
+            text: root.tip;
+            color: white;
+        }
+    }
 }
 
 export component ScreenshotWindow inherits Window {
@@ -72,6 +182,37 @@ export component ScreenshotWindow inherits Window {
     in property <image> loupe-picture;
     in property <length> loupe-cell: 8px;
     in property <int> loupe-cells: 15;
+    // What is drawn on the capture, the topmost last.
+    in property <[Mark]> marks;
+    // The toolbar: whether it is there and where, its buttons, the colours,
+    // and which of each is chosen.
+    in property <bool> toolbar;
+    in property <Spot> toolbar-at;
+    in property <bool> tips-above;
+    in property <[ToolItem]> tools;
+    in property <[ToolItem]> actions;
+    in property <image> undo-icon;
+    in property <[color]> colours;
+    in property <string> tool;
+    in property <int> colour;
+    in property <bool> can-undo;
+    callback pick-tool(id: string);
+    callback pick-colour(index: int);
+    callback undo();
+    callback act(id: string);
+    // Text being typed on the capture: whether, where and in what colour;
+    // what has been typed, and how wide that is.
+    in property <bool> typing;
+    in property <Spot> typing-at;
+    in property <color> ink;
+    in-out property <string> typed <=> field.text;
+    out property <length> typed-width: field.preferred-width;
+    // Only the capture and what is drawn on it: for the picture that is
+    // taken of the selection when it is done.
+    in property <bool> exporting;
+    public function focus-typing() {
+        field.focus();
+    }
     title: "Heyo Screenshot";
     no-frame: true;
     always-on-top: true;
@@ -105,9 +246,75 @@ export component ScreenshotWindow inherits Window {
         image-fit: fill;
     }
 
+    // What is drawn on the capture, cut off at the selection's edge.
+    Rectangle {
+        x: root.part.x;
+        y: root.part.y;
+        width: root.part.width;
+        height: root.part.height;
+        clip: true;
+        for mark in root.marks: Rectangle {
+            x: mark.x - root.part.x;
+            y: mark.y - root.part.y;
+            width: mark.width;
+            height: mark.height;
+            if mark.kind == "blur": Image {
+                width: parent.width;
+                height: parent.height;
+                source: mark.picture;
+                image-fit: fill;
+                image-rendering: pixelated;
+            }
+            // The outline's middle runs along the rectangle's edges.
+            if mark.kind == "rect": Rectangle {
+                x: -1.5px;
+                y: -1.5px;
+                width: parent.width + 3px;
+                height: parent.height + 3px;
+                border-width: 3px;
+                border-radius: 1.5px;
+                border-color: mark.colour;
+            }
+            // A stroked path is fitted into its element less the stroke's
+            // width, so the element is that much larger than what the path
+            // is written for: a point of the path is then that point.
+            if mark.kind == "pen" || mark.kind == "arrow": Path {
+                x: -1.5px;
+                y: -1.5px;
+                width: parent.width + 3px;
+                height: parent.height + 3px;
+                viewbox-width: parent.width / 1px;
+                viewbox-height: parent.height / 1px;
+                commands: mark.path;
+                stroke: mark.colour;
+                stroke-width: 3px;
+                stroke-line-cap: round;
+                stroke-line-join: round;
+            }
+            if mark.kind == "arrow": Path {
+                width: parent.width;
+                height: parent.height;
+                viewbox-width: parent.width / 1px;
+                viewbox-height: parent.height / 1px;
+                commands: mark.head;
+                fill: mark.colour;
+            }
+            if mark.kind == "text": Text {
+                x: 0;
+                y: 0;
+                height: 24px;
+                vertical-alignment: center;
+                text: mark.text;
+                color: mark.colour;
+                font-size: 18px;
+                font-weight: 600;
+            }
+        }
+    }
+
     // The outline: outside the selection, its inner edge on the
     // selection's; inside a window.
-    if root.selected: Rectangle {
+    if root.selected && !root.exporting: Rectangle {
         property <length> out: root.outline-inside ? 0px : 1.5px;
         x: root.part.x - self.out;
         y: root.part.y - self.out;
@@ -118,6 +325,7 @@ export component ScreenshotWindow inherits Window {
     }
 
     for handle in root.handles: Rectangle {
+        visible: !root.exporting;
         x: handle.x - 4.5px;
         y: handle.y - 4.5px;
         width: 9px;
@@ -128,7 +336,7 @@ export component ScreenshotWindow inherits Window {
         background: Tokens.accent;
     }
 
-    if root.label != "": Hud {
+    if root.label != "" && !root.exporting: Hud {
         x: root.label-at.x;
         y: root.label-at.y;
         width: size.preferred-width + 12px;
@@ -145,7 +353,7 @@ export component ScreenshotWindow inherits Window {
         }
     }
 
-    if root.hint != "": Hud {
+    if root.hint != "" && !root.exporting: Hud {
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
         width: said.preferred-width + 28px;
@@ -160,7 +368,7 @@ export component ScreenshotWindow inherits Window {
         }
     }
 
-    if root.status != "": Hud {
+    if root.status != "" && !root.exporting: Hud {
         x: (root.width - self.width) / 2;
         y: root.height - 40px - self.height;
         width: min(root.width * 0.7, told.preferred-width + 28px);
@@ -179,7 +387,7 @@ export component ScreenshotWindow inherits Window {
 
     // The loupe: the capture's pixels round the pointer, each a square, not
     // smoothed, with a grid; black where the screen ends.
-    if root.loupe: Rectangle {
+    if root.loupe && !root.exporting: Rectangle {
         property <length> side: root.loupe-cells * root.loupe-cell;
         x: root.loupe-at.x;
         y: root.loupe-at.y;
@@ -236,6 +444,96 @@ export component ScreenshotWindow inherits Window {
             border-radius: Tokens.radius-lg + 1px;
             border-width: 1.5px;
             border-color: #ffffffe6;
+        }
+    }
+
+    // The line text is typed in, with a thin frame round it while it is.
+    Rectangle {
+        visible: root.typing && !root.exporting;
+        x: field.x - 4px;
+        y: field.y - 3px;
+        width: field.width + 8px;
+        height: field.height + 6px;
+        border-width: 1px;
+        border-color: #ffffffb3;
+    }
+
+    field := TextInput {
+        visible: root.typing && !root.exporting;
+        x: root.typing-at.x;
+        y: root.typing-at.y;
+        width: max(120px, self.preferred-width + 2px);
+        height: 24px;
+        single-line: true;
+        vertical-alignment: center;
+        color: root.ink;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    if root.toolbar && !root.exporting: Rectangle {
+        x: root.toolbar-at.x;
+        y: root.toolbar-at.y;
+        width: 499px;
+        height: 40px;
+        border-radius: Tokens.radius-lg;
+        border-width: 1px;
+        border-color: Tokens.border;
+        background: Tokens.surface-raised;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: Tokens.shadow-far;
+        HorizontalLayout {
+            padding: 5px;
+            spacing: 2px;
+            alignment: start;
+            for item in root.tools: ToolButton {
+                icon: item.icon;
+                tip: item.tip;
+                tip-above: root.tips-above;
+                active: root.tool == item.id;
+                clicked => {
+                    root.pick-tool(item.id);
+                }
+            }
+            for dot[index] in root.colours: ToolButton {
+                is-colour: true;
+                dot: dot;
+                tip: "Color";
+                tip-above: root.tips-above;
+                active: root.colour == index;
+                clicked => {
+                    root.pick-colour(index);
+                }
+            }
+            ToolButton {
+                icon: root.undo-icon;
+                tip: "Undo (Ctrl+Z)";
+                tip-above: root.tips-above;
+                enabled: root.can-undo;
+                clicked => {
+                    root.undo();
+                }
+            }
+
+            Rectangle {
+                width: 9px;
+                Rectangle {
+                    width: 1px;
+                    height: 20px;
+                    background: Tokens.border;
+                }
+            }
+
+            for item in root.actions: ToolButton {
+                icon: item.icon;
+                tip: item.tip;
+                tip-above: root.tips-above;
+                primary: item.primary;
+                clicked => {
+                    root.act(item.id);
+                }
+            }
         }
     }
 }

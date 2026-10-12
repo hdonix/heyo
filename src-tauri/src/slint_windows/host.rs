@@ -33,8 +33,9 @@ pub(crate) trait Host: Send + Sync + 'static {
     fn forward(&self, title: String);
     /// Something was done to the dictation pill.
     fn pill(&self, did: super::pill::Did);
-    /// What is to become of the capture in the screenshot overlay.
-    fn screenshot(&self, outcome: crate::screenshot::selecting::Outcome);
+    /// What is to become of the capture in the screenshot overlay; and
+    /// the selected part as a picture, where something was drawn on it.
+    fn screenshot(&self, outcome: crate::screenshot::selecting::Outcome, drawn: Option<image::RgbaImage>);
 }
 
 /// The commands this window calls: each is answered in `call` below.
@@ -162,8 +163,8 @@ impl Host for Running {
         }
     }
 
-    fn screenshot(&self, outcome: crate::screenshot::selecting::Outcome) {
-        crate::screenshot::decided(&self.0, outcome);
+    fn screenshot(&self, outcome: crate::screenshot::selecting::Outcome, drawn: Option<image::RgbaImage>) {
+        crate::screenshot::decided(&self.0, outcome, drawn);
     }
 }
 

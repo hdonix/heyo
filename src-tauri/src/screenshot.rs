@@ -273,7 +273,8 @@ pub fn start(app: &AppHandle, mode: &str) {
                 };
                 let frozen = std::sync::Arc::new(Frozen { shot, area });
                 *FROZEN.lock().unwrap() = Some(frozen.clone());
-                if !crate::slint_windows::screenshot::show(&app, area, &frozen.shot, mode, asked) {
+                let dark = crate::settings::Settings::load().dark();
+                if !crate::slint_windows::screenshot::show(&app, area, &frozen.shot, mode, dark, asked) {
                     *FROZEN.lock().unwrap() = None;
                     return Err(format!("the overlay cannot be shown: {}", crate::slint_windows::failure()));
                 }
@@ -463,14 +464,17 @@ fn cut(bgrx: &[u8], width: u32, area: selecting::Area) -> image::RgbaImage {
 }
 
 /// What the overlay Slint draws was told to do with the capture: does it.
-/// What cannot be done is said in the overlay where that is still up, and
-/// in a notification where it is not.
-pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome) {
+/// `drawn` is the selected part as the overlay showed it, where something
+/// was drawn on it; without, the part is cut from the capture as it was
+/// read. What cannot be done is said in the overlay where that is still
+/// up, and in a notification where it is not.
+pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome, drawn: Option<image::RgbaImage>) {
     let selecting::Outcome::Finish { action, area } = outcome else { return cancel(app) };
     let Some(frozen) = FROZEN.lock().unwrap().clone() else { return };
     let action = match action {
         selecting::Action::Copy => "copy",
         selecting::Action::Save => "save",
+        selecting::Action::Pin => "pin",
         selecting::Action::Text => "text",
         selecting::Action::Pick => "pick",
     };
@@ -483,7 +487,7 @@ pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome) {
         height: area.height as f64 / scale,
         scale,
     };
-    let selected = Selected::Pixels(cut(&frozen.shot.bgrx, frozen.shot.width, area));
+    let selected = Selected::Pixels(drawn.unwrap_or_else(|| cut(&frozen.shot.bgrx, frozen.shot.width, area)));
     if let Err(e) = tauri::async_runtime::block_on(complete(app.clone(), action, selected, place)) {
         eprintln!("heyo: screenshot failed: {e}");
         if crate::slint_windows::screenshot::up() {

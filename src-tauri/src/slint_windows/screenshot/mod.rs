@@ -5,10 +5,13 @@
 //!   by `crate::screenshot::selecting`, which knows no toolkit.
 //! - `native` is what a desktop is told for the window to cover a monitor
 //!   and have every key.
+//! - `marks` is what is drawn on the capture, as the markup is given it.
 //! - This file is the window: made ahead, put over the monitor that was
 //!   read, told of the pointer and the keys by winit (not by Slint's own
 //!   elements: no element can then stand between a key and the overlay),
-//!   and what was decided told to the host.
+//!   and what was decided told to the host. Two things in it are Slint's
+//!   own, and hear of the pointer and the keys from it: the toolbar's
+//!   buttons, and the line text is typed in.
 //!
 //! It covers the screen and holds the keyboard, so it must not outlive
 //! what answers it:
@@ -21,6 +24,7 @@
 //!   screen from outside, which gives the keyboard back too.
 //! - If Heyo ends, however, the display does the same.
 
+mod marks;
 pub(super) mod native;
 
 use std::cell::RefCell;
@@ -40,7 +44,7 @@ use super::guard::{self, State};
 use super::thread::{self, Job, Kind};
 use super::ui;
 use crate::platform::capture::{Area, Shot};
-use crate::screenshot::selecting::{self, Action, Button, Cursor, Event, Key, Mode, Outcome, Selecting};
+use crate::screenshot::selecting::{self, Action, Button, Cursor, Event, Key, Mode, Outcome, Selecting, Shape, Tool};
 
 /// How bright the capture is around the selection, out of 256.
 const DIM: u16 = 154;
@@ -71,6 +75,8 @@ static BEATS: AtomicU64 = AtomicU64::new(0);
 struct Capture {
     area: Area,
     mode: Mode,
+    /// Whether Heyo is dark: the toolbar is then, and the accent lighter.
+    dark: bool,
     dimmed: SharedPixelBuffer<Rgba8Pixel>,
     asked: Instant,
 }
@@ -107,6 +113,33 @@ struct Overlay {
     ctrl: bool,
     alt: bool,
     cursor: Option<Cursor>,
+    /// What is drawn on the capture, as the markup has it, and of what.
+    marks: Rc<VecModel<ui::Mark>>,
+    drawn: Vec<Shape>,
+    /// The pointer is over the toolbar, which is Slint's; and its button
+    /// went down there, or in the line that is being typed.
+    on_toolbar: bool,
+    pressed_in_slint: bool,
+    /// Where text is being typed, as the markup has it.
+    typing: Option<selecting::Point>,
+}
+
+/// The toolbar's tools and what they are called there.
+const TOOLS: [(Tool, &str, &str, &str); 5] =
+    [(Tool::Rect, "rect", "square", "Rectangle"), (Tool::Arrow, "arrow", "arrow-up-right", "Arrow"), (Tool::Pen, "pen", "pen", "Pen"), (Tool::Text, "text", "type", "Text"), (Tool::Blur, "blur", "grid-3x3", "Blur")];
+
+/// The buttons that say what becomes of the selection. None is Cancel.
+const ACTIONS: [(Option<Action>, &str, &str, &str); 5] = [
+    (Some(Action::Text), "text", "scan-text", "Copy text in the selection"),
+    (Some(Action::Pin), "pin", "pin", "Pin to screen"),
+    (Some(Action::Save), "save", "download", "Save (Ctrl+S)"),
+    (Some(Action::Copy), "copy", "copy", "Copy (Enter)"),
+    (None, "cancel", "x", "Cancel (Esc)"),
+];
+
+/// A symbol by its name, as a picture.
+fn symbol(name: &str) -> Image {
+    super::icons::svg(name).and_then(|svg| Image::load_from_svg_data(svg.as_bytes()).ok()).unwrap_or_default()
 }
 
 thread_local! {
@@ -141,6 +174,26 @@ fn make() -> Result<Overlay, String> {
     let window = thread::making(Kind::Screenshot, ui::ScreenshotWindow::new).map_err(|e| format!("Slint could not make it: {e}"))?;
     let handles = Rc::new(VecModel::default());
     window.set_handles(ModelRc::from(handles.clone()));
+    let marks = Rc::new(VecModel::default());
+    window.set_marks(ModelRc::from(marks.clone()));
+    let item = |id: &str, icon: &str, tip: &str, primary: bool| ui::ToolItem { id: id.into(), icon: symbol(icon), tip: tip.into(), primary };
+    window.set_tools(ModelRc::new(VecModel::from(TOOLS.iter().map(|(_, id, icon, tip)| item(id, icon, tip, false)).collect::<Vec<_>>())));
+    window.set_actions(ModelRc::new(VecModel::from(ACTIONS.iter().map(|(action, id, icon, tip)| item(id, icon, tip, *action == Some(Action::Copy))).collect::<Vec<_>>())));
+    window.set_undo_icon(symbol("undo-2"));
+    window.set_colours(ModelRc::new(VecModel::from((0..selecting::COLOURS.len()).map(marks::colour).collect::<Vec<_>>())));
+    // The toolbar's buttons: each says what was pressed.
+    window.on_pick_tool(|id| {
+        if let Some((tool, ..)) = TOOLS.iter().find(|(_, name, ..)| *name == id.as_str()) {
+            with(|overlay| overlay.act(Event::Tool(*tool)));
+        }
+    });
+    window.on_pick_colour(|index| with(|overlay| overlay.act(Event::Colour(index.max(0) as usize))));
+    window.on_undo(|| with(|overlay| overlay.act(Event::Undo)));
+    window.on_act(|id| {
+        if let Some((action, ..)) = ACTIONS.iter().find(|(_, name, ..)| *name == id.as_str()) {
+            with(|overlay| overlay.act(action.map_or(Event::Cancel, Event::Do)));
+        }
+    });
     // Off the screen and small until it is wanted.
     window.window().set_position(slint::PhysicalPosition::new(-(IDLE as i32) * 4, -(IDLE as i32) * 4));
     window.window().set_size(slint::PhysicalSize::new(IDLE, IDLE));
@@ -170,6 +223,11 @@ fn make() -> Result<Overlay, String> {
         ctrl: false,
         alt: false,
         cursor: None,
+        marks,
+        drawn: Vec::new(),
+        on_toolbar: false,
+        pressed_in_slint: false,
+        typing: None,
     })
 }
 
@@ -230,6 +288,8 @@ fn icon(cursor: Cursor) -> CursorIcon {
         Cursor::Resize(_, 0) => CursorIcon::EwResize,
         Cursor::Resize(across, down) if across == down => CursorIcon::NwseResize,
         Cursor::Resize(..) => CursorIcon::NeswResize,
+        Cursor::Grab => CursorIcon::Grab,
+        Cursor::Arrow => CursorIcon::Default,
     }
 }
 
@@ -268,13 +328,15 @@ impl Overlay {
         if !self.ready {
             return self.prepare(move || with(|overlay| overlay.show(capture)));
         }
-        let Capture { area, mode, dimmed, asked } = capture;
+        let Capture { area, mode, dark, dimmed, asked } = capture;
         self.resting.stop();
         let scale = f64::from(self.window.window().scale_factor()).max(0.1);
+        self.window.set_dark(dark);
         self.window.set_dimmed(Image::from_rgba8_premultiplied(dimmed));
         let selecting = Selecting::new((area.width as f64 / scale, area.height as f64 / scale), (area.width, area.height), mode);
         self.up = Some(Up { selecting, scale, size: (area.width, area.height), mapped: false, asked, clear: None });
         (self.pressed, self.moved_pressed, self.ctrl, self.alt, self.cursor) = (false, 0, false, false, None);
+        (self.on_toolbar, self.pressed_in_slint) = (false, false);
         self.push();
         let window = self.window.window();
         window.set_position(slint::PhysicalPosition::new(area.x, area.y));
@@ -357,14 +419,80 @@ impl Overlay {
         self.window.set_status("".into());
         self.window.set_label("".into());
         self.handles.set_vec(Vec::new());
+        self.marks.set_vec(Vec::new());
+        self.drawn.clear();
+        self.typing = None;
+        self.window.set_typing(false);
+        self.window.set_toolbar(false);
     }
 
-    /// What winit told the window. Nothing of it goes on to Slint while
-    /// the overlay is up: there is nothing in it for Slint to answer.
+    /// A button of the toolbar was pressed. What was being typed is done
+    /// with first: the pointer went elsewhere.
+    fn act(&mut self, event: Event) {
+        self.typed();
+        let Some(up) = self.up.as_mut() else { return };
+        let outcome = up.selecting.handle(event);
+        self.after(outcome);
+    }
+
+    /// The text that is being typed is done with: it stays where it was
+    /// typed, as it is.
+    fn typed(&mut self) {
+        let Some(up) = self.up.as_mut().filter(|up| up.selecting.typing().is_some()) else { return };
+        let (text, width) = (self.window.get_typed().to_string(), f64::from(self.window.get_typed_width()));
+        up.selecting.handle(Event::Typed { text, width });
+    }
+
+    /// Shows what the overlay has become, or does what was decided.
+    fn after(&mut self, outcome: Option<Outcome>) {
+        let Some(outcome) = outcome else { return self.push() };
+        let drawn = match outcome {
+            Outcome::Finish { area, .. } => self.pictured(area),
+            Outcome::Cancel => None,
+        };
+        // Handed over, the overlay is done with; except where what becomes
+        // of it may fail and is said in the overlay.
+        if matches!(outcome, Outcome::Finish { action: Action::Text, .. }) {
+            self.push();
+        } else {
+            self.close();
+        }
+        let _ = self.telling.send(Box::new(move |host| host.screenshot(outcome, drawn)));
+    }
+
+    /// The selected part with what is drawn on it, as a picture taken of
+    /// the overlay itself with nothing else in it: what was seen is what
+    /// is had. None when nothing is drawn on it: it is then cut from the
+    /// capture as it was read.
+    fn pictured(&mut self, area: selecting::Area) -> Option<image::RgbaImage> {
+        if self.up.as_ref()?.selecting.shapes().is_empty() {
+            return None;
+        }
+        self.push();
+        self.window.set_exporting(true);
+        let taken = self.window.window().take_snapshot();
+        self.window.set_exporting(false);
+        let taken = taken.map_err(|e| eprintln!("heyo: the annotations could not be drawn into the screenshot: {e}")).ok()?;
+        let (width, height) = (taken.width(), taken.height());
+        let (x, y) = (area.x.min(width), area.y.min(height));
+        let (across, down) = (area.width.min(width - x), area.height.min(height - y));
+        let mut part = Vec::with_capacity((across * down * 4) as usize);
+        for row in y..y + down {
+            let from = ((row * width + x) * 4) as usize;
+            part.extend_from_slice(&taken.as_bytes()[from..from + across as usize * 4]);
+        }
+        image::RgbaImage::from_raw(across, down, part)
+    }
+
+    /// What winit told the window. Escape is the overlay's whatever else
+    /// has the keyboard. The rest goes on to Slint only where something of
+    /// Slint's is to answer it: over the toolbar, and for the line that is
+    /// being typed.
     fn told(&mut self, event: &WindowEvent) -> EventResult {
         let Some(up) = self.up.as_mut() else { return EventResult::Propagate };
         let scale = up.scale;
         let at = |pointer: (f64, f64)| (pointer.0 / scale, pointer.1 / scale);
+        let typing = up.selecting.typing();
         let event = match event {
             WindowEvent::RedrawRequested => {
                 super::window::frames::begun();
@@ -385,13 +513,22 @@ impl Overlay {
                     _ => {}
                 }
                 match key_of(&event.logical_key, event.physical_key).filter(|_| down && !is_synthetic) {
+                    // It gives up the text that is being typed, or the screenshot.
+                    Some(Key::Escape) => Event::Key { key: Key::Escape, ctrl: self.ctrl, alt: self.alt },
+                    Some(Key::Enter) if typing.is_some() => {
+                        self.typed();
+                        self.push();
+                        return EventResult::PreventDefault;
+                    }
+                    // Every other key is the text's while text is typed.
+                    _ if typing.is_some() => return EventResult::Propagate,
                     Some(key) => Event::Key { key, ctrl: self.ctrl, alt: self.alt },
                     None => return EventResult::PreventDefault,
                 }
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 (self.ctrl, self.alt) = (modifiers.state().control_key(), modifiers.state().alt_key());
-                return EventResult::PreventDefault;
+                return if typing.is_some() { EventResult::Propagate } else { EventResult::PreventDefault };
             }
             WindowEvent::CursorMoved { position, .. } => {
                 trace("pointer moved");
@@ -400,40 +537,64 @@ impl Overlay {
                     self.moved_pressed += 1;
                     guard::test_in_drag(self.moved_pressed);
                 }
-                Event::Moved { to: at(self.pointer) }
-            }
-            WindowEvent::CursorLeft { .. } => Event::Left,
-            WindowEvent::MouseInput { state, button, .. } => {
-                let button = match button {
-                    MouseButton::Left => Button::Primary,
-                    MouseButton::Right => Button::Secondary,
-                    _ => return EventResult::PreventDefault,
-                };
-                if button == Button::Primary {
-                    (self.pressed, self.moved_pressed) = (*state == ElementState::Pressed, 0);
+                if self.pressed_in_slint {
+                    return EventResult::Propagate;
                 }
-                match state {
-                    ElementState::Pressed => Event::Pressed { at: at(self.pointer), button },
-                    ElementState::Released => Event::Released { button },
+                let to = at(self.pointer);
+                up.selecting.handle(Event::Moved { to });
+                // Slint hears of the pointer while it is over the toolbar,
+                // and that it has left when it has.
+                let on_toolbar = up.selecting.toolbar().is_some_and(|toolbar| toolbar.contains(to));
+                if self.on_toolbar && !on_toolbar {
+                    let _ = self.window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
+                    // And had the pointer's shape meanwhile.
+                    self.cursor = None;
+                }
+                self.on_toolbar = on_toolbar;
+                self.push();
+                return if on_toolbar { EventResult::Propagate } else { EventResult::PreventDefault };
+            }
+            WindowEvent::CursorLeft { .. } => {
+                let was_on_toolbar = std::mem::take(&mut self.on_toolbar);
+                up.selecting.handle(Event::Left);
+                self.push();
+                return if was_on_toolbar { EventResult::Propagate } else { EventResult::PreventDefault };
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                let down = *state == ElementState::Pressed;
+                let place = at(self.pointer);
+                match button {
+                    // Gives the screenshot up, wherever it is pressed.
+                    MouseButton::Right if down => Event::Pressed { at: place, button: Button::Secondary },
+                    MouseButton::Left if !down && self.pressed_in_slint => {
+                        self.pressed_in_slint = false;
+                        return EventResult::Propagate;
+                    }
+                    MouseButton::Left if !down => {
+                        (self.pressed, self.moved_pressed) = (false, 0);
+                        Event::Released { button: Button::Primary }
+                    }
+                    MouseButton::Left => {
+                        // A press on the toolbar is the toolbar's, and one in
+                        // the line that is being typed is the line's.
+                        let line = typing.map(|line| selecting::Rect { x: line.0 - 4.0, y: line.1 - 3.0, width: (f64::from(self.window.get_typed_width()) + 2.0).max(120.0) + 8.0, height: selecting::TEXT_LINE + 6.0 });
+                        if up.selecting.toolbar().is_some_and(|toolbar| toolbar.contains(place)) || line.is_some_and(|line| line.contains(place)) {
+                            self.pressed_in_slint = true;
+                            return EventResult::Propagate;
+                        }
+                        // Anywhere else, what was being typed is done with.
+                        self.typed();
+                        (self.pressed, self.moved_pressed) = (true, 0);
+                        Event::Pressed { at: place, button: Button::Primary }
+                    }
+                    _ => return EventResult::PreventDefault,
                 }
             }
             WindowEvent::MouseWheel { .. } | WindowEvent::Touch(_) | WindowEvent::CursorEntered { .. } => return EventResult::PreventDefault,
             _ => return EventResult::Propagate,
         };
-        let outcome = up.selecting.handle(event);
-        match outcome {
-            None => self.push(),
-            Some(outcome) => {
-                // Handed over, the overlay is done with; except where what
-                // becomes of it may fail and is said in the overlay.
-                if matches!(outcome, Outcome::Finish { action: Action::Text, .. }) {
-                    self.push();
-                } else {
-                    self.close();
-                }
-                let _ = self.telling.send(Box::new(move |host| host.screenshot(outcome)));
-            }
-        }
+        let outcome = self.up.as_mut().and_then(|up| up.selecting.handle(event));
+        self.after(outcome);
         EventResult::PreventDefault
     }
 
@@ -469,6 +630,41 @@ impl Overlay {
         if let Some((loupe, clear)) = loupe {
             window.set_loupe_at(spot((loupe.frame.x, loupe.frame.y)));
             window.set_loupe_picture(Image::from_rgba8_premultiplied(magnified(clear, loupe.source)));
+        }
+        // What is drawn on it: all of it anew when one was added or taken
+        // away, the last one alone while it is being drawn or moved.
+        let shapes = up.selecting.shapes();
+        if shapes != self.drawn.as_slice() {
+            let drawn = |shape: &Shape| marks::mark(shape, up.clear.as_ref(), scale);
+            match shapes.split_last() {
+                Some((last, before)) if shapes.len() == self.drawn.len() && before == &self.drawn[..before.len()] => self.marks.set_row_data(before.len(), drawn(last)),
+                _ => self.marks.set_vec(shapes.iter().map(drawn).collect::<Vec<_>>()),
+            }
+            self.drawn = shapes.to_vec();
+        }
+        window.set_toolbar(look.toolbar.is_some());
+        if let Some(toolbar) = look.toolbar {
+            window.set_toolbar_at(spot((toolbar.x, toolbar.y)));
+            // Where a button's tip has no room below, it is above.
+            window.set_tips_above(toolbar.bottom() + 40.0 > up.size.1 as f64 / scale);
+        }
+        let tool = up.selecting.tool();
+        window.set_tool(TOOLS.iter().find(|(known, ..)| *known == tool).map_or("", |(_, id, ..)| *id).into());
+        window.set_colour(up.selecting.colour() as i32);
+        window.set_ink(marks::colour(up.selecting.colour()));
+        window.set_can_undo(!shapes.is_empty());
+        if look.typing != self.typing {
+            self.typing = look.typing;
+            window.set_typing(look.typing.is_some());
+            if let Some(line) = look.typing {
+                // A new line each time: empty, and with the keyboard. The
+                // window has the keyboard by its grab, which Slint does not
+                // know of: it is told that the window is the one in use.
+                window.set_typed("".into());
+                window.set_typing_at(spot(line));
+                let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::WindowActiveChanged(true));
+                window.invoke_focus_typing();
+            }
         }
         let cursor = up.selecting.cursor();
         let changed = self.cursor != Some(cursor);
@@ -574,7 +770,7 @@ pub(super) fn prepare() {
 /// Shows `shot`, the monitor `area` as it was read, over that monitor, for
 /// part of it to be selected. From any thread; it does not wait for the
 /// overlay to be on screen. False when Slint cannot show it.
-pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: Instant) -> bool {
+pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, dark: bool, asked: Instant) -> bool {
     if !super::ensure(app) {
         return false;
     }
@@ -585,7 +781,7 @@ pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: 
         let clear = scope.spawn(|| picture(shot, 256));
         let dimmed = picture(shot, DIM);
         crate::screenshot::mark("dimmed picture made", asked);
-        let capture = Capture { area, mode, dimmed, asked };
+        let capture = Capture { area, mode, dark, dimmed, asked };
         (thread::on(move || with(|overlay| overlay.show(capture))), clear.join())
     });
     let Ok(clear) = clear else { return false };
