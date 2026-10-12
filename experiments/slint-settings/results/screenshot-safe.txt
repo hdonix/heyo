@@ -1,0 +1,28 @@
+# 2026-10-12, 3840x2160 at scale 1 under GNOME Shell
+== escape
+the overlay was off the screen 24 ms after
+PASS: the field has exactly "hello"
+Heyo is running
+the next screenshot comes up
+ended heyo 4108079
+== panic
+the overlay was off the screen 151 ms after
+PASS: the field has exactly "hello"
+Heyo is running
+the palette opens
+heyo: panicked at src/slint_windows/guard.rs:205:9 (thread heyo-slint, version 0.1.0): HEYO_SLINT_PANIC_IN_DRAG asked for this panic
+heyo: Slint's thread panicked. Its windows are taken away; the settings and the dictation pill are not shown again until Heyo is restarted
+ended heyo 4108935
+== stall
+the overlay was off the screen 1653 ms after
+PASS: the field has exactly "hello"
+Heyo is running
+the palette opens
+heyo: HEYO_SLINT_STALL_IN_DRAG asked Slint's thread to stop for a minute
+heyo: what draws the screenshot overlay does not answer; the overlay is taken off the screen
+ended heyo 4109861
+== kill
+the overlay was off the screen 49 ms after
+PASS: the field has exactly "hello"
+Heyo is not running
+heyo 4111160 had ended

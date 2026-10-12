@@ -1,0 +1,17 @@
+# 2026-10-12, heyo, 3840x2160 at scale 1
+heyo: started
+heyo: renderer: CPU (setting Auto; driver NVIDIA without modesetting (nvidia-drm modeset=0))
+the overlay's window:  Depth: 24 Map State: IsViewable Override Redirect State: yes -geometry 3840x2160+0+0 
+## selected 1200 by 700 at 1000,600
+inside the selection: 0 of 817344 pixels differ from the desktop (by 0 at most)
+above: 0 of 2188800 pixels differ from the desktop dimmed (by 0 at most)
+below: 0 of 3187200 pixels differ from the desktop dimmed (by 0 at most)
+left: 0 of 737200 pixels differ from the desktop dimmed (by 0 at most)
+right: 0 of 1223600 pixels differ from the desktop dimmed (by 0 at most)
+## moved by 200,100 and its bottom right corner taken 200,100 further
+inside the selection: 0 of 1093744 pixels differ from the desktop (by 0 at most)
+above: 0 of 2572800 pixels differ from the desktop dimmed (by 0 at most)
+below: 0 of 2419200 pixels differ from the desktop dimmed (by 0 at most)
+left: 0 of 1006200 pixels differ from the desktop dimmed (by 0 at most)
+right: 0 of 1040600 pixels differ from the desktop dimmed (by 0 at most)
+## after Enter the screen is the desktop again
