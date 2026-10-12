@@ -349,7 +349,8 @@ impl Live {
                     } else if let Some(accelerator) = keys::accelerator(self.held, &format!("{code:?}")) {
                         let id = self.recording.take().unwrap_or_default();
                         self.push_recording();
-                        self.ask(self.model.bind(&id, &accelerator));
+                        let asks = self.model.bind(&id, &accelerator);
+                        self.ask(asks);
                     }
                 }
                 self.draw_soon();
@@ -469,7 +470,10 @@ fn wire(window: &ui::SettingsWindow) {
         with(Live::stop_recording);
     });
     host.on_clear_hotkey(|id| {
-        with(|live| live.ask(live.model.bind(&id, "")));
+        with(|live| {
+            let asks = live.model.bind(&id, "");
+            live.ask(asks);
+        });
     });
     host.on_close(|| {
         with(Live::hide);

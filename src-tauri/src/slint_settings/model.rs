@@ -1010,7 +1010,8 @@ impl Model {
 
     /// Binds `accelerator` (none, when it is empty) to one of Heyo's own
     /// hotkeys or to an item.
-    pub(crate) fn bind(&self, id: &str, accelerator: &str) -> Vec<Ask> {
+    pub(crate) fn bind(&mut self, id: &str, accelerator: &str) -> Vec<Ask> {
+        self.error.clear();
         if let Some(name) = id.strip_prefix('@') {
             return vec![ask("set_hotkey", json!({ "name": name, "accelerator": accelerator }), Then::Hotkeys)];
         }
@@ -1021,6 +1022,10 @@ impl Model {
     /// The control `id` was used and now says `value`: what to ask of the
     /// host. What only changes what is shown is changed here.
     pub(crate) fn acted(&mut self, id: &str, value: &str) -> Vec<Ask> {
+        // What went wrong before stays said until something else is done:
+        // not until the host next answers, which it also does unasked (a
+        // download that failed is followed by a look at what is installed).
+        self.error.clear();
         let on = value == "true";
         if let Some(name) = id.strip_prefix("set:") {
             // A switch says true or false; everything else its words.
@@ -1185,6 +1190,7 @@ impl Model {
         }
         self.page = page.to_string();
         self.find.clear();
+        self.error.clear();
         self.entered()
     }
 
@@ -1214,9 +1220,6 @@ impl Model {
                 return if then == Then::Settings { vec![ask("get_settings", Value::Null, Then::Reread)] } else { Vec::new() };
             }
         };
-        if !matches!(then, Then::Started(_) | Then::Models(_) | Then::Reread) {
-            self.error.clear();
-        }
         match then {
             Then::Settings | Then::Reread => {
                 if let Value::Object(settings) = answer {
@@ -1455,6 +1458,12 @@ mod tests {
         assert_eq!(row(&model.lines(), "Speech Recognition").value, "Unpacking…");
         assert_eq!(asked(&model.heard(event::DICTATION_INSTALL, &json!({ "type": "error", "message": "no space left" }))).0, "dictation_status");
         assert_eq!((row(&model.lines(), "Speech Recognition").control, model.error.as_str()), ("button", "no space left"));
+        // What that asked is answered; why it failed stays said, until
+        // something else is done.
+        model.answered(Then::Dictation, Ok(json!({ "installed": false, "installing": false, "microphones": [] })));
+        assert_eq!(model.error, "no space left");
+        model.acted("set:dictationLive", "false");
+        assert_eq!(model.error, "");
         // It could not even be started.
         model.acted("act:install-dictation", "");
         model.answered(Then::Started("dictation"), Err("no Node.js".into()));
