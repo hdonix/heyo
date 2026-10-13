@@ -145,14 +145,34 @@ banners() {
     gsettings reset org.gnome.desktop.notifications show-banners 2> /dev/null
   fi
 }
-# What a window cannot be asked yet is in layout.py, once.
-# toolbar BUTTON RIGHT BOTTOM: X Y of a button of the screenshot's toolbar,
-# under a selection whose right and bottom edges are those.
-toolbar() { python3 "$GUI/layout.py" toolbar "$1" "$2" "$3" "$(scale)"; }
+# middle X Y W H: the middle of that rectangle.
+middle() { [ $# -eq 4 ] && echo $(($1 + $3 / 2)) $(($2 + $4 / 2)); }
+# toolbar BUTTON: X Y of the middle of a button of the screenshot's
+# toolbar, asked of the overlay, which must be up with something selected.
+# BUTTON is rect arrow pen text blur, red yellow green blue, undo, ocr pin
+# save copy cancel. (The tools and the colours are buttons of which one is
+# chosen, which the accessibility bus calls toggle buttons.)
+toolbar() {
+  case $1 in
+    rect) set -- "toggle button" Rectangle ;; arrow) set -- "toggle button" Arrow ;; pen) set -- "toggle button" Pen ;;
+    text) set -- "toggle button" Text ;; blur) set -- "toggle button" Blur ;;
+    red) set -- "toggle button" Red ;; yellow) set -- "toggle button" Yellow ;; green) set -- "toggle button" Green ;; blue) set -- "toggle button" Blue ;;
+    undo) set -- "push button" Undo ;; ocr) set -- "push button" "Copy Text" ;; pin) set -- "push button" Pin ;;
+    save) set -- "push button" Save ;; copy) set -- "push button" Copy ;; cancel) set -- "push button" Cancel ;;
+    *) echo "toolbar: no button $1" >&2; return 2 ;;
+  esac
+  # Waited for: the overlay says where its toolbar is a moment after it shows it.
+  middle $(ask wait "$1" "$2" "Heyo Screenshot")
+}
+# toolbar_box: X Y W H of the toolbar itself.
+toolbar_box() { ask wait panel Tools "Heyo Screenshot"; }
 # pill: the dictation pill's window, if it is on screen. pill_at
-# body|cancel: X Y of that part of it.
+# body|cancel: X Y of the middle of that part of it, asked of the pill.
 pill() { window '^Heyo Dictation$'; }
-pill_at() { python3 "$GUI/layout.py" pill "$1" $(place "$(pill)"); }
+pill_at() {
+  case $1 in body) set -- Dictation ;; cancel) set -- Cancel ;; esac
+  middle $(ask wait "push button" "$1" "Heyo Dictation")
+}
 
 # session_for xfwm|gnome: the session a script tries things in. One that
 # runs already is used as it is and left running, so that several scripts

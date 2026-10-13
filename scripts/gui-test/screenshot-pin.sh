@@ -26,7 +26,7 @@ pins() { xdotool search --onlyvisible --name '^Heyo Pinned Screenshot$' 2>/dev/n
 pin() {
   heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3
   xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $((($1 + $3) / 2)) $((($2 + $4) / 2)); sleep 0.1; xdotool mousemove "$3" "$4"; sleep 0.2; xdotool mouseup 1; sleep 0.3
-  xdotool mousemove $(toolbar pin "$3" "$4"); sleep 0.15; xdotool click 1; sleep "$wait"
+  xdotool mousemove $(toolbar pin); sleep 0.15; xdotool click 1; sleep "$wait"
 }
 {
   echo "# $(date +%F), $BUILD, $(xdpyinfo | awk '/dimensions/{print $2}') at scale $scale"

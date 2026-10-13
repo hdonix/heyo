@@ -125,10 +125,14 @@ appear within a second. The settings window names its rows, switches,
 buttons and fields. It says only what is in view: a control further down
 a page is there once the page is scrolled to it.
 
-The screenshot overlay and the dictation pill cannot be asked yet: the
-toolbar's buttons are pictures without a name, its colours are not there
-at all, and of the pill only its text is. Where those are is in
-`layout.py`, once, for every script that clicks them.
+The screenshot overlay and the dictation pill are asked too. The toolbar
+is a panel named Tools, its buttons are named (Rectangle, Arrow, Pen,
+Text, Blur; Red, Yellow, Green, Blue; Undo; Copy Text, Pin, Save, Copy,
+Cancel), the tools and the colours saying which is chosen, and the
+selection is a panel named Selection. The pill's body is a button named
+Dictation and its X one named Cancel. `env.sh` has them as `toolbar
+BUTTON`, `toolbar_box` and `pill_at body|cancel`; no script carries a
+window's layout as numbers.
 
 ## The scripts
 

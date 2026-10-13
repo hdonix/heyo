@@ -33,9 +33,9 @@ up() { if viewable "$(overlay)"; then echo up; else echo gone; fi; }
 drag() { xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $((($1 + $3) / 2)) $((($2 + $4) / 2 + 20)); sleep 0.1; xdotool mousemove "$3" "$4"; sleep 0.2; xdotool mouseup 1; sleep 0.25; }
 # The selection every case makes, in the screen's pixels, and a button of
 # its toolbar by its name (rect arrow pen text blur red yellow green blue
-# undo ocr pin save copy cancel): where it is, is layout.py's to say.
+# undo ocr pin save copy cancel): where it is, the overlay says (`toolbar`).
 select_it() { heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.3; drag 1000 600 2200 1300; }
-button() { set -- $(toolbar "$1" 2200 1300); bx=$1; by=$2; }
+button() { set -- "$1" $(toolbar "$1"); bx=$2; by=$3; [ "$1" != copy ] || { copy_x=$bx; copy_y=$by; }; }
 B() { button "$1"; xdotool mousemove "$bx" "$by"; sleep 0.15; xdotool click 1; sleep 0.25; }
 at() { xdotool mousemove "$1" "$2"; sleep 0.25; echo "the pointer $3: $($READ cursor)"; }
 saved() { ls -t "$HOME/Pictures/Screenshots/"*.png 2>/dev/null | head -1; }
@@ -99,9 +99,13 @@ PY
 
   echo "## undo, by key and by button"
   select_it
+  # The tool stays the rectangle until it is pressed again (which, with the
+  # toolbar's place carried as numbers, this pressed twice more: the
+  # second press put the tool away and the drag after it moved the
+  # selection, and the toolbar with it).
   B rect; drag 1100 700 1400 900
-  B rect; drag 1500 700 1800 900
-  B rect; drag 1100 1000 1400 1200
+  drag 1500 700 1800 900
+  drag 1100 1000 1400 1200
   xdotool key ctrl+z; sleep 0.2; B undo
   xdotool mousemove 300 1900; sleep 0.2
   xdotool key ctrl+s; sleep "$wait"
@@ -221,7 +225,7 @@ PY
   drag 1000 600 2200 1300
   sleep 4
   png "$RESULTS/screenshot-tools-$name-text-read.png" $((1920 - 380 * scale)) $((2160 - 90 * scale)) $((760 * scale)) $((60 * scale))
-  echo "after the selection was made the overlay is $(up), with no toolbar: the pointer where the toolbar would be is $(button copy; xdotool mousemove "$bx" "$by"; sleep 0.3; $READ cursor)"
+  echo "after the selection was made the overlay is $(up), with no toolbar: the pointer where the toolbar would be is $(xdotool mousemove "$copy_x" "$copy_y"; sleep 0.3; $READ cursor)"
   xdotool key Escape; sleep 0.4
 
   echo "## pin"

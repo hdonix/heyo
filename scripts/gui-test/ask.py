@@ -8,6 +8,9 @@ carrying the window's layout as numbers.
     ask.py click ROLE NAME [WINDOW]      a click in its middle, with the sandbox's xdotool
     ask.py states ROLE NAME [WINDOW]     its states (checked, selected, focused…), one line
     ask.py wait ROLE NAME [WINDOW]       waits for it (10 s), then as `where`
+    ask.py enable                        only says to the session that an assistive tool is there
+                                         (the desktop then shows so, in its top bar: a script that
+                                         compares pictures of the screen says it before the first)
 
 ROLE is as the accessibility bus names it ("push button", "list item",
 "check box"…; `tree` shows them) and NAME is the control's label, exactly.
@@ -126,6 +129,9 @@ def find(role, name, title):
 
 def main():
     what, arguments = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
+    if what == "enable":
+        enable()
+        return
     if what == "tree":
         found = windows(arguments[0] if arguments else None)
         if not found:

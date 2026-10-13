@@ -119,7 +119,7 @@ use() {
   png "$T/display-before.png"
   heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.5
   xdotool mousemove 1000 600 mousedown 1; sleep 0.1; xdotool mousemove 1600 900; sleep 0.1; xdotool mousemove 2200 1300; sleep 0.2; xdotool mouseup 1; sleep 0.4
-  inside=$(over 1500 900); handle=$(over 2200 1300); bar=$(over $(toolbar green 2200 1300))
+  inside=$(over 1500 900); handle=$(over 2200 1300); bar=$(over $(toolbar green))
   echo "screenshot: pointer in the selection: $inside; on a handle: $handle; on the toolbar: $bar"
   check "the pointer over the overlay is the session's size" same "${inside##* } ${handle##* } ${bar##* }" "$size $size $size"
   check "the overlay says the selection is 1200 by 700 of the screen's pixels" says label "1200 × 700" "Heyo Screenshot"
@@ -128,7 +128,7 @@ use() {
   [ "$when" = before ] || png "$RESULTS/display-$name.png" 900 500 1400 $((860 + 60 * scale))
   # The toolbar as drawn, measured in its padding, clear of its buttons and
   # its round corners: all of its width but the corners.
-  set -- $(python3 "$GUI/layout.py" toolbar-box 2200 1300 "$scale")
+  set -- $(toolbar_box)
   set -- "$3" $(python3 "$GUI/toolbar.py" "$T/display-overlay.png" $(($1 + $3 / 2)) $(($2 + 2 * scale)))
   echo "  toolbar: $2 px across where it was measured, $3 px down to the next button"
   check "the toolbar is drawn $1 px wide (but for its corners)" [ "$2" -le "$1" -a "$2" -ge $(($1 * 95 / 100)) ]
@@ -146,7 +146,7 @@ use() {
   # Another, 300 by 200 from 400,300, pinned.
   heyo --open heyo:screenshot > /dev/null 2>&1; sleep 1.5
   xdotool mousemove 400 300 mousedown 1; sleep 0.1; xdotool mousemove 550 400; sleep 0.1; xdotool mousemove 700 500; sleep 0.2; xdotool mouseup 1; sleep 0.3
-  xdotool mousemove $(toolbar pin 700 500); sleep 0.15; xdotool click 1; sleep 1.5
+  xdotool mousemove $(toolbar pin); sleep 0.15; xdotool click 1; sleep 1.5
   pin=$(pins | tail -1)
   if [ -n "$pin" ]; then
     pointer=$(over 550 400)

@@ -30,6 +30,10 @@ drag() { xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $
   HEYO_TEST_WARMUP=${HEYO_TEST_WARMUP:-4} "$GUI/sandbox.sh" heyo || exit 1
   xdotool mousemove 300 1900
   sleep 0.5
+  # The overlay is asked where its toolbar is, and the desktop shows in its
+  # top bar that somebody asks: said before the first picture, so that the
+  # pictures differ by the overlay alone.
+  ask enable; sleep 1.5
   png "$T/shot-before.png"
   heyo --open heyo:screenshot > /dev/null 2>&1
   sleep 1.2
@@ -44,24 +48,28 @@ drag() { xdotool mousemove "$1" "$2" mousedown 1; sleep 0.1; xdotool mousemove $
   xdotool mousemove 300 1900
   sleep 0.4
   png "$T/shot-selected.png"
+  bar=$(toolbar_box)
   # Its corner, with the size above it and two of its handles.
   png "$RESULTS/screenshot-$name-selected.png" 940 540 760 460
   echo "## selected 1200 by 700 at 1000,600"
-  python3 "$GUI/screenshot-pixels.py" "$T/shot-before.png" "$T/shot-selected.png" 1000 600 1200 700 "$scale"
+  python3 "$GUI/screenshot-pixels.py" "$T/shot-before.png" "$T/shot-selected.png" 1000 600 1200 700 "$scale" $bar
   drag 1600 900 1800 1000; xdotool mouseup 1; sleep 0.2
   drag 2400 1400 2600 1500; xdotool mouseup 1; sleep 0.2
   xdotool mousemove 300 1900
   sleep 0.4
   png "$T/shot-moved.png"
+  bar=$(toolbar_box)
   echo "## moved by 200,100 and its bottom right corner taken 200,100 further"
-  python3 "$GUI/screenshot-pixels.py" "$T/shot-before.png" "$T/shot-moved.png" 1200 700 1400 800 "$scale"
+  python3 "$GUI/screenshot-pixels.py" "$T/shot-before.png" "$T/shot-moved.png" 1200 700 1400 800 "$scale" $bar
   xdotool key Return
   sleep 1
   png "$T/shot-after.png"
-  python3 - "$T/shot-before.png" "$T/shot-after.png" <<'PY'
+  # Below the desktop's own bar, whose clock goes on meanwhile.
+  python3 - "$T/shot-before.png" "$T/shot-after.png" "$(xprop -root _NET_WORKAREA | awk -F'[=,]' '{print $3 + 0}')" <<'PY'
 import sys
 from PIL import Image, ImageChops
 before, after = (Image.open(path).convert("RGB") for path in sys.argv[1:3])
+before, after = (picture.crop((0, int(sys.argv[3]), picture.width, picture.height)) for picture in (before, after))
 box = ImageChops.difference(before, after).getbbox()
 print("## after Enter the screen is the desktop again" if box is None else f"## FAIL: after Enter the screen differs from the desktop in {box}")
 PY

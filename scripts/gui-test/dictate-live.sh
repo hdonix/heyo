@@ -116,8 +116,10 @@ record() {
   python3 - "$HEYO" "$T/$1.json" "$LENGTH" "${2:-0}" "${3:-}" "${4:-cli}" "${5:-}" "$HOTKEY" "$GUI" <<'PY'
 import json, os, signal, subprocess, sys, threading, time
 heyo, out, length, at, what, begun, terminal, hotkey, gui = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), *sys.argv[5:10]
-sys.path.insert(0, gui)
-import layout
+def asked(name):
+    """The middle of a part of the pill, as the pill says where it is."""
+    x, y, width, height = map(int, run("/usr/bin/python3", gui + "/ask.py", "where", "push button", name, "Heyo Dictation").split())
+    return str(x + width // 2), str(y + height // 2)
 notes = os.environ["WINDOW_DIR"] + "/window-org.test.Notes"
 states, stop = [], threading.Event()
 def run(*command):
@@ -168,18 +170,15 @@ time.sleep(2.0)
 during = engine()
 ended = None
 if what in ("click", "cancel"):
-    # The pill is in the middle of its window, which Slint draws, and of
-    # which only the text can be asked where it is: where its body and its
-    # X are is layout.py's to say. The X shows when the pointer is on the
-    # pill. So the pointer is on the pill a little ahead of the click, and
-    # the click still comes when it was asked for.
+    # Where the pill's body and its X are, the pill says. The X shows when
+    # the pointer is on the pill. So the pointer is on the pill a little
+    # ahead of the click, and the click still comes when it was asked for.
     ahead = 0.7 if what == "cancel" else 0
     time.sleep(max(0, at - ahead - (time.time() - start)))
-    window = pill()
-    run("xdotool", "mousemove", *map(str, layout.pill("body", *window)))
+    run("xdotool", "mousemove", *asked("Dictation"))
     if what == "cancel":
         time.sleep(0.4)
-        run("xdotool", "mousemove", *map(str, layout.pill("cancel", *window)))
+        run("xdotool", "mousemove", *asked("Cancel"))
         time.sleep(max(0, at - (time.time() - start)))
     ended = round(time.time() - start, 2)
     run("xdotool", "click", "1")

@@ -207,7 +207,7 @@ for THEME in ${*:-light dark}; do
   xdotool mousemove 1250 620 mousedown 1; w 0.2
   for step in 1 2 3 4 5 6 7 8 9 10; do xdotool mousemove $((1250 + step * 110)) $((620 + step * 60)); w 0.05; done
   xdotool mouseup 1; w 1.2
-  button() { set -- $(python3 "$HERE/layout.py" toolbar "$1" 2350 1220 2); xdotool mousemove "$1" "$2"; w 0.4; xdotool click 1; w 0.4; }
+  button() { set -- $(toolbar "$1"); xdotool mousemove "$1" "$2"; w 0.4; xdotool click 1; w 0.4; }
   button rect
   xdotool mousemove 1330 700 mousedown 1; w 0.1; xdotool mousemove 1500 800; w 0.1; xdotool mousemove 1760 900; w 0.1; xdotool mouseup 1; w 0.7
   button arrow

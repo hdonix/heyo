@@ -1,32 +1,29 @@
 #!/usr/bin/env python3
 """Checks the overlay's pixels against the desktop it froze.
 
-    screenshot-pixels.py BEFORE.png SELECTED.png X Y W H [SCALE]
+    screenshot-pixels.py BEFORE.png SELECTED.png X Y W H SCALE BAR_X BAR_Y BAR_W BAR_H
 
 BEFORE is the screen before the screenshot was asked for, SELECTED the
 screen with the overlay up and X Y W H selected (handles, outline and label
 round it, the toolbar below its right end). Inside the selection every
 pixel must be the desktop's; outside it, away from what the overlay draws
 round the selection, every pixel must be the desktop's dimmed to 154 of
-256, rounded down. Where the toolbar is (layout.py), and its shadow falls
-(40 logical pixels round it, a little of that on the selection), is not
-looked at.
+256, rounded down. Where the toolbar is (BAR…, as the overlay says when
+asked), and its shadow falls (40 logical pixels round it, a little of that
+on the selection), is not looked at.
 """
-import os
 import sys
 
 from PIL import Image, ImageChops
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import layout  # noqa: E402
-
 before = Image.open(sys.argv[1]).convert("RGB")
 shown = Image.open(sys.argv[2]).convert("RGB")
 x, y, w, h = map(int, sys.argv[3:7])
-scale = int(sys.argv[7]) if len(sys.argv) > 7 else 1
+scale = int(sys.argv[7])
 assert before.size == shown.size, (before.size, shown.size)
-left, top, width, height = layout.toolbar_box(x + w, y + h, scale)
-shadow = layout.TOOLBAR_SHADOW * scale
+left, top, width, height = map(int, sys.argv[8:12])
+# How far the toolbar's shadow is drawn round it, in logical pixels.
+shadow = 40 * scale
 # Its shadow is cast 8 down.
 toolbar = (left - shadow, top - shadow, left + width + shadow, top + height + shadow + 8 * scale)
 for picture in (before, shown):
