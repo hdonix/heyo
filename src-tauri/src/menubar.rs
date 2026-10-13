@@ -7,6 +7,7 @@
 //! which keeps menu bar commands mounted so a click on an item is answered
 //! at once.
 
+use crate::i18n::t;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -87,7 +88,7 @@ fn run(app: &AppHandle, key: &str, user: bool, action: Option<Vec<usize>>, given
         app.state::<MenuBar>().0.lock().unwrap().running.remove(&id);
         eprintln!("heyo: {e}");
         if user {
-            crate::notify("Could not run the command", &e);
+            crate::notify(t("Could not run the command"), &e);
         }
     }
 }
@@ -261,7 +262,7 @@ pub fn handle(app: &AppHandle, message: &Value) {
             if let (Some((key, user, _)), Some(error)) = (run, message["error"].as_str()) {
                 eprintln!("heyo: {key}: {error}");
                 if user {
-                    crate::notify("The command failed", error);
+                    crate::notify(t("The command failed"), error);
                 }
             }
         }
@@ -336,7 +337,7 @@ fn show(app: &AppHandle, key: &str, menu: &Value) -> tauri::Result<()> {
     if !built.is_empty() {
         built.push(Box::new(PredefinedMenuItem::separator(app)?));
     }
-    built.push(Box::new(MenuItem::with_id(app, format!("{ITEM}|{key}|refresh"), "Refresh", true, None::<&str>)?));
+    built.push(Box::new(MenuItem::with_id(app, format!("{ITEM}|{key}|refresh"), t("Refresh"), true, None::<&str>)?));
     let refs: Vec<&dyn IsMenuItem<Wry>> = built.iter().map(|c| c.as_ref()).collect();
     let tray_menu = Menu::with_items(app, &refs)?;
     let title = menu["title"].as_str();

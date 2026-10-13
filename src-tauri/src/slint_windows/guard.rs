@@ -30,6 +30,7 @@
 //!   drops what was on it. A window of winit's is not handled: it stays as
 //!   it was last drawn.
 
+use crate::i18n::t;
 use std::sync::atomic::{AtomicI64, AtomicU8, Ordering};
 use std::sync::Once;
 
@@ -85,7 +86,7 @@ pub(super) fn gone_because(reason: &str) {
 
 pub(super) fn reason() -> String {
     let why = REASON.lock().map(|why| why.clone()).unwrap_or_default();
-    if why.is_empty() { "it stopped".into() } else { why }
+    if why.is_empty() { t("it stopped").into() } else { why }
 }
 
 /// Notes what `take_away` will need, while the window can still be asked.
@@ -183,7 +184,7 @@ pub(super) fn install() {
         std::panic::set_hook(Box::new(move |panic| {
             before(panic);
             if std::thread::current().name() == Some(THREAD) {
-                gone_because("what draws it failed; Heyo's log has the details");
+                gone_because(t("what draws it failed; Heyo's log has the details"));
                 eprintln!("heyo: Slint's thread panicked. Its windows are taken away; the settings, the dictation pill and the screenshot overlay are not shown again until Heyo is restarted");
                 rest();
             }

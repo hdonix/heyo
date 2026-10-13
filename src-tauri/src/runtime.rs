@@ -5,6 +5,7 @@
 //! every other message is relayed to the webview as a `heyo://runtime`
 //! event, and the webview replies through [`Runtime::send`].
 
+use crate::i18n::{t, tf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
@@ -96,10 +97,10 @@ impl Runtime {
 }
 
 fn write(process: &mut Option<Process>, message: &Value) -> Result<(), String> {
-    let Some(p) = process else { return Err("extension runtime is not running".into()) };
+    let Some(p) = process else { return Err(t("extension runtime is not running").into()) };
     if let Err(e) = p.helper.send(message) {
         *process = None;
-        return Err(format!("extension runtime is not running: {e}"));
+        return Err(tf("extension runtime is not running: {0}", &[&e]));
     }
     Ok(())
 }
@@ -130,7 +131,7 @@ fn spawn(app: &AppHandle, generation: u64, background: bool) -> Result<Process, 
     )
     .map_err(|e| {
         let node = helper::node_name(app);
-        format!("failed to start the extension runtime ({node}): {e}. Extensions need Node.js 22 or newer; set its path in Heyo Settings.")
+        tf("failed to start the extension runtime ({0}): {1}. Extensions need Node.js 22 or newer; set its path in Heyo Settings.", &[&node, &e])
     })?;
     Ok(Process { generation, helper })
 }

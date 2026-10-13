@@ -9,6 +9,7 @@
 //! answers requests with tables of its own and a fake desktop, and needs no
 //! application.
 
+use crate::i18n::{marked, t};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
@@ -181,10 +182,10 @@ fn ability(request: &ExtRequest) -> Option<Ability> {
 
 fn can(ability: Ability, supported: Abilities) -> Result<(), ExtError> {
     let (support, what) = match ability {
-        Ability::Windows => (support(Module::Windows, supported), "Reaching other applications' windows"),
-        Ability::Capture => (support(Module::Screen, supported), "Capturing the screen"),
-        Ability::Dictation => (support(Module::Dictation, supported), "Dictation"),
-        Ability::Paste => (supported.paste, "Pasting"),
+        Ability::Windows => (support(Module::Windows, supported), marked("Reaching other applications' windows")),
+        Ability::Capture => (support(Module::Screen, supported), marked("Capturing the screen")),
+        Ability::Dictation => (support(Module::Dictation, supported), marked("Dictation")),
+        Ability::Paste => (supported.paste, marked("Pasting")),
     };
     match support {
         Support::None => Err(ExtError::unsupported(platform::unsupported(what))),
@@ -273,7 +274,7 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
                 return Err(ExtError::invalid(format!("{path} is not a file.")));
             }
             if !crate::ocr::installed() {
-                return Err(ExtError::new(ErrorCode::Unavailable, "Text recognition is not set up yet. Download it in Heyo Settings → Screenshots."));
+                return Err(ExtError::new(ErrorCode::Unavailable, t("Text recognition is not set up yet. Download it in Heyo Settings → Screenshots.")));
             }
             return value(RecognizedText { text: world.running.recognize_text(image)? });
         }
@@ -625,9 +626,9 @@ fn first_files(found: Value, limit: Option<u32>) -> Value {
 /// confirmed every time.
 fn confirmed(action: Action) -> Option<(&'static str, &'static str)> {
     match action {
-        Action::Restart => Some(("Restart the computer?", "Restart")),
-        Action::ShutDown => Some(("Shut the computer down?", "Shut Down")),
-        Action::LogOut => Some(("Log out?", "Log Out")),
+        Action::Restart => Some((t("Restart the computer?"), t("Restart"))),
+        Action::ShutDown => Some((t("Shut the computer down?"), t("Shut Down"))),
+        Action::LogOut => Some((t("Log out?"), t("Log Out"))),
         _ => None,
     }
 }

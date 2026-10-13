@@ -6,6 +6,7 @@
 //! The desktop decides how ([`Desktop::system`] and friends); without a way
 //! of its own it uses the freedesktop tools here.
 
+use crate::i18n::{t, tf};
 use std::collections::HashMap;
 use std::process::Stdio;
 
@@ -156,7 +157,7 @@ fn volume_percent(output: &str) -> Option<&str> {
 fn volume(change: &str) -> Result<Option<String>, String> {
     tool("pactl", &["set-sink-volume", "@DEFAULT_SINK@", change])?;
     let now = tool("pactl", &["get-sink-volume", "@DEFAULT_SINK@"])?;
-    Ok(Some(format!("Volume {}%", volume_percent(&now).unwrap_or("?"))))
+    Ok(Some(tf("Volume {0}%", &[&volume_percent(&now).unwrap_or("?")])))
 }
 
 /// The freedesktop way: systemd, PulseAudio/PipeWire, GLib and GNOME's settings.
@@ -169,18 +170,18 @@ pub(super) fn freedesktop(action: Action) -> Result<Option<String>, String> {
         Action::Restart => tool("systemctl", &["reboot"]).map(done),
         Action::ShutDown => tool("systemctl", &["poweroff"]).map(done),
         Action::LogOut => tool("gnome-session-quit", &["--logout", "--no-prompt"]).map(done),
-        Action::EmptyTrash => tool("gio", &["trash", "--empty"]).map(|_| Some("Trash emptied".into())),
+        Action::EmptyTrash => tool("gio", &["trash", "--empty"]).map(|_| Some(t("Trash emptied").into())),
         Action::ToggleDarkMode => {
             let dark = tool("gsettings", &["get", SCHEME[0], SCHEME[1]])?.contains("prefer-dark");
             tool("gsettings", &["set", SCHEME[0], SCHEME[1], if dark { "default" } else { "prefer-dark" }])?;
-            Ok(Some(if dark { "Light appearance" } else { "Dark appearance" }.into()))
+            Ok(Some(if dark { t("Light appearance") } else { t("Dark appearance") }.into()))
         }
         Action::VolumeUp => volume("+5%"),
         Action::VolumeDown => volume("-5%"),
         Action::ToggleMute => {
             tool("pactl", &["set-sink-mute", "@DEFAULT_SINK@", "toggle"])?;
             let muted = tool("pactl", &["get-sink-mute", "@DEFAULT_SINK@"])?.contains("yes");
-            Ok(Some(if muted { "Muted" } else { "Unmuted" }.into()))
+            Ok(Some(if muted { t("Muted") } else { t("Unmuted") }.into()))
         }
     }
 }

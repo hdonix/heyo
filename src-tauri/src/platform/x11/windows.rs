@@ -1,5 +1,6 @@
 //! Other applications' windows through X11 and the EWMH window-manager hints.
 
+use crate::i18n::t;
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{Atom, AtomEnum, ClientMessageEvent, ConfigureWindowAux, ConnectionExt, EventMask};
 use x11rb::rust_connection::RustConnection;
@@ -306,7 +307,7 @@ pub fn apply(window: Window, layout: Layout, monitors: &[Rect]) -> Result<(), St
 
     let rect = if layout == Layout::NextDisplay {
         if monitors.len() < 2 {
-            return Err("There is only one display.".into());
+            return Err(t("There is only one display.").into());
         }
         // Same relative place on the next monitor.
         let (from, to) = (usable(monitor), usable(monitors[(index + 1) % monitors.len()]));

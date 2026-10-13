@@ -10,6 +10,7 @@ pub mod hotkeys;
 pub(crate) mod icons;
 mod selection;
 
+use crate::i18n::t;
 use std::ptr::{null, null_mut};
 
 use windows_sys::Win32::Foundation::{CloseHandle, BOOL, HWND, LPARAM, RECT};
@@ -263,7 +264,7 @@ pub mod windows {
             let to = match layout {
                 Layout::NextDisplay => {
                     let monitors: Vec<Rect> = displays.iter().map(|display| display.whole).collect();
-                    let next = next_display(&monitors, current).ok_or("There is only one display.")?;
+                    let next = next_display(&monitors, current).ok_or(t("There is only one display."))?;
                     carried(visible, displays[current].work, displays[next].work)
                 }
                 _ => target(layout, displays[current].work, visible),
@@ -297,7 +298,7 @@ fn toggle_dark() -> Result<Option<String>, String> {
     for value in ["AppsUseLightTheme", "SystemUsesLightTheme"] {
         tool("reg", &["add", KEY, "/v", value, "/t", "REG_DWORD", "/d", if light { "0" } else { "1" }, "/f"])?;
     }
-    Ok(Some(if light { "Dark appearance" } else { "Light appearance" }.into()))
+    Ok(Some(if light { t("Dark appearance") } else { t("Light appearance") }.into()))
 }
 
 fn system(action: crate::platform::system::Action) -> Result<Option<String>, String> {
@@ -314,7 +315,7 @@ fn system(action: crate::platform::system::Action) -> Result<Option<String>, Str
         Action::ShutDown => tool("shutdown", &["/s", "/t", "0"]).map(done),
         Action::LogOut => tool("shutdown", &["/l"]).map(done),
         Action::EmptyTrash => tool("powershell", &["-NoProfile", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"])
-            .map(|_| Some("Recycle Bin emptied".into())),
+            .map(|_| Some(t("Recycle Bin emptied").into())),
         Action::ToggleDarkMode => toggle_dark(),
         Action::VolumeUp => tap(VOLUME_UP).map(|()| None),
         Action::VolumeDown => tap(VOLUME_DOWN).map(|()| None),

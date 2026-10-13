@@ -21,6 +21,7 @@
 //! framework (Fcitx), no framework, Windows: composing is refused, and the
 //! caller pastes instead.
 
+use crate::i18n::marked;
 use super::desktop::desktop;
 use super::Support;
 
@@ -79,7 +80,7 @@ pub fn supported() -> bool {
 /// Heyo speaks to, no field with the focus that takes one, a password.
 pub fn compose(own_keys: &[&str], on: Hearing) -> Result<Box<dyn Composing>, String> {
     if desktop().supported().composing == Support::None {
-        return Err(super::unsupported("Composing text in another application"));
+        return Err(super::unsupported(marked("Composing text in another application")));
     }
     desktop().compose(own_keys, on)
 }

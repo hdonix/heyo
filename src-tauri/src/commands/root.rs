@@ -1,6 +1,7 @@
 //! Commands for the palette: searching, opening items, favorites and
 //! aliases, the clipboard, and messages to the extension runtime.
 
+use crate::i18n::t;
 use tauri::{AppHandle, State};
 
 use crate::*;
@@ -126,7 +127,7 @@ pub(crate) fn runtime_send(message: WebviewMessage, runtime: State<Runtime>, app
     }
     // "open" comes from links in rendered Markdown.
     if matches!(&message, WebviewMessage::Open { target } if !is_safe_link(target)) {
-        return Err("only web and mail links can be opened from here".into());
+        return Err(t("only web and mail links can be opened from here").into());
     }
     runtime.send(&app, &serde_json::to_value(message).map_err(|e| e.to_string())?)
 }

@@ -5,6 +5,7 @@
 
 pub mod extension;
 
+use crate::i18n::t;
 use std::sync::mpsc::RecvTimeoutError;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -253,7 +254,7 @@ pub mod windows {
         let frame = Rect { x: current.x, y: current.y, width: current.width, height: current.height };
         let rect = if layout == Layout::NextDisplay {
             if monitors.len() < 2 {
-                return Err("There is only one display.".into());
+                return Err(t("There is only one display.").into());
             }
             // Same relative place on the next monitor.
             let to = area((index + 1) % monitors.len()).ok_or("no monitor")?;

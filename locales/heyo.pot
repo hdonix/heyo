@@ -5,6 +5,229 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: src-tauri/src/apps/desktop_entries.rs
+msgid "invalid Exec line: {0}"
+msgstr ""
+
+#: src-tauri/src/apps/desktop_entries.rs
+msgid "no terminal emulator found"
+msgstr ""
+
+#: src-tauri/src/apps/desktop_entries.rs
+msgid "failed to launch {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/apps/windows.rs
+#: src-tauri/src/platform/common.rs
+msgid "failed to open {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/cli.rs
+msgid "Could not move the window"
+msgstr ""
+
+#: src-tauri/src/clipboard/meaning.rs
+msgid "Language model"
+msgstr ""
+
+#: src-tauri/src/clipboard.rs
+msgid "Clipboard history is paused"
+msgstr ""
+
+#: src-tauri/src/clipboard.rs
+msgid "Nothing you copy is recorded until you resume it."
+msgstr ""
+
+#: src-tauri/src/clipboard.rs
+msgid "Clipboard history resumed"
+msgstr ""
+
+#: src-tauri/src/clipboard.rs
+msgid "What you copy is recorded again."
+msgstr ""
+
+#: src-tauri/src/clipboard.rs
+msgid "Could not change clipboard history"
+msgstr ""
+
+#: src-tauri/src/commands/root.rs
+msgid "only web and mail links can be opened from here"
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "could not run curl: {0}"
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "the server did not answer with a model list"
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "Settings need Heyo to be restarted"
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "The settings window stopped working ({0}). Everything else goes on as it was."
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+#: src-tauri/src/root.rs
+msgid "Restart Heyo"
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "Not Now"
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "Hotkeys need GNOME. Bind a desktop shortcut to `heyo --open <id>` instead."
+msgstr ""
+
+#: src-tauri/src/confirm.rs
+#: src-tauri/src/permissions.rs
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Cancel"
+msgstr ""
+
+#: src-tauri/src/dictation/composed.rs
+msgid "part of it had become the application's text as it was heard"
+msgstr ""
+
+#: src-tauri/src/dictation/onscreen.rs
+msgid "there is too much text to replace where it stands"
+msgstr ""
+
+#: src-tauri/src/dictation/onscreen.rs
+msgid "it could not safely take the place of the text, which was left as it was heard"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "Dictation failed"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "Dictation stopped unexpectedly"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "failed to start dictation: {0}"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "dictation is not running"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "dictation is not running: {0}"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "Dictation is not set up yet. Open Heyo Settings → Dictation to download it."
+msgstr ""
+
+#: src-tauri/src/expand.rs
+msgid "Snippets cannot expand as you type here"
+msgstr ""
+
+#: src-tauri/src/expand.rs
+#: src-tauri/src/platform/desktop.rs
+msgid "Following what is typed"
+msgstr ""
+
+#: src-tauri/src/expand.rs
+msgid "Snippet expansion is on"
+msgstr ""
+
+#: src-tauri/src/expand.rs
+msgid "Heyo follows what you type to replace the keywords of your snippets."
+msgstr ""
+
+#: src-tauri/src/expand.rs
+msgid "Snippet expansion is off"
+msgstr ""
+
+#: src-tauri/src/expand.rs
+msgid "Heyo no longer follows what you type."
+msgstr ""
+
+#: src-tauri/src/expand.rs
+msgid "Could not change snippet expansion"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+msgid "Reaching other applications' windows"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/platform/desktop.rs
+msgid "Capturing the screen"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Dictation"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/platform/desktop.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Pasting"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/ocr.rs
+msgid "Text recognition is not set up yet. Download it in Heyo Settings → Screenshots."
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+msgid "Restart the computer?"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/extensions.rs
+msgid "Restart"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+msgid "Shut the computer down?"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/extensions.rs
+msgid "Shut Down"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+msgid "Log out?"
+msgstr ""
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/extensions.rs
+msgid "Log Out"
+msgstr ""
+
+#: src-tauri/src/ext.rs
+msgid "No area was selected."
+msgstr ""
+
+#: src-tauri/src/ext.rs
+msgid "This desktop does not say where its windows are."
+msgstr ""
+
+#: src-tauri/src/ext.rs
+msgid "The recording was discarded."
+msgstr ""
+
+#: src-tauri/src/ext.rs
+msgid "A recording is already in progress."
+msgstr ""
+
+#: src-tauri/src/ext.rs
+msgid "Dictation is not set up yet. Download it in Heyo Settings → Dictation."
+msgstr ""
+
 #: src-tauri/src/extensions.rs
 msgctxt "command group"
 msgid "System"
@@ -241,10 +464,6 @@ msgid "system, suspend"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
-msgid "Restart"
-msgstr ""
-
-#: src-tauri/src/extensions.rs
 msgid "Restart the computer, after confirming."
 msgstr ""
 
@@ -253,19 +472,11 @@ msgid "system, reboot"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
-msgid "Shut Down"
-msgstr ""
-
-#: src-tauri/src/extensions.rs
 msgid "Shut the computer down, after confirming."
 msgstr ""
 
 #: src-tauri/src/extensions.rs
 msgid "system, poweroff, power off"
-msgstr ""
-
-#: src-tauri/src/extensions.rs
-msgid "Log Out"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
@@ -353,7 +564,327 @@ msgid "Development"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: src-tauri/src/settings.rs
+msgid "failed to write {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
 msgid "Commands built into Heyo."
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "The download stopped unexpectedly"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "failed to start the download: {0}"
+msgstr ""
+
+#: src-tauri/src/menubar.rs
+msgid "Could not run the command"
+msgstr ""
+
+#: src-tauri/src/menubar.rs
+msgid "The command failed"
+msgstr ""
+
+#: src-tauri/src/menubar.rs
+msgid "Refresh"
+msgstr ""
+
+#: src-tauri/src/ocr.rs
+msgid "failed to run text recognition: {0}"
+msgstr ""
+
+#: src-tauri/src/ocr.rs
+msgid "text recognition returned nothing"
+msgstr ""
+
+#: src-tauri/src/ocr.rs
+msgid "Text recognition engine"
+msgstr ""
+
+#: src-tauri/src/open.rs
+msgid "nothing to open for {0} (was it uninstalled?)"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "… and {0} more"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "Paste a line and its line end into the terminal?"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "Paste {n} line into the terminal?"
+msgid_plural "Paste {n} lines into the terminal?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/pasting.rs
+msgid "A terminal runs each line as a command as soon as it is pasted."
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "Paste"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "Paste and Don't Ask Again"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "Could not paste"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "Nothing to paste"
+msgstr ""
+
+#: src-tauri/src/pasting.rs
+msgid "The clipboard has no text."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "see, switch, move and close the windows of other applications"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "take pictures of the screen without you selecting what"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "read the text in images it gives Heyo"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "record the microphone and turn what is said into text"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "read your clipboard history"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "search what Heyo remembers, which includes your clipboard history"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "add entries of its own to what Heyo remembers"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "search the names of your files"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "lock or suspend the computer, change the volume, the sound device and the appearance, and empty the trash"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "paste into the application in front"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "use the AI model set up in Heyo"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "see what you type in the root search and add results to it"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "show what it is doing in Heyo's In Progress section, and tell you when it is done"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "{0} was written for a newer Heyo (this one provides version {1} of the extension API)."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "{0} has not been allowed to {1}. Open one of its commands in Heyo to be asked."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "{0} was not allowed to {1}."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "{0} is not allowed to {1}: it is turned off in Heyo Settings."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "Allow {0} to {1}?"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "Heyo will not ask again; you can take this back in Settings, on the extension's page.\n\nThis is about what Heyo hands over or does for the extension. It does not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "Allow"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "Deny"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "{0} Nobody can be asked from the menu bar or the background."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "{0} asks for it."
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "It was called off."
+msgstr ""
+
+#: src-tauri/src/platform/common.rs
+msgid "Keep Awake is off"
+msgstr ""
+
+#: src-tauri/src/platform/common.rs
+msgid "The computer can sleep again."
+msgstr ""
+
+#: src-tauri/src/platform/common.rs
+msgid "Keep Awake is on"
+msgstr ""
+
+#: src-tauri/src/platform/common.rs
+msgid "The computer will not sleep or dim until you turn this off."
+msgstr ""
+
+#: src-tauri/src/platform/common.rs
+msgid "Could not keep the computer awake"
+msgstr ""
+
+#: src-tauri/src/platform/composing.rs
+#: src-tauri/src/platform/desktop.rs
+msgid "Composing text in another application"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Listing windows"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Switching windows"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Closing windows"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Moving windows"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Watching the clipboard"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "A hold-to-talk key"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Choosing audio devices"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Listing processes"
+msgstr ""
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Ending processes"
+msgstr ""
+
+#: src-tauri/src/platform/gnome/mod.rs
+#: src-tauri/src/platform/win/mod.rs
+#: src-tauri/src/platform/x11/windows.rs
+msgid "There is only one display."
+msgstr ""
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Heyo Clipboard History"
+msgstr ""
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Heyo Dictation"
+msgstr ""
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Heyo: {0}"
+msgstr ""
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Setting hotkeys"
+msgstr ""
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "This hotkey is already used by “{0}”."
+msgstr ""
+
+#: src-tauri/src/platform/mod.rs
+msgid "The GNOME Shell extension"
+msgstr ""
+
+#: src-tauri/src/platform/mod.rs
+msgid "{0} is not supported on Wayland yet."
+msgstr ""
+
+#: src-tauri/src/platform/mod.rs
+msgid "{0} is not supported in this session."
+msgstr ""
+
+#: src-tauri/src/platform/system.rs
+msgid "Volume {0}%"
+msgstr ""
+
+#: src-tauri/src/platform/system.rs
+msgid "Trash emptied"
+msgstr ""
+
+#: src-tauri/src/platform/system.rs
+#: src-tauri/src/platform/win/mod.rs
+msgid "Light appearance"
+msgstr ""
+
+#: src-tauri/src/platform/system.rs
+#: src-tauri/src/platform/win/mod.rs
+msgid "Dark appearance"
+msgstr ""
+
+#: src-tauri/src/platform/system.rs
+msgid "Muted"
+msgstr ""
+
+#: src-tauri/src/platform/system.rs
+msgid "Unmuted"
+msgstr ""
+
+#: src-tauri/src/platform/typed.rs
+msgid "Replacing what is typed"
+msgstr ""
+
+#: src-tauri/src/platform/typed.rs
+msgid "Writing words as they are spoken"
+msgstr ""
+
+#: src-tauri/src/platform/win/hotkeys.rs
+msgid "{0} cannot be a hotkey on Windows."
+msgstr ""
+
+#: src-tauri/src/platform/win/hotkeys.rs
+msgid "{0} is already used by another Heyo hotkey."
+msgstr ""
+
+#: src-tauri/src/platform/win/mod.rs
+msgid "Recycle Bin emptied"
 msgstr ""
 
 #: src-tauri/src/platform/windows.rs
@@ -480,10 +1011,6 @@ msgid "caffeine, sleep, idle, inhibit, amphetamine"
 msgstr ""
 
 #: src-tauri/src/root.rs
-msgid "Restart Heyo"
-msgstr ""
-
-#: src-tauri/src/root.rs
 msgid "Quit Heyo and start it again, as it was started."
 msgstr ""
 
@@ -535,17 +1062,104 @@ msgstr ""
 msgid "window, resize, tile, snap, layout"
 msgstr ""
 
+#: src-tauri/src/runtime.rs
+msgid "extension runtime is not running"
+msgstr ""
+
+#: src-tauri/src/runtime.rs
+msgid "extension runtime is not running: {0}"
+msgstr ""
+
+#: src-tauri/src/runtime.rs
+msgid "failed to start the extension runtime ({0}): {1}. Extensions need Node.js 22 or newer; set its path in Heyo Settings."
+msgstr ""
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Recognizing text…"
+msgstr ""
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag over the text to copy · Esc to cancel"
+msgstr ""
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag over the text to copy, or click a window · Esc to cancel"
+msgstr ""
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag to select an area · Esc to cancel"
+msgstr ""
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag to select an area, or click a window · Esc to cancel"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "failed to save {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot failed"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot copied"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "The image is on the clipboard."
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot {0}.png"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot saved"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "the capture cannot be pinned: {0}"
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "No text was found in the selection."
+msgstr ""
+
+#: src-tauri/src/screenshot.rs
+msgid "Text copied"
+msgstr ""
+
+#: src-tauri/src/settings.rs
+msgid "Heyo's settings could not be read"
+msgstr ""
+
+#: src-tauri/src/settings.rs
+msgid "Using defaults. The old file is kept as {0}."
+msgstr ""
+
+#: src-tauri/src/settings.rs
+msgid "{0} --version failed"
+msgstr ""
+
+#: src-tauri/src/settings.rs
+msgid "{0} is too old; extensions need Node.js 22 or newer"
+msgstr ""
+
+#: src-tauri/src/slint_windows/guard.rs
+msgid "it stopped"
+msgstr ""
+
+#: src-tauri/src/slint_windows/guard.rs
+msgid "what draws it failed; Heyo's log has the details"
+msgstr ""
+
 #: src-tauri/src/slint_windows/model.rs
 msgid "General"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Shortcuts"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/ui/pill.slint
-msgid "Dictation"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1101,10 +1715,6 @@ msgid "Remove"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Pasting"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Ask Before Pasting Several Lines into a Terminal"
 msgstr ""
 
@@ -1439,11 +2049,6 @@ msgid "Copy (Enter)"
 msgstr ""
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
-#: src-tauri/src/slint_windows/ui/pill.slint
-msgid "Cancel"
-msgstr ""
-
-#: src-tauri/src/slint_windows/screenshot/mod.rs
 msgid "Cancel (Esc)"
 msgstr ""
 
@@ -1461,6 +2066,18 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 msgid "Blue"
+msgstr ""
+
+#: src-tauri/src/updates.rs
+msgid "This copy of Heyo does not update itself."
+msgstr ""
+
+#: src-tauri/src/updates.rs
+msgid "Could not look for a new version: {0}"
+msgstr ""
+
+#: src-tauri/src/updates.rs
+msgid "Could not install Heyo {0}: {1}"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint

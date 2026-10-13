@@ -21,6 +21,7 @@
 //! hook disturbs dead keys for the application being typed into, and that
 //! needs care this has not had yet.
 
+use crate::i18n::marked;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
@@ -162,7 +163,7 @@ pub fn rewriting() -> bool {
 }
 
 fn typing() -> Result<&'static dyn Typing, String> {
-    desktop().typing().ok_or_else(|| super::unsupported("Replacing what is typed"))
+    desktop().typing().ok_or_else(|| super::unsupported(marked("Replacing what is typed")))
 }
 
 /// See [`Typing::watch`].
@@ -178,7 +179,7 @@ pub fn replace(erase: usize, text: &str, terminal: bool) -> Result<(), String> {
 /// See [`Typing::write`].
 pub fn write(hotkeys: &[String], own_presses: Arc<AtomicU32>) -> Result<Box<dyn Writing>, String> {
     if !rewriting() {
-        return Err(super::unsupported("Writing words as they are spoken"));
+        return Err(super::unsupported(marked("Writing words as they are spoken")));
     }
     typing()?.write(hotkeys, own_presses)
 }

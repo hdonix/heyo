@@ -8,6 +8,229 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+#: src-tauri/src/apps/desktop_entries.rs
+msgid "invalid Exec line: {0}"
+msgstr "Exec 行无效：{0}"
+
+#: src-tauri/src/apps/desktop_entries.rs
+msgid "no terminal emulator found"
+msgstr "找不到终端模拟器"
+
+#: src-tauri/src/apps/desktop_entries.rs
+msgid "failed to launch {0}: {1}"
+msgstr "无法启动 {0}：{1}"
+
+#: src-tauri/src/apps/windows.rs
+#: src-tauri/src/platform/common.rs
+msgid "failed to open {0}: {1}"
+msgstr "无法打开 {0}：{1}"
+
+#: src-tauri/src/cli.rs
+msgid "Could not move the window"
+msgstr "无法移动窗口"
+
+#: src-tauri/src/clipboard/meaning.rs
+msgid "Language model"
+msgstr "语言模型"
+
+#: src-tauri/src/clipboard.rs
+msgid "Clipboard history is paused"
+msgstr "剪贴板历史已暂停"
+
+#: src-tauri/src/clipboard.rs
+msgid "Nothing you copy is recorded until you resume it."
+msgstr "恢复之前，你复制的内容都不会被记录。"
+
+#: src-tauri/src/clipboard.rs
+msgid "Clipboard history resumed"
+msgstr "剪贴板历史已恢复"
+
+#: src-tauri/src/clipboard.rs
+msgid "What you copy is recorded again."
+msgstr "你复制的内容会重新被记录。"
+
+#: src-tauri/src/clipboard.rs
+msgid "Could not change clipboard history"
+msgstr "无法更改剪贴板历史"
+
+#: src-tauri/src/commands/root.rs
+msgid "only web and mail links can be opened from here"
+msgstr "这里只能打开网页和邮件链接"
+
+#: src-tauri/src/commands/settings.rs
+msgid "could not run curl: {0}"
+msgstr "无法运行 curl：{0}"
+
+#: src-tauri/src/commands/settings.rs
+msgid "the server did not answer with a model list"
+msgstr "服务器没有返回模型列表"
+
+#: src-tauri/src/commands/settings.rs
+msgid "Settings need Heyo to be restarted"
+msgstr "需要重启 Heyo 才能打开设置"
+
+#: src-tauri/src/commands/settings.rs
+msgid "The settings window stopped working ({0}). Everything else goes on as it was."
+msgstr "设置窗口已停止工作（{0}）。其他功能照常运行。"
+
+#: src-tauri/src/commands/settings.rs
+#: src-tauri/src/root.rs
+msgid "Restart Heyo"
+msgstr "重启 Heyo"
+
+#: src-tauri/src/commands/settings.rs
+msgid "Not Now"
+msgstr "以后再说"
+
+#: src-tauri/src/commands/settings.rs
+msgid "Hotkeys need GNOME. Bind a desktop shortcut to `heyo --open <id>` instead."
+msgstr "快捷键需要 GNOME。请改为在桌面环境中把快捷键绑定到 `heyo --open <id>`。"
+
+#: src-tauri/src/confirm.rs
+#: src-tauri/src/permissions.rs
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Cancel"
+msgstr "取消"
+
+#: src-tauri/src/dictation/composed.rs
+msgid "part of it had become the application's text as it was heard"
+msgstr "其中一部分已按听到的内容写入应用程序"
+
+#: src-tauri/src/dictation/onscreen.rs
+msgid "there is too much text to replace where it stands"
+msgstr "文本太多，无法原地替换"
+
+#: src-tauri/src/dictation/onscreen.rs
+msgid "it could not safely take the place of the text, which was left as it was heard"
+msgstr "无法安全地替换原文，已保留听到的内容"
+
+#: src-tauri/src/dictation.rs
+msgid "Dictation failed"
+msgstr "听写失败"
+
+#: src-tauri/src/dictation.rs
+msgid "Dictation stopped unexpectedly"
+msgstr "听写意外停止"
+
+#: src-tauri/src/dictation.rs
+msgid "failed to start dictation: {0}"
+msgstr "无法启动听写：{0}"
+
+#: src-tauri/src/dictation.rs
+msgid "dictation is not running"
+msgstr "听写未在运行"
+
+#: src-tauri/src/dictation.rs
+msgid "dictation is not running: {0}"
+msgstr "听写未在运行：{0}"
+
+#: src-tauri/src/dictation.rs
+msgid "Dictation is not set up yet. Open Heyo Settings → Dictation to download it."
+msgstr "听写尚未设置。请打开“Heyo 设置”→“听写”进行下载。"
+
+#: src-tauri/src/expand.rs
+msgid "Snippets cannot expand as you type here"
+msgstr "文本片段无法在这里随输入展开"
+
+#: src-tauri/src/expand.rs
+#: src-tauri/src/platform/desktop.rs
+msgid "Following what is typed"
+msgstr "跟踪输入内容"
+
+#: src-tauri/src/expand.rs
+msgid "Snippet expansion is on"
+msgstr "文本片段展开已开启"
+
+#: src-tauri/src/expand.rs
+msgid "Heyo follows what you type to replace the keywords of your snippets."
+msgstr "Heyo 会跟踪你输入的内容，以替换文本片段的关键词。"
+
+#: src-tauri/src/expand.rs
+msgid "Snippet expansion is off"
+msgstr "文本片段展开已关闭"
+
+#: src-tauri/src/expand.rs
+msgid "Heyo no longer follows what you type."
+msgstr "Heyo 不再跟踪你输入的内容。"
+
+#: src-tauri/src/expand.rs
+msgid "Could not change snippet expansion"
+msgstr "无法更改文本片段展开"
+
+#: src-tauri/src/ext/answer.rs
+msgid "Reaching other applications' windows"
+msgstr "访问其他应用程序的窗口"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/platform/desktop.rs
+msgid "Capturing the screen"
+msgstr "截取屏幕"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Dictation"
+msgstr "听写"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/platform/desktop.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Pasting"
+msgstr "粘贴"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/ocr.rs
+msgid "Text recognition is not set up yet. Download it in Heyo Settings → Screenshots."
+msgstr "文字识别尚未设置。请在“Heyo 设置”→“截图”中下载。"
+
+#: src-tauri/src/ext/answer.rs
+msgid "Restart the computer?"
+msgstr "重启电脑？"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/extensions.rs
+msgid "Restart"
+msgstr "重启"
+
+#: src-tauri/src/ext/answer.rs
+msgid "Shut the computer down?"
+msgstr "关闭电脑？"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/extensions.rs
+msgid "Shut Down"
+msgstr "关机"
+
+#: src-tauri/src/ext/answer.rs
+msgid "Log out?"
+msgstr "注销？"
+
+#: src-tauri/src/ext/answer.rs
+#: src-tauri/src/extensions.rs
+msgid "Log Out"
+msgstr "注销"
+
+#: src-tauri/src/ext.rs
+msgid "No area was selected."
+msgstr "未选择任何区域。"
+
+#: src-tauri/src/ext.rs
+msgid "This desktop does not say where its windows are."
+msgstr "此桌面不提供窗口的位置。"
+
+#: src-tauri/src/ext.rs
+msgid "The recording was discarded."
+msgstr "录音已丢弃。"
+
+#: src-tauri/src/ext.rs
+msgid "A recording is already in progress."
+msgstr "已有录音正在进行。"
+
+#: src-tauri/src/ext.rs
+msgid "Dictation is not set up yet. Download it in Heyo Settings → Dictation."
+msgstr "听写尚未设置。请在“Heyo 设置”→“听写”中下载。"
+
 #: src-tauri/src/extensions.rs
 msgctxt "command group"
 msgid "System"
@@ -244,10 +467,6 @@ msgid "system, suspend"
 msgstr "系统, 休眠, 挂起, 待机"
 
 #: src-tauri/src/extensions.rs
-msgid "Restart"
-msgstr "重启"
-
-#: src-tauri/src/extensions.rs
 msgid "Restart the computer, after confirming."
 msgstr "确认后重启电脑。"
 
@@ -256,20 +475,12 @@ msgid "system, reboot"
 msgstr "系统, 重启, 重新启动"
 
 #: src-tauri/src/extensions.rs
-msgid "Shut Down"
-msgstr "关机"
-
-#: src-tauri/src/extensions.rs
 msgid "Shut the computer down, after confirming."
 msgstr "确认后关闭电脑。"
 
 #: src-tauri/src/extensions.rs
 msgid "system, poweroff, power off"
 msgstr "系统, 关机, 关闭电脑"
-
-#: src-tauri/src/extensions.rs
-msgid "Log Out"
-msgstr "注销"
 
 #: src-tauri/src/extensions.rs
 msgid "End the desktop session, after confirming."
@@ -356,8 +567,327 @@ msgid "Development"
 msgstr "开发中"
 
 #: src-tauri/src/extensions.rs
+#: src-tauri/src/settings.rs
+msgid "failed to write {0}: {1}"
+msgstr "无法写入 {0}：{1}"
+
+#: src-tauri/src/extensions.rs
 msgid "Commands built into Heyo."
 msgstr "Heyo 内置的命令。"
+
+#: src-tauri/src/helper.rs
+msgid "The download stopped unexpectedly"
+msgstr "下载意外停止"
+
+#: src-tauri/src/helper.rs
+msgid "failed to start the download: {0}"
+msgstr "无法开始下载：{0}"
+
+#: src-tauri/src/menubar.rs
+msgid "Could not run the command"
+msgstr "无法运行命令"
+
+#: src-tauri/src/menubar.rs
+msgid "The command failed"
+msgstr "命令执行失败"
+
+#: src-tauri/src/menubar.rs
+msgid "Refresh"
+msgstr "刷新"
+
+#: src-tauri/src/ocr.rs
+msgid "failed to run text recognition: {0}"
+msgstr "无法运行文字识别：{0}"
+
+#: src-tauri/src/ocr.rs
+msgid "text recognition returned nothing"
+msgstr "文字识别没有返回任何结果"
+
+#: src-tauri/src/ocr.rs
+msgid "Text recognition engine"
+msgstr "文字识别引擎"
+
+#: src-tauri/src/open.rs
+msgid "nothing to open for {0} (was it uninstalled?)"
+msgstr "{0} 没有可打开的内容（是否已卸载？）"
+
+#: src-tauri/src/pasting.rs
+msgid "… and {0} more"
+msgstr "…以及另外 {0} 行"
+
+#: src-tauri/src/pasting.rs
+msgid "Paste a line and its line end into the terminal?"
+msgstr "将一行文本连同行尾换行粘贴到终端？"
+
+#: src-tauri/src/pasting.rs
+msgid "Paste {n} line into the terminal?"
+msgid_plural "Paste {n} lines into the terminal?"
+msgstr[0] "将 {n} 行文本粘贴到终端？"
+
+#: src-tauri/src/pasting.rs
+msgid "A terminal runs each line as a command as soon as it is pasted."
+msgstr "每一行一经粘贴，终端就会把它当作命令执行。"
+
+#: src-tauri/src/pasting.rs
+msgid "Paste"
+msgstr "粘贴"
+
+#: src-tauri/src/pasting.rs
+msgid "Paste and Don't Ask Again"
+msgstr "粘贴且不再询问"
+
+#: src-tauri/src/pasting.rs
+msgid "Could not paste"
+msgstr "无法粘贴"
+
+#: src-tauri/src/pasting.rs
+msgid "Nothing to paste"
+msgstr "没有可粘贴的内容"
+
+#: src-tauri/src/pasting.rs
+msgid "The clipboard has no text."
+msgstr "剪贴板中没有文本。"
+
+#: src-tauri/src/permissions.rs
+msgid "see, switch, move and close the windows of other applications"
+msgstr "查看、切换、移动和关闭其他应用程序的窗口"
+
+#: src-tauri/src/permissions.rs
+msgid "take pictures of the screen without you selecting what"
+msgstr "无需你选择区域即可截取屏幕"
+
+#: src-tauri/src/permissions.rs
+msgid "read the text in images it gives Heyo"
+msgstr "识别它交给 Heyo 的图像中的文字"
+
+#: src-tauri/src/permissions.rs
+msgid "record the microphone and turn what is said into text"
+msgstr "通过麦克风录音并把语音转成文字"
+
+#: src-tauri/src/permissions.rs
+msgid "read your clipboard history"
+msgstr "读取你的剪贴板历史"
+
+#: src-tauri/src/permissions.rs
+msgid "search what Heyo remembers, which includes your clipboard history"
+msgstr "搜索 Heyo 记住的内容，其中包括你的剪贴板历史"
+
+#: src-tauri/src/permissions.rs
+msgid "add entries of its own to what Heyo remembers"
+msgstr "向 Heyo 记住的内容中添加它自己的条目"
+
+#: src-tauri/src/permissions.rs
+msgid "search the names of your files"
+msgstr "搜索你的文件名"
+
+#: src-tauri/src/permissions.rs
+msgid "lock or suspend the computer, change the volume, the sound device and the appearance, and empty the trash"
+msgstr "锁定电脑或让它睡眠，更改音量、音频设备和外观，以及清空回收站"
+
+#: src-tauri/src/permissions.rs
+msgid "paste into the application in front"
+msgstr "粘贴到最前面的应用程序"
+
+#: src-tauri/src/permissions.rs
+msgid "use the AI model set up in Heyo"
+msgstr "使用 Heyo 中设置的 AI 模型"
+
+#: src-tauri/src/permissions.rs
+msgid "see what you type in the root search and add results to it"
+msgstr "查看你在主搜索中输入的内容并向其中添加结果"
+
+#: src-tauri/src/permissions.rs
+msgid "show what it is doing in Heyo's In Progress section, and tell you when it is done"
+msgstr "在 Heyo 的“进行中”部分显示它正在做的事，并在完成时通知你"
+
+#: src-tauri/src/permissions.rs
+msgid "{0} was written for a newer Heyo (this one provides version {1} of the extension API)."
+msgstr "“{0}”是为更新版本的 Heyo 编写的（当前版本提供的扩展 API 为第 {1} 版）。"
+
+#: src-tauri/src/permissions.rs
+msgid "{0} has not been allowed to {1}. Open one of its commands in Heyo to be asked."
+msgstr "尚未允许“{0}”{1}。在 Heyo 中打开它的任一命令即可收到询问。"
+
+#: src-tauri/src/permissions.rs
+msgid "{0} was not allowed to {1}."
+msgstr "未允许“{0}”{1}。"
+
+#: src-tauri/src/permissions.rs
+msgid "{0} is not allowed to {1}: it is turned off in Heyo Settings."
+msgstr "不允许“{0}”{1}：该权限已在“Heyo 设置”中关闭。"
+
+#: src-tauri/src/permissions.rs
+msgid "Allow {0} to {1}?"
+msgstr "允许“{0}”{1}？"
+
+#: src-tauri/src/permissions.rs
+msgid "Heyo will not ask again; you can take this back in Settings, on the extension's page.\n\nThis is about what Heyo hands over or does for the extension. It does not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."
+msgstr "Heyo 不会再次询问；你可以在“设置”中该扩展的页面上撤销。\n\n这里指的是 Heyo 交给扩展的内容或替它做的事，并不会限制扩展本身：扩展是这台电脑上的程序，可以自行读取你的文件并启动其他程序。"
+
+#: src-tauri/src/permissions.rs
+msgid "Allow"
+msgstr "允许"
+
+#: src-tauri/src/permissions.rs
+msgid "Deny"
+msgstr "拒绝"
+
+#: src-tauri/src/permissions.rs
+msgid "{0} Nobody can be asked from the menu bar or the background."
+msgstr "{0}无法从菜单栏或后台向你询问。"
+
+#: src-tauri/src/permissions.rs
+msgid "{0} asks for it."
+msgstr "由“{0}”请求。"
+
+#: src-tauri/src/permissions.rs
+msgid "It was called off."
+msgstr "已取消。"
+
+#: src-tauri/src/platform/common.rs
+msgid "Keep Awake is off"
+msgstr "保持唤醒已关闭"
+
+#: src-tauri/src/platform/common.rs
+msgid "The computer can sleep again."
+msgstr "电脑可以正常睡眠了。"
+
+#: src-tauri/src/platform/common.rs
+msgid "Keep Awake is on"
+msgstr "保持唤醒已开启"
+
+#: src-tauri/src/platform/common.rs
+msgid "The computer will not sleep or dim until you turn this off."
+msgstr "在你关闭之前，电脑不会睡眠，屏幕也不会变暗。"
+
+#: src-tauri/src/platform/common.rs
+msgid "Could not keep the computer awake"
+msgstr "无法让电脑保持唤醒"
+
+#: src-tauri/src/platform/composing.rs
+#: src-tauri/src/platform/desktop.rs
+msgid "Composing text in another application"
+msgstr "在其他应用程序中输入组合文本"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Listing windows"
+msgstr "列出窗口"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Switching windows"
+msgstr "切换窗口"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Closing windows"
+msgstr "关闭窗口"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Moving windows"
+msgstr "移动窗口"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Watching the clipboard"
+msgstr "监视剪贴板"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "A hold-to-talk key"
+msgstr "按住说话键"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Choosing audio devices"
+msgstr "选择音频设备"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Listing processes"
+msgstr "列出进程"
+
+#: src-tauri/src/platform/desktop.rs
+msgid "Ending processes"
+msgstr "结束进程"
+
+#: src-tauri/src/platform/gnome/mod.rs
+#: src-tauri/src/platform/win/mod.rs
+#: src-tauri/src/platform/x11/windows.rs
+msgid "There is only one display."
+msgstr "只有一个显示器。"
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Heyo Clipboard History"
+msgstr "Heyo 剪贴板历史"
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Heyo Dictation"
+msgstr "Heyo 听写"
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Heyo: {0}"
+msgstr "Heyo：{0}"
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "Setting hotkeys"
+msgstr "设置快捷键"
+
+#: src-tauri/src/platform/hotkeys.rs
+msgid "This hotkey is already used by “{0}”."
+msgstr "此快捷键已被“{0}”使用。"
+
+#: src-tauri/src/platform/mod.rs
+msgid "The GNOME Shell extension"
+msgstr "GNOME Shell 扩展"
+
+#: src-tauri/src/platform/mod.rs
+msgid "{0} is not supported on Wayland yet."
+msgstr "Wayland 上暂不支持{0}。"
+
+#: src-tauri/src/platform/mod.rs
+msgid "{0} is not supported in this session."
+msgstr "此会话不支持{0}。"
+
+#: src-tauri/src/platform/system.rs
+msgid "Volume {0}%"
+msgstr "音量 {0}%"
+
+#: src-tauri/src/platform/system.rs
+msgid "Trash emptied"
+msgstr "回收站已清空"
+
+#: src-tauri/src/platform/system.rs
+#: src-tauri/src/platform/win/mod.rs
+msgid "Light appearance"
+msgstr "浅色外观"
+
+#: src-tauri/src/platform/system.rs
+#: src-tauri/src/platform/win/mod.rs
+msgid "Dark appearance"
+msgstr "深色外观"
+
+#: src-tauri/src/platform/system.rs
+msgid "Muted"
+msgstr "已静音"
+
+#: src-tauri/src/platform/system.rs
+msgid "Unmuted"
+msgstr "已取消静音"
+
+#: src-tauri/src/platform/typed.rs
+msgid "Replacing what is typed"
+msgstr "替换输入的内容"
+
+#: src-tauri/src/platform/typed.rs
+msgid "Writing words as they are spoken"
+msgstr "边说边输入"
+
+#: src-tauri/src/platform/win/hotkeys.rs
+msgid "{0} cannot be a hotkey on Windows."
+msgstr "{0} 在 Windows 上不能用作快捷键。"
+
+#: src-tauri/src/platform/win/hotkeys.rs
+msgid "{0} is already used by another Heyo hotkey."
+msgstr "{0} 已被 Heyo 的另一个快捷键使用。"
+
+#: src-tauri/src/platform/win/mod.rs
+msgid "Recycle Bin emptied"
+msgstr "回收站已清空"
 
 #: src-tauri/src/platform/windows.rs
 msgid "Left Half"
@@ -483,10 +1013,6 @@ msgid "caffeine, sleep, idle, inhibit, amphetamine"
 msgstr "防休眠, 不睡眠, 睡眠, 常亮, 咖啡因"
 
 #: src-tauri/src/root.rs
-msgid "Restart Heyo"
-msgstr "重启 Heyo"
-
-#: src-tauri/src/root.rs
 msgid "Quit Heyo and start it again, as it was started."
 msgstr "退出 Heyo，并按原来的方式重新启动。"
 
@@ -538,6 +1064,98 @@ msgstr "移动当前窗口并调整其大小。"
 msgid "window, resize, tile, snap, layout"
 msgstr "窗口, 调整大小, 平铺, 分屏, 布局"
 
+#: src-tauri/src/runtime.rs
+msgid "extension runtime is not running"
+msgstr "扩展运行时未在运行"
+
+#: src-tauri/src/runtime.rs
+msgid "extension runtime is not running: {0}"
+msgstr "扩展运行时未在运行：{0}"
+
+#: src-tauri/src/runtime.rs
+msgid "failed to start the extension runtime ({0}): {1}. Extensions need Node.js 22 or newer; set its path in Heyo Settings."
+msgstr "无法启动扩展运行时（{0}）：{1}。扩展需要 Node.js 22 或更高版本；请在“Heyo 设置”中设置它的路径。"
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Recognizing text…"
+msgstr "正在识别文字…"
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag over the text to copy · Esc to cancel"
+msgstr "拖过要复制的文字 · 按 Esc 取消"
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag over the text to copy, or click a window · Esc to cancel"
+msgstr "拖过要复制的文字，或点击窗口 · 按 Esc 取消"
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag to select an area · Esc to cancel"
+msgstr "拖动以选择区域 · 按 Esc 取消"
+
+#: src-tauri/src/screenshot/selecting.rs
+msgid "Drag to select an area, or click a window · Esc to cancel"
+msgstr "拖动以选择区域，或点击窗口 · 按 Esc 取消"
+
+#: src-tauri/src/screenshot.rs
+msgid "failed to save {0}: {1}"
+msgstr "无法保存 {0}：{1}"
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot failed"
+msgstr "截图失败"
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot copied"
+msgstr "截图已复制"
+
+#: src-tauri/src/screenshot.rs
+msgid "The image is on the clipboard."
+msgstr "图像已在剪贴板中。"
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot {0}.png"
+msgstr "截图 {0}.png"
+
+#: src-tauri/src/screenshot.rs
+msgid "Screenshot saved"
+msgstr "截图已保存"
+
+#: src-tauri/src/screenshot.rs
+msgid "the capture cannot be pinned: {0}"
+msgstr "无法把截图钉在屏幕上：{0}"
+
+#: src-tauri/src/screenshot.rs
+msgid "No text was found in the selection."
+msgstr "选区中没有找到文字。"
+
+#: src-tauri/src/screenshot.rs
+msgid "Text copied"
+msgstr "文字已复制"
+
+#: src-tauri/src/settings.rs
+msgid "Heyo's settings could not be read"
+msgstr "无法读取 Heyo 的设置"
+
+#: src-tauri/src/settings.rs
+msgid "Using defaults. The old file is kept as {0}."
+msgstr "正在使用默认设置。原文件已另存为 {0}。"
+
+#: src-tauri/src/settings.rs
+msgid "{0} --version failed"
+msgstr "{0} --version 运行失败"
+
+#: src-tauri/src/settings.rs
+msgid "{0} is too old; extensions need Node.js 22 or newer"
+msgstr "{0} 版本太旧；扩展需要 Node.js 22 或更高版本"
+
+#: src-tauri/src/slint_windows/guard.rs
+msgid "it stopped"
+msgstr "它已停止"
+
+#: src-tauri/src/slint_windows/guard.rs
+msgid "what draws it failed; Heyo's log has the details"
+msgstr "绘制它的部分出错了；详情见 Heyo 的日志"
+
 #: src-tauri/src/slint_windows/model.rs
 msgid "General"
 msgstr "通用"
@@ -545,11 +1163,6 @@ msgstr "通用"
 #: src-tauri/src/slint_windows/model.rs
 msgid "Shortcuts"
 msgstr "快捷键"
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/ui/pill.slint
-msgid "Dictation"
-msgstr "听写"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Screenshots"
@@ -1104,10 +1717,6 @@ msgid "Remove"
 msgstr "移除"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Pasting"
-msgstr "粘贴"
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Ask Before Pasting Several Lines into a Terminal"
 msgstr "向终端粘贴多行内容前先询问"
 
@@ -1440,11 +2049,6 @@ msgid "Copy (Enter)"
 msgstr "复制 (Enter)"
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
-#: src-tauri/src/slint_windows/ui/pill.slint
-msgid "Cancel"
-msgstr "取消"
-
-#: src-tauri/src/slint_windows/screenshot/mod.rs
 msgid "Cancel (Esc)"
 msgstr "取消 (Esc)"
 
@@ -1463,6 +2067,18 @@ msgstr "绿色"
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 msgid "Blue"
 msgstr "蓝色"
+
+#: src-tauri/src/updates.rs
+msgid "This copy of Heyo does not update itself."
+msgstr "这份 Heyo 不会自行更新。"
+
+#: src-tauri/src/updates.rs
+msgid "Could not look for a new version: {0}"
+msgstr "无法检查新版本：{0}"
+
+#: src-tauri/src/updates.rs
+msgid "Could not install Heyo {0}: {1}"
+msgstr "无法安装 Heyo {0}：{1}"
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint
 msgid "Selection"

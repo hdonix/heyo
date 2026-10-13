@@ -46,6 +46,7 @@
 //! no field to say them in. [`Composed::standing`] is then what the
 //! application holds of the recording, for whoever writes the rest.
 
+use crate::i18n::marked;
 use super::onscreen::{held, Shortfall, Standing};
 
 /// What was heard, and what happened in the field.
@@ -113,7 +114,7 @@ pub(crate) struct Composed {
     shortfall: Option<Shortfall>,
 }
 
-const KEPT_AS_HEARD: &str = "part of it had become the application's text as it was heard";
+const KEPT_AS_HEARD: &str = marked("part of it had become the application's text as it was heard");
 
 impl Composed {
     /// `live`: the sentence in progress is shown while it is spoken.

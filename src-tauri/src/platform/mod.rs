@@ -8,6 +8,7 @@
 //! an adapter cannot do, its function says (an error, or "nothing") and
 //! `capabilities` reports, so features can be hidden rather than fail.
 
+use crate::i18n::{tf, translate};
 use std::sync::OnceLock;
 
 pub mod capture;
@@ -146,7 +147,7 @@ pub fn install_extension() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     return gnome::extension::install();
     #[cfg(not(target_os = "linux"))]
-    Err(unsupported("The GNOME Shell extension"))
+    Err(unsupported(crate::i18n::marked("The GNOME Shell extension")))
 }
 
 pub fn capabilities() -> Capabilities {
@@ -188,11 +189,13 @@ pub fn item_available(id: &str) -> bool {
     !needs_windows || desktop::desktop().supported().windows != Support::None
 }
 
-/// The error for something the session cannot do.
-pub(crate) fn unsupported(what: &str) -> String {
+/// The error for something the session cannot do: `what` is `marked`
+/// where it is said.
+pub(crate) fn unsupported(what: &'static str) -> String {
+    let what = translate(what);
     match session() {
-        Session::Wayland => format!("{what} is not supported on Wayland yet."),
-        _ => format!("{what} is not supported in this session."),
+        Session::Wayland => tf("{0} is not supported on Wayland yet.", &[&what]),
+        _ => tf("{0} is not supported in this session.", &[&what]),
     }
 }
 

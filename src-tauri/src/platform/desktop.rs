@@ -10,6 +10,7 @@
 //! interface the rest of Heyo uses; they hold what is the same on every
 //! desktop and ask the adapter for the rest.
 
+use crate::i18n::marked;
 use std::sync::OnceLock;
 
 use super::capture::{Area, Shot};
@@ -119,7 +120,7 @@ pub trait Desktop: Send + Sync {
 
     /// Application windows, most recently used first; `current` goes last.
     fn windows(&self, _current: Option<Window>) -> Result<Vec<WindowInfo>, String> {
-        Err(unsupported("Listing windows"))
+        Err(unsupported(marked("Listing windows")))
     }
 
     /// The windows that can be seen at present (not minimized, not on
@@ -141,22 +142,22 @@ pub trait Desktop: Send + Sync {
     }
 
     fn activate(&self, _window: Window) -> Result<(), String> {
-        Err(unsupported("Switching windows"))
+        Err(unsupported(marked("Switching windows")))
     }
 
     fn close(&self, _window: Window) -> Result<(), String> {
-        Err(unsupported("Closing windows"))
+        Err(unsupported(marked("Closing windows")))
     }
 
     fn arrange(&self, _window: Window, _layout: Layout, _monitors: &[Rect]) -> Result<(), String> {
-        Err(unsupported("Moving windows"))
+        Err(unsupported(marked("Moving windows")))
     }
 
     // --- Input into the application in front -----------------------------------
 
     /// Presses the paste shortcut there (a terminal's, if it is one).
     fn paste(&self, _terminal: bool) -> Result<(), String> {
-        Err(unsupported("Pasting"))
+        Err(unsupported(marked("Pasting")))
     }
 
     /// The text selected there, or nothing.
@@ -192,13 +193,13 @@ pub trait Desktop: Send + Sync {
     /// Reports every clipboard change for as long as the session lasts, or
     /// says at once that it cannot.
     fn watch_clipboard(&self, _on_change: &mut dyn FnMut(Change)) -> Result<(), String> {
-        Err(unsupported("Watching the clipboard"))
+        Err(unsupported(marked("Watching the clipboard")))
     }
 
     // --- The screen -----------------------------------------------------------------
 
     fn grab(&self, _area: Area) -> Result<Shot, String> {
-        Err(unsupported("Capturing the screen"))
+        Err(unsupported(marked("Capturing the screen")))
     }
 
     // --- A key held to talk ---------------------------------------------------------
@@ -209,7 +210,7 @@ pub trait Desktop: Send + Sync {
     }
 
     fn watch_hold(&self, _key: &dyn Fn() -> String, _on: &dyn Fn(Hold)) -> Result<(), String> {
-        Err(unsupported("A hold-to-talk key"))
+        Err(unsupported(marked("A hold-to-talk key")))
     }
 
     // --- Heyo's own windows ---------------------------------------------------------
@@ -272,14 +273,14 @@ pub trait Desktop: Send + Sync {
         #[cfg(target_os = "linux")]
         return super::system::freedesktop_audio_devices();
         #[cfg(not(target_os = "linux"))]
-        Err(unsupported("Choosing audio devices"))
+        Err(unsupported(marked("Choosing audio devices")))
     }
 
     fn use_audio_device(&self, _kind: super::system::AudioKind, _name: &str) -> Result<(), String> {
         #[cfg(target_os = "linux")]
         return super::system::freedesktop_use_audio_device(_kind, _name);
         #[cfg(not(target_os = "linux"))]
-        Err(unsupported("Choosing audio devices"))
+        Err(unsupported(marked("Choosing audio devices")))
     }
 
     /// The user's processes, the busiest first.
@@ -287,14 +288,14 @@ pub trait Desktop: Send + Sync {
         #[cfg(target_os = "linux")]
         return super::system::freedesktop_processes();
         #[cfg(not(target_os = "linux"))]
-        Err(unsupported("Listing processes"))
+        Err(unsupported(marked("Listing processes")))
     }
 
     fn end_process(&self, _pid: u32, _force: bool) -> Result<(), String> {
         #[cfg(target_os = "linux")]
         return super::system::freedesktop_end_process(_pid, _force);
         #[cfg(not(target_os = "linux"))]
-        Err(unsupported("Ending processes"))
+        Err(unsupported(marked("Ending processes")))
     }
 
     // --- Global hotkeys -------------------------------------------------------------
@@ -322,7 +323,7 @@ pub trait Desktop: Send + Sync {
 
     /// See [`super::composing::compose`].
     fn compose(&self, _own_keys: &[&str], _on: super::composing::Hearing) -> Result<Box<dyn super::composing::Composing>, String> {
-        Err(unsupported("Composing text in another application"))
+        Err(unsupported(marked("Composing text in another application")))
     }
 
     /// See [`super::composing::recover`].
@@ -568,7 +569,7 @@ pub mod fake {
 
     impl Typing for Fake {
         fn watch(&self, _wanted: &dyn Fn() -> bool, _on: &mut dyn FnMut(Typed)) -> Result<(), String> {
-            Err(unsupported("Following what is typed"))
+            Err(unsupported(marked("Following what is typed")))
         }
 
         fn replace(&self, erase: usize, text: &str, terminal: bool) -> Result<(), String> {

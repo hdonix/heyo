@@ -5,6 +5,7 @@
 //! This is the one place that finds the scripts, starts them, frames their
 //! messages and notices them ending.
 
+use crate::i18n::{t, tf};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -222,11 +223,11 @@ pub fn install(command: Result<Command, String>, report: impl Fn(InstallProgress
             },
             move || {
                 if !done.load(std::sync::atomic::Ordering::Relaxed) {
-                    at_exit(failed("The download stopped unexpectedly".into()));
+                    at_exit(failed(t("The download stopped unexpectedly").into()));
                 }
             },
         )
-        .map_err(|e| format!("failed to start the download: {e}"))
+        .map_err(|e| tf("failed to start the download: {0}", &[&e]))
     });
     if let Err(e) = started {
         report(failed(e));

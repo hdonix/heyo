@@ -32,6 +32,7 @@
 //! typed, Paste as Plain Text), the text goes in on one line
 //! ([`Lines::Joined`]).
 
+use crate::i18n::{t, tf, tn};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
@@ -143,17 +144,17 @@ pub(crate) fn question_before(text: &str, ask: bool, terminal: impl FnOnce() -> 
         })
         .collect();
     if lines.len() > SHOWN {
-        preview.push(format!("… and {} more", lines.len() - SHOWN));
+        preview.push(tf("… and {0} more", &[&(lines.len() - SHOWN)]));
     }
-    let count = match lines.len() {
-        0 | 1 => "a line and its line end".to_owned(),
-        n => format!("{n} lines"),
+    let title = match lines.len() {
+        0 | 1 => t("Paste a line and its line end into the terminal?").to_owned(),
+        n => tn("Paste {n} line into the terminal?", "Paste {n} lines into the terminal?", n as u64, &[]),
     };
     Some(Question {
-        title: format!("Paste {count} into the terminal?"),
-        message: format!("A terminal runs each line as a command as soon as it is pasted.\n\n{}", preview.join("\n")),
-        yes: "Paste",
-        always: "Paste and Don't Ask Again",
+        title,
+        message: format!("{}\n\n{}", t("A terminal runs each line as a command as soon as it is pasted."), preview.join("\n")),
+        yes: t("Paste"),
+        always: t("Paste and Don't Ask Again"),
     })
 }
 
@@ -393,7 +394,7 @@ pub(crate) fn copy_and_paste(app: &AppHandle, text: String) -> Result<(), String
             if agreed(&asking, answer) {
                 match write_text(&text) {
                     Ok(()) => hide_and_paste(&asking, None),
-                    Err(e) => notify("Could not paste", &e),
+                    Err(e) => notify(t("Could not paste"), &e),
                 }
             }
         });
@@ -436,13 +437,13 @@ pub(crate) fn paste_and_give_back(app: &AppHandle, text: &str, html: Option<&str
 /// palette is hiding). There is nowhere to ask: into a terminal it goes on
 /// one line.
 pub(crate) fn paste_plain() {
-    let Some(text) = read_text().filter(|text| !text.is_empty()) else { return notify("Nothing to paste", "The clipboard has no text.") };
+    let Some(text) = read_text().filter(|text| !text.is_empty()) else { return notify(t("Nothing to paste"), t("The clipboard has no text.")) };
     // Writing only text drops every richer format the source offered.
     match write_text(&text) {
         Ok(()) => {
             std::thread::spawn(|| logged(press(FOCUS, Lines::Joined)));
         }
-        Err(e) => notify("Could not paste", &e),
+        Err(e) => notify(t("Could not paste"), &e),
     }
 }
 

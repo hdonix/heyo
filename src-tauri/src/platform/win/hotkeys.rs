@@ -3,6 +3,7 @@
 //!
 //! Accelerators are written as elsewhere in Heyo (`<Control><Alt>c`).
 
+use crate::i18n::tf;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -179,11 +180,11 @@ fn item_hotkeys() -> HashMap<String, String> {
 /// removes the hotkey.
 fn set(args: &[String], accelerator: &str) -> Result<(), String> {
     if !accelerator.is_empty() && parse(accelerator).is_none() {
-        return Err(format!("{accelerator} cannot be a hotkey on Windows."));
+        return Err(tf("{0} cannot be a hotkey on Windows.", &[&accelerator]));
     }
     let saved = with(|hotkeys| {
         if !accelerator.is_empty() && hotkeys.get(accelerator).is_some_and(|other| other.as_slice() != args) {
-            return Err(format!("{accelerator} is already used by another Heyo hotkey."));
+            return Err(tf("{0} is already used by another Heyo hotkey.", &[&accelerator]));
         }
         hotkeys.retain(|_, a| a.as_slice() != args);
         if !accelerator.is_empty() {

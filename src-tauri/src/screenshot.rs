@@ -9,6 +9,7 @@
 //! no toolkit. This file is the host's part: reading the screen, and doing
 //! with the selected part what was chosen.
 
+use crate::i18n::{t, tf};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -80,7 +81,7 @@ fn end_pick(outcome: Picked) {
 fn save_pick(picture: &image::RgbaImage, path: &std::path::Path) -> Picked {
     let saved = (|| {
         std::fs::create_dir_all(path.parent().ok_or("the capture has no directory")?).map_err(|e| e.to_string())?;
-        picture.save_with_format(path, image::ImageFormat::Png).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
+        picture.save_with_format(path, image::ImageFormat::Png).map_err(|e| tf("failed to save {0}: {1}", &[&path.display(), &e]))?;
         Ok::<_, String>(Picked::Saved { width: picture.width(), height: picture.height() })
     })();
     saved.unwrap_or_else(Picked::Failed)
@@ -219,7 +220,7 @@ pub fn start(app: &AppHandle, mode: Mode) {
                 // The extension that asked says so in its own way.
                 return end_pick(Picked::Failed(e));
             }
-            notify("Screenshot failed", &e);
+            notify(t("Screenshot failed"), &e);
         }
     });
 }
@@ -301,7 +302,7 @@ pub(crate) fn decided(app: &AppHandle, outcome: selecting::Outcome, drawn: Optio
         } else if action == Action::Pick {
             end_pick(Picked::Failed(e));
         } else {
-            notify("Screenshot failed", &e);
+            notify(t("Screenshot failed"), &e);
         }
     }
 }
@@ -323,16 +324,16 @@ fn complete(app: &AppHandle, action: Action, picture: image::RgbaImage, place: P
             let (width, height) = picture.dimensions();
             close_overlay();
             app.clipboard().write_image(&tauri::image::Image::new_owned(picture.into_raw(), width, height)).map_err(|e| e.to_string())?;
-            notify("Screenshot copied", "The image is on the clipboard.");
+            notify(t("Screenshot copied"), t("The image is on the clipboard."));
             Ok(())
         }
         Action::Save => {
             let dir = pictures_dir();
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-            let path = dir.join(format!("Screenshot {}.png", timestamp()));
-            picture.save_with_format(&path, image::ImageFormat::Png).map_err(|e| format!("failed to save {}: {e}", path.display()))?;
+            let path = dir.join(tf("Screenshot {0}.png", &[&timestamp()]));
+            picture.save_with_format(&path, image::ImageFormat::Png).map_err(|e| tf("failed to save {0}: {1}", &[&path.display(), &e]))?;
             close_overlay();
-            notify("Screenshot saved", &path.to_string_lossy());
+            notify(t("Screenshot saved"), &path.to_string_lossy());
             Ok(())
         }
         Action::Pin => {
@@ -340,7 +341,7 @@ fn complete(app: &AppHandle, action: Action, picture: image::RgbaImage, place: P
             if crate::slint_windows::screenshot::pin::show(app, picture, place.at) {
                 Ok(())
             } else {
-                Err(format!("the capture cannot be pinned: {}", crate::slint_windows::failure()))
+                Err(tf("the capture cannot be pinned: {0}", &[&crate::slint_windows::failure()]))
             }
         }
         Action::Text => {
@@ -355,12 +356,12 @@ fn complete(app: &AppHandle, action: Action, picture: image::RgbaImage, place: P
             let _ = std::fs::remove_file(&path);
             let text = recognized?;
             if text.trim().is_empty() {
-                return Err("No text was found in the selection.".into());
+                return Err(t("No text was found in the selection.").into());
             }
             close_overlay();
             crate::platform::clipboard_watch::write_text(&text)?;
             let preview: String = text.chars().take(80).collect();
-            notify("Text copied", &preview);
+            notify(t("Text copied"), &preview);
             Ok(())
         }
     }

@@ -16,6 +16,7 @@ pub mod sources;
 pub mod store;
 pub mod vectors;
 
+use crate::i18n::t;
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -417,9 +418,9 @@ pub fn set_paused(app: &AppHandle, paused: bool) -> Result<(), String> {
 pub fn toggle_paused(app: &AppHandle) {
     let paused = !app.state::<SettingsState>().0.read().unwrap().clipboard_paused;
     match set_paused(app, paused) {
-        Ok(()) if paused => crate::notify("Clipboard history is paused", "Nothing you copy is recorded until you resume it."),
-        Ok(()) => crate::notify("Clipboard history resumed", "What you copy is recorded again."),
-        Err(e) => crate::notify("Could not change clipboard history", &e),
+        Ok(()) if paused => crate::notify(t("Clipboard history is paused"), t("Nothing you copy is recorded until you resume it.")),
+        Ok(()) => crate::notify(t("Clipboard history resumed"), t("What you copy is recorded again.")),
+        Err(e) => crate::notify(t("Could not change clipboard history"), &e),
     }
 }
 

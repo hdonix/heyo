@@ -557,7 +557,7 @@ fn stop_developing(entry: &Development) -> Result<(), String> {
     let registry = Registry { extensions: development().into_iter().filter(|other| other != entry).collect() };
     let text = serde_json::to_string_pretty(&registry).map_err(|e| e.to_string())?;
     let partial = file.with_extension("json.tmp");
-    fs::write(&partial, text + "\n").and_then(|()| fs::rename(&partial, &file)).map_err(|e| format!("failed to write {}: {e}", file.display()))?;
+    fs::write(&partial, text + "\n").and_then(|()| fs::rename(&partial, &file)).map_err(|e| crate::i18n::tf("failed to write {0}: {1}", &[&file.display(), &e]))?;
     // Only ever what `heyo dev` built, whatever the file was made to say.
     let dir = Path::new(&entry.dir);
     if dir.parent() == Some(crate::paths::data().join("development").as_path()) {

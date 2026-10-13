@@ -13,6 +13,8 @@
 //! by its inside and resized by its handles, Enter copies it. With a tool
 //! chosen from the toolbar a drag in the selection draws on it instead.
 
+use crate::i18n::t;
+
 /// A selection smaller than this, either way, is a click, not a selection.
 pub const MIN_SIZE: f64 = 6.0;
 /// How far from a handle's middle a press still takes it.
@@ -636,7 +638,7 @@ impl Selecting {
         self.hover = None;
         self.typing = None;
         if action == Action::Text {
-            self.status = Some(Status { text: "Recognizing text…".into(), error: false });
+            self.status = Some(Status { text: t("Recognizing text…").into(), error: false });
         }
         Some(Outcome::Finish { action, area: self.area(rect) })
     }
@@ -682,8 +684,13 @@ impl Selecting {
             (text, (rect.x, if above < 0.0 { rect.y + LABEL_GAP } else { above }))
         });
         let hint = self.rect.is_none().then(|| {
-            let what = if self.mode == Mode::Text { "Drag over the text to copy" } else { "Drag to select an area" };
-            format!("{what}{} · Esc to cancel", if self.windows.is_empty() { "" } else { ", or click a window" })
+            match (self.mode == Mode::Text, self.windows.is_empty()) {
+                (true, true) => t("Drag over the text to copy · Esc to cancel"),
+                (true, false) => t("Drag over the text to copy, or click a window · Esc to cancel"),
+                (false, true) => t("Drag to select an area · Esc to cancel"),
+                (false, false) => t("Drag to select an area, or click a window · Esc to cancel"),
+            }
+            .to_owned()
         });
         // While the selection is being made or changed, and before there is
         // one: where an edge will be, to the pixel.

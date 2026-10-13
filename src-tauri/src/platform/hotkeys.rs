@@ -7,6 +7,7 @@
 //! they are managed here through `gsettings`; an existing shortcut for the
 //! same command (e.g. one made by hand) is reused rather than duplicated.
 
+use crate::i18n::{marked, t, tf};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 #[cfg(any(target_os = "linux", test))]
@@ -47,14 +48,14 @@ impl Target {
     pub fn clipboard_history() -> Self {
         Target {
             args: vec!["--clipboard".into()],
-            label: "Heyo Clipboard History".into(),
+            label: t("Heyo Clipboard History").into(),
             path_id: "heyo-clipboard".into(),
         }
     }
 
     /// Starts or finishes voice dictation.
     pub fn dictation() -> Self {
-        Target { args: vec!["--dictate".into()], label: "Heyo Dictation".into(), path_id: "heyo-dictation".into() }
+        Target { args: vec!["--dictate".into()], label: t("Heyo Dictation").into(), path_id: "heyo-dictation".into() }
     }
 
     /// Opens a root search item.
@@ -63,7 +64,7 @@ impl Target {
         id.hash(&mut hasher);
         Target {
             args: vec!["--open".into(), id.into()],
-            label: format!("Heyo: {title}"),
+            label: tf("Heyo: {0}", &[&title]),
             path_id: format!("heyo-item-{:016x}", hasher.finish()),
         }
     }
@@ -118,7 +119,7 @@ pub fn item_hotkeys() -> HashMap<String, String> {
 
 /// Sets the accelerator; an empty one removes the hotkey.
 pub fn set(target: &Target, accelerator: &str) -> Result<(), String> {
-    desktop().hotkeys().ok_or_else(|| super::unsupported("Setting hotkeys"))?.set(target, accelerator)
+    desktop().hotkeys().ok_or_else(|| super::unsupported(marked("Setting hotkeys")))?.set(target, accelerator)
 }
 
 /// Starts acting on the hotkeys, where Heyo itself has to (elsewhere the
@@ -277,7 +278,7 @@ fn gsettings_set(target: &Target, accelerator: &str) -> Result<(), String> {
             let binding = entry_get(path, "binding");
             if !binding.is_empty() && normalize(&binding) == wanted {
                 let name = entry_get(path, "name");
-                return Err(format!("This hotkey is already used by “{name}”."));
+                return Err(tf("This hotkey is already used by “{0}”.", &[&name]));
             }
         }
     }

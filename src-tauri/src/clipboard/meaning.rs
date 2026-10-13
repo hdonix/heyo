@@ -10,6 +10,7 @@
 //! meaning is asked for separately, and says "not yet" until the vector is there.
 //! Whenever anything is missing or fails, the search by words is all there is.
 
+use crate::i18n::t;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, OnceLock};
@@ -306,7 +307,7 @@ pub fn install(app: &AppHandle) -> Result<(), String> {
     if meaning.installing.swap(true, Ordering::Relaxed) {
         return Ok(());
     }
-    let _ = app.emit(event::CLIPBOARD_MEANING_INSTALL, InstallProgress::Progress { step: "Language model".into(), received: None, total: None });
+    let _ = app.emit(event::CLIPBOARD_MEANING_INSTALL, InstallProgress::Progress { step: t("Language model").into(), received: None, total: None });
     let window = app.clone();
     let command = embed::command(app).map(|mut command| {
         command.arg("install");

@@ -1,5 +1,6 @@
 //! Applications from freedesktop `.desktop` entries.
 
+use crate::i18n::{t, tf};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
@@ -304,11 +305,11 @@ fn terminal_prefix() -> Vec<String> {
 }
 
 pub fn launch(app: &App) -> Result<(), String> {
-    let mut argv = expand_exec(app).ok_or_else(|| format!("invalid Exec line: {}", app.exec))?;
+    let mut argv = expand_exec(app).ok_or_else(|| tf("invalid Exec line: {0}", &[&app.exec]))?;
     if app.terminal {
         let mut prefix = terminal_prefix();
         if prefix.is_empty() {
-            return Err("no terminal emulator found".into());
+            return Err(t("no terminal emulator found").into());
         }
         prefix.append(&mut argv);
         argv = prefix;
@@ -324,7 +325,7 @@ pub fn launch(app: &App) -> Result<(), String> {
     if let Some(dir) = &app.working_dir {
         cmd.current_dir(dir);
     }
-    let mut child = cmd.spawn().map_err(|e| format!("failed to launch {}: {e}", argv[0]))?;
+    let mut child = cmd.spawn().map_err(|e| tf("failed to launch {0}: {1}", &[&argv[0], &e]))?;
     std::thread::spawn(move || child.wait());
     Ok(())
 }

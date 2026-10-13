@@ -1,6 +1,7 @@
 //! What a `heyo …` invocation or a hotkey asks for: opening an item by
 //! id, native commands, and the command-line flags.
 
+use crate::i18n::t;
 use tauri::AppHandle;
 
 use crate::*;
@@ -34,7 +35,7 @@ pub(crate) fn open_native(app: &AppHandle, id: &str) -> bool {
         _ => match id.strip_prefix(root::WINDOW_PREFIX) {
             Some(layout) => {
                 if let Err(e) = apply_layout(app, layout) {
-                    notify("Could not move the window", &e);
+                    notify(t("Could not move the window"), &e);
                 }
             }
             None => return false,

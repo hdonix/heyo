@@ -46,6 +46,8 @@
 //! application up to then (`composed`) and can be no longer
 //! ([`OnScreen::resuming`]).
 
+use crate::i18n::marked;
+
 /// The most characters erased at the end, for the polished text or a
 /// cancelled recording. A GTK text view takes two thousand Backspaces in a
 /// quarter of a second; an application several times slower is still done
@@ -260,7 +262,7 @@ impl OnScreen {
                     How::Revising => {
                         let same = common(&self.screen, text);
                         if self.screen[same..].chars().count() > MOST_ERASED {
-                            self.shortfall = Some(Shortfall::NotPolished("there is too much text to replace where it stands"));
+                            self.shortfall = Some(Shortfall::NotPolished(marked("there is too much text to replace where it stands")));
                             return self.revise(self.said.clone());
                         }
                         self.revise(text.to_owned())
@@ -380,7 +382,7 @@ impl OnScreen {
     }
 }
 
-const UNSAFE: &str = "it could not safely take the place of the text, which was left as it was heard";
+const UNSAFE: &str = marked("it could not safely take the place of the text, which was left as it was heard");
 
 #[cfg(test)]
 mod tests {

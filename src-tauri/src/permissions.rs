@@ -15,6 +15,7 @@
 //! and could name another extension as the one asking. Nothing here, and
 //! nothing the user is shown, may say otherwise.
 
+use crate::i18n::{t, tf};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Mutex};
@@ -119,22 +120,23 @@ impl Permission {
         self == Permission::Windows
     }
 
-    /// What it lets an extension do, in words that follow "allow it to".
+    /// What it lets an extension do, in words that follow "allow it to":
+    /// the sentences they stand in are messages that take them.
     pub fn allows(self) -> &'static str {
         match self {
-            Permission::Windows => "see, switch, move and close the windows of other applications",
-            Permission::ScreenCapture => "take pictures of the screen without you selecting what",
-            Permission::ScreenText => "read the text in images it gives Heyo",
-            Permission::Microphone => "record the microphone and turn what is said into text",
-            Permission::ClipboardHistory => "read your clipboard history",
-            Permission::MemoryRead => "search what Heyo remembers, which includes your clipboard history",
-            Permission::MemoryWrite => "add entries of its own to what Heyo remembers",
-            Permission::FilesSearch => "search the names of your files",
-            Permission::System => "lock or suspend the computer, change the volume, the sound device and the appearance, and empty the trash",
-            Permission::InputPaste => "paste into the application in front",
-            Permission::Ai => "use the AI model set up in Heyo",
-            Permission::SearchProvider => "see what you type in the root search and add results to it",
-            Permission::Activity => "show what it is doing in Heyo's In Progress section, and tell you when it is done",
+            Permission::Windows => t("see, switch, move and close the windows of other applications"),
+            Permission::ScreenCapture => t("take pictures of the screen without you selecting what"),
+            Permission::ScreenText => t("read the text in images it gives Heyo"),
+            Permission::Microphone => t("record the microphone and turn what is said into text"),
+            Permission::ClipboardHistory => t("read your clipboard history"),
+            Permission::MemoryRead => t("search what Heyo remembers, which includes your clipboard history"),
+            Permission::MemoryWrite => t("add entries of its own to what Heyo remembers"),
+            Permission::FilesSearch => t("search the names of your files"),
+            Permission::System => t("lock or suspend the computer, change the volume, the sound device and the appearance, and empty the trash"),
+            Permission::InputPaste => t("paste into the application in front"),
+            Permission::Ai => t("use the AI model set up in Heyo"),
+            Permission::SearchProvider => t("see what you type in the root search and add results to it"),
+            Permission::Activity => t("show what it is doing in Heyo's In Progress section, and tell you when it is done"),
         }
     }
 }
@@ -314,23 +316,21 @@ pub fn decide(heyo: Option<&Heyo>, permission: Permission, granted: &BTreeSet<Pe
 fn refusal(reason: Reason, title: &str, need: Need) -> String {
     let permission = need.permission;
     match reason {
-        Reason::Newer => format!("{title} was written for a newer Heyo (this one provides version {API_VERSION} of the extension API)."),
+        Reason::Newer => tf("{0} was written for a newer Heyo (this one provides version {1} of the extension API).", &[&title, &API_VERSION]),
         Reason::Undeclared => format!("{} needs the \"{}\" permission; add it to \"heyo.permissions\" in package.json.", need.member, permission.name()),
-        Reason::Background => format!("{title} has not been allowed to {}. Open one of its commands in Heyo to be asked.", permission.allows()),
-        Reason::Refused => format!("{title} was not allowed to {}.", permission.allows()),
-        Reason::Off => format!("{title} is not allowed to {}: it is turned off in Heyo Settings.", permission.allows()),
+        Reason::Background => tf("{0} has not been allowed to {1}. Open one of its commands in Heyo to be asked.", &[&title, &permission.allows()]),
+        Reason::Refused => tf("{0} was not allowed to {1}.", &[&title, &permission.allows()]),
+        Reason::Off => tf("{0} is not allowed to {1}: it is turned off in Heyo Settings.", &[&title, &permission.allows()]),
     }
 }
 
 /// What the palette asks. It says what is given and what is not.
 fn consent(title: &str, permission: Permission) -> Consent {
     Consent {
-        title: format!("Allow {title} to {}?", permission.allows()),
-        message: "Heyo will not ask again; you can take this back in Settings, on the extension's page.\n\n\
-                  This is about what Heyo hands over or does for the extension. It does not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."
-            .into(),
-        yes: "Allow",
-        no: "Deny",
+        title: tf("Allow {0} to {1}?", &[&title, &permission.allows()]),
+        message: t("Heyo will not ask again; you can take this back in Settings, on the extension's page.\n\nThis is about what Heyo hands over or does for the extension. It does not confine it: an extension is a program on this computer, and can read your files and start other programs by itself.").into(),
+        yes: t("Allow"),
+        no: t("Deny"),
     }
 }
 
@@ -537,13 +537,13 @@ impl Granted {
     /// the computer), whoever asks and whatever they were allowed.
     pub(crate) fn confirm_each_time(&self, caller: &Caller, title: String, yes: &'static str, ask: &dyn Fn(Consent) -> bool) -> Result<(), ExtError> {
         if caller.background {
-            return Err(ExtError::new(ErrorCode::Denied, format!("{title} Nobody can be asked from the menu bar or the background.")));
+            return Err(ExtError::new(ErrorCode::Denied, tf("{0} Nobody can be asked from the menu bar or the background.", &[&title])));
         }
         let _one = self.asking.lock().unwrap_or_else(|e| e.into_inner());
-        let message = if caller.builtin { String::new() } else { format!("{} asks for it.", caller.title) };
-        match ask(Consent { title, message, yes, no: "Cancel" }) {
+        let message = if caller.builtin { String::new() } else { tf("{0} asks for it.", &[&caller.title]) };
+        match ask(Consent { title, message, yes, no: t("Cancel") }) {
             true => Ok(()),
-            false => Err(ExtError::new(ErrorCode::Cancelled, "It was called off.")),
+            false => Err(ExtError::new(ErrorCode::Cancelled, t("It was called off."))),
         }
     }
 }

@@ -7,6 +7,7 @@
 //! taken out of the palette's messages (`runtime_send`) before the runtime
 //! would see it. One question at a time; a new one answers the old with No.
 
+use crate::i18n::t;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -47,7 +48,7 @@ impl Question {
                 "message": self.message,
                 "primaryAction": { "title": self.yes },
                 "alwaysAction": { "title": self.always },
-                "dismissAction": { "title": "Cancel" },
+                "dismissAction": { "title": t("Cancel") },
             },
         })
     }

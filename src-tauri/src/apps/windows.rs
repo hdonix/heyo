@@ -237,7 +237,7 @@ pub fn discover() -> Vec<App> {
 pub fn launch(app: &App) -> Result<(), String> {
     if app.exec.starts_with(PACKAGED) {
         // Explorer knows what to do with such a name; what it returns says nothing.
-        let mut child = crate::platform::common::quiet("explorer.exe").arg(&app.exec).spawn().map_err(|e| format!("failed to open {}: {e}", app.name))?;
+        let mut child = crate::platform::common::quiet("explorer.exe").arg(&app.exec).spawn().map_err(|e| crate::i18n::tf("failed to open {0}: {1}", &[&app.name, &e]))?;
         std::thread::spawn(move || child.wait());
         return Ok(());
     }

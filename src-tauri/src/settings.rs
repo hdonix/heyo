@@ -11,6 +11,7 @@
 //!
 //! "Launch at login" is not stored: it is whether the autostart entry exists.
 
+use crate::i18n::{t, tf};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
@@ -265,7 +266,7 @@ impl Settings {
     pub fn load() -> Self {
         let (settings, kept) = Settings::load_from(&settings_path());
         if let Some(kept) = kept {
-            crate::notify("Heyo's settings could not be read", &format!("Using defaults. The old file is kept as {}.", kept.display()));
+            crate::notify(t("Heyo's settings could not be read"), &tf("Using defaults. The old file is kept as {0}.", &[&kept.display()]));
         }
         settings
     }
@@ -311,7 +312,7 @@ impl Settings {
             file.sync_all()?;
             fs::rename(&temporary, path)
         };
-        write().map_err(|e| format!("failed to write {}: {e}", path.display()))
+        write().map_err(|e| tf("failed to write {0}: {1}", &[&path.display(), &e]))
     }
 
     /// The Node.js executable; `HEYO_NODE` overrides the setting.
@@ -367,7 +368,7 @@ fn set_autostart_entry(enabled: bool) -> Result<(), String> {
         exe.display()
     );
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    fs::write(&path, entry).map_err(|e| format!("failed to write {}: {e}", path.display()))
+    fs::write(&path, entry).map_err(|e| tf("failed to write {0}: {1}", &[&path.display(), &e]))
 }
 
 /// `node --version`, or why it could not run.
@@ -396,12 +397,12 @@ pub fn node_version(node: &str) -> Result<String, String> {
 fn check_node(node: &str) -> Result<String, String> {
     let output = crate::platform::common::quiet(node).arg("--version").output().map_err(|e| format!("{node}: {e}"))?;
     if !output.status.success() {
-        return Err(format!("{node} --version failed"));
+        return Err(tf("{0} --version failed", &[&node]));
     }
     let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     let major: u32 = version.trim_start_matches('v').split('.').next().and_then(|m| m.parse().ok()).unwrap_or(0);
     if major < 22 {
-        return Err(format!("{version} is too old; extensions need Node.js 22 or newer"));
+        return Err(tf("{0} is too old; extensions need Node.js 22 or newer", &[&version]));
     }
     Ok(version)
 }

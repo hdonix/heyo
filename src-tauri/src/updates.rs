@@ -9,6 +9,7 @@
 //! the Windows installer's. A package is updated by the package manager, a
 //! source build by building again.
 
+use crate::i18n::t;
 use tauri::AppHandle;
 
 /// Whether this build was told where its updates come from.
@@ -43,9 +44,9 @@ pub fn start(app: &AppHandle) {
 async fn newer(app: &AppHandle) -> Result<Option<tauri_plugin_updater::Update>, String> {
     use tauri_plugin_updater::UpdaterExt;
     if !available(app) {
-        return Err("This copy of Heyo does not update itself.".into());
+        return Err(t("This copy of Heyo does not update itself.").into());
     }
-    app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| format!("Could not look for a new version: {e}"))
+    app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| crate::i18n::tf("Could not look for a new version: {0}", &[&e]))
 }
 
 /// The version that can be installed, if there is one newer than this.
@@ -55,7 +56,7 @@ pub(crate) async fn check_for_update(app: AppHandle) -> Result<Option<String>, S
     #[cfg(not(feature = "updater"))]
     {
         let _ = app;
-        Err("This copy of Heyo does not update itself.".into())
+        Err(t("This copy of Heyo does not update itself.").into())
     }
 }
 
@@ -65,12 +66,12 @@ pub(crate) async fn install_update(app: AppHandle) -> Result<(), String> {
     #[cfg(feature = "updater")]
     {
         let Some(update) = newer(&app).await? else { return Ok(()) };
-        update.download_and_install(|_, _| {}, || {}).await.map_err(|e| format!("Could not install Heyo {}: {e}", update.version))?;
+        update.download_and_install(|_, _| {}, || {}).await.map_err(|e| crate::i18n::tf("Could not install Heyo {0}: {1}", &[&update.version, &e]))?;
         app.restart();
     }
     #[cfg(not(feature = "updater"))]
     {
         let _ = app;
-        Err("This copy of Heyo does not update itself.".into())
+        Err(t("This copy of Heyo does not update itself.").into())
     }
 }

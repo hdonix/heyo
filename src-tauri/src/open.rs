@@ -4,6 +4,7 @@
 //! An id says what it names: `app:<desktop id>`, `cmd:<extension>:<command>`,
 //! `heyo:<native command>`, `quicklink:<id>`, `snippet:<id>`.
 
+use crate::i18n::tf;
 use tauri::{AppHandle, Manager};
 
 use crate::root::{Index, NATIVE};
@@ -96,7 +97,7 @@ pub(crate) fn open_with(app: &AppHandle, id: &str, fallback_text: Option<String>
             app.state::<Runtime>().send(app, &launch.json())?;
         }
         Way::Webview => return Ok(false),
-        Way::Missing => return Err(format!("nothing to open for {id} (was it uninstalled?)")),
+        Way::Missing => return Err(tf("nothing to open for {0} (was it uninstalled?)", &[&id])),
     }
     Ok(true)
 }

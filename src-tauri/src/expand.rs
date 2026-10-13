@@ -52,6 +52,7 @@
 //! put back after the text ([`Meanwhile`]); anything else typed meanwhile,
 //! and the keyword is left as it is.
 
+use crate::i18n::{marked, t};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Sender};
@@ -512,13 +513,13 @@ pub(crate) fn snippet_expanded(request: u64, text: String) {
 /// search or by a hotkey, with nothing on screen to show it.
 pub fn toggle(app: &AppHandle) {
     if !typed::supported() {
-        return crate::notify("Snippets cannot expand as you type here", &crate::platform::unsupported("Following what is typed"));
+        return crate::notify(t("Snippets cannot expand as you type here"), &crate::platform::unsupported(marked("Following what is typed")));
     }
     let on = !wanted(app);
     match crate::update_settings(app, |settings| settings.snippet_expansion = on) {
-        Ok(()) if on => crate::notify("Snippet expansion is on", "Heyo follows what you type to replace the keywords of your snippets."),
-        Ok(()) => crate::notify("Snippet expansion is off", "Heyo no longer follows what you type."),
-        Err(e) => crate::notify("Could not change snippet expansion", &e),
+        Ok(()) if on => crate::notify(t("Snippet expansion is on"), t("Heyo follows what you type to replace the keywords of your snippets.")),
+        Ok(()) => crate::notify(t("Snippet expansion is off"), t("Heyo no longer follows what you type.")),
+        Err(e) => crate::notify(t("Could not change snippet expansion"), &e),
     }
 }
 

@@ -30,6 +30,7 @@
 mod composed;
 mod onscreen;
 
+use crate::i18n::{t, tf, translate};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::Command;
@@ -106,7 +107,7 @@ fn heard(event: &Value) -> Option<Heard> {
         "segment" => Some(Heard::Segment(text().trim_start().to_owned())),
         "result" if event["cancelled"] == true => Some(Heard::Cancelled),
         "result" => Some(Heard::Result(text())),
-        "error" => Some(Heard::Failed(event["message"].as_str().unwrap_or("Dictation failed").to_owned())),
+        "error" => Some(Heard::Failed(event["message"].as_str().unwrap_or(t("Dictation failed")).to_owned())),
         _ => None,
     }
 }
@@ -208,7 +209,7 @@ fn start_helper(app: &AppHandle) -> Result<Helper, String> {
             if !state.recording {
                 return;
             }
-            let stopped = json!({ "type": "error", "message": "Dictation stopped unexpectedly" });
+            let stopped = json!({ "type": "error", "message": t("Dictation stopped unexpectedly") });
             // What the recording wrote is finished off by its own thread.
             if let Some(writing) = state.writing.clone() {
                 return writing.post(Said::Ended(stopped));
@@ -217,20 +218,20 @@ fn start_helper(app: &AppHandle) -> Result<Helper, String> {
             let listener = state.listener.take();
             drop(state);
             if let Some(listener) = listener {
-                listener(Heard::Failed("Dictation stopped unexpectedly".into()));
+                listener(Heard::Failed(t("Dictation stopped unexpectedly").into()));
             }
             emit(&ended, stopped);
             hide_window_after(&ended, Duration::from_secs(3));
         },
     )
-    .map_err(|e| format!("failed to start dictation: {e}"))
+    .map_err(|e| tf("failed to start dictation: {0}", &[&e]))
 }
 
 fn send(state: &mut State, message: &Value) -> Result<(), String> {
-    let helper = state.helper.as_mut().ok_or("dictation is not running")?;
+    let helper = state.helper.as_mut().ok_or(t("dictation is not running"))?;
     helper.send(message).map_err(|e| {
         state.helper = None;
-        format!("dictation is not running: {e}")
+        tf("dictation is not running: {0}", &[&e])
     })
 }
 
@@ -596,7 +597,7 @@ impl Writer {
         match self.way.shortfall() {
             // The text in the application is what was heard.
             Some(Shortfall::NotPolished(why)) => {
-                event["warning"] = json!(why);
+                event["warning"] = json!(translate(why));
                 event["text"] = event["raw"].clone();
             }
             Some(Shortfall::NotTakenBack) => event["kept"] = json!(true),
@@ -830,7 +831,7 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     }
     if !installed() {
         drop(state);
-        return fail(app, "Dictation is not set up yet. Open Heyo Settings → Dictation to download it.".into());
+        return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Dictation to download it.").into());
     }
     let (language, source, polish, vocabulary, live) = {
         let settings = app.state::<SettingsState>();

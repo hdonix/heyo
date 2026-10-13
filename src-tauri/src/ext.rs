@@ -18,6 +18,7 @@
 //! `answer` sees it (its tables gathered, and what only it can do), and
 //! what is done once an answer is known.
 
+use crate::i18n::t;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
@@ -175,14 +176,14 @@ fn capture(app: &AppHandle, extension: &str, target: CaptureTarget) -> Result<Ca
                     private(&path);
                     Ok(Capture { path: shown, width, height })
                 }
-                Picked::Cancelled => Err(ExtError::new(ErrorCode::Cancelled, "No area was selected.")),
+                Picked::Cancelled => Err(ExtError::new(ErrorCode::Cancelled, t("No area was selected."))),
                 Picked::Failed(e) => Err(e.into()),
             };
         }
         CaptureTarget::Whole(CaptureWhole::Screen) => None,
         CaptureTarget::Window { window } => {
             let found = windows::list(None)?.into_iter().find(|w| w.id == window).ok_or_else(|| ExtError::invalid(format!("There is no window {window}.")))?;
-            Some(found.bounds.ok_or_else(|| ExtError::unsupported("This desktop does not say where its windows are."))?)
+            Some(found.bounds.ok_or_else(|| ExtError::unsupported(t("This desktop does not say where its windows are.")))?)
         }
         CaptureTarget::Rect { rect } => Some(rect),
     };
@@ -205,15 +206,15 @@ fn heard_event(heard: &Heard) -> Value {
     match heard {
         Heard::Segment(text) => json!({ "kind": "segment", "text": text }),
         Heard::Result(text) => json!({ "kind": "result", "text": text }),
-        Heard::Cancelled => json!({ "kind": "error", "code": "cancelled", "message": "The recording was discarded." }),
+        Heard::Cancelled => json!({ "kind": "error", "code": "cancelled", "message": t("The recording was discarded.") }),
         Heard::Failed(message) => json!({ "kind": "error", "code": "failed", "message": message }),
     }
 }
 
 fn not_listening(why: NotListening) -> ExtError {
     match why {
-        NotListening::Busy => ExtError::from("A recording is already in progress."),
-        NotListening::NotInstalled => ExtError::new(ErrorCode::Unavailable, "Dictation is not set up yet. Download it in Heyo Settings → Dictation."),
+        NotListening::Busy => ExtError::from(t("A recording is already in progress.")),
+        NotListening::NotInstalled => ExtError::new(ErrorCode::Unavailable, t("Dictation is not set up yet. Download it in Heyo Settings → Dictation.")),
         NotListening::Failed(e) => e.into(),
     }
 }

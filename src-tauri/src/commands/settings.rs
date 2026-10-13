@@ -1,5 +1,6 @@
 //! Commands for the settings window: settings, hotkeys, extensions.
 
+use crate::i18n::{t, tf};
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -19,13 +20,13 @@ pub(crate) async fn local_models(url: String) -> Result<Vec<String>, String> {
     })
     .await
     .map_err(|e| e.to_string())?
-    .map_err(|e| format!("could not run curl: {e}"))?;
+    .map_err(|e| tf("could not run curl: {0}", &[&e]))?;
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
         // "curl: (7) Failed to connect to …" → the part after the code.
         return Err(error.trim().split_once(") ").map_or(error.trim(), |(_, reason)| reason).to_owned());
     }
-    let body: Value = serde_json::from_slice(&output.stdout).map_err(|_| "the server did not answer with a model list".to_owned())?;
+    let body: Value = serde_json::from_slice(&output.stdout).map_err(|_| t("the server did not answer with a model list").to_owned())?;
     Ok(body["data"].as_array().into_iter().flatten().filter_map(|m| m["id"].as_str().map(str::to_owned)).collect())
 }
 
@@ -219,10 +220,10 @@ pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
     palette::bring_back(&app);
     let restarting = app.clone();
     let consent = crate::confirm::Consent {
-        title: "Settings need Heyo to be restarted".into(),
-        message: format!("The settings window stopped working ({}). Everything else goes on as it was.", crate::slint_windows::failure()),
-        yes: "Restart Heyo",
-        no: "Not Now",
+        title: t("Settings need Heyo to be restarted").into(),
+        message: tf("The settings window stopped working ({0}). Everything else goes on as it was.", &[&crate::slint_windows::failure()]),
+        yes: t("Restart Heyo"),
+        no: t("Not Now"),
     };
     crate::confirm::ask_consent(&app, consent, move |yes| {
         if yes {
@@ -276,7 +277,7 @@ pub(crate) async fn set_hotkey(name: HotkeyName, accelerator: String) -> Result<
 #[tauri::command]
 pub(crate) async fn set_item_hotkey(id: String, title: String, accelerator: String, app: AppHandle) -> Result<(), String> {
     if !hotkeys::supported() {
-        return Err("Hotkeys need GNOME. Bind a desktop shortcut to `heyo --open <id>` instead.".into());
+        return Err(t("Hotkeys need GNOME. Bind a desktop shortcut to `heyo --open <id>` instead.").into());
     }
     hotkeys::set(&hotkeys::Target::item(&id, &title), &accelerator)?;
     let state = app.state::<ItemHotkeys>();
