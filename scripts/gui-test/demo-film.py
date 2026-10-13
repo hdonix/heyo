@@ -351,7 +351,11 @@ def storyboard(capture):
     nx = note[0] + note[2] / 2
     WIDE = view(nx, (note[1] + pill[1] + pill[3]) / 2, 2880)
     PILL = view(pill[0] + pill[2] / 2, pill[1] + pill[3] / 2 - 50, 1100)
-    WORDS = view(nx, note[1] + 440, 1920)
+    # The words and, under the note, the window that hears them: both in
+    # the picture for as long as someone is speaking, down to the screen's
+    # lower edge so that the caption has its place below the window.
+    WORDS = view(nx, SCREEN[1], 2500)
+    NEARER = view(nx, SCREEN[1], 2300)
     # The cut to the words comes a beat and a half into the sentence: the
     # window is seen hearing it first.
     listening = speech_starts(capture, "english") + SPEECH["english"]["sentences"][0][0] - 2.5 * PERIOD
@@ -361,7 +365,7 @@ def storyboard(capture):
     heard = speech_starts(capture, "chinese")
     sentences = SPEECH["chinese"]["sentences"]
     shots.append(Shot("dictation-mixed", [(12, heard + sentences[0][0] - 0.3, "live")], [(0, WORDS)], "Mix languages mid-sentence."))
-    shots.append(Shot("dictation-mixed-on", [(8, heard + sentences[-1][0] - 0.25, "live")], [(0, view(nx, note[1] + 705, 1740))], "Mix languages mid-sentence."))
+    shots.append(Shot("dictation-mixed-on", [(8, heard + sentences[-1][0] - 0.25, "live")], [(0, WORDS), (6, NEARER)], "Mix languages mid-sentence."))
 
     # Windows: asked for by name once, then a layout on every beat.
     shots.append(Shot("windows-ask", [
