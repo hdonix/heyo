@@ -24,7 +24,7 @@ import { SelectionIndicator } from "./SelectionIndicator";
 import { actionForShortcut, ActionOverlay, ShortcutHint } from "./raycast/actions";
 import { ToastView } from "./raycast/CommandView";
 import type { Toast } from "./raycast/model";
-import { t } from "../shared/i18n";
+import { language, t } from "../shared/i18n";
 
 export type { Item };
 
@@ -204,8 +204,10 @@ export function RootSearch(props: {
     call("list_quicklinks").then(setQuicklinks);
   }, [props.version]);
 
-  const calc = useMemo(() => calculate(query, rates), [query, rates]);
-  const rows = useMemo(() => rowsFor(query, { activities, calc, items, quicklinks }), [query, activities, calc, items, quicklinks]);
+  // What these say is said in the language spoken: another one makes them anew.
+  const spoken = language();
+  const calc = useMemo(() => calculate(query, rates), [query, rates, spoken]);
+  const rows = useMemo(() => rowsFor(query, { activities, calc, items, quicklinks }), [query, activities, calc, items, quicklinks, spoken]);
   const keys = useMemo(() => rows.map((row) => row.key), [rows]);
   const selected = locate(keys, held);
   const current = rows[selected];
