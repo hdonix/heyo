@@ -135,7 +135,9 @@ all four targets with `build.sh`; four jobs then make the packages with
 `bundle.sh` from its programs, the arm64 Linux one on an arm64 machine. For
 a tag, the tag must be the version in `tauri.conf.json`, and the packages
 with a `SHA256SUMS` become a draft release: nothing is published until
-someone publishes it.
+someone publishes it. The release's notes are the version's section of
+`CHANGELOG.md` (`scripts/package/notes.sh`), and a tag whose version has
+no section there is stopped before anything is compiled: write it first.
 
 The compiling job keeps one cache of the dependencies for all four targets.
 A run for a tag can read the cache of the default branch but not another

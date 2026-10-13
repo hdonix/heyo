@@ -179,9 +179,11 @@ windows, the screen, dictation, the clipboard history, live activities.
 
 ## Install
 
-There are no released packages yet: build from source, or have the
-packages built, for Linux and Windows on x86_64 and arm64, as
-[packaging/README.md](packaging/README.md) describes.
+Packages for Linux and Windows, on x86_64 and arm64, are on the
+[releases page](https://github.com/hdonix/heyo/releases), and
+[CHANGELOG.md](CHANGELOG.md) says what is in each version. Or build from
+source; [packaging/README.md](packaging/README.md) describes how the
+packages are made.
 
 From source, for the current user, under `~/.local` (what the build needs
 is in [docs/development.md](docs/development.md#what-you-need)):
@@ -192,7 +194,7 @@ pnpm install
 scripts/install.sh --build       # scripts/install.sh --uninstall removes it
 ```
 
-A package you built installs as packages do:
+A package installs as packages do:
 
 - Debian, Ubuntu: `sudo apt install ./Heyo_<version>_<arch>.deb`
 - Fedora, openSUSE: `sudo dnf install ./Heyo-<version>-1.<arch>.rpm`

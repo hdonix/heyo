@@ -49,6 +49,8 @@ jobs:
             echo "::error::the tag is $GITHUB_REF_NAME but src-tauri/tauri.conf.json says $version"
             exit 1
           fi
+          # And it has its notes, before an hour is spent on packages.
+          scripts/package/notes.sh "$version" > /dev/null
 
       - name: Install system packages
         run: |
@@ -192,6 +194,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           path: packages
@@ -201,9 +204,11 @@ jobs:
         working-directory: packages
         run: sha256sum * > SHA256SUMS && cat SHA256SUMS
       # A draft: nothing is announced until someone has read it and
-      # published it.
+      # published it. Its notes are what CHANGELOG.md says of the version.
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes --title "Heyo ${GITHUB_REF_NAME#v}" packages/*
+        run: |
+          scripts/package/notes.sh "${GITHUB_REF_NAME#v}" > notes.md
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --notes-file notes.md --title "Heyo ${GITHUB_REF_NAME#v}" packages/*
