@@ -40,12 +40,12 @@ if [ $# -gt 0 ]; then
   run "$1" layout capture
 else
   # Which windows are listed, and the extension coming back after the lock screen.
-  run "1 1" lists relock layout capture
+  run "1 1" lists own relock layout capture
   # Scaled units: one monitor at 200 % beside one at 100 %, then fractional scales.
-  run "2 1" layout capture
-  run "1.5 1.25" layout capture
+  run "2 1" own layout capture
+  run "1.5 1.25" own layout capture
   # Laid out in pixels, as GNOME does until fractional scaling is switched on.
-  run "--pixels 2 1" layout capture
+  run "--pixels 2 1" own layout capture
 fi
 "$HERE/run.sh" stop >/dev/null
 [ $failed = 0 ] && echo "all passed" || { echo "SOME FAILED"; exit 1; }

@@ -88,6 +88,23 @@ def pixel(path, x, y):
     offset = int(y) * image.get_rowstride() + int(x) * image.get_n_channels()
     return (image.get_width(), image.get_height()), tuple(image.get_pixels()[offset:offset + 3])
 
+# How bright the overlay shows what is not selected (DIM of 256, in
+# slint_windows/screenshot/mod.rs).
+DIMMED = 154 / 256
+
+
+def screen(path):
+    """Saves the whole screen as the Shell draws it."""
+    subprocess.run([os.path.join(HERE, "screenshot.sh"), path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def on_screen(path, x, y):
+    """The colour at a place given in the Shell's units, in a picture of the whole screen."""
+    (width, height), _ = pixel(path, 0, 0)
+    per = width / max(monitor["x"] + monitor["width"] for monitor in monitors())
+    return pixel(path, min(width - 1, round(x * per)), min(height - 1, round(y * per)))[1]
+
+
 def is_colour(rgb, colour):
     return all(abs(a - b) <= 6 for a, b in zip(rgb, bytes.fromhex(colour)))
 
@@ -203,6 +220,8 @@ def capture():
         frame = window("A Colour")
         # Somewhere on this monitor that is not the window.
         point(monitor["x"] + 60, monitor["y"] + monitor["height"] - 60)
+        time.sleep(0.3)
+        screen("/tmp/check-before.png")
         heyo("--open", "heyo:screenshot")
         overlay = wait(lambda: window("Heyo Screenshot"))
         time.sleep(1.0)
@@ -213,15 +232,18 @@ def capture():
         check(f"{how}: the overlay is on the monitor the pointer is on", overlay["monitor"] == index, overlay)
         check(f"{how}: the overlay covers that monitor", near(overlay, monitor, 0), f"{overlay} over {monitor}")
         check(f"{how}: the overlay is kept out of the lists", overlay["skip"])
-        captures = sorted(glob.glob(os.path.expanduser("~/.cache/heyo/screenshot/capture-*.bmp")), key=os.path.getmtime)
-        check(f"{how}: the capture is there", bool(captures))
-        if captures:
-            density = monitor["density"]
-            size, inside = pixel(captures[-1], (frame["x"] - monitor["x"] + frame["width"] / 2) * density, (frame["y"] - monitor["y"] + frame["height"] / 2) * density)
-            _, outside = pixel(captures[-1], (frame["x"] - monitor["x"] - 30) * density, (frame["y"] - monitor["y"] + frame["height"] / 2) * density)
-            expected = (round(monitor["width"] * density), round(monitor["height"] * density))
-            check(f"{how}: the capture has the monitor's own pixels", size == expected, f"{size} instead of {expected}")
-            check(f"{how}: the window is where its frame says in the capture", is_colour(inside, colour) and not is_colour(outside, colour), f"inside {inside}, outside {outside}")
+        # The overlay shows the monitor as it was, dimmed, each thing where
+        # it was: the screen with the overlay up, against the screen before.
+        screen("/tmp/check-overlay.png")
+        # (Not the window's middle: on a small monitor the overlay's hint is over it.)
+        places = {"in the window": (frame["x"] + frame["width"] / 4, frame["y"] + frame["height"] / 4),
+                  "left of it": (frame["x"] - 30, frame["y"] + frame["height"] / 2),
+                  "below it": (frame["x"] + frame["width"] / 2, frame["y"] + frame["height"] + 40)}
+        shown = {}
+        for name, (x, y) in places.items():
+            was, now = on_screen("/tmp/check-before.png", x, y), on_screen("/tmp/check-overlay.png", x, y)
+            shown[name] = (was, now, all(abs(channel * DIMMED - seen) <= 8 for channel, seen in zip(was, now)))
+        check(f"{how}: the overlay shows what was on the monitor, dimmed, where it was", all(alike for _, _, alike in shown.values()) and is_colour(shown["in the window"][0], colour), shown)
         # A click on the window selects it; Ctrl+S saves the selection.
         before = set(glob.glob(os.path.join(pictures, "Screenshots", "*.png")))
         point(frame["x"] + frame["width"] / 2, frame["y"] + frame["height"] / 2)
@@ -244,6 +266,55 @@ def capture():
     app.terminate()
 
 
+STANDING = """(w => w && (r => ({title: w.get_title(), above: w.is_above(), everywhere: w.is_on_all_workspaces(), focused: w.has_focus(),
+    skip: w.skip_taskbar, monitor: w.get_monitor(), x: r.x, y: r.y, width: r.width, height: r.height}))(w.get_frame_rect()))"""
+
+def standing(title):
+    return run(f"{STANDING}(global.get_window_actors().map(a => a.meta_window).find(w => w.get_title() === {title!r}))")
+
+def focused():
+    return run("(w => w ? w.get_title() : '')(global.display.focus_window)")
+
+def own():
+    """Heyo's own windows that a Wayland window could not be without the Shell: the pill, and the overlay's keyboard."""
+    app = tool("window.py", "Notes", "check-own")
+    wait(lambda: window("Notes"))
+    time.sleep(0.8)
+    check("an application has the keyboard", focused() == "Notes", focused())
+    check("nothing of Heyo's is on the screen before it is asked for", not [title for title in run("global.get_window_actors().map(a => a.meta_window.get_title())") if (title or "").startswith("Heyo")])
+    # The pill: a recording begins (with no speech engine here it says so, which is as good).
+    heyo("--dictate")
+    wait(lambda: standing("Heyo Dictation"))
+    time.sleep(0.8)
+    pill = standing("Heyo Dictation")
+    check("the pill comes up", bool(pill))
+    if pill:
+        primary = monitors()[run("global.display.get_primary_monitor()")]
+        where = (primary["x"] + (primary["width"] - pill["width"]) // 2, primary["y"] + primary["height"] - pill["height"] - primary["height"] // 10)
+        check("the pill is at the bottom centre of the primary monitor, a tenth up", abs(pill["x"] - where[0]) <= 1 and abs(pill["y"] - where[1]) <= 1, f"{pill} and not at {where}")
+        check("the pill is above the other windows, on every workspace", pill["above"] and pill["everywhere"], pill)
+        check("the pill does not have the keyboard: the application has", not pill["focused"] and focused() == "Notes", focused())
+        check("the pill is kept out of the lists", pill["skip"], pill)
+        # A click on it must not take the keyboard either.
+        point(pill["x"] + pill["width"] / 2, pill["y"] + pill["height"] / 2)
+        subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:3", "wait:0.3", "nudge:-3", "wait:0.3", "press:left", "wait:0.6"], check=True)
+        check("... nor after a click on it", focused() == "Notes", focused())
+    if not wait(lambda: not window("Heyo Dictation"), 8):
+        heyo("--dictate")
+    check("the pill is gone afterwards", bool(wait(lambda: not window("Heyo Dictation"), 10)), standing("Heyo Dictation"))
+    check("... and the application still has the keyboard", focused() == "Notes", focused())
+    # The overlay has the keyboard while it is up, and Escape gives it back.
+    point(300, 300)
+    heyo("--open", "heyo:screenshot")
+    overlay = wait(lambda: window("Heyo Screenshot"))
+    time.sleep(1.0)
+    check("the overlay has the keyboard while it is up", focused() == "Heyo Screenshot", focused())
+    subprocess.run([os.path.join(HERE, "input.py"), "key", "Escape"], check=True)
+    check("Escape closes the overlay", bool(wait(lambda: not window("Heyo Screenshot"), 5)))
+    time.sleep(0.4)
+    check("... and the keyboard is back with the application", focused() == "Notes", focused())
+    app.terminate()
+
 def relock():
     subprocess.run([os.path.join(HERE, "settings.py"), 'dictationHoldKey="alt_r"'], check=True, stdout=subprocess.DEVNULL)
     subprocess.run([os.path.join(HERE, "start-heyo.sh")], check=True, stdout=subprocess.DEVNULL)
@@ -255,7 +326,7 @@ def relock():
     check("... and again after the extension was switched off and on", bool(wait(lambda: watched() == 2, 5)), watched())
 
 
-CHECKS = {"lists": lists, "layout": layout, "capture": capture, "relock": relock}
+CHECKS = {"lists": lists, "layout": layout, "capture": capture, "relock": relock, "own": own}
 if len(sys.argv) < 2 or any(name not in CHECKS for name in sys.argv[1:]):
     sys.exit(__doc__)
 # For test.sh, which reads this through a pipe.
