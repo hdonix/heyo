@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // say-zh.cjs OUT.wav SENTENCE...: speech in Chinese, or Chinese with English
-// in it, for the film (demo-video.sh).
+// in it, for the film (demo-film.sh).
 //
 // say.py speaks English only (Flite). This speaks with the MeloTTS model for
 // Chinese and English through sherpa-onnx, the library Heyo's dictation

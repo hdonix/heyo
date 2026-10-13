@@ -166,6 +166,7 @@ scripts/gui-test/sandbox.sh down
 | `dev.sh` | `heyo dev` against a running Heyo |
 | `scroll.sh` | how smoothly lists scroll, measured in the web view |
 | `readme-shots.sh`, `readme-dictation.sh` | the README's pictures ([development.md](../../docs/development.md#the-readmes-pictures)) |
+| `demo-film.sh [capture\|edit\|all]` | the film that shows Heyo around ([below](#the-film)) |
 | | **Sharing a session:** |
 | `display-change.sh FROM TO` | the display changed under a running Heyo (the scale, the screen's size, the monitors), every window used before and after and judged: sizes, a held click on a switch, the pointer's size against a GTK window's, the toolbar as drawn, a part saved pixel for pixel, the pill's place, the palette centred. Expected to pass in both directions |
 | `settings-window.sh` | the settings window as a window: moved by its top edge, Tab and Space, Esc, asked for again |
@@ -190,6 +191,43 @@ own directory: each sandbox reads its own window.
 The parts they share: `grab.py` (a picture of the screen), `screen-read.py`
 (the clipboard's picture, the pointer's shape and size, two pictures
 compared), `screenshot-pixels.py`, `toolbar.py`, `seed.py` (settings to
-start from), `say.py` (speech in place of a microphone), `clip.py`,
+start from), `say.py` and `say-zh.cjs` (speech in place of a microphone,
+in English and in Chinese with English in it), `clip.py`,
 `llm-stub.py`, `menubar.py`, and `extensions/`, the small extensions some
 of them install.
+
+## The film
+
+`demo-film.sh` makes the film that shows Heyo around, in two stages, so
+that the cutting can be changed without filming again:
+
+```sh
+scripts/gui-test/demo-film.sh            # both: $HEYO_TEST_DIR/film/heyo.mp4 and heyo.webm
+scripts/gui-test/demo-film.sh capture    # films the sandbox: film/capture.mkv, film/moments.jsonl
+scripts/gui-test/demo-film.sh edit       # cuts what was filmed, again
+```
+
+- **Capture.** The real Heyo in the sandbox's GNOME session at 3840x2160
+  and scale 2, used as a person would use it, one scene after another
+  (`scene_…` in the script), the whole screen filmed. Beside the film it
+  writes the moments: when each thing happened and where on the screen it
+  is, asked of the windows (`mark`). Nothing in the edit carries a place as
+  a number that the capture could have told it.
+- **Edit.** `demo-film.py` is the cutting: a list of shots (`storyboard`),
+  each so many beats of the music long, saying which stretch of the capture
+  it shows, how fast, and where the camera is. Cuts are on beats; what must
+  happen on a beat is found in the capture by the picture in which the
+  screen changes. Captions and the two cards are drawn there. It writes
+  `film/cuts.txt`: how far each cut is from a beat.
+
+The music is not in the repository. `demo-film.py` fetches it by its
+address, checks its SHA-256 and keeps it (`$HEYO_FILM_CACHE/music`); its
+title, author and licence are at the head of that file, with how another
+track is given. A licence that asks for a credit gets it on the last card.
+
+The edit runs under a Python of its own with what it needs (numpy, Pillow,
+OpenCV, librosa, and an ffmpeg with H.264 from `imageio-ffmpeg`): a virtual
+environment that `demo-film.sh` makes with `uv` the first time, in
+`$HEYO_FILM_CACHE/venv`. `HEYO_FILM_DRAFT=1` makes a quick film at half
+the size; `HEYO_FILM_STILLS=1` also writes the first, middle and last
+picture of every shot to `film/stills/`, to look the film over.
