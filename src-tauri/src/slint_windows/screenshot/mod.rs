@@ -261,6 +261,47 @@ fn trace(what: &str) {
     }
 }
 
+/// What the pointer or a key did in the overlay, as whoever hears of it
+/// says it: winit for one of its windows, Heyo's own surface for a layer
+/// surface. Places are in the window's device pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Input {
+    Moved((f64, f64)),
+    /// The pointer left the window.
+    Left,
+    Button {
+        button: Mouse,
+        down: bool,
+    },
+    /// A key went down or up: what it is to the overlay's rules, if
+    /// anything; whether it is one of the two that are held with others;
+    /// and whether it was really pressed now.
+    Key {
+        key: Option<Key>,
+        down: bool,
+        held: Option<Held>,
+        real: bool,
+    },
+    /// Which of the keys held with others are down, as the desktop says.
+    Modifiers {
+        ctrl: bool,
+        alt: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Mouse {
+    Left,
+    Right,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Held {
+    Control,
+    Alt,
+}
+
 /// A key as the overlay's rules know keys.
 fn key_of(logical: &WinitKey, physical: PhysicalKey) -> Option<Key> {
     match logical {
@@ -482,10 +523,7 @@ impl Overlay {
     /// being typed.
     fn told(&mut self, event: &WindowEvent) -> EventResult {
         let Some(up) = self.up.as_mut() else { return EventResult::Propagate };
-        let scale = up.scale;
-        let at = |pointer: (f64, f64)| (pointer.0 / scale, pointer.1 / scale);
-        let typing = up.selecting.typing();
-        let event = match event {
+        let input = match event {
             WindowEvent::RedrawRequested => {
                 super::window::frames::begun();
                 return EventResult::Propagate;
@@ -504,14 +542,53 @@ impl Overlay {
                 slint::Timer::single_shot(Duration::ZERO, || with(Overlay::rescaled));
                 return EventResult::Propagate;
             }
-            WindowEvent::KeyboardInput { event, is_synthetic, .. } => {
-                let down = event.state == ElementState::Pressed;
-                match event.physical_key {
-                    PhysicalKey::Code(KeyCode::ControlLeft | KeyCode::ControlRight) => self.ctrl = down,
-                    PhysicalKey::Code(KeyCode::AltLeft | KeyCode::AltRight) => self.alt = down,
-                    _ => {}
+            WindowEvent::KeyboardInput { event, is_synthetic, .. } => Input::Key {
+                key: key_of(&event.logical_key, event.physical_key),
+                down: event.state == ElementState::Pressed,
+                held: match event.physical_key {
+                    PhysicalKey::Code(KeyCode::ControlLeft | KeyCode::ControlRight) => Some(Held::Control),
+                    PhysicalKey::Code(KeyCode::AltLeft | KeyCode::AltRight) => Some(Held::Alt),
+                    _ => None,
+                },
+                // Not a key that was down already when the window was
+                // given the keyboard, which winit says as a press too.
+                real: !is_synthetic,
+            },
+            WindowEvent::ModifiersChanged(modifiers) => Input::Modifiers { ctrl: modifiers.state().control_key(), alt: modifiers.state().alt_key() },
+            WindowEvent::CursorMoved { position, .. } => Input::Moved((position.x, position.y)),
+            WindowEvent::CursorLeft { .. } => Input::Left,
+            WindowEvent::MouseInput { state, button, .. } => Input::Button {
+                button: match button {
+                    MouseButton::Left => Mouse::Left,
+                    MouseButton::Right => Mouse::Right,
+                    _ => Mouse::Other,
+                },
+                down: *state == ElementState::Pressed,
+            },
+            WindowEvent::MouseWheel { .. } | WindowEvent::Touch(_) | WindowEvent::CursorEntered { .. } => return EventResult::PreventDefault,
+            _ => return EventResult::Propagate,
+        };
+        self.input(input)
+    }
+
+    /// What the pointer or a key did in the overlay, whoever says so
+    /// (winit, or a surface of Heyo's own). Escape is the overlay's
+    /// whatever else has the keyboard. `Propagate` says that Slint is to
+    /// have it too, which is so only where something of Slint's is to
+    /// answer it: over the toolbar, and for the line that is being typed.
+    pub(super) fn input(&mut self, input: Input) -> EventResult {
+        let Some(up) = self.up.as_mut() else { return EventResult::Propagate };
+        let scale = up.scale;
+        let at = |pointer: (f64, f64)| (pointer.0 / scale, pointer.1 / scale);
+        let typing = up.selecting.typing();
+        let event = match input {
+            Input::Key { key, down, held, real } => {
+                match held {
+                    Some(Held::Control) => self.ctrl = down,
+                    Some(Held::Alt) => self.alt = down,
+                    None => {}
                 }
-                match key_of(&event.logical_key, event.physical_key).filter(|_| down && !is_synthetic) {
+                match key.filter(|_| down && real) {
                     // It gives up the text that is being typed, or the screenshot.
                     Some(Key::Escape) => Event::Key { key: Key::Escape, ctrl: self.ctrl, alt: self.alt },
                     Some(Key::Enter) if typing.is_some() => {
@@ -525,13 +602,13 @@ impl Overlay {
                     None => return EventResult::PreventDefault,
                 }
             }
-            WindowEvent::ModifiersChanged(modifiers) => {
-                (self.ctrl, self.alt) = (modifiers.state().control_key(), modifiers.state().alt_key());
+            Input::Modifiers { ctrl, alt } => {
+                (self.ctrl, self.alt) = (ctrl, alt);
                 return if typing.is_some() { EventResult::Propagate } else { EventResult::PreventDefault };
             }
-            WindowEvent::CursorMoved { position, .. } => {
+            Input::Moved(to) => {
                 trace("pointer moved");
-                self.pointer = (position.x, position.y);
+                self.pointer = to;
                 if self.pressed {
                     self.moved_pressed += 1;
                     guard::test_in_drag(self.moved_pressed);
@@ -553,27 +630,26 @@ impl Overlay {
                 self.push();
                 return if on_toolbar { EventResult::Propagate } else { EventResult::PreventDefault };
             }
-            WindowEvent::CursorLeft { .. } => {
+            Input::Left => {
                 let was_on_toolbar = std::mem::take(&mut self.on_toolbar);
                 up.selecting.handle(Event::Left);
                 self.push();
                 return if was_on_toolbar { EventResult::Propagate } else { EventResult::PreventDefault };
             }
-            WindowEvent::MouseInput { state, button, .. } => {
-                let down = *state == ElementState::Pressed;
+            Input::Button { button, down } => {
                 let place = at(self.pointer);
                 match button {
                     // Gives the screenshot up, wherever it is pressed.
-                    MouseButton::Right if down => Event::Pressed { at: place, button: Button::Secondary },
-                    MouseButton::Left if !down && self.pressed_in_slint => {
+                    Mouse::Right if down => Event::Pressed { at: place, button: Button::Secondary },
+                    Mouse::Left if !down && self.pressed_in_slint => {
                         self.pressed_in_slint = false;
                         return EventResult::Propagate;
                     }
-                    MouseButton::Left if !down => {
+                    Mouse::Left if !down => {
                         (self.pressed, self.moved_pressed) = (false, 0);
                         Event::Released { button: Button::Primary }
                     }
-                    MouseButton::Left => {
+                    Mouse::Left => {
                         // A press on the toolbar is the toolbar's, and one in
                         // the line that is being typed is the line's.
                         let line = typing.map(|line| selecting::Rect { x: line.0 - 4.0, y: line.1 - 3.0, width: (f64::from(self.life.window().get_typed_width()) + 2.0).max(120.0) + 8.0, height: selecting::TEXT_LINE + 6.0 });
@@ -589,8 +665,6 @@ impl Overlay {
                     _ => return EventResult::PreventDefault,
                 }
             }
-            WindowEvent::MouseWheel { .. } | WindowEvent::Touch(_) | WindowEvent::CursorEntered { .. } => return EventResult::PreventDefault,
-            _ => return EventResult::Propagate,
         };
         let outcome = self.up.as_mut().and_then(|up| up.selecting.handle(event));
         self.after(outcome);
