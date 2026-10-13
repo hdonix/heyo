@@ -10,6 +10,11 @@
 //! `sans-serif` and `system-ui` mean, which is what Slint sets text in
 //! when no family is named. The system's fonts stay behind them, for what
 //! these two have not: Korean, emoji, rare characters.
+//!
+//! Noto Sans SC is not the file Google ships: its line is given Inter's
+//! height and its characters are at 94%, so that a row is as tall and its
+//! text as large in Chinese as in English (`scripts/fonts/fit-chinese.py`
+//! made it, and says why). A newer download is to go through that script.
 
 use std::sync::Arc;
 

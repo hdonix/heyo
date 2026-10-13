@@ -1,3 +1,7 @@
+NotoSansSC-Variable.otf in this directory is a Modified Version: its line
+metrics are Inter's and its em is 1064 units where the original's is 1000
+(scripts/fonts/fit-chinese.py in Heyo's repository). Nothing else differs.
+
 This Font Software is licensed under the SIL Open Font License,
 Version 1.1.
 
