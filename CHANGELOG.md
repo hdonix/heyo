@@ -3,6 +3,14 @@
 What changed in each version of Heyo, newest first, for the people who use
 it. A release's notes are its section here (`scripts/package/notes.sh`).
 
+## Unreleased
+
+- **简体中文**: Heyo's own interface, its commands' names and its notices
+  are translated. Settings → General → Language chooses; it follows the
+  system unless you say otherwise, and changes without a restart. Commands
+  are found by their Chinese and their English names alike. Extensions
+  from the Raycast Store stay in the language they were written in.
+
 ## 0.0.1 (2026-10-13)
 
 The first version, and a first try of the packages on other people's

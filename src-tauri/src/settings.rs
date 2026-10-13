@@ -139,10 +139,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             appearance: Appearance::System,
-            // English until the translations are whole: nobody is to get half
-            // an interface in their own language. It becomes the system's
-            // (`i18n::SYSTEM`) when zh_CN is complete.
-            language: crate::i18n::SOURCE.into(),
+            language: crate::i18n::SYSTEM.into(),
             hide_on_blur: true,
             compact_mode: false,
             keep_command: false,
