@@ -1,7 +1,12 @@
 // The root search calculator: arithmetic, unit and currency conversion, and
 // time zones, e.g. `2^10`, `15% of 80`, `5 km in mi`, `100 usd in cny`,
 // `time in tokyo`, `3pm pst in beijing`.
+//
+// What is typed is English whatever language Heyo speaks; the answer's
+// wording (what kind of result it is, a unit or a place written out, the
+// date) is in that language.
 
+import { locale, t } from "../shared/i18n";
 export interface Calculation {
   question: string;
   /// Formatted for display.
@@ -94,8 +99,8 @@ class Parser {
   }
 
   peek(value?: string) {
-    const t = this.tokens[this.i];
-    return t && (value === undefined || (t.type !== "num" && t.value === value)) ? t : undefined;
+    const token = this.tokens[this.i];
+    return token && (value === undefined || (token.type !== "num" && token.value === value)) ? token : undefined;
   }
   take(value: string) {
     if (this.peek(value)) {
@@ -160,24 +165,24 @@ class Parser {
   }
 
   primary(): Value {
-    const t = this.tokens[this.i++];
-    if (!t) throw new Error("unexpected end");
-    if (t.type === "num") return { n: t.value };
-    if (t.type === "op" && t.value === "(") {
+    const token = this.tokens[this.i++];
+    if (!token) throw new Error("unexpected end");
+    if (token.type === "num") return { n: token.value };
+    if (token.type === "op" && token.value === "(") {
       const inner = this.expr();
       if (!this.take(")")) throw new Error("missing )");
       return inner;
     }
-    if (t.type === "id") {
-      const apply = lookup(FUNCTIONS, t.value);
+    if (token.type === "id") {
+      const apply = lookup(FUNCTIONS, token.value);
       if (apply) {
         const arg = this.peek("(") ? this.primary() : this.unary();
         return { n: apply(arg.n) };
       }
-      const constant = lookup(CONSTANTS, t.value);
+      const constant = lookup(CONSTANTS, token.value);
       if (constant !== undefined) return { n: constant };
     }
-    throw new Error(`unexpected ${t.value}`);
+    throw new Error(`unexpected ${token.value}`);
   }
 }
 
@@ -201,20 +206,37 @@ function plain(n: number) {
 
 function pretty(n: number) {
   if (n !== 0 && (Math.abs(n) >= 1e15 || Math.abs(n) < 1e-9)) return plain(n);
-  return Number(n.toPrecision(12)).toLocaleString("en-US", { maximumFractionDigits: 10 });
+  return Number(n.toPrecision(12)).toLocaleString(locale(), { maximumFractionDigits: 10 });
 }
 
 // --- Units -------------------------------------------------------------------
+
+/// How a unit is written after a number: its symbol, or its word in the
+/// language spoken at the time.
+type Label = string | (() => string);
 
 interface Unit {
   category: string;
   /// Multiplier to the category's base unit.
   factor: number;
-  label: string;
+  label: Label;
 }
 
+const written = (label: Label) => (typeof label === "string" ? label : label());
+
+/// What each kind of quantity is called, under an answer.
+const CATEGORIES: Record<string, () => string> = {
+  length: () => t("Length"),
+  mass: () => t("Mass"),
+  volume: () => t("Volume"),
+  time: () => t("Time"),
+  data: () => t("Data"),
+  speed: () => t("Speed"),
+  area: () => t("Area"),
+};
+
 const UNITS = new Map<string, Unit>();
-function units(category: string, entries: [string[], number, string][]) {
+function units(category: string, entries: [string[], number, Label][]) {
   for (const [names, factor, label] of entries) for (const name of names) UNITS.set(name, { category, factor, label });
 }
 units("length", [
@@ -247,7 +269,7 @@ units("volume", [
   [["gal", "gallon", "gallons"], 3.785411784, "gal"],
   [["qt", "quart", "quarts"], 0.946352946, "qt"],
   [["pt", "pint", "pints"], 0.473176473, "pt"],
-  [["cup", "cups"], 0.2365882365, "cups"],
+  [["cup", "cups"], 0.2365882365, () => t("cups")],
   [["floz"], 0.0295735295625, "fl oz"],
   [["tbsp"], 0.01478676478125, "tbsp"],
   [["tsp"], 0.00492892159375, "tsp"],
@@ -257,13 +279,13 @@ units("time", [
   [["s", "sec", "secs", "second", "seconds"], 1, "s"],
   [["min", "mins", "minute", "minutes"], 60, "min"],
   [["h", "hr", "hrs", "hour", "hours"], 3600, "h"],
-  [["d", "day", "days"], 86400, "days"],
-  [["wk", "week", "weeks"], 604800, "weeks"],
-  [["month", "months"], 2629746, "months"],
-  [["yr", "year", "years"], 31556952, "years"],
+  [["d", "day", "days"], 86400, () => t("days")],
+  [["wk", "week", "weeks"], 604800, () => t("weeks")],
+  [["month", "months"], 2629746, () => t("months")],
+  [["yr", "year", "years"], 31556952, () => t("years")],
 ]);
 units("data", [
-  [["bit", "bits"], 0.125, "bits"],
+  [["bit", "bits"], 0.125, () => t("bits")],
   [["B", "byte", "bytes"], 1, "B"],
   [["KB", "kb"], 1e3, "KB"],
   [["MB", "mb"], 1e6, "MB"],
@@ -286,7 +308,7 @@ units("area", [
   [["m2", "m²", "sqm"], 1, "m²"],
   [["km2", "km²"], 1e6, "km²"],
   [["ha", "hectare", "hectares"], 1e4, "ha"],
-  [["acre", "acres"], 4046.8564224, "acres"],
+  [["acre", "acres"], 4046.8564224, () => t("acres")],
   [["ft2", "ft²", "sqft"], 0.09290304, "ft²"],
   [["mi2", "mi²"], 2589988.110336, "mi²"],
 ]);
@@ -322,13 +344,12 @@ function convertUnits(query: string): Calculation | null {
   const [tFrom, tTo] = [lookup(TEMPERATURES, from.toLowerCase()), lookup(TEMPERATURES, to.toLowerCase())];
   if (tFrom && tTo) {
     const result = fromCelsius(toCelsius(amount, tFrom), tTo);
-    return { question: `${pretty(amount)} ${tFrom}`, answer: `${pretty(result)} ${tTo}`, value: plain(result), label: "Temperature" };
+    return { question: `${pretty(amount)} ${tFrom}`, answer: `${pretty(result)} ${tTo}`, value: plain(result), label: t("Temperature") };
   }
   const [uFrom, uTo] = [unit(from), unit(to)];
   if (!uFrom || !uTo || uFrom.category !== uTo.category) return null;
   const result = (amount * uFrom.factor) / uTo.factor;
-  const category = uFrom.category[0].toUpperCase() + uFrom.category.slice(1);
-  return { question: `${pretty(amount)} ${uFrom.label}`, answer: `${pretty(result)} ${uTo.label}`, value: plain(result), label: category };
+  return { question: `${pretty(amount)} ${written(uFrom.label)}`, answer: `${pretty(result)} ${written(uTo.label)}`, value: plain(result), label: CATEGORIES[uFrom.category]() };
 }
 
 // --- Currency ----------------------------------------------------------------
@@ -389,14 +410,14 @@ function convertCurrency(query: string, rates: Rates | null): Calculation | null
   if (amount === null || !from || !to) return null;
   const result = (amount / rates.rates[from]) * rates.rates[to];
   const money = (n: number, code: string) =>
-    `${n.toLocaleString("en-US", { maximumFractionDigits: n < 1 ? 6 : 2, minimumFractionDigits: n < 1 ? 0 : 2 })} ${code}`;
-  const date = new Date(rates.updated).toLocaleDateString(undefined, { dateStyle: "medium" });
+    `${n.toLocaleString(locale(), { maximumFractionDigits: n < 1 ? 6 : 2, minimumFractionDigits: n < 1 ? 0 : 2 })} ${code}`;
+  const date = new Date(rates.updated).toLocaleDateString(locale(), { dateStyle: "medium" });
   return {
     question: money(amount, from),
     answer: money(result, to),
     // As many digits as the answer shows: two would make a small amount 0.00.
     value: Math.abs(result) < 1 ? String(Number(result.toFixed(6))) : result.toFixed(2),
-    label: `Currency · rates of ${date}`,
+    label: t("Currency · rates of {0}", date),
   };
 }
 
@@ -492,9 +513,69 @@ const ZONES: Record<string, string> = {
   nz: "Pacific/Auckland",
 };
 
+/// The places a time zone can be asked for by, as an answer names them.
+/// (An abbreviation, such as "pst", is answered with the zone's own name.)
+const PLACES: Record<string, () => string> = {
+  "los angeles": () => t("Los Angeles"),
+  "san francisco": () => t("San Francisco"),
+  seattle: () => t("Seattle"),
+  vancouver: () => t("Vancouver"),
+  denver: () => t("Denver"),
+  chicago: () => t("Chicago"),
+  "new york": () => t("New York"),
+  boston: () => t("Boston"),
+  toronto: () => t("Toronto"),
+  "mexico city": () => t("Mexico City"),
+  "sao paulo": () => t("São Paulo"),
+  "são paulo": () => t("São Paulo"),
+  london: () => t("London"),
+  dublin: () => t("Dublin"),
+  paris: () => t("Paris"),
+  berlin: () => t("Berlin"),
+  germany: () => t("Germany"),
+  amsterdam: () => t("Amsterdam"),
+  madrid: () => t("Madrid"),
+  rome: () => t("Rome"),
+  stockholm: () => t("Stockholm"),
+  zurich: () => t("Zurich"),
+  istanbul: () => t("Istanbul"),
+  moscow: () => t("Moscow"),
+  cairo: () => t("Cairo"),
+  johannesburg: () => t("Johannesburg"),
+  dubai: () => t("Dubai"),
+  india: () => t("India"),
+  mumbai: () => t("Mumbai"),
+  delhi: () => t("Delhi"),
+  bangalore: () => t("Bangalore"),
+  bangkok: () => t("Bangkok"),
+  jakarta: () => t("Jakarta"),
+  singapore: () => t("Singapore"),
+  "kuala lumpur": () => t("Kuala Lumpur"),
+  manila: () => t("Manila"),
+  china: () => t("China"),
+  beijing: () => t("Beijing"),
+  shanghai: () => t("Shanghai"),
+  shenzhen: () => t("Shenzhen"),
+  guangzhou: () => t("Guangzhou"),
+  "hong kong": () => t("Hong Kong"),
+  taipei: () => t("Taipei"),
+  taiwan: () => t("Taiwan"),
+  tokyo: () => t("Tokyo"),
+  japan: () => t("Japan"),
+  seoul: () => t("Seoul"),
+  korea: () => t("Korea"),
+  sydney: () => t("Sydney"),
+  melbourne: () => t("Melbourne"),
+  auckland: () => t("Auckland"),
+};
+// The same places, typed in Chinese.
+for (const [typed, place] of [["北京", "beijing"], ["上海", "shanghai"], ["深圳", "shenzhen"], ["香港", "hong kong"], ["台北", "taipei"], ["东京", "tokyo"], ["纽约", "new york"], ["伦敦", "london"]]) {
+  PLACES[typed] = PLACES[place];
+}
+
 function zone(name: string): { id: string; label: string } | null {
   const key = name.trim().toLowerCase();
-  if (key === "local" || key === "here") return { id: Intl.DateTimeFormat().resolvedOptions().timeZone, label: "Local time" };
+  if (key === "local" || key === "here") return { id: Intl.DateTimeFormat().resolvedOptions().timeZone, label: t("Local time") };
   const known = lookup(ZONES, key);
   const id = known ?? name.trim();
   try {
@@ -502,8 +583,7 @@ function zone(name: string): { id: string; label: string } | null {
   } catch {
     return null;
   }
-  const label = known && key.length > 3 ? name.trim().replace(/\b\w/g, (c) => c.toUpperCase()) : id;
-  return { id, label };
+  return { id, label: lookup(PLACES, key)?.() ?? id };
 }
 
 /// Offset of a time zone from UTC at `date`, in milliseconds.
@@ -527,8 +607,8 @@ function offset(date: Date, timeZone: string) {
 }
 
 function showTime(date: Date, timeZone: string) {
-  const time = date.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" });
-  const day = date.toLocaleDateString("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" });
+  const time = date.toLocaleTimeString(locale(), { timeZone, hour: "numeric", minute: "2-digit" });
+  const day = date.toLocaleDateString(locale(), { timeZone, weekday: "short", month: "short", day: "numeric" });
   return { time, day };
 }
 
@@ -554,7 +634,7 @@ function convertTime(query: string): Calculation | null {
     const target = zone(now[1]);
     if (!target) return null;
     const { time, day } = showTime(new Date(), target.id);
-    return { question: `Now in ${target.label}`, answer: time, value: time, label: `${day} · ${target.id}` };
+    return { question: t("Now in {0}", target.label), answer: time, value: time, label: `${day} · ${target.id}` };
   }
   // "3pm pst in beijing", "15:00 in tokyo" (from local time)
   const conversion = /^(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(.*?)\s+(?:in|to)\s+(.+)$/i.exec(query);
@@ -594,5 +674,5 @@ export function calculate(query: string, rates: Rates | null): Calculation | nul
   if (!/[\dπ]|pi|tau|\be\b/i.test(q)) return null;
   const result = evaluate(q);
   if (result === null) return null;
-  return { question: q, answer: pretty(result), value: plain(result), label: "Calculator" };
+  return { question: q, answer: pretty(result), value: plain(result), label: t("Calculator") };
 }

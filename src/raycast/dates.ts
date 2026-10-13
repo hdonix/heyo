@@ -1,6 +1,8 @@
 //! Dates in and out of the browser's date fields (`<input type="date">`
 //! and `datetime-local`), which speak local time as text.
 
+import { t } from "../../shared/i18n";
+
 const pad = (n: number, width = 2) => String(n).padStart(width, "0");
 
 /// A date as the field's text; empty for no date.
@@ -47,12 +49,12 @@ export function dateChoices(now: Date, withTime: boolean, min?: unknown, max?: u
   if (withTime) {
     const soon = new Date(now.getTime() + 60 * 60 * 1000);
     soon.setSeconds(0, 0);
-    choices.push({ title: "In an Hour", date: soon });
-  } else choices.push({ title: "Today", date: day(0) });
-  choices.push({ title: "Tomorrow", date: day(1) });
+    choices.push({ title: t("In an Hour"), date: soon });
+  } else choices.push({ title: t("Today"), date: day(0) });
+  choices.push({ title: t("Tomorrow"), date: day(1) });
   // Monday of next week; on a Sunday that is tomorrow, already offered, so
   // the Monday after.
   const monday = ((8 - now.getDay()) % 7) || 7;
-  choices.push({ title: "Next Week", date: day(monday === 1 ? 8 : monday) });
-  return [...choices.filter((c) => inRange(c.date!, min, max)), { title: "No Date", date: null }];
+  choices.push({ title: t("Next Week"), date: day(monday === 1 ? 8 : monday) });
+  return [...choices.filter((c) => inRange(c.date!, min, max)), { title: t("No Date"), date: null }];
 }

@@ -12,7 +12,7 @@ import { step, underPointer, useReveal } from "../selection";
 import { dateChoices, fromDateInput, inRange, toDateInput } from "./dates";
 import { Image } from "./Image";
 import { content, matchesQuery, type Node } from "./model";
-import { t } from "../../shared/i18n";
+import { locale, t } from "../../shared/i18n";
 
 /// What the panel shows of an action, and how the action takes part in it.
 export interface PanelAction {
@@ -182,7 +182,7 @@ function DatePanel(props: { dates: NonNullable<PanelAction["pickDate"]>; onPick(
         {choices.map((choice) => (
           <button key={choice.title} className="action-row date-choice" onClick={() => props.onPick(choice.date)}>
             <span className="action-title">{choice.title}</span>
-            {choice.date && <span className="date-choice-value">{choice.date.toLocaleString(undefined, format)}</span>}
+            {choice.date && <span className="date-choice-value">{choice.date.toLocaleString(locale(), format)}</span>}
           </button>
         ))}
       </div>

@@ -103,6 +103,7 @@ msgstr ""
 #: src-tauri/src/permissions.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
+#: src/RootSearch.tsx
 msgid "Cancel"
 msgstr ""
 
@@ -300,6 +301,8 @@ msgid "translate, improve, explain, ai"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: src/RootSearch.tsx
+#: src/rows.ts
 msgid "Ask AI"
 msgstr ""
 
@@ -396,6 +399,7 @@ msgid "emoticon, smiley, symbol, character, 表情"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: src/rows.ts
 msgid "Search Files"
 msgstr ""
 
@@ -1676,6 +1680,7 @@ msgid "Extensions Folder"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: src/rows.ts
 msgid "Open"
 msgstr ""
 
@@ -1732,6 +1737,7 @@ msgid "Saved — type a new key to replace it"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: src/raycast/FormView.tsx
 msgid "Remove"
 msgstr ""
 
@@ -1744,6 +1750,7 @@ msgid "A terminal runs each pasted line as a command. Dictation never asks: ther
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: src/calculator.ts
 msgid "Data"
 msgstr ""
 
@@ -2014,6 +2021,7 @@ msgid "Polishing…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pill/model.rs
+#: src/RootSearch.tsx
 msgid "Done"
 msgstr ""
 
@@ -2030,6 +2038,7 @@ msgid "Pen"
 msgstr ""
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
+#: src/arguments.ts
 msgid "Text"
 msgstr ""
 
@@ -2170,6 +2179,7 @@ msgid "Pages"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint
+#: src/RootSearch.tsx
 msgid "Close"
 msgstr ""
 
@@ -2182,15 +2192,53 @@ msgid "Set"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/widgets.slint
+#: src/hotkey.tsx
 msgid "Press a shortcut…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/widgets.slint
+#: src/hotkey.tsx
 msgid "Record Hotkey"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/widgets.slint
 msgid "Remove hotkey"
+msgstr ""
+
+#: src/App.tsx
+msgid "Could not read the settings"
+msgstr ""
+
+#: src/App.tsx
+msgid "Could not expand the snippet"
+msgstr ""
+
+#: src/App.tsx
+msgid "The extension runtime stopped"
+msgstr ""
+
+#: src/App.tsx
+msgid "Could not open settings"
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "Hotkey for {0}"
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "Press a key combination with Ctrl, Alt, Shift or Super. It works anywhere on your desktop."
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "Needs you"
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "Ended"
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "Fallback"
 msgstr ""
 
 #: src/RootSearch.tsx
@@ -2206,12 +2254,579 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
+#: src/arguments.ts
+#: src/rows.ts
+msgid "Query"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Length"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Mass"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Volume"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Time"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Speed"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Area"
+msgstr ""
+
+#: src/calculator.ts
+msgid "cups"
+msgstr ""
+
+#: src/calculator.ts
+msgid "days"
+msgstr ""
+
+#: src/calculator.ts
+msgid "weeks"
+msgstr ""
+
+#: src/calculator.ts
+msgid "months"
+msgstr ""
+
+#: src/calculator.ts
+msgid "years"
+msgstr ""
+
+#: src/calculator.ts
+msgid "bits"
+msgstr ""
+
+#: src/calculator.ts
+msgid "acres"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Temperature"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Currency · rates of {0}"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Los Angeles"
+msgstr ""
+
+#: src/calculator.ts
+msgid "San Francisco"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Seattle"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Vancouver"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Denver"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Chicago"
+msgstr ""
+
+#: src/calculator.ts
+msgid "New York"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Boston"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Toronto"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Mexico City"
+msgstr ""
+
+#: src/calculator.ts
+msgid "São Paulo"
+msgstr ""
+
+#: src/calculator.ts
+msgid "London"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Dublin"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Paris"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Berlin"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Germany"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Amsterdam"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Madrid"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Rome"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Stockholm"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Zurich"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Istanbul"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Moscow"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Cairo"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Johannesburg"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Dubai"
+msgstr ""
+
+#: src/calculator.ts
+msgid "India"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Mumbai"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Delhi"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Bangalore"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Bangkok"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Jakarta"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Singapore"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Kuala Lumpur"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Manila"
+msgstr ""
+
+#: src/calculator.ts
+msgid "China"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Beijing"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Shanghai"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Shenzhen"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Guangzhou"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Hong Kong"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Taipei"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Taiwan"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Tokyo"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Japan"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Seoul"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Korea"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Sydney"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Melbourne"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Auckland"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Local time"
+msgstr ""
+
+#: src/calculator.ts
+msgid "Now in {0}"
+msgstr ""
+
+#: src/calculator.ts
+#: src/rows.ts
+msgid "Calculator"
+msgstr ""
+
+#: src/hotkey.tsx
+#: src/rows.ts
+msgid "Remove Hotkey"
+msgstr ""
+
+#: src/raycast/CommandView.tsx
+msgid "Running {0}…"
+msgstr ""
+
+#: src/raycast/CommandView.tsx
+msgid "Back (Esc)"
+msgstr ""
+
+#: src/raycast/FormView.tsx
+msgid "Choose Files or Folders…"
+msgstr ""
+
+#: src/raycast/FormView.tsx
+msgid "Choose File or Folder…"
+msgstr ""
+
+#: src/raycast/FormView.tsx
+msgid "Choose Folders…"
+msgstr ""
+
+#: src/raycast/FormView.tsx
+msgid "Choose Folder…"
+msgstr ""
+
+#: src/raycast/FormView.tsx
+msgid "Choose Files…"
+msgstr ""
+
+#: src/raycast/FormView.tsx
+msgid "Choose File…"
+msgstr ""
+
+#: src/raycast/ListView.tsx
+msgid "No Results"
+msgstr ""
+
+#: src/raycast/ListView.tsx
+msgid "Try a different search."
+msgstr ""
+
 #: src/raycast/actions.tsx
 msgid "No actions"
 msgstr ""
 
 #: src/raycast/actions.tsx
 msgid "Search for actions…"
+msgstr ""
+
+#: src/raycast/dates.ts
+msgid "In an Hour"
+msgstr ""
+
+#: src/raycast/dates.ts
+msgid "Today"
+msgstr ""
+
+#: src/raycast/dates.ts
+msgid "Tomorrow"
+msgstr ""
+
+#: src/raycast/dates.ts
+msgid "Next Week"
+msgstr ""
+
+#: src/raycast/dates.ts
+msgid "No Date"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "{0}y"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "in {0}y"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "{0}mo"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "in {0}mo"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "{0}w"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "in {0}w"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "{0}d"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "in {0}d"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "{0}h"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "in {0}h"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "{0}m"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "in {0}m"
+msgstr ""
+
+#: src/raycast/model.ts
+msgid "now"
+msgstr ""
+
+#: src/rows.ts
+msgid "Application"
+msgstr ""
+
+#: src/rows.ts
+msgid "Command"
+msgstr ""
+
+#: src/rows.ts
+msgid "Quicklink"
+msgstr ""
+
+#: src/rows.ts
+msgid "Snippet"
+msgstr ""
+
+#: src/rows.ts
+msgid "Favorites"
+msgstr ""
+
+#: src/rows.ts
+msgid "Suggestions"
+msgstr ""
+
+#: src/rows.ts
+msgid "In Progress"
+msgstr ""
+
+#: src/rows.ts
+msgid "Results"
+msgstr ""
+
+#: src/rows.ts
+msgid "Use “{0}” with…"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not act on {0}"
+msgstr ""
+
+#: src/rows.ts
+msgid "End Activity"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not copy"
+msgstr ""
+
+#: src/rows.ts
+msgid "Copy Answer"
+msgstr ""
+
+#: src/rows.ts
+msgid "Paste Answer"
+msgstr ""
+
+#: src/rows.ts
+msgid "Copy Question and Answer"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not ask AI"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not open"
+msgstr ""
+
+#: src/rows.ts
+msgid "Search Google"
+msgstr ""
+
+#: src/rows.ts
+msgid "Open Application"
+msgstr ""
+
+#: src/rows.ts
+msgid "Paste Snippet"
+msgstr ""
+
+#: src/rows.ts
+msgid "Open Quicklink"
+msgstr ""
+
+#: src/rows.ts
+msgid "Open Command"
+msgstr ""
+
+#: src/rows.ts
+msgid "Copy Snippet"
+msgstr ""
+
+#: src/rows.ts
+msgid "Copy Link"
+msgstr ""
+
+#: src/rows.ts
+msgid "Remove from Favorites"
+msgstr ""
+
+#: src/rows.ts
+msgid "Add to Favorites"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not change favorites"
+msgstr ""
+
+#: src/rows.ts
+msgid "Move Up in Favorites"
+msgstr ""
+
+#: src/rows.ts
+msgid "Move Down in Favorites"
+msgstr ""
+
+#: src/rows.ts
+msgid "Edit Alias"
+msgstr ""
+
+#: src/rows.ts
+msgid "Set Alias"
+msgstr ""
+
+#: src/rows.ts
+msgid "Change Hotkey"
+msgstr ""
+
+#: src/rows.ts
+msgid "Set Hotkey"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not remove hotkey"
+msgstr ""
+
+#: src/rows.ts
+msgid "Reset Ranking"
+msgstr ""
+
+#: src/rows.ts
+msgid "Reset ranking of {0}"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not reset ranking"
+msgstr ""
+
+#: src/rows.ts
+msgid "Open Settings"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not open {0}"
+msgstr ""
+
+#: src/rows.ts
+msgid "Text for {0}"
+msgstr ""
+
+#: src/rows.ts
+msgid "Alias for {0}"
+msgstr ""
+
+#: src/rows.ts
+msgid "e.g. cb — leave empty to remove"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not set alias"
 msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx

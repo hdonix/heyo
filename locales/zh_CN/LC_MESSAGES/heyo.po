@@ -106,6 +106,7 @@ msgstr "快捷键需要 GNOME。请改为在桌面环境中把快捷键绑定到
 #: src-tauri/src/permissions.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
+#: src/RootSearch.tsx
 msgid "Cancel"
 msgstr "取消"
 
@@ -303,8 +304,10 @@ msgid "translate, improve, explain, ai"
 msgstr "翻译, 润色, 解释, 划词"
 
 #: src-tauri/src/extensions.rs
+#: src/RootSearch.tsx
+#: src/rows.ts
 msgid "Ask AI"
-msgstr "询问 AI"
+msgstr "问 AI"
 
 #: src-tauri/src/extensions.rs
 msgid "Ask the AI model a question. From the root search, type the question and press Tab."
@@ -399,6 +402,7 @@ msgid "emoticon, smiley, symbol, character, 表情"
 msgstr "表情, 符号, 颜文字, 字符"
 
 #: src-tauri/src/extensions.rs
+#: src/rows.ts
 msgid "Search Files"
 msgstr "搜索文件"
 
@@ -1678,6 +1682,7 @@ msgid "Extensions Folder"
 msgstr "扩展文件夹"
 
 #: src-tauri/src/slint_windows/model.rs
+#: src/rows.ts
 msgid "Open"
 msgstr "打开"
 
@@ -1734,6 +1739,7 @@ msgid "Saved — type a new key to replace it"
 msgstr "已保存 — 输入新密钥即可替换"
 
 #: src-tauri/src/slint_windows/model.rs
+#: src/raycast/FormView.tsx
 msgid "Remove"
 msgstr "移除"
 
@@ -1746,6 +1752,7 @@ msgid "A terminal runs each pasted line as a command. Dictation never asks: ther
 msgstr "终端会把粘贴的每一行当作命令执行。听写不会询问：在终端中换行会变成空格。"
 
 #: src-tauri/src/slint_windows/model.rs
+#: src/calculator.ts
 msgid "Data"
 msgstr "数据"
 
@@ -2014,6 +2021,7 @@ msgid "Polishing…"
 msgstr "正在润色…"
 
 #: src-tauri/src/slint_windows/pill/model.rs
+#: src/RootSearch.tsx
 msgid "Done"
 msgstr "完成"
 
@@ -2030,6 +2038,7 @@ msgid "Pen"
 msgstr "画笔"
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
+#: src/arguments.ts
 msgid "Text"
 msgstr "文字"
 
@@ -2170,6 +2179,7 @@ msgid "Pages"
 msgstr "页面"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
+#: src/RootSearch.tsx
 msgid "Close"
 msgstr "关闭"
 
@@ -2182,16 +2192,54 @@ msgid "Set"
 msgstr "已设置"
 
 #: src-tauri/src/slint_windows/ui/widgets.slint
+#: src/hotkey.tsx
 msgid "Press a shortcut…"
 msgstr "请按下快捷键…"
 
 #: src-tauri/src/slint_windows/ui/widgets.slint
+#: src/hotkey.tsx
 msgid "Record Hotkey"
 msgstr "录制快捷键"
 
 #: src-tauri/src/slint_windows/ui/widgets.slint
 msgid "Remove hotkey"
 msgstr "移除快捷键"
+
+#: src/App.tsx
+msgid "Could not read the settings"
+msgstr "无法读取设置"
+
+#: src/App.tsx
+msgid "Could not expand the snippet"
+msgstr "无法展开文本片段"
+
+#: src/App.tsx
+msgid "The extension runtime stopped"
+msgstr "扩展运行时已停止"
+
+#: src/App.tsx
+msgid "Could not open settings"
+msgstr "无法打开设置"
+
+#: src/RootSearch.tsx
+msgid "Hotkey for {0}"
+msgstr "{0} 的快捷键"
+
+#: src/RootSearch.tsx
+msgid "Press a key combination with Ctrl, Alt, Shift or Super. It works anywhere on your desktop."
+msgstr "按下带 Ctrl、Alt、Shift 或 Super 的组合键。它在桌面上任何地方都有效。"
+
+#: src/RootSearch.tsx
+msgid "Needs you"
+msgstr "等你处理"
+
+#: src/RootSearch.tsx
+msgid "Ended"
+msgstr "已结束"
+
+#: src/RootSearch.tsx
+msgid "Fallback"
+msgstr "后备"
 
 #: src/RootSearch.tsx
 msgid "Search apps, commands, or calculate…"
@@ -2206,6 +2254,329 @@ msgstr "没有结果"
 msgid "Actions"
 msgstr "操作"
 
+#: src/arguments.ts
+#: src/rows.ts
+msgid "Query"
+msgstr "查询"
+
+#: src/calculator.ts
+msgid "Length"
+msgstr "长度"
+
+#: src/calculator.ts
+msgid "Mass"
+msgstr "质量"
+
+#: src/calculator.ts
+msgid "Volume"
+msgstr "体积"
+
+#: src/calculator.ts
+msgid "Time"
+msgstr "时间"
+
+#: src/calculator.ts
+msgid "Speed"
+msgstr "速度"
+
+#: src/calculator.ts
+msgid "Area"
+msgstr "面积"
+
+#: src/calculator.ts
+msgid "cups"
+msgstr "杯"
+
+#: src/calculator.ts
+msgid "days"
+msgstr "天"
+
+#: src/calculator.ts
+msgid "weeks"
+msgstr "周"
+
+#: src/calculator.ts
+msgid "months"
+msgstr "个月"
+
+#: src/calculator.ts
+msgid "years"
+msgstr "年"
+
+#: src/calculator.ts
+msgid "bits"
+msgstr "比特"
+
+#: src/calculator.ts
+msgid "acres"
+msgstr "英亩"
+
+#: src/calculator.ts
+msgid "Temperature"
+msgstr "温度"
+
+#: src/calculator.ts
+msgid "Currency · rates of {0}"
+msgstr "货币 · {0} 的汇率"
+
+#: src/calculator.ts
+msgid "Los Angeles"
+msgstr "洛杉矶"
+
+#: src/calculator.ts
+msgid "San Francisco"
+msgstr "旧金山"
+
+#: src/calculator.ts
+msgid "Seattle"
+msgstr "西雅图"
+
+#: src/calculator.ts
+msgid "Vancouver"
+msgstr "温哥华"
+
+#: src/calculator.ts
+msgid "Denver"
+msgstr "丹佛"
+
+#: src/calculator.ts
+msgid "Chicago"
+msgstr "芝加哥"
+
+#: src/calculator.ts
+msgid "New York"
+msgstr "纽约"
+
+#: src/calculator.ts
+msgid "Boston"
+msgstr "波士顿"
+
+#: src/calculator.ts
+msgid "Toronto"
+msgstr "多伦多"
+
+#: src/calculator.ts
+msgid "Mexico City"
+msgstr "墨西哥城"
+
+#: src/calculator.ts
+msgid "São Paulo"
+msgstr "圣保罗"
+
+#: src/calculator.ts
+msgid "London"
+msgstr "伦敦"
+
+#: src/calculator.ts
+msgid "Dublin"
+msgstr "都柏林"
+
+#: src/calculator.ts
+msgid "Paris"
+msgstr "巴黎"
+
+#: src/calculator.ts
+msgid "Berlin"
+msgstr "柏林"
+
+#: src/calculator.ts
+msgid "Germany"
+msgstr "德国"
+
+#: src/calculator.ts
+msgid "Amsterdam"
+msgstr "阿姆斯特丹"
+
+#: src/calculator.ts
+msgid "Madrid"
+msgstr "马德里"
+
+#: src/calculator.ts
+msgid "Rome"
+msgstr "罗马"
+
+#: src/calculator.ts
+msgid "Stockholm"
+msgstr "斯德哥尔摩"
+
+#: src/calculator.ts
+msgid "Zurich"
+msgstr "苏黎世"
+
+#: src/calculator.ts
+msgid "Istanbul"
+msgstr "伊斯坦布尔"
+
+#: src/calculator.ts
+msgid "Moscow"
+msgstr "莫斯科"
+
+#: src/calculator.ts
+msgid "Cairo"
+msgstr "开罗"
+
+#: src/calculator.ts
+msgid "Johannesburg"
+msgstr "约翰内斯堡"
+
+#: src/calculator.ts
+msgid "Dubai"
+msgstr "迪拜"
+
+#: src/calculator.ts
+msgid "India"
+msgstr "印度"
+
+#: src/calculator.ts
+msgid "Mumbai"
+msgstr "孟买"
+
+#: src/calculator.ts
+msgid "Delhi"
+msgstr "德里"
+
+#: src/calculator.ts
+msgid "Bangalore"
+msgstr "班加罗尔"
+
+#: src/calculator.ts
+msgid "Bangkok"
+msgstr "曼谷"
+
+#: src/calculator.ts
+msgid "Jakarta"
+msgstr "雅加达"
+
+#: src/calculator.ts
+msgid "Singapore"
+msgstr "新加坡"
+
+#: src/calculator.ts
+msgid "Kuala Lumpur"
+msgstr "吉隆坡"
+
+#: src/calculator.ts
+msgid "Manila"
+msgstr "马尼拉"
+
+#: src/calculator.ts
+msgid "China"
+msgstr "中国"
+
+#: src/calculator.ts
+msgid "Beijing"
+msgstr "北京"
+
+#: src/calculator.ts
+msgid "Shanghai"
+msgstr "上海"
+
+#: src/calculator.ts
+msgid "Shenzhen"
+msgstr "深圳"
+
+#: src/calculator.ts
+msgid "Guangzhou"
+msgstr "广州"
+
+#: src/calculator.ts
+msgid "Hong Kong"
+msgstr "香港"
+
+#: src/calculator.ts
+msgid "Taipei"
+msgstr "台北"
+
+#: src/calculator.ts
+msgid "Taiwan"
+msgstr "台湾"
+
+#: src/calculator.ts
+msgid "Tokyo"
+msgstr "东京"
+
+#: src/calculator.ts
+msgid "Japan"
+msgstr "日本"
+
+#: src/calculator.ts
+msgid "Seoul"
+msgstr "首尔"
+
+#: src/calculator.ts
+msgid "Korea"
+msgstr "韩国"
+
+#: src/calculator.ts
+msgid "Sydney"
+msgstr "悉尼"
+
+#: src/calculator.ts
+msgid "Melbourne"
+msgstr "墨尔本"
+
+#: src/calculator.ts
+msgid "Auckland"
+msgstr "奥克兰"
+
+#: src/calculator.ts
+msgid "Local time"
+msgstr "本地时间"
+
+#: src/calculator.ts
+msgid "Now in {0}"
+msgstr "{0}现在"
+
+#: src/calculator.ts
+#: src/rows.ts
+msgid "Calculator"
+msgstr "计算器"
+
+#: src/hotkey.tsx
+#: src/rows.ts
+msgid "Remove Hotkey"
+msgstr "移除快捷键"
+
+#: src/raycast/CommandView.tsx
+msgid "Running {0}…"
+msgstr "正在运行 {0}…"
+
+#: src/raycast/CommandView.tsx
+msgid "Back (Esc)"
+msgstr "返回（Esc）"
+
+#: src/raycast/FormView.tsx
+msgid "Choose Files or Folders…"
+msgstr "选择文件或文件夹…"
+
+#: src/raycast/FormView.tsx
+msgid "Choose File or Folder…"
+msgstr "选择文件或文件夹…"
+
+#: src/raycast/FormView.tsx
+msgid "Choose Folders…"
+msgstr "选择文件夹…"
+
+#: src/raycast/FormView.tsx
+msgid "Choose Folder…"
+msgstr "选择文件夹…"
+
+#: src/raycast/FormView.tsx
+msgid "Choose Files…"
+msgstr "选择文件…"
+
+#: src/raycast/FormView.tsx
+msgid "Choose File…"
+msgstr "选择文件…"
+
+#: src/raycast/ListView.tsx
+msgid "No Results"
+msgstr "没有结果"
+
+#: src/raycast/ListView.tsx
+msgid "Try a different search."
+msgstr "换个搜索词试试。"
+
 #: src/raycast/actions.tsx
 msgid "No actions"
 msgstr "没有操作"
@@ -2213,6 +2584,250 @@ msgstr "没有操作"
 #: src/raycast/actions.tsx
 msgid "Search for actions…"
 msgstr "搜索操作…"
+
+#: src/raycast/dates.ts
+msgid "In an Hour"
+msgstr "一小时后"
+
+#: src/raycast/dates.ts
+msgid "Today"
+msgstr "今天"
+
+#: src/raycast/dates.ts
+msgid "Tomorrow"
+msgstr "明天"
+
+#: src/raycast/dates.ts
+msgid "Next Week"
+msgstr "下周"
+
+#: src/raycast/dates.ts
+msgid "No Date"
+msgstr "无日期"
+
+#: src/raycast/model.ts
+msgid "{0}y"
+msgstr "{0} 年前"
+
+#: src/raycast/model.ts
+msgid "in {0}y"
+msgstr "{0} 年后"
+
+#: src/raycast/model.ts
+msgid "{0}mo"
+msgstr "{0} 个月前"
+
+#: src/raycast/model.ts
+msgid "in {0}mo"
+msgstr "{0} 个月后"
+
+#: src/raycast/model.ts
+msgid "{0}w"
+msgstr "{0} 周前"
+
+#: src/raycast/model.ts
+msgid "in {0}w"
+msgstr "{0} 周后"
+
+#: src/raycast/model.ts
+msgid "{0}d"
+msgstr "{0} 天前"
+
+#: src/raycast/model.ts
+msgid "in {0}d"
+msgstr "{0} 天后"
+
+#: src/raycast/model.ts
+msgid "{0}h"
+msgstr "{0} 小时前"
+
+#: src/raycast/model.ts
+msgid "in {0}h"
+msgstr "{0} 小时后"
+
+#: src/raycast/model.ts
+msgid "{0}m"
+msgstr "{0} 分钟前"
+
+#: src/raycast/model.ts
+msgid "in {0}m"
+msgstr "{0} 分钟后"
+
+#: src/raycast/model.ts
+msgid "now"
+msgstr "刚刚"
+
+#: src/rows.ts
+msgid "Application"
+msgstr "应用程序"
+
+#: src/rows.ts
+msgid "Command"
+msgstr "命令"
+
+#: src/rows.ts
+msgid "Quicklink"
+msgstr "快速链接"
+
+#: src/rows.ts
+msgid "Snippet"
+msgstr "文本片段"
+
+#: src/rows.ts
+msgid "Favorites"
+msgstr "收藏"
+
+#: src/rows.ts
+msgid "Suggestions"
+msgstr "建议"
+
+#: src/rows.ts
+msgid "In Progress"
+msgstr "进行中"
+
+#: src/rows.ts
+msgid "Results"
+msgstr "结果"
+
+#: src/rows.ts
+msgid "Use “{0}” with…"
+msgstr "将“{0}”用于…"
+
+#: src/rows.ts
+msgid "Could not act on {0}"
+msgstr "无法操作 {0}"
+
+#: src/rows.ts
+msgid "End Activity"
+msgstr "结束活动"
+
+#: src/rows.ts
+msgid "Could not copy"
+msgstr "无法复制"
+
+#: src/rows.ts
+msgid "Copy Answer"
+msgstr "复制答案"
+
+#: src/rows.ts
+msgid "Paste Answer"
+msgstr "粘贴答案"
+
+#: src/rows.ts
+msgid "Copy Question and Answer"
+msgstr "复制问题和答案"
+
+#: src/rows.ts
+msgid "Could not ask AI"
+msgstr "无法问 AI"
+
+#: src/rows.ts
+msgid "Could not open"
+msgstr "无法打开"
+
+#: src/rows.ts
+msgid "Search Google"
+msgstr "用 Google 搜索"
+
+#: src/rows.ts
+msgid "Open Application"
+msgstr "打开应用程序"
+
+#: src/rows.ts
+msgid "Paste Snippet"
+msgstr "粘贴文本片段"
+
+#: src/rows.ts
+msgid "Open Quicklink"
+msgstr "打开快速链接"
+
+#: src/rows.ts
+msgid "Open Command"
+msgstr "打开命令"
+
+#: src/rows.ts
+msgid "Copy Snippet"
+msgstr "复制文本片段"
+
+#: src/rows.ts
+msgid "Copy Link"
+msgstr "复制链接"
+
+#: src/rows.ts
+msgid "Remove from Favorites"
+msgstr "取消收藏"
+
+#: src/rows.ts
+msgid "Add to Favorites"
+msgstr "添加到收藏"
+
+#: src/rows.ts
+msgid "Could not change favorites"
+msgstr "无法更改收藏"
+
+#: src/rows.ts
+msgid "Move Up in Favorites"
+msgstr "在收藏中上移"
+
+#: src/rows.ts
+msgid "Move Down in Favorites"
+msgstr "在收藏中下移"
+
+#: src/rows.ts
+msgid "Edit Alias"
+msgstr "编辑别名"
+
+#: src/rows.ts
+msgid "Set Alias"
+msgstr "设置别名"
+
+#: src/rows.ts
+msgid "Change Hotkey"
+msgstr "更改快捷键"
+
+#: src/rows.ts
+msgid "Set Hotkey"
+msgstr "设置快捷键"
+
+#: src/rows.ts
+msgid "Could not remove hotkey"
+msgstr "无法移除快捷键"
+
+#: src/rows.ts
+msgid "Reset Ranking"
+msgstr "重置排序"
+
+#: src/rows.ts
+msgid "Reset ranking of {0}"
+msgstr "已重置 {0} 的排序"
+
+#: src/rows.ts
+msgid "Could not reset ranking"
+msgstr "无法重置排序"
+
+#: src/rows.ts
+msgid "Open Settings"
+msgstr "打开设置"
+
+#: src/rows.ts
+msgid "Could not open {0}"
+msgstr "无法打开 {0}"
+
+#: src/rows.ts
+msgid "Text for {0}"
+msgstr "{0} 的文本"
+
+#: src/rows.ts
+msgid "Alias for {0}"
+msgstr "{0} 的别名"
+
+#: src/rows.ts
+msgid "e.g. cb — leave empty to remove"
+msgstr "例如 cb；留空则移除"
+
+#: src/rows.ts
+msgid "Could not set alias"
+msgstr "无法设置别名"
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Resume Recording"

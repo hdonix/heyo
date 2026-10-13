@@ -7,6 +7,9 @@
 //   tc("verb", "Open")
 //   tn("{n} entry", "{n} entries", count)
 //
+// A text that is marked where it is written and said elsewhere, as the
+// host's names of Heyo's own commands are, is said with `translate`.
+//
 // The text is a literal, for `pnpm i18n` to gather (`scripts/i18n.mjs`).
 // Which language it is said in is the host's to decide: it hands over that
 // language's translations (`speak`), at the start and whenever it changes.
@@ -27,6 +30,12 @@ export function speak(translations: Translations) {
 /// The code of the language spoken: `en`, `zh_CN`.
 export function language() {
   return spoken.language;
+}
+
+/// The language spoken as dates and numbers are written in it (`zh-CN`):
+/// what `toLocaleString` and `Intl` are handed, in place of the system's.
+export function locale() {
+  return spoken.language.replace("_", "-");
 }
 
 /// Calls `hear` whenever another language is spoken, until the function
@@ -58,6 +67,12 @@ export function t(text: string, ...args: unknown[]) {
 /// it is.
 export function tc(context: string, text: string, ...args: unknown[]) {
   return fill(forms(text, context)?.[0] ?? text, args);
+}
+
+/// A text that was marked for translating where it was written, which is
+/// not here: in the language spoken, or itself where that has none for it.
+export function translate(text: string) {
+  return forms(text)?.[0] ?? text;
 }
 
 /// The text for `n` things, `{n}` being the number.

@@ -7,6 +7,7 @@ import { RootSearch } from "./RootSearch";
 import type { SettingsView } from "../shared/bindings/SettingsView";
 import { expand } from "../shared/placeholders";
 import type { UiRequests } from "../shared/wire";
+import { t } from "../shared/i18n";
 
 type Confirm = UiRequests["ui.confirm"] & { id: number };
 
@@ -54,7 +55,7 @@ export default function App() {
         settingsRef.current = s;
         setCompact(s.compactMode);
       })
-      .catch(reported("Could not read the settings"));
+      .catch(reported(t("Could not read the settings")));
   }, []);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export default function App() {
       listen("expandSnippet", (asked) => {
         expand(asked.text, { readClipboard: () => call("read_clipboard") })
           .then((text) => call("snippet_expanded", { request: asked.request, text }))
-          .catch(reported("Could not expand the snippet"));
+          .catch(reported(t("Could not expand the snippet")));
       }),
       listen("runtime", (m) => {
         const current = commandRef.current;
@@ -131,14 +132,14 @@ export default function App() {
             setToast(m.toast);
             break;
           case "toast-hide":
-            setToast((t) => (t?.id === m.id ? null : t));
+            setToast((shown) => (shown?.id === m.id ? null : shown));
             break;
           case "request":
             setConfirm({ id: m.id, ...m.params });
             break;
           case "exited":
             if (current) {
-              showError("The extension runtime stopped");
+              showError(t("The extension runtime stopped"));
               backToRoot();
             }
             break;
@@ -151,14 +152,14 @@ export default function App() {
   // Success toasts fade; failures stay until replaced.
   useEffect(() => {
     if (!toast || toast.style !== "SUCCESS") return;
-    const timer = setTimeout(() => setToast((t) => (t === toast ? null : t)), 2500);
+    const timer = setTimeout(() => setToast((shown) => (shown === toast ? null : shown)), 2500);
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const openSettings = () => call("open_settings").catch(reported("Could not open settings"));
+  const openSettings = () => call("open_settings").catch(reported(t("Could not open settings")));
 
-  const onToastAction = (t: Toast) =>
-    sendToRuntime({ type: "toast-action", id: t.id, action: "primary" });
+  const onToastAction = (toast: Toast) =>
+    sendToRuntime({ type: "toast-action", id: toast.id, action: "primary" });
 
   const answer = (confirmed: boolean | "always") => {
     if (!confirm) return;

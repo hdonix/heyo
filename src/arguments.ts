@@ -8,6 +8,7 @@
 
 import type { Argument } from "../shared/bindings/Argument";
 import type { Item } from "../shared/bindings/Item";
+import { t } from "../shared/i18n";
 
 export type { Argument };
 
@@ -24,8 +25,8 @@ function ofTemplate(template: string, placeholder: string): Argument[] {
 
 /// The fields an item shows in the search bar; none for most.
 export function argumentsOf(item: Item): Argument[] {
-  if (item.kind === "Quicklink") return ofTemplate(item.link ?? "", "Query");
-  if (item.kind === "Snippet") return ofTemplate(item.text ?? "", "Text");
+  if (item.kind === "Quicklink") return ofTemplate(item.link ?? "", t("Query"));
+  if (item.kind === "Snippet") return ofTemplate(item.text ?? "", t("Text"));
   return item.arguments ?? [];
 }
 

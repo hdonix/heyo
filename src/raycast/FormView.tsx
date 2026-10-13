@@ -9,6 +9,7 @@ import type { ViewMemory } from "./memory";
 import { content, isFn, slot, type Node } from "./model";
 import { useTyping } from "./typing";
 import type { BodyProps } from "./CommandView";
+import { t } from "../../shared/i18n";
 
 const FIELD_TYPES = new Set([
   "Form.TextField",
@@ -62,9 +63,11 @@ const fileName = (path: string) => path.replace(/[\\/]+$/, "").split(/[\\/]/).po
 
 /// What the button of a file picker says it chooses.
 export function pickerLabel(props: { allowMultipleSelection?: unknown; canChooseFiles?: unknown; canChooseDirectories?: unknown }) {
-  const kinds = [props.canChooseFiles !== false && "File", !!props.canChooseDirectories && "Folder"].filter(Boolean) as string[];
-  if (!kinds.length) kinds.push("File");
-  return `Choose ${kinds.map((kind) => (props.allowMultipleSelection ? `${kind}s` : kind)).join(" or ")}…`;
+  const many = !!props.allowMultipleSelection;
+  const folders = !!props.canChooseDirectories;
+  if (props.canChooseFiles !== false && folders) return many ? t("Choose Files or Folders…") : t("Choose File or Folder…");
+  if (folders) return many ? t("Choose Folders…") : t("Choose Folder…");
+  return many ? t("Choose Files…") : t("Choose File…");
 }
 
 /// The current form values, read by `Action.SubmitForm`.
@@ -253,7 +256,7 @@ export function FormView({ node, dispatch, keys, onActions, formValues, memory }
             {paths.map((path) => (
               <span key={path} className="tag file" title={path}>
                 <span className="file-name">{fileName(path)}</span>
-                <button className="file-remove" title="Remove" tabIndex={-1} onClick={() => change(field, paths.filter((other) => other !== path))}>
+                <button className="file-remove" title={t("Remove")} tabIndex={-1} onClick={() => change(field, paths.filter((other) => other !== path))}>
                   <X size={12} />
                 </button>
               </span>

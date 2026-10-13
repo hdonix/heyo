@@ -261,7 +261,7 @@ export function CommandView(props: {
     keys.current = undefined;
     body = (
       <div className="empty-view">
-        <div className="empty-description">{command.mode === "no-view" ? `Running ${command.title}…` : ""}</div>
+        <div className="empty-description">{command.mode === "no-view" ? t("Running {0}…", command.title) : ""}</div>
       </div>
     );
   } else if (searchable) body = <ListView key={view!.key} {...bodyProps} memory={memory!} />;
@@ -283,7 +283,7 @@ export function CommandView(props: {
     <ExtensionDir.Provider value={command.extension.dir}>
       <div className="panel" onKeyDown={onKeyDown} ref={panelRef} tabIndex={-1}>
         <div className="search-row">
-          <button className="back" onClick={pop} title="Back (Esc)">
+          <button className="back" onClick={pop} title={t("Back (Esc)")}>
             <ArrowLeft size={16} />
           </button>
           {searchable ? (

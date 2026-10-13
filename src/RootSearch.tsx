@@ -18,7 +18,7 @@ import { ItemIcon } from "./ItemIcon";
 import { ArgumentFields } from "./ArgumentFields";
 import { afterAlias, missing, tabStop } from "./arguments";
 import { FIRST, hold, locate } from "./reselect";
-import { askAi, describe, open, rowsFor, type Context, type Palette, type Row, type RowAction } from "./rows";
+import { askAi, describe, kindName, open, rowsFor, type Context, type Palette, type Row, type RowAction } from "./rows";
 import { step, underPointer, useReveal } from "./selection";
 import { SelectionIndicator } from "./SelectionIndicator";
 import { actionForShortcut, ActionOverlay, ShortcutHint } from "./raycast/actions";
@@ -65,9 +65,9 @@ function Prompt(props: {
           spellCheck={false}
         />
         <div className="alert-buttons">
-          <button onClick={props.onCancel}>Cancel</button>
+          <button onClick={props.onCancel}>{t("Cancel")}</button>
           <button className="primary" onClick={() => props.onSubmit(value)}>
-            Done
+            {t("Done")}
           </button>
         </div>
       </div>
@@ -92,15 +92,15 @@ function HotkeyPrompt(props: { item: Item; onDone(): void }) {
           if (e.key === "Escape") props.onDone();
         }}
       >
-        <div className="alert-title">Hotkey for {props.item.title}</div>
+        <div className="alert-title">{t("Hotkey for {0}", props.item.title)}</div>
         <div className="prompt-hotkey">
           <HotkeyRecorder value={props.item.hotkey ?? null} onChange={save} autoStart />
         </div>
         <div className={error ? "prompt-hint error" : "prompt-hint"}>
-          {error ?? "Press a key combination with Ctrl, Alt, Shift or Super. It works anywhere on your desktop."}
+          {error ?? t("Press a key combination with Ctrl, Alt, Shift or Super. It works anywhere on your desktop.")}
         </div>
         <div className="alert-buttons">
-          <button onClick={props.onDone}>Close</button>
+          <button onClick={props.onDone}>{t("Close")}</button>
         </div>
       </div>
     </div>
@@ -362,9 +362,9 @@ export function RootSearch(props: {
               <span className="title">{activity.title}</span>
               {activity.subtitle && <span className="subtitle">{activity.subtitle}</span>}
               <span className="accessories">
-                {activity.needsAttention && <span className="tag attention">Needs you</span>}
+                {activity.needsAttention && <span className="tag attention">{t("Needs you")}</span>}
                 {activity.compact && activity.compact !== activity.title && <span className="activity-value">{activity.compact}</span>}
-                <span className="kind">{activity.ended ? "Ended" : activity.name}</span>
+                <span className="kind">{activity.ended ? t("Ended") : activity.name}</span>
               </span>
             </div>
           </li>
@@ -385,7 +385,7 @@ export function RootSearch(props: {
               <ItemIcon icon={row.fallback.icon} title={row.fallback.title} />
               <span className="title">{row.fallback.title}</span>
               <span className="accessories">
-                <span className="kind">Fallback</span>
+                <span className="kind">{t("Fallback")}</span>
               </span>
             </div>
           </li>
@@ -404,7 +404,7 @@ export function RootSearch(props: {
                 {item.hotkey && <HotkeyHint accelerator={item.hotkey} />}
                 {item.alias && <span className="tag alias">{item.alias}</span>}
                 {item.favorite && item.section !== "Favorites" && <Star size={13} className="favorite-star" />}
-                <span className="kind">{item.kind}</span>
+                <span className="kind">{kindName(item.kind)}</span>
               </span>
             </div>
           </li>
@@ -445,7 +445,7 @@ export function RootSearch(props: {
           </>
         ) : (
           <button className="search-hint" onClick={() => query.trim() && askAi(query.trim(), palette)} tabIndex={-1}>
-            Ask AI <kbd>⇥</kbd>
+            {t("Ask AI")} <kbd>⇥</kbd>
           </button>
         )}
       </div>

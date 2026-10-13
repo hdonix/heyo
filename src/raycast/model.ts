@@ -2,6 +2,7 @@
 
 import type { Toast, WebviewMessage, WireView } from "../../shared/wire";
 import { call } from "../host";
+import { t } from "../../shared/i18n";
 
 export type { Toast, WireView };
 
@@ -136,23 +137,25 @@ export function cssColor(color: unknown): string | undefined {
   return undefined;
 }
 
+/// The units a time ago or to come is counted in, the longest first: its
+/// seconds, and how that many of it are said, past and future.
+const SPANS: [number, (n: number) => string, (n: number) => string][] = [
+  [31_536_000, (n) => t("{0}y", n), (n) => t("in {0}y", n)],
+  [2_592_000, (n) => t("{0}mo", n), (n) => t("in {0}mo", n)],
+  [604_800, (n) => t("{0}w", n), (n) => t("in {0}w", n)],
+  [86_400, (n) => t("{0}d", n), (n) => t("in {0}d", n)],
+  [3_600, (n) => t("{0}h", n), (n) => t("in {0}h", n)],
+  [60, (n) => t("{0}m", n), (n) => t("in {0}m", n)],
+];
+
 /// Raycast-style compact relative time ("now", "5m", "3h", "2d").
 export function relativeTime(date: Date) {
   const seconds = (Date.now() - date.getTime()) / 1000;
   const abs = Math.abs(seconds);
-  const sign = seconds < 0 ? "in " : "";
-  if (abs < 60) return "now";
-  for (const [unit, size] of [
-    ["y", 31_536_000],
-    ["mo", 2_592_000],
-    ["w", 604_800],
-    ["d", 86_400],
-    ["h", 3_600],
-    ["m", 60],
-  ] as const) {
-    if (abs >= size) return `${sign}${Math.floor(abs / size)}${unit}`;
+  for (const [size, past, future] of SPANS) {
+    if (abs >= size) return (seconds < 0 ? future : past)(Math.floor(abs / size));
   }
-  return "now";
+  return t("now");
 }
 
 /// Raycast's default list filtering: every query word must occur in the

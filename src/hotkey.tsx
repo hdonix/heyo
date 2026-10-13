@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
+import { t } from "../shared/i18n";
+
 const MODIFIER_LABELS: Record<string, string> = {
   Control: "Ctrl",
   Primary: "Ctrl",
@@ -109,15 +111,15 @@ export function HotkeyRecorder(props: { value: string | null; onChange(accel: st
         }}
       >
         {recording ? (
-          <span className="hotkey-placeholder">Press a shortcut…</span>
+          <span className="hotkey-placeholder">{t("Press a shortcut…")}</span>
         ) : props.value ? (
           accelParts(props.value).map((part, i) => <kbd key={i}>{part}</kbd>)
         ) : (
-          <span className="hotkey-placeholder">Record Hotkey</span>
+          <span className="hotkey-placeholder">{t("Record Hotkey")}</span>
         )}
       </button>
       {props.value && !recording && (
-        <button className="icon-button" title="Remove hotkey" onClick={() => props.onChange("")}>
+        <button className="icon-button" title={t("Remove Hotkey")} onClick={() => props.onChange("")}>
           <X size={13} />
         </button>
       )}

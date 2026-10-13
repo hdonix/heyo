@@ -19,6 +19,7 @@ import { afterAlias, argumentsOf, filled, missing, type Argument } from "./argum
 import type { Calculation } from "./calculator";
 import { call, ignored, reported } from "./host";
 import type { ActionSection, PanelAction } from "./raycast/actions";
+import { t } from "../shared/i18n";
 
 const SETTINGS_ID = "heyo:settings";
 
@@ -93,6 +94,26 @@ export interface Found {
   quicklinks: Item[];
 }
 
+/// What kind of thing an item is, as its row says it.
+export function kindName(kind: Item["kind"]): string {
+  switch (kind) {
+    case "Application":
+      return t("Application");
+    case "Command":
+      return t("Command");
+    case "Quicklink":
+      return t("Quicklink");
+    case "Snippet":
+      return t("Snippet");
+  }
+}
+
+/// The title of a section the host put an item in. The host names the
+/// section in English, which is also what it is told apart by.
+function sectionTitle(section: string): string {
+  return section === "Favorites" ? t("Favorites") : section === "Suggestions" ? t("Suggestions") : section;
+}
+
 /// Whether an activity answers a query: by its title, what it is, or whose it is.
 function activityMatches(activity: ActivityView, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -107,16 +128,16 @@ export function rowsFor(query: string, found: Found): Row[] {
   const above = activities.length > 0 || found.calc !== null;
   let section: string | undefined;
   return [
-    ...activities.map((activity, i): Row => ({ type: "activity", key: `activity-${activity.key}`, heading: i === 0 ? "In Progress" : undefined, activity })),
-    ...(found.calc ? [{ type: "calc", key: "calc", heading: "Calculator", calc: found.calc } satisfies Row] : []),
+    ...activities.map((activity, i): Row => ({ type: "activity", key: `activity-${activity.key}`, heading: i === 0 ? t("In Progress") : undefined, activity })),
+    ...(found.calc ? [{ type: "calc", key: "calc", heading: t("Calculator"), calc: found.calc } satisfies Row] : []),
     ...found.items.map((item, i): Row => {
       // What was found needs a title only under something else.
-      const heading = item.section && item.section !== section ? item.section : above && i === 0 ? "Results" : undefined;
+      const heading = item.section && item.section !== section ? sectionTitle(item.section) : above && i === 0 ? t("Results") : undefined;
       section = item.section;
       return { type: "item", key: item.id, heading, item };
     }),
     ...(text ? fallbacks(found.quicklinks) : []).map(
-      (fallback, i): Row => ({ type: "fallback", key: `fallback-${fallback.id}`, heading: i === 0 ? `Use “${text}” with…` : undefined, fallback }),
+      (fallback, i): Row => ({ type: "fallback", key: `fallback-${fallback.id}`, heading: i === 0 ? t("Use “{0}” with…", text) : undefined, fallback }),
     ),
   ];
 }
@@ -150,33 +171,33 @@ function ofKind(row: Row, context: Context, palette: Palette): Own {
 }
 
 function ofActivity(activity: ActivityView, palette: Palette): Own {
-  const failed = (e: unknown) => palette.showError(`Could not act on ${activity.name}`, String(e));
+  const failed = (e: unknown) => palette.showError(t("Could not act on {0}", activity.name), String(e));
   const act = (button: number | null) => void call("activity_action", { key: activity.key, button }).catch(failed);
   return {
     title: activity.title,
     groups: [
       // Enter does what the activity itself does, else its first button.
       [
-        ...(activity.hasAction ? [{ title: "Open", icon: "arrow-right-16", run: () => act(null) }] : []),
+        ...(activity.hasAction ? [{ title: t("Open"), icon: "arrow-right-16", run: () => act(null) }] : []),
         ...activity.buttons.map((button, index) => ({ title: button.title, icon: button.icon ?? "circle-16", run: () => act(index) })),
       ],
       activity.dismissible
-        ? [{ title: "End Activity", icon: "x-mark-circle-16", run: () => void call("activity_dismiss", { key: activity.key }).catch(failed) }]
+        ? [{ title: t("End Activity"), icon: "x-mark-circle-16", run: () => void call("activity_dismiss", { key: activity.key }).catch(failed) }]
         : [],
     ],
   };
 }
 
 function ofCalculation(calc: Calculation): Own {
-  const copy = (text: string, paste: boolean) => void call("copy_text", { text, paste }).catch(reported("Could not copy"));
+  const copy = (text: string, paste: boolean) => void call("copy_text", { text, paste }).catch(reported(t("Could not copy")));
   return {
-    title: "Calculator",
+    title: t("Calculator"),
     groups: [
       [
-        { title: "Copy Answer", icon: "copy-clipboard-16", run: () => copy(calc.value, false) },
-        { title: "Paste Answer", icon: "clipboard-16", shortcut: { modifiers: ["ctrl"], key: "return" }, run: () => copy(calc.value, true) },
+        { title: t("Copy Answer"), icon: "copy-clipboard-16", run: () => copy(calc.value, false) },
+        { title: t("Paste Answer"), icon: "clipboard-16", shortcut: { modifiers: ["ctrl"], key: "return" }, run: () => copy(calc.value, true) },
         {
-          title: "Copy Question and Answer",
+          title: t("Copy Question and Answer"),
           icon: "copy-clipboard-16",
           shortcut: { modifiers: ["ctrl", "shift"], key: "c" },
           run: () => copy(`${calc.question} = ${calc.answer}`, false),
@@ -192,22 +213,22 @@ function ofFallback(fallback: Fallback, context: Context, palette: Palette): Own
 
 /// Hands a question to the AI model.
 export function askAi(question: string, palette: Palette) {
-  void call("launch", { id: "cmd:@heyo:ask-ai", fallbackText: question }).catch((e) => palette.showError("Could not ask AI", String(e)));
+  void call("launch", { id: "cmd:@heyo:ask-ai", fallbackText: question }).catch((e) => palette.showError(t("Could not ask AI"), String(e)));
 }
 
 function fallbacks(quicklinks: Item[]): Fallback[] {
-  const failed = (palette: Palette) => (e: unknown) => palette.showError("Could not open", String(e));
+  const failed = (palette: Palette) => (e: unknown) => palette.showError(t("Could not open"), String(e));
   return [
     {
       id: "google",
-      title: "Search Google",
+      title: t("Search Google"),
       icon: "magnifying-glass-16",
       run: (q, palette) => void call("open_target", { target: `https://www.google.com/search?q=${encodeURIComponent(q)}` }).catch(failed(palette)),
     },
-    { id: "ask-ai", title: "Ask AI", icon: "stars-16", run: askAi },
+    { id: "ask-ai", title: t("Ask AI"), icon: "stars-16", run: askAi },
     {
       id: "files",
-      title: "Search Files",
+      title: t("Search Files"),
       icon: "blank-document-16",
       run: (q, palette) => void call("launch", { id: "cmd:@heyo:search-files", fallbackText: q }).catch(failed(palette)),
     },
@@ -246,14 +267,14 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
 
   const primary: RowAction[] = [
     {
-      title: item.kind === "Application" ? "Open Application" : item.kind === "Snippet" ? "Paste Snippet" : item.kind === "Quicklink" ? "Open Quicklink" : "Open Command",
+      title: item.kind === "Application" ? t("Open Application") : item.kind === "Snippet" ? t("Paste Snippet") : item.kind === "Quicklink" ? t("Open Quicklink") : t("Open Command"),
       icon: item.kind === "Snippet" ? "clipboard-16" : "arrow-right-16",
       run: openWithArguments,
     },
   ];
   if (item.kind === "Snippet") {
     primary.push({
-      title: "Copy Snippet",
+      title: t("Copy Snippet"),
       icon: "copy-clipboard-16",
       shortcut: { modifiers: ["ctrl"], key: "return" },
       // With its argument when one was typed; else it asks.
@@ -262,46 +283,46 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
   }
   if (item.kind === "Quicklink") {
     primary.push({
-      title: "Copy Link",
+      title: t("Copy Link"),
       icon: "copy-clipboard-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "c" },
-      run: () => void call("copy_text", { text: item.link ?? "", paste: false }).catch(reported("Could not copy")),
+      run: () => void call("copy_text", { text: item.link ?? "", paste: false }).catch(reported(t("Could not copy"))),
     });
   }
 
   const manage: RowAction[] = [
     {
-      title: item.favorite ? "Remove from Favorites" : "Add to Favorites",
+      title: item.favorite ? t("Remove from Favorites") : t("Add to Favorites"),
       icon: item.favorite ? "star-disabled-16" : "star-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "f" },
-      run: () => void call("set_favorite", { id, favorite: !item.favorite }).catch(reported("Could not change favorites")),
+      run: () => void call("set_favorite", { id, favorite: !item.favorite }).catch(reported(t("Could not change favorites"))),
     },
   ];
   if (item.favorite && item.section === "Favorites") {
     manage.push(
       {
-        title: "Move Up in Favorites",
+        title: t("Move Up in Favorites"),
         icon: "arrow-up-16",
         shortcut: { modifiers: ["ctrl", "alt"], key: "arrowUp" },
-        run: () => void call("move_favorite", { id, offset: -1 }).catch(reported("Could not change favorites")),
+        run: () => void call("move_favorite", { id, offset: -1 }).catch(reported(t("Could not change favorites"))),
       },
       {
-        title: "Move Down in Favorites",
+        title: t("Move Down in Favorites"),
         icon: "arrow-down-16",
         shortcut: { modifiers: ["ctrl", "alt"], key: "arrowDown" },
-        run: () => void call("move_favorite", { id, offset: 1 }).catch(reported("Could not change favorites")),
+        run: () => void call("move_favorite", { id, offset: 1 }).catch(reported(t("Could not change favorites"))),
       },
     );
   }
   manage.push(
     {
-      title: item.alias ? "Edit Alias" : "Set Alias",
+      title: item.alias ? t("Edit Alias") : t("Set Alias"),
       icon: "tag-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "a" },
       run: () => void editAlias(item, palette),
     },
     {
-      title: item.hotkey ? "Change Hotkey" : "Set Hotkey",
+      title: item.hotkey ? t("Change Hotkey") : t("Set Hotkey"),
       icon: "keyboard-16",
       shortcut: { modifiers: ["ctrl", "shift"], key: "h" },
       run: () => palette.askHotkey(item),
@@ -309,22 +330,22 @@ function ofItem(item: Item, context: Context, palette: Palette): Own {
   );
   if (item.hotkey) {
     manage.push({
-      title: "Remove Hotkey",
+      title: t("Remove Hotkey"),
       icon: "x-mark-circle-16",
       run: () =>
-        void call("set_item_hotkey", { id, title: item.title, accelerator: "" }).catch((e) => palette.showError("Could not remove hotkey", String(e))),
+        void call("set_item_hotkey", { id, title: item.title, accelerator: "" }).catch((e) => palette.showError(t("Could not remove hotkey"), String(e))),
     });
   }
   manage.push({
-    title: "Reset Ranking",
+    title: t("Reset Ranking"),
     icon: "arrow-counter-clockwise-16",
     run: () =>
       void call("reset_ranking", { id })
-        .then(() => palette.showSuccess(`Reset ranking of ${item.title}`))
-        .catch(reported("Could not reset ranking")),
+        .then(() => palette.showSuccess(t("Reset ranking of {0}", item.title)))
+        .catch(reported(t("Could not reset ranking"))),
   });
   if (item.kind === "Command" || item.kind === "Quicklink" || item.kind === "Snippet") {
-    manage.push({ title: "Open Settings", icon: "cog-16", shortcut: { modifiers: ["ctrl"], key: "," }, run: palette.openSettings });
+    manage.push({ title: t("Open Settings"), icon: "cog-16", shortcut: { modifiers: ["ctrl"], key: "," }, run: palette.openSettings });
   }
   return { title: item.title, fields, values, groups: [primary, manage] };
 }
@@ -339,7 +360,7 @@ export async function open(item: Item, palette: Palette, given?: Record<string, 
     // Applications, extensions' commands, and Heyo's own (screenshots, …), which run in the host.
     await call("launch", { id: item.id, arguments: given });
   } catch (e) {
-    palette.showError(`Could not open ${item.title}`, String(e));
+    palette.showError(t("Could not open {0}", item.title), String(e));
   }
 }
 
@@ -350,7 +371,7 @@ async function openQuicklink(item: Item, palette: Palette, argument?: string): P
   if (needsArgument(link) && argument === undefined) {
     // Opened by a hotkey while hidden: show the window to ask.
     await call("show_window");
-    const asked = await palette.ask({ title: item.title, placeholder: "Query" });
+    const asked = await palette.ask({ title: item.title, placeholder: t("Query") });
     if (asked === null) return;
     argument = asked;
   }
@@ -362,7 +383,7 @@ async function openQuicklink(item: Item, palette: Palette, argument?: string): P
 async function pasteSnippet(item: Item, palette: Palette, paste: boolean, argument?: string): Promise<void> {
   if (needsArgument(item.text ?? "") && argument === undefined) {
     await call("show_window");
-    const asked = await palette.ask({ title: item.title, placeholder: "Text for {argument}" });
+    const asked = await palette.ask({ title: item.title, placeholder: t("Text for {0}", "{argument}") });
     if (asked === null) return;
     argument = asked;
   }
@@ -371,6 +392,6 @@ async function pasteSnippet(item: Item, palette: Palette, paste: boolean, argume
 }
 
 async function editAlias(item: Item, palette: Palette) {
-  const alias = await palette.ask({ title: `Alias for ${item.title}`, placeholder: "e.g. cb — leave empty to remove", initial: item.alias ?? "" });
-  if (alias !== null) void call("set_alias", { id: item.id, alias }).catch((e) => palette.showError("Could not set alias", String(e)));
+  const alias = await palette.ask({ title: t("Alias for {0}", item.title), placeholder: t("e.g. cb — leave empty to remove"), initial: item.alias ?? "" });
+  if (alias !== null) void call("set_alias", { id: item.id, alias }).catch((e) => palette.showError(t("Could not set alias"), String(e)));
 }

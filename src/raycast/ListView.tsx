@@ -10,6 +10,7 @@ import { reveal, step as stepped, underPointer, useReveal } from "../selection";
 import { SelectionIndicator } from "../SelectionIndicator";
 import { content, cssColor, isFn, matchesQuery, relativeTime, slot, textOf, tooltipOf, type Node } from "./model";
 import type { BodyProps } from "./CommandView";
+import { t } from "../../shared/i18n";
 
 interface Group {
   section?: Node;
@@ -273,7 +274,7 @@ export function ListView({ node, query, dispatch, keys, onActions, memory }: Bod
       return (
         <div className="empty-view">
           {emptyView.props.icon != null && <Image image={emptyView.props.icon} size={48} />}
-          <div className="empty-title">{emptyView.props.title ?? "No Results"}</div>
+          <div className="empty-title">{emptyView.props.title ?? t("No Results")}</div>
           {emptyView.props.description && <div className="empty-description">{emptyView.props.description}</div>}
         </div>
       );
@@ -290,8 +291,8 @@ export function ListView({ node, query, dispatch, keys, onActions, memory }: Bod
     }
     return (
       <div className="empty-view">
-        <div className="empty-title">No Results</div>
-        <div className="empty-description">Try a different search.</div>
+        <div className="empty-title">{t("No Results")}</div>
+        <div className="empty-description">{t("Try a different search.")}</div>
       </div>
     );
   }

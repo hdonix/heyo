@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { language, onLanguage, speak, t, tc, tn } from "./i18n";
+import { language, locale, onLanguage, speak, t, tc, tn, translate } from "./i18n";
 
 const english = { language: "en", plural: [], messages: {} };
 // Russian's rule, written out as the host writes it: a form for each
@@ -23,9 +23,22 @@ describe("a text", () => {
     expect(t("{2} and {n} and {")).toBe("{2} and {n} and {");
   });
 
+  it("is looked up as it stands when it was marked elsewhere", () => {
+    speak({ language: "zh_CN", plural: [0], messages: { "Clipboard History": ["剪贴板历史"] } });
+    expect(["Clipboard History", "Another Command"].map(translate)).toEqual(["剪贴板历史", "Another Command"]);
+  });
+
   it("is another message under a context", () => {
     speak({ language: "zh_CN", plural: [0], messages: { Open: ["打开"], "state\u0004Open": ["已打开"] } });
     expect([t("Open"), tc("state", "Open"), tc("no such context", "Open")]).toEqual(["打开", "已打开", "Open"]);
+  });
+});
+
+describe("the language", () => {
+  it("is named as dates and numbers take it", () => {
+    expect(locale()).toBe("en");
+    speak({ language: "zh_CN", plural: [0], messages: {} });
+    expect([locale(), new Date(2026, 9, 13).toLocaleDateString(locale(), { month: "short", day: "numeric" })]).toEqual(["zh-CN", "10月13日"]);
   });
 });
 

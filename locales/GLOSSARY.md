@@ -13,6 +13,13 @@ for it. A translation uses these and no synonym; change a term here and in
 | Command | 命令 | What an extension offers and the root search runs. |
 | Palette (command palette) | 命令面板 | VS Code's term, which the people Heyo is for know. |
 | Root search | 主搜索 | The search the palette opens on; “根” means nothing to a user. |
+| Application | 应用程序 | The settings already say it so; “应用” only where a row has no room. |
+| Favorites | 收藏 | As browsers say it; adding is 添加到收藏, removing 取消收藏. |
+| Suggestions | 建议 | Standard. |
+| Fallback (what a query can be used with) | 后备 | Short enough for the end of a row; “备选” would promise a choice among equals. |
+| Ranking (of a result) | 排序 | Where a result stands in the list, which is what resetting it changes. |
+| Activity (a live activity's row) | 活动 | Follows from Live Activity. |
+| Ask AI | 问 AI | The verb people use; “询问” is stiff on a key hint. |
 | Quicklink | 快速链接 | Raycast's own Chinese usage; says what it is. |
 | Snippet | 文本片段 | “片段” alone is unclear outside code. |
 | Snippet expansion | 文本片段展开 | Follows from Snippet. |
