@@ -7,8 +7,8 @@
 # 2), used as a person would use it, the whole screen filmed, and beside the
 # film a list of moments: when each thing happened and where on the screen
 # it is, asked of the windows themselves ($FILM/moments.jsonl). What is
-# dictated is spoken by say.py (English) and by a kept take of say-zh.cjs
-# (Chinese with English in it) in place of a microphone.
+# dictated is spoken by kept takes of say-zh.cjs (English, then Chinese
+# with English in it, in one voice) in place of a microphone.
 #
 # edit: demo-film.py cuts that into the film: shots that begin on a beat of
 # the music, a camera that moves in on what matters, the waiting left out,
@@ -31,6 +31,7 @@
 #                      demo-zh.wav beside the speech model say-zh.cjs uses);
 #                      without one say-zh.cjs speaks them anew, and the
 #                      recognizer may mishear that
+#   HEYO_FILM_SPEECH_ENGLISH  the same for the English sentence (demo-en.wav)
 #   KEEP=1             leaves the sandbox running after the capture
 #
 # It needs what readme-dictation.sh needs, uv (or HEYO_FILM_PYTHON), gedit,
@@ -79,22 +80,28 @@ export GTK_IM_MODULE=ibus QT_IM_MODULE=ibus XMODIFIERS=@im=ibus
 SPOKEN="$T/spoken.wav"
 ENGLISH="$FILM/spoken-en.wav"
 CHINESE="$FILM/spoken-zh.wav"
-ENGLISH_LENGTH=$(/usr/bin/python3 "$HERE/say.py" "$ENGLISH" \
-  "We can have lunch by the lake.") || exit 1
-# The voice is not the same twice, and the recognizer mishears some of its
-# takes: one that is heard right is kept, and is then what is said.
+# One voice says both (say-zh.cjs: it speaks English as well). It is not
+# the same twice, and the recognizer mishears some of its takes: one that
+# is heard right is kept, and is then what is said.
 TTS="${HEYO_TTS_MODEL:-$REAL_HOME/.cache/heyo-build/tts/vits-melo-tts-zh_en}"
-KEPT="${HEYO_FILM_SPEECH:-$(dirname "$TTS")/demo-zh.wav}"
-if [ -f "$KEPT" ]; then
-  cp "$KEPT" "$CHINESE"
-  CHINESE_LENGTH=$(/usr/bin/python3 -c 'import sys, wave; w = wave.open(sys.argv[1]); print(round(w.getnframes() / w.getframerate(), 1))' "$CHINESE") || exit 1
-else
-  CHINESE_LENGTH=$(HEYO_TTS_MODEL="$TTS" HEYO_TTS_LIB="$HEYO_TEST_SPEECH/node_modules" node "$HERE/say-zh.cjs" "$CHINESE" \
-    "这个 feature 下周上线。" \
-    "明天早上可以 review 一下。" \
-    "有问题的话，直接发 email 给我。" \
-    "中文和 English 混着说也可以。") || exit 1
-fi
+# said OUT KEPT SENTENCE...: the kept take if there is one, or a new one;
+# its length in seconds.
+said() {
+  out=$1; kept=$2; shift 2
+  if [ -f "$kept" ]; then
+    cp "$kept" "$out"
+    /usr/bin/python3 -c 'import sys, wave; w = wave.open(sys.argv[1]); print(round(w.getnframes() / w.getframerate(), 1))' "$out"
+  else
+    HEYO_TTS_MODEL="$TTS" HEYO_TTS_LIB="$HEYO_TEST_SPEECH/node_modules" node "$HERE/say-zh.cjs" "$out" "$@"
+  fi
+}
+ENGLISH_LENGTH=$(said "$ENGLISH" "${HEYO_FILM_SPEECH_ENGLISH:-$(dirname "$TTS")/demo-en.wav}" \
+  "We can have lunch by the lake.") || exit 1
+CHINESE_LENGTH=$(said "$CHINESE" "${HEYO_FILM_SPEECH:-$(dirname "$TTS")/demo-zh.wav}" \
+  "这个 feature 下周上线。" \
+  "明天早上可以 review 一下。" \
+  "有问题的话，直接发 email 给我。" \
+  "中文和 English 混着说也可以。") || exit 1
 export HEYO_DICTATION_WAV="$SPOKEN"
 
 # The applications the film uses, beside those of the README's pictures:
