@@ -104,6 +104,7 @@ msgstr ""
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
 #: src/RootSearch.tsx
+#: runtime/src/api/system.ts
 msgid "Cancel"
 msgstr ""
 
@@ -327,6 +328,7 @@ msgid "conversations, history, assistant, llm, claude, ask"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/api/components.ts
 msgid "Create Quicklink"
 msgstr ""
 
@@ -351,6 +353,7 @@ msgid "bookmarks, urls"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/api/components.ts
 msgid "Create Snippet"
 msgstr ""
 
@@ -652,6 +655,7 @@ msgid "A terminal runs each line as a command as soon as it is pasted."
 msgstr ""
 
 #: src-tauri/src/pasting.rs
+#: runtime/src/api/components.ts
 msgid "Paste"
 msgstr ""
 
@@ -748,6 +752,7 @@ msgid "Heyo will not ask again; you can take this back in Settings, on the exten
 msgstr ""
 
 #: src-tauri/src/permissions.rs
+#: runtime/src/api/index.ts
 msgid "Allow"
 msgstr ""
 
@@ -1681,6 +1686,7 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 #: src/rows.ts
+#: runtime/src/api/components.ts
 msgid "Open"
 msgstr ""
 
@@ -2022,6 +2028,7 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pill/model.rs
 #: src/RootSearch.tsx
+#: runtime/src/api/files.tsx
 msgid "Done"
 msgstr ""
 
@@ -2147,6 +2154,7 @@ msgid "Copy Diagnostics"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint
+#: runtime/src/api/quicklook.tsx
 msgid "Name"
 msgstr ""
 
@@ -2829,6 +2837,237 @@ msgstr ""
 msgid "Could not set alias"
 msgstr ""
 
+#: runtime/src/ai.ts
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
+msgstr ""
+
+#: runtime/src/ai.ts
+msgid "Claude's rate limit was reached. Try again shortly."
+msgstr ""
+
+#: runtime/src/ai.ts
+msgid "Could not reach the Claude API."
+msgstr ""
+
+#: runtime/src/ai.ts
+msgid "Claude API error {0}: {1}"
+msgstr ""
+
+#: runtime/src/ai.ts
+msgid "No Claude API key is set. Add one in Heyo Settings → Advanced."
+msgstr ""
+
+#: runtime/src/ai.ts
+msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
+msgstr ""
+
+#: runtime/src/ai.ts
+msgid "Claude declined this request."
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Quick Look"
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Set Date…"
+msgstr ""
+
+#: runtime/src/api/components.ts
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copy to Clipboard"
+msgstr ""
+
+#: runtime/src/api/components.ts
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copied to Clipboard"
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Open in Browser"
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Open With"
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Show in Files"
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Move to Trash"
+msgstr ""
+
+#: runtime/src/api/components.ts
+msgid "Submit Form"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Done ({0} Selected)"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Go to Enclosing Folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Hide Hidden Files"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Show Hidden Files"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose files or folders in {0}…"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose a file or folder in {0}…"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose folders in {0}…"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose a folder in {0}…"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose files in {0}…"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose a file in {0}…"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "{0} selected"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose “{0}”"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "This folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Deselect Folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Select Folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose Folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Enclosing folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Open Folder"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Deselect"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Select"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Choose File"
+msgstr ""
+
+#: runtime/src/api/files.tsx
+msgid "Selected"
+msgstr ""
+
+#: runtime/src/api/index.ts
+msgid "Allow {0} to launch commands of {1}?"
+msgstr ""
+
+#: runtime/src/api/index.ts
+msgid "It will not ask again."
+msgstr ""
+
+#: runtime/src/api/index.ts
+msgid "Don't Allow"
+msgstr ""
+
+#: runtime/src/api/navigation.tsx
+#: runtime/src/session.ts
+msgid "Error"
+msgstr ""
+
+#: runtime/src/api/oauth.ts
+msgid "Sign in to {0}"
+msgstr ""
+
+#: runtime/src/api/oauth.ts
+msgid "Continue in your browser…"
+msgstr ""
+
+#: runtime/src/api/oauth.ts
+msgid "Signed in to {0}"
+msgstr ""
+
+#: runtime/src/api/oauth.ts
+msgid "Could not sign in to {0}"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "{0} bytes"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Only the beginning of the file is shown."
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Where"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Size"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Modified"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Close Quick Look"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Copy Path"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Nothing to preview"
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "This item has no file to look at."
+msgstr ""
+
+#: runtime/src/api/quicklook.tsx
+msgid "Could not preview the file"
+msgstr ""
+
+#: runtime/src/api/system.ts
+msgid "OK"
+msgstr ""
+
 #: runtime/src/builtins/clipboard.tsx
 msgid "Resume Recording"
 msgstr ""
@@ -2849,14 +3088,6 @@ msgstr[1] ""
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Paste to Active App"
-msgstr ""
-
-#: runtime/src/builtins/clipboard.tsx
-msgid "Copy to Clipboard"
-msgstr ""
-
-#: runtime/src/builtins/clipboard.tsx
-msgid "Copied to Clipboard"
 msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
@@ -2889,4 +3120,48 @@ msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
+msgstr ""
+
+#: runtime/src/builtins/setup.tsx
+msgid "Required preferences missing"
+msgstr ""
+
+#: runtime/src/builtins/setup.tsx
+msgid "{0} Preferences"
+msgstr ""
+
+#: runtime/src/builtins/setup.tsx
+msgid "Save Preferences"
+msgstr ""
+
+#: runtime/src/builtins/setup.tsx
+msgid "Configure {0}. Required fields are marked."
+msgstr ""
+
+#: runtime/src/builtins/setup.tsx
+msgid "Required arguments missing"
+msgstr ""
+
+#: runtime/src/builtins/setup.tsx
+msgid "Run {0}"
+msgstr ""
+
+#: runtime/src/llm.ts
+msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
+msgstr ""
+
+#: runtime/src/llm.ts
+msgid "The local model answered with an error ({0}): {1}"
+msgstr ""
+
+#: runtime/src/llm.ts
+msgid "The local server lists no models."
+msgstr ""
+
+#: runtime/src/llm.ts
+msgid "The local model returned no text."
+msgstr ""
+
+#: runtime/src/session.ts
+msgid "Could not prepare {0} for Linux"
 msgstr ""

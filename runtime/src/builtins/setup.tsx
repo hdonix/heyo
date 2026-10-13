@@ -2,6 +2,7 @@
 
 import { Action, ActionPanel, Form } from "../api/components";
 import { showToast, Toast } from "../api/system";
+import { t } from "../../../shared/i18n";
 import {
   preferenceValues,
   savePreferences,
@@ -49,7 +50,7 @@ export function PreferencesForm(props: { extension: Extension; command?: string;
     if (missing.length) {
       showToast({
         style: Toast.Style.Failure,
-        title: "Required preferences missing",
+        title: t("Required preferences missing"),
         message: missing.map((p) => p.title ?? p.name).join(", "),
       });
       return;
@@ -65,14 +66,14 @@ export function PreferencesForm(props: { extension: Extension; command?: string;
 
   return (
     <Form
-      navigationTitle={`${manifest.title} Preferences`}
+      navigationTitle={t("{0} Preferences", manifest.title)}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Save Preferences" onSubmit={submit} />
+          <Action.SubmitForm title={t("Save Preferences")} onSubmit={submit} />
         </ActionPanel>
       }
     >
-      <Form.Description text={`Configure ${manifest.title}. Required fields are marked.`} />
+      <Form.Description text={t("Configure {0}. Required fields are marked.", manifest.title)} />
       {[...extensionPrefs, ...commandPrefs].map((pref) => (
         <PreferenceField key={pref.name} pref={{ ...pref, title: `${pref.title ?? pref.name}${pref.required ? " *" : ""}` }} value={values[pref.name]} />
       ))}
@@ -88,7 +89,7 @@ export function ArgumentsForm(props: { command: CommandManifest; onSubmit(values
     if (missing.length) {
       showToast({
         style: Toast.Style.Failure,
-        title: "Required arguments missing",
+        title: t("Required arguments missing"),
         message: missing.map((a) => a.placeholder ?? a.name).join(", "),
       });
       return;
@@ -101,7 +102,7 @@ export function ArgumentsForm(props: { command: CommandManifest; onSubmit(values
       navigationTitle={props.command.title}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title={`Run ${props.command.title}`} onSubmit={submit} />
+          <Action.SubmitForm title={t("Run {0}", props.command.title)} onSubmit={submit} />
         </ActionPanel>
       }
     >

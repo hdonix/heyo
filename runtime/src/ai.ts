@@ -5,16 +5,17 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { type AiSettings, LocalModelError, streamLocal } from "./llm";
 import { request } from "./protocol";
+import { t } from "../../shared/i18n";
 
 /// Why a request to the model failed, in words for the user.
 export function describeClaudeError(error: unknown) {
   if (error instanceof LocalModelError) return error.message;
-  if (error instanceof Anthropic.AuthenticationError) return "The Claude API key is invalid. Check it in Heyo Settings → Advanced.";
-  if (error instanceof Anthropic.RateLimitError) return "Claude's rate limit was reached. Try again shortly.";
-  if (error instanceof Anthropic.APIConnectionError) return "Could not reach the Claude API.";
-  if (error instanceof Anthropic.APIError) return `Claude API error ${error.status}: ${error.message}`;
+  if (error instanceof Anthropic.AuthenticationError) return t("The Claude API key is invalid. Check it in Heyo Settings → Advanced.");
+  if (error instanceof Anthropic.RateLimitError) return t("Claude's rate limit was reached. Try again shortly.");
+  if (error instanceof Anthropic.APIConnectionError) return t("Could not reach the Claude API.");
+  if (error instanceof Anthropic.APIError) return t("Claude API error {0}: {1}", error.status, error.message);
   // The SDK's own (non-HTTP) errors here mean no credentials could be resolved.
-  if (error instanceof Anthropic.AnthropicError) return "No Claude API key is set. Add one in Heyo Settings → Advanced.";
+  if (error instanceof Anthropic.AnthropicError) return t("No Claude API key is set. Add one in Heyo Settings → Advanced.");
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -86,10 +87,10 @@ export async function streamClaude(options: {
     // The SDK's own words for this ("Could not resolve authentication
     // method…") tell a user nothing about what to do.
     if (!apiKey && /authentication method|api[_ ]?key/i.test(String(error))) {
-      throw new Error("AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced.");
+      throw new Error(t("AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."));
     }
     throw error;
   });
-  if (message.stop_reason === "refusal") throw new Error("Claude declined this request.");
+  if (message.stop_reason === "refusal") throw new Error(t("Claude declined this request."));
   return text;
 }

@@ -15,6 +15,7 @@ import { useState } from "react";
 import { Action, ActionPanel, Detail } from "./components";
 import { Icon } from "./icon";
 import { closeMainWindow, open, showToast, Toast } from "./system";
+import { locale, t } from "../../../shared/i18n";
 
 const IMAGES: Record<string, string> = {
   ".png": "image/png",
@@ -76,14 +77,14 @@ export function preview(file: string): Preview {
 }
 
 function size(bytes: number) {
-  const units = ["bytes", "KB", "MB", "GB", "TB"];
+  const units = ["", "KB", "MB", "GB", "TB"];
   let value = bytes;
   let unit = 0;
   while (value >= 1024 && unit < units.length - 1) {
     value /= 1024;
     unit++;
   }
-  return `${unit ? value.toFixed(1) : value} ${units[unit]}`;
+  return unit ? `${value.toFixed(1)} ${units[unit]}` : t("{0} bytes", value);
 }
 
 /// The markdown that shows a preview.
@@ -91,7 +92,7 @@ export function previewMarkdown(shown: Exclude<Preview, { kind: "other" }>, name
   if (shown.kind === "image") return `![${name.replace(/[[\]]/g, "")}](${shown.url})`;
   // A fence longer than any run of backticks in the text cannot be closed by it.
   const fence = "`".repeat(Math.max(3, ...(shown.text.match(/`+/g) ?? []).map((run) => run.length + 1)));
-  return `${fence}\n${shown.text}\n${fence}${shown.truncated ? "\n\n*Only the beginning of the file is shown.*" : ""}`;
+  return `${fence}\n${shown.text}\n${fence}${shown.truncated ? `\n\n*${t("Only the beginning of the file is shown.")}*` : ""}`;
 }
 
 /// What `Action.ToggleQuickLook` uses when it is given no shortcut: Raycast's.
@@ -105,19 +106,19 @@ function QuickLook(props: { file: string; name: string; shown: Exclude<Preview, 
       markdown={previewMarkdown(props.shown, props.name)}
       metadata={
         <Detail.Metadata>
-          <Detail.Metadata.Label title="Name" text={props.name} />
-          <Detail.Metadata.Label title="Where" text={path.dirname(props.file)} />
-          <Detail.Metadata.Label title="Size" text={size(stat.size)} />
-          <Detail.Metadata.Label title="Modified" text={stat.mtime.toLocaleString()} />
+          <Detail.Metadata.Label title={t("Name")} text={props.name} />
+          <Detail.Metadata.Label title={t("Where")} text={path.dirname(props.file)} />
+          <Detail.Metadata.Label title={t("Size")} text={size(stat.size)} />
+          <Detail.Metadata.Label title={t("Modified")} text={stat.mtime.toLocaleString(locale())} />
         </Detail.Metadata>
       }
       actions={
         <ActionPanel>
           {/* The same key that opened it closes it: a toggle. */}
-          <Action title="Close Quick Look" icon={Icon.Eye} shortcut={props.shortcut} onAction={props.onClose} />
-          <Action.Open title="Open" target={props.file} />
+          <Action title={t("Close Quick Look")} icon={Icon.Eye} shortcut={props.shortcut} onAction={props.onClose} />
+          <Action.Open target={props.file} />
           <Action.ShowInFinder path={props.file} />
-          <Action.CopyToClipboard title="Copy Path" content={props.file} />
+          <Action.CopyToClipboard title={t("Copy Path")} content={props.file} />
         </ActionPanel>
       }
     />
@@ -131,7 +132,7 @@ export async function quickLook(
   shortcut: unknown,
 ) {
   if (!target?.path) {
-    await showToast({ style: Toast.Style.Failure, title: "Nothing to preview", message: "This item has no file to look at." });
+    await showToast({ style: Toast.Style.Failure, title: t("Nothing to preview"), message: t("This item has no file to look at.") });
     return;
   }
   const file = resolvePath(target.path);
@@ -139,7 +140,7 @@ export async function quickLook(
   try {
     shown = preview(file);
   } catch (e) {
-    await showToast({ style: Toast.Style.Failure, title: "Could not preview the file", message: e instanceof Error ? e.message : String(e) });
+    await showToast({ style: Toast.Style.Failure, title: t("Could not preview the file"), message: e instanceof Error ? e.message : String(e) });
     return;
   }
   if (shown.kind === "other") {

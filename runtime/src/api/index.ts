@@ -16,6 +16,7 @@ import { OAuth } from "./oauth";
 import { REFUSING } from "./shortfalls";
 import * as system from "./system";
 import { getFrontmostApplication, WindowManagement } from "./windows";
+import { t } from "../../../shared/i18n";
 
 export const LaunchType = { UserInitiated: "userInitiated", Background: "background" } as const;
 
@@ -152,10 +153,10 @@ async function allowLaunch(caller: Extension, target: Extension) {
   // Nobody can be asked from the menu bar or the background.
   if (isBackground()) throw new Error(`${refused}: it has to ask once from a command opened in Heyo`);
   const yes = await system.confirmAlert({
-    title: `Allow ${caller.manifest.title} to launch commands of ${target.manifest.title}?`,
-    message: "It will not ask again.",
-    primaryAction: { title: "Allow" },
-    dismissAction: { title: "Don't Allow" },
+    title: t("Allow {0} to launch commands of {1}?", caller.manifest.title, target.manifest.title),
+    message: t("It will not ask again."),
+    primaryAction: { title: t("Allow") },
+    dismissAction: { title: t("Don't Allow") },
   });
   if (!yes) throw new Error(refused);
   // Read again: another launch may have been allowed while this one waited.

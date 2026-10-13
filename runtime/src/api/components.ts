@@ -11,6 +11,7 @@ import { useNavigation } from "./navigation";
 import { QUICK_LOOK_SHORTCUT, quickLook } from "./quicklook";
 import { dropdownKey, fieldKey, keep, store, stored, storeSubmitted } from "./stored";
 import { Clipboard, closeMainWindow, open, showHUD, showInFinder, trash } from "./system";
+import { t } from "../../../shared/i18n";
 
 const h = createElement;
 type Props = Record<string, any>;
@@ -280,11 +281,13 @@ export const ActionPanel = Object.assign(host("ActionPanel"), {
   Submenu: host("ActionPanel.Submenu"),
 });
 
-function action(defaults: Props, perform: (props: Props) => unknown) {
+/// An action that knows what it does. Its title is asked for when it is
+/// drawn: in the language spoken then.
+function action(defaults: { title(): string; icon: unknown }, perform: (props: Props) => unknown) {
   return ({ title, icon, ...props }: Props) =>
     h("Action", {
       ...props,
-      title: title ?? defaults.title,
+      title: title ?? defaults.title(),
       icon: icon ?? defaults.icon,
       onAction: () => perform(props),
     });
@@ -306,7 +309,7 @@ function CreateSnippet({ snippet, title, icon, ...props }: Props) {
   const { push, pop } = useNavigation();
   return h("Action", {
     ...props,
-    title: title ?? "Create Snippet",
+    title: title ?? t("Create Snippet"),
     icon: icon ?? Icon.Snippets,
     onAction: () => push(h(SnippetForm, { draft: { name: snippet?.name, text: snippet?.text, keyword: snippet?.keyword }, onSaved: pop })),
   });
@@ -319,7 +322,7 @@ function CreateQuicklink({ quicklink, title, icon, ...props }: Props) {
   const { push, pop } = useNavigation();
   return h("Action", {
     ...props,
-    title: title ?? "Create Quicklink",
+    title: title ?? t("Create Quicklink"),
     icon: icon ?? Icon.Link,
     onAction: () => push(h(QuicklinkForm, { draft: { name: quicklink?.name, link: quicklink?.link }, onSaved: pop })),
   });
@@ -332,7 +335,7 @@ function ToggleQuickLook({ title, icon, shortcut, ...props }: Props) {
   const key = shortcut ?? QUICK_LOOK_SHORTCUT;
   return h("Action", {
     ...props,
-    title: title ?? "Quick Look",
+    title: title ?? t("Quick Look"),
     icon: icon ?? Icon.Eye,
     shortcut: key,
     preview: true,
@@ -344,7 +347,7 @@ function ToggleQuickLook({ title, icon, shortcut, ...props }: Props) {
 function PickDate({ title, icon, type, min, max, ...props }: Props) {
   return h("Action", {
     ...props,
-    title: title ?? "Set Date…",
+    title: title ?? t("Set Date…"),
     icon: icon ?? Icon.Calendar,
     pickDate: { type: type ?? "date_time", min, max },
   });
@@ -352,36 +355,36 @@ function PickDate({ title, icon, type, min, max, ...props }: Props) {
 
 export const Action = Object.assign((props: Props) => h("Action", props), {
   Style: { Regular: "regular", Destructive: "destructive" },
-  CopyToClipboard: action({ title: "Copy to Clipboard", icon: Icon.CopyClipboard }, async (p) => {
+  CopyToClipboard: action({ title: () => t("Copy to Clipboard"), icon: Icon.CopyClipboard }, async (p) => {
     await Clipboard.copy(p.content, { concealed: p.concealed, transient: p.transient });
-    await showHUD("Copied to Clipboard");
+    await showHUD(t("Copied to Clipboard"));
     p.onCopy?.(p.content);
   }),
-  Paste: action({ title: "Paste", icon: Icon.Clipboard }, async (p) => {
+  Paste: action({ title: () => t("Paste"), icon: Icon.Clipboard }, async (p) => {
     await Clipboard.paste(p.content);
     p.onPaste?.(p.content);
   }),
-  OpenInBrowser: action({ title: "Open in Browser", icon: Icon.Globe }, async (p) => {
+  OpenInBrowser: action({ title: () => t("Open in Browser"), icon: Icon.Globe }, async (p) => {
     await open(p.url);
     await closeMainWindow();
     p.onOpen?.(p.url);
   }),
-  Open: action({ title: "Open", icon: Icon.Finder }, async (p) => {
+  Open: action({ title: () => t("Open"), icon: Icon.Finder }, async (p) => {
     await open(p.target, p.application);
     await closeMainWindow();
     p.onOpen?.(p.target);
   }),
-  OpenWith: action({ title: "Open With", icon: Icon.Upload }, async (p) => {
+  OpenWith: action({ title: () => t("Open With"), icon: Icon.Upload }, async (p) => {
     await open(p.path);
     await closeMainWindow();
     p.onOpen?.(p.path);
   }),
-  ShowInFinder: action({ title: "Show in Files", icon: Icon.Finder }, async (p) => {
+  ShowInFinder: action({ title: () => t("Show in Files"), icon: Icon.Finder }, async (p) => {
     await showInFinder(p.path);
     await closeMainWindow();
     p.onShow?.(p.path);
   }),
-  Trash: action({ title: "Move to Trash", icon: Icon.Trash }, async (p) => {
+  Trash: action({ title: () => t("Move to Trash"), icon: Icon.Trash }, async (p) => {
     await trash(p.paths);
     p.onTrash?.(p.paths);
   }),
@@ -389,7 +392,7 @@ export const Action = Object.assign((props: Props) => h("Action", props), {
   SubmitForm: ({ title, icon, onSubmit, ...props }: Props) =>
     h("Action", {
       ...props,
-      title: title ?? "Submit Form",
+      title: title ?? t("Submit Form"),
       icon: icon ?? Icon.Checkmark,
       submit: true,
       onSubmit: (values: unknown) => {

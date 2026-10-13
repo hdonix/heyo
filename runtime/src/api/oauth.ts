@@ -11,6 +11,7 @@ import path from "node:path";
 import { ownsPalette, readJson, requireCurrent, supportPath } from "../context";
 import { on, request } from "../protocol";
 import { open, showToast, Toast } from "./system";
+import { t } from "../../../shared/i18n";
 
 const RedirectMethod = { Web: "web", App: "app", AppURI: "appURI" } as const;
 /// How long the user has to finish signing in in the browser.
@@ -152,8 +153,8 @@ export class PKCEClient {
 
     const toast = await showToast({
       style: Toast.Style.Animated,
-      title: `Sign in to ${this.providerName}`,
-      message: "Continue in your browser…",
+      title: t("Sign in to {0}", this.providerName),
+      message: t("Continue in your browser…"),
     });
     try {
       const code = await new Promise<string>((resolve, reject) => {
@@ -165,13 +166,13 @@ export class PKCEClient {
       // one in the palette (a menu bar command signs in without it).
       if (ownsPalette()) await request("host.show").catch(() => {});
       toast.style = Toast.Style.Success;
-      toast.title = `Signed in to ${this.providerName}`;
+      toast.title = t("Signed in to {0}", this.providerName);
       toast.message = undefined;
       return { authorizationCode: code };
     } catch (e) {
       waiting.delete(id);
       toast.style = Toast.Style.Failure;
-      toast.title = `Could not sign in to ${this.providerName}`;
+      toast.title = t("Could not sign in to {0}", this.providerName);
       toast.message = e instanceof Error ? e.message : String(e);
       throw e;
     }

@@ -13,6 +13,7 @@ import { asCommand, current, ended, foreground, missingPreferences, ownsPalette,
 import { pendingFixup } from "./compat";
 import { send } from "./protocol";
 import type { WireNode } from "../../shared/wire";
+import { t } from "../../shared/i18n";
 import { encodeProps, mount, visibleChildren, type Container, type HostNode } from "./renderer";
 
 export interface LaunchOptions {
@@ -42,7 +43,7 @@ export function reportError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   // With no host to show it to, printed is all it can be: a report that
   // fails must not be the next error reported.
-  showToast({ style: Toast.Style.Failure, title: "Error", message }).catch(() => {});
+  showToast({ style: Toast.Style.Failure, title: t("Error"), message }).catch(() => {});
 }
 
 /// Makes `modules` what extensions get when they ask for those names: built
@@ -115,7 +116,7 @@ function Launch(props: { extension: Extension; command: CommandManifest; context
   if (phase === "fixup") {
     return h(Detail, {
       isLoading: !fixupError,
-      markdown: fixupError ? `**Could not prepare ${extension.manifest.title} for Linux**\n\n${fixupError}` : fixup?.title,
+      markdown: fixupError ? `**${t("Could not prepare {0} for Linux", extension.manifest.title)}**\n\n${fixupError}` : fixup?.title,
     });
   }
 

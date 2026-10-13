@@ -7,6 +7,7 @@ import path from "node:path";
 import { cachePath, current, ownsPalette, readJson, requireCurrent, runAs, supportPath, writeJson, type Current } from "../context";
 import type { Application, Toast as WireToast } from "../../../shared/wire";
 import { on, request, send } from "../protocol";
+import { t } from "../../../shared/i18n";
 
 // --- Window --------------------------------------------------------------
 //
@@ -165,8 +166,8 @@ export async function confirmAlert(options: AlertOptions): Promise<boolean> {
     title: options.title,
     message: options.message,
     icon: options.icon,
-    primaryAction: { title: primaryAction?.title ?? "OK", style: primaryAction?.style },
-    dismissAction: { title: dismissAction?.title ?? "Cancel" },
+    primaryAction: { title: primaryAction?.title ?? t("OK"), style: primaryAction?.style },
+    dismissAction: { title: dismissAction?.title ?? t("Cancel") },
   });
   (confirmed ? primaryAction : dismissAction)?.onAction?.();
   return confirmed;

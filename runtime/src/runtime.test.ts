@@ -62,6 +62,34 @@ test("a launch is answered with the command, then with its view", async () => {
   expect(world.seen).toEqual(["alpha acted"]);
 });
 
+test("another language is spoken by the command on screen, and by the next one's name", async () => {
+  const copy = `
+    const { Action, ActionPanel, Detail } = require("@heyo/api");
+    const React = require("react");
+    exports.default = () => {
+      const [count] = React.useState(() => globalThis.seen.push("started"));
+      return React.createElement(Detail, { markdown: String(count), actions: React.createElement(ActionPanel, null, React.createElement(Action.CopyToClipboard, { content: "x" })) });
+    };
+  `;
+  const { dir } = extension("polyglot", { show: { mode: "view", source: copy } });
+  const { session, action } = await launch(dir, "show");
+  const titles = () => views(session).flatMap((view) => view.nodes.filter((node: { id: number }) => node.id === action).map((node: { props: { title: string } }) => node.props.title));
+  expect(titles()).toEqual(["Copy to Clipboard"]);
+
+  const chinese = { language: "zh_CN", plural: [0], messages: { "Copy to Clipboard": ["复制到剪贴板"], "Switch Windows": ["切换窗口"] } };
+  receive({ type: "language", translations: chinese });
+  await until(() => titles().length > 1, "the view to be drawn again");
+  expect(titles()).toEqual(["Copy to Clipboard", "复制到剪贴板"]);
+  // Drawn again, not started again: what it held it still holds.
+  expect(world.seen).toEqual(["started"]);
+
+  answers["ext.windows.list"] = () => [];
+  answers["host.applications"] = () => [];
+  receive({ type: "launch", extension: "@heyo", command: "switch-windows" });
+  expect((await until(() => launched()[1], "the command to be launched")).title).toBe("切换窗口");
+  receive({ type: "language", translations: { language: "en", plural: [], messages: {} } });
+});
+
 test("one of Heyo's own commands is launched by Heyo's name, and asks under it", async () => {
   answers["ext.windows.list"] = () => [
     { id: 7, title: "Notes", class: "notes", active: true },

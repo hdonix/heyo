@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { Action, ActionPanel, List } from "./components";
 import { Icon } from "./icon";
 import { clearSearchBar } from "./system";
+import { t } from "../../../shared/i18n";
 
 export interface Entry {
   name: string;
@@ -95,15 +96,15 @@ export function FileBrowser(props: FileBrowserProps) {
     <ActionPanel.Section>
       {props.multiple && (
         <Action
-          title={chosen.length ? `Done (${chosen.length} Selected)` : "Done"}
+          title={chosen.length ? t("Done ({0} Selected)", chosen.length) : t("Done")}
           icon={Icon.Checkmark}
           shortcut={{ modifiers: ["cmd"], key: "d" }}
           onAction={() => props.onDone(chosen)}
         />
       )}
-      {parent !== dir && <Action title="Go to Enclosing Folder" icon={Icon.ArrowUp} shortcut={{ modifiers: ["cmd"], key: "arrowUp" }} onAction={() => enter(parent)} />}
+      {parent !== dir && <Action title={t("Go to Enclosing Folder")} icon={Icon.ArrowUp} shortcut={{ modifiers: ["cmd"], key: "arrowUp" }} onAction={() => enter(parent)} />}
       <Action
-        title={hidden ? "Hide Hidden Files" : "Show Hidden Files"}
+        title={hidden ? t("Hide Hidden Files") : t("Show Hidden Files")}
         icon={Icon.Eye}
         shortcut={{ modifiers: ["cmd"], key: "h" }}
         onAction={() => setHidden(!hidden)}
@@ -111,21 +112,26 @@ export function FileBrowser(props: FileBrowserProps) {
     </ActionPanel.Section>
   );
 
-  const kinds = [props.files && "file", props.directories && "folder"].filter(Boolean);
-  const what = props.multiple ? kinds.map((kind) => `${kind}s`).join(" or ") : `a ${kinds.join(" or ")}`;
+  const here = path.basename(dir) || dir;
+  /// What the search bar asks for: files, folders or either, one or several.
+  const asking = () => {
+    if (props.files && props.directories) return props.multiple ? t("Choose files or folders in {0}…", here) : t("Choose a file or folder in {0}…", here);
+    if (props.directories) return props.multiple ? t("Choose folders in {0}…", here) : t("Choose a folder in {0}…", here);
+    return props.multiple ? t("Choose files in {0}…", here) : t("Choose a file in {0}…", here);
+  };
   return (
     // The footer has room for the folder's name; the section heading says where it is.
-    <List navigationTitle={path.basename(dir) || dir} searchBarPlaceholder={`Choose ${what} in ${path.basename(dir) || dir}…`}>
-      <List.Section title={dir} subtitle={props.multiple && chosen.length ? `${chosen.length} selected` : undefined}>
+    <List navigationTitle={here} searchBarPlaceholder={asking()}>
+      <List.Section title={dir} subtitle={props.multiple && chosen.length ? t("{0} selected", chosen.length) : undefined}>
         {props.directories && (
           <List.Item
             key="."
-            title={`Choose “${path.basename(dir) || dir}”`}
-            subtitle="This folder"
+            title={t("Choose “{0}”", here)}
+            subtitle={t("This folder")}
             icon={chosen.includes(dir) ? Icon.CheckCircle : Icon.Folder}
             actions={
               <ActionPanel>
-                <Action title={props.multiple ? (chosen.includes(dir) ? "Deselect Folder" : "Select Folder") : "Choose Folder"} icon={Icon.Checkmark} onAction={() => choose(dir)} />
+                <Action title={props.multiple ? (chosen.includes(dir) ? t("Deselect Folder") : t("Select Folder")) : t("Choose Folder")} icon={Icon.Checkmark} onAction={() => choose(dir)} />
                 {common}
               </ActionPanel>
             }
@@ -135,11 +141,11 @@ export function FileBrowser(props: FileBrowserProps) {
           <List.Item
             key=".."
             title=".."
-            subtitle="Enclosing folder"
+            subtitle={t("Enclosing folder")}
             icon={Icon.ArrowUp}
             actions={
               <ActionPanel>
-                <Action title="Open Folder" icon={Icon.Folder} onAction={() => enter(parent)} />
+                <Action title={t("Open Folder")} icon={Icon.Folder} onAction={() => enter(parent)} />
                 {common}
               </ActionPanel>
             }
@@ -150,18 +156,18 @@ export function FileBrowser(props: FileBrowserProps) {
           const pick = can(entry) && (
             <Action
               key="choose"
-              title={props.multiple ? (selected ? "Deselect" : "Select") : entry.directory ? "Choose Folder" : "Choose File"}
+              title={props.multiple ? (selected ? t("Deselect") : t("Select")) : entry.directory ? t("Choose Folder") : t("Choose File")}
               icon={Icon.Checkmark}
               onAction={() => choose(entry.path)}
             />
           );
-          const open = entry.directory && <Action key="open" title="Open Folder" icon={Icon.Folder} onAction={() => enter(entry.path)} />;
+          const open = entry.directory && <Action key="open" title={t("Open Folder")} icon={Icon.Folder} onAction={() => enter(entry.path)} />;
           return (
             <List.Item
               key={entry.path}
               title={entry.name}
               icon={selected ? Icon.CheckCircle : entry.directory ? Icon.Folder : Icon.BlankDocument}
-              accessories={selected ? [{ tag: "Selected" }] : undefined}
+              accessories={selected ? [{ tag: t("Selected") }] : undefined}
               actions={
                 <ActionPanel>
                   {/* Enter walks into a folder; a file it chooses. */}

@@ -107,6 +107,7 @@ msgstr "快捷键需要 GNOME。请改为在桌面环境中把快捷键绑定到
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
 #: src/RootSearch.tsx
+#: runtime/src/api/system.ts
 msgid "Cancel"
 msgstr "取消"
 
@@ -330,6 +331,7 @@ msgid "conversations, history, assistant, llm, claude, ask"
 msgstr "对话, 聊天, 历史, 助手, 大模型"
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/api/components.ts
 msgid "Create Quicklink"
 msgstr "创建快速链接"
 
@@ -354,6 +356,7 @@ msgid "bookmarks, urls"
 msgstr "书签, 网址, 链接"
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/api/components.ts
 msgid "Create Snippet"
 msgstr "创建文本片段"
 
@@ -654,6 +657,7 @@ msgid "A terminal runs each line as a command as soon as it is pasted."
 msgstr "每一行一经粘贴，终端就会把它当作命令执行。"
 
 #: src-tauri/src/pasting.rs
+#: runtime/src/api/components.ts
 msgid "Paste"
 msgstr "粘贴"
 
@@ -750,6 +754,7 @@ msgid "Heyo will not ask again; you can take this back in Settings, on the exten
 msgstr "Heyo 不会再次询问；你可以在“设置”中该扩展的页面上撤销。\n\n这里指的是 Heyo 交给扩展的内容或替它做的事，并不会限制扩展本身：扩展是这台电脑上的程序，可以自行读取你的文件并启动其他程序。"
 
 #: src-tauri/src/permissions.rs
+#: runtime/src/api/index.ts
 msgid "Allow"
 msgstr "允许"
 
@@ -1683,6 +1688,7 @@ msgstr "扩展文件夹"
 
 #: src-tauri/src/slint_windows/model.rs
 #: src/rows.ts
+#: runtime/src/api/components.ts
 msgid "Open"
 msgstr "打开"
 
@@ -2022,6 +2028,7 @@ msgstr "正在润色…"
 
 #: src-tauri/src/slint_windows/pill/model.rs
 #: src/RootSearch.tsx
+#: runtime/src/api/files.tsx
 msgid "Done"
 msgstr "完成"
 
@@ -2147,6 +2154,7 @@ msgid "Copy Diagnostics"
 msgstr "复制诊断信息"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
+#: runtime/src/api/quicklook.tsx
 msgid "Name"
 msgstr "名称"
 
@@ -2829,6 +2837,237 @@ msgstr "例如 cb；留空则移除"
 msgid "Could not set alias"
 msgstr "无法设置别名"
 
+#: runtime/src/ai.ts
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
+msgstr "Claude API 密钥无效。请在“Heyo 设置 → 高级”中检查。"
+
+#: runtime/src/ai.ts
+msgid "Claude's rate limit was reached. Try again shortly."
+msgstr "已达到 Claude 的速率限制，请稍后再试。"
+
+#: runtime/src/ai.ts
+msgid "Could not reach the Claude API."
+msgstr "无法连接 Claude API。"
+
+#: runtime/src/ai.ts
+msgid "Claude API error {0}: {1}"
+msgstr "Claude API 错误 {0}：{1}"
+
+#: runtime/src/ai.ts
+msgid "No Claude API key is set. Add one in Heyo Settings → Advanced."
+msgstr "尚未设置 Claude API 密钥。请在“Heyo 设置 → 高级”中添加。"
+
+#: runtime/src/ai.ts
+msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
+msgstr "尚未设置 AI。请在“Heyo 设置 → 高级”中添加 Anthropic API 密钥，或选择本地模型。"
+
+#: runtime/src/ai.ts
+msgid "Claude declined this request."
+msgstr "Claude 拒绝了这个请求。"
+
+#: runtime/src/api/components.ts
+msgid "Quick Look"
+msgstr "快速查看"
+
+#: runtime/src/api/components.ts
+msgid "Set Date…"
+msgstr "设置日期…"
+
+#: runtime/src/api/components.ts
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copy to Clipboard"
+msgstr "复制到剪贴板"
+
+#: runtime/src/api/components.ts
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copied to Clipboard"
+msgstr "已复制到剪贴板"
+
+#: runtime/src/api/components.ts
+msgid "Open in Browser"
+msgstr "在浏览器中打开"
+
+#: runtime/src/api/components.ts
+msgid "Open With"
+msgstr "打开方式"
+
+#: runtime/src/api/components.ts
+msgid "Show in Files"
+msgstr "在文件管理器中显示"
+
+#: runtime/src/api/components.ts
+msgid "Move to Trash"
+msgstr "移到回收站"
+
+#: runtime/src/api/components.ts
+msgid "Submit Form"
+msgstr "提交表单"
+
+#: runtime/src/api/files.tsx
+msgid "Done ({0} Selected)"
+msgstr "完成（已选 {0} 项）"
+
+#: runtime/src/api/files.tsx
+msgid "Go to Enclosing Folder"
+msgstr "前往上层文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Hide Hidden Files"
+msgstr "不显示隐藏文件"
+
+#: runtime/src/api/files.tsx
+msgid "Show Hidden Files"
+msgstr "显示隐藏文件"
+
+#: runtime/src/api/files.tsx
+msgid "Choose files or folders in {0}…"
+msgstr "在 {0} 中选择文件或文件夹…"
+
+#: runtime/src/api/files.tsx
+msgid "Choose a file or folder in {0}…"
+msgstr "在 {0} 中选择文件或文件夹…"
+
+#: runtime/src/api/files.tsx
+msgid "Choose folders in {0}…"
+msgstr "在 {0} 中选择文件夹…"
+
+#: runtime/src/api/files.tsx
+msgid "Choose a folder in {0}…"
+msgstr "在 {0} 中选择文件夹…"
+
+#: runtime/src/api/files.tsx
+msgid "Choose files in {0}…"
+msgstr "在 {0} 中选择文件…"
+
+#: runtime/src/api/files.tsx
+msgid "Choose a file in {0}…"
+msgstr "在 {0} 中选择文件…"
+
+#: runtime/src/api/files.tsx
+msgid "{0} selected"
+msgstr "已选 {0} 项"
+
+#: runtime/src/api/files.tsx
+msgid "Choose “{0}”"
+msgstr "选择“{0}”"
+
+#: runtime/src/api/files.tsx
+msgid "This folder"
+msgstr "当前文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Deselect Folder"
+msgstr "取消选择文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Select Folder"
+msgstr "选择文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Choose Folder"
+msgstr "选择文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Enclosing folder"
+msgstr "上层文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Open Folder"
+msgstr "打开文件夹"
+
+#: runtime/src/api/files.tsx
+msgid "Deselect"
+msgstr "取消选择"
+
+#: runtime/src/api/files.tsx
+msgid "Select"
+msgstr "选择"
+
+#: runtime/src/api/files.tsx
+msgid "Choose File"
+msgstr "选择文件"
+
+#: runtime/src/api/files.tsx
+msgid "Selected"
+msgstr "已选"
+
+#: runtime/src/api/index.ts
+msgid "Allow {0} to launch commands of {1}?"
+msgstr "允许 {0} 启动 {1} 的命令吗？"
+
+#: runtime/src/api/index.ts
+msgid "It will not ask again."
+msgstr "之后不会再询问。"
+
+#: runtime/src/api/index.ts
+msgid "Don't Allow"
+msgstr "不允许"
+
+#: runtime/src/api/navigation.tsx
+#: runtime/src/session.ts
+msgid "Error"
+msgstr "错误"
+
+#: runtime/src/api/oauth.ts
+msgid "Sign in to {0}"
+msgstr "登录 {0}"
+
+#: runtime/src/api/oauth.ts
+msgid "Continue in your browser…"
+msgstr "请在浏览器中继续…"
+
+#: runtime/src/api/oauth.ts
+msgid "Signed in to {0}"
+msgstr "已登录 {0}"
+
+#: runtime/src/api/oauth.ts
+msgid "Could not sign in to {0}"
+msgstr "无法登录 {0}"
+
+#: runtime/src/api/quicklook.tsx
+msgid "{0} bytes"
+msgstr "{0} 字节"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Only the beginning of the file is shown."
+msgstr "仅显示文件的开头部分。"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Where"
+msgstr "位置"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Size"
+msgstr "大小"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Modified"
+msgstr "修改时间"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Close Quick Look"
+msgstr "关闭快速查看"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Copy Path"
+msgstr "复制路径"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Nothing to preview"
+msgstr "没有可预览的内容"
+
+#: runtime/src/api/quicklook.tsx
+msgid "This item has no file to look at."
+msgstr "这一项没有可查看的文件。"
+
+#: runtime/src/api/quicklook.tsx
+msgid "Could not preview the file"
+msgstr "无法预览文件"
+
+#: runtime/src/api/system.ts
+msgid "OK"
+msgstr "好"
+
 #: runtime/src/builtins/clipboard.tsx
 msgid "Resume Recording"
 msgstr "继续记录"
@@ -2849,14 +3088,6 @@ msgstr[0] "按含义查找仍在读取 {0} 个条目"
 #: runtime/src/builtins/clipboard.tsx
 msgid "Paste to Active App"
 msgstr "粘贴到当前应用"
-
-#: runtime/src/builtins/clipboard.tsx
-msgid "Copy to Clipboard"
-msgstr "复制到剪贴板"
-
-#: runtime/src/builtins/clipboard.tsx
-msgid "Copied to Clipboard"
-msgstr "已复制到剪贴板"
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Unpin Entry"
@@ -2889,3 +3120,47 @@ msgstr "全部删除"
 #: runtime/src/builtins/clipboard.tsx
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
 msgstr "搜索，或说出时间和来源：昨天下午、last week、from firefox…"
+
+#: runtime/src/builtins/setup.tsx
+msgid "Required preferences missing"
+msgstr "缺少必填的偏好设置"
+
+#: runtime/src/builtins/setup.tsx
+msgid "{0} Preferences"
+msgstr "{0} 偏好设置"
+
+#: runtime/src/builtins/setup.tsx
+msgid "Save Preferences"
+msgstr "保存偏好设置"
+
+#: runtime/src/builtins/setup.tsx
+msgid "Configure {0}. Required fields are marked."
+msgstr "配置 {0}。必填项已标出。"
+
+#: runtime/src/builtins/setup.tsx
+msgid "Required arguments missing"
+msgstr "缺少必填的参数"
+
+#: runtime/src/builtins/setup.tsx
+msgid "Run {0}"
+msgstr "运行 {0}"
+
+#: runtime/src/llm.ts
+msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
+msgstr "无法连接位于 {0} 的本地模型。它在运行吗？（Heyo 设置 → 高级）"
+
+#: runtime/src/llm.ts
+msgid "The local model answered with an error ({0}): {1}"
+msgstr "本地模型返回了错误（{0}）：{1}"
+
+#: runtime/src/llm.ts
+msgid "The local server lists no models."
+msgstr "本地服务器没有列出任何模型。"
+
+#: runtime/src/llm.ts
+msgid "The local model returned no text."
+msgstr "本地模型没有返回任何文本。"
+
+#: runtime/src/session.ts
+msgid "Could not prepare {0} for Linux"
+msgstr "无法为 Linux 准备 {0}"

@@ -1,4 +1,6 @@
-import { Component, createContext, createElement, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { cloneElement, Component, createContext, createElement, isValidElement, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
+import { onLanguage, t } from "../../../shared/i18n";
 
 export interface Navigation {
   push(element: ReactNode, onPop?: () => void): void;
@@ -44,6 +46,18 @@ export function Navigator(props: { root: ReactNode; onPopRoot(): void; expose(na
   );
   props.expose(navigation);
 
+  // Another language is spoken: every view says what it says again. Each
+  // is the element it was, made anew, so that it is drawn again and keeps
+  // what it holds. (What a view worked out earlier and kept, it says in
+  // the new language when it next works it out.)
+  useEffect(
+    () =>
+      onLanguage(() => {
+        stackRef.current = stackRef.current.map((entry) => (isValidElement(entry.element) ? { ...entry, element: cloneElement(entry.element) } : entry));
+        setStack(stackRef.current);
+      }),
+    [],
+  );
   return createElement(
     NavigationContext.Provider,
     { value: navigation },
@@ -64,6 +78,6 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: unknown 
     const { error } = this.state;
     if (!error) return this.props.children;
     const text = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    return createElement("Detail", { markdown: `## Error\n\n\`\`\`\n${text}\n\`\`\`` });
+    return createElement("Detail", { markdown: `## ${t("Error")}\n\n\`\`\`\n${text}\n\`\`\`` });
   }
 }

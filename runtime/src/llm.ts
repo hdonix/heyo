@@ -2,6 +2,7 @@
 //! (vLLM, LM Studio, Ollama, llama.cpp), as an alternative to Claude for
 //! Heyo's own AI features.
 
+import { t } from "../../shared/i18n";
 /// Which model answers, from the settings.
 export interface AiSettings {
   provider: "claude" | "local";
@@ -20,7 +21,7 @@ async function call(url: string, init?: RequestInit) {
     response = await fetch(url, init);
   } catch (e) {
     if (init?.signal?.aborted) throw e;
-    throw new LocalModelError(`Could not reach the local model at ${new URL(url).origin}. Is it running? (Heyo Settings → Advanced)`);
+    throw new LocalModelError(t("Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)", new URL(url).origin));
   }
   if (!response.ok) {
     const body = await response.text().catch(() => "");
@@ -31,7 +32,7 @@ async function call(url: string, init?: RequestInit) {
     } catch {
       // Not JSON; the text itself is the detail.
     }
-    throw new LocalModelError(`The local model answered with an error (${response.status}): ${detail}`);
+    throw new LocalModelError(t("The local model answered with an error ({0}): {1}", response.status, detail));
   }
   return response;
 }
@@ -68,7 +69,7 @@ export async function streamLocal(options: {
 }): Promise<string> {
   const base = options.settings.localUrl.replace(/\/+$/, "");
   const model = options.settings.localModel || (await listLocalModels(base, options.signal))[0];
-  if (!model) throw new LocalModelError("The local server lists no models.");
+  if (!model) throw new LocalModelError(t("The local server lists no models."));
   const response = await call(`${base}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -112,6 +113,6 @@ export async function streamLocal(options: {
     }
   }
   const answer = stripThinking(text).trim();
-  if (!answer) throw new LocalModelError("The local model returned no text.");
+  if (!answer) throw new LocalModelError(t("The local model returned no text."));
   return answer;
 }
