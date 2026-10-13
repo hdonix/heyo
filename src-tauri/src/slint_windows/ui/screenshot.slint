@@ -65,6 +65,8 @@ export struct Mark {
 // A button of the toolbar that is not a colour's.
 export struct ToolItem {
     id: string,
+    // What it is called, for whoever cannot see its symbol.
+    name: string,
     icon: image,
     tip: string,
     primary: bool,
@@ -79,7 +81,11 @@ component Hud inherits Rectangle {
 // for when the pointer rests on it.
 component ToolButton inherits Rectangle {
     in property <image> icon;
+    in property <string> name;
     in property <string> tip;
+    // Whether it is one of several of which one is chosen (a tool, a
+    // colour), and so says whether it is the one.
+    in property <bool> chosen-of-several;
     in property <bool> active;
     in property <bool> primary;
     in property <bool> enabled: true;
@@ -94,6 +100,14 @@ component ToolButton inherits Rectangle {
     border-radius: Tokens.radius-md;
     background: root.primary ? Tokens.accent : (root.active || (touch.has-hover && root.enabled)) ? Theme.selected : transparent;
     opacity: root.enabled ? 1 : 0.35;
+    accessible-role: button;
+    accessible-label: root.name;
+    accessible-enabled: root.enabled;
+    accessible-checkable: root.chosen-of-several;
+    accessible-checked: root.active;
+    accessible-action-default => {
+        root.clicked();
+    }
     touch := TouchArea {
         enabled: root.enabled;
         mouse-cursor: pointer;
@@ -191,6 +205,8 @@ export component ScreenshotWindow inherits Window {
     in property <[ToolItem]> tools;
     in property <[ToolItem]> actions;
     in property <image> undo-icon;
+    // What the colours are called, in their order.
+    in property <[string]> colour-names;
     in property <[color]> colours;
     in property <string> tool;
     in property <int> colour;
@@ -318,6 +334,9 @@ export component ScreenshotWindow inherits Window {
         y: root.part.y - self.out;
         width: root.part.width + 2 * self.out;
         height: root.part.height + 2 * self.out;
+        // The selection, by its outline.
+        accessible-role: groupbox;
+        accessible-label: "Selection";
         border-width: 1.5px;
         border-color: Tokens.accent;
     }
@@ -481,12 +500,16 @@ export component ScreenshotWindow inherits Window {
         drop-shadow-blur: 24px;
         drop-shadow-offset-y: 8px;
         drop-shadow-color: Tokens.shadow-far;
+        accessible-role: groupbox;
+        accessible-label: "Tools";
         HorizontalLayout {
             padding: 5px;
             spacing: 2px;
             alignment: start;
             for item in root.tools: ToolButton {
                 icon: item.icon;
+                name: item.name;
+                chosen-of-several: true;
                 tip: item.tip;
                 tip-above: root.tips-above;
                 active: root.tool == item.id;
@@ -497,6 +520,8 @@ export component ScreenshotWindow inherits Window {
             for dot[index] in root.colours: ToolButton {
                 is-colour: true;
                 dot: dot;
+                name: root.colour-names[index];
+                chosen-of-several: true;
                 tip: "Color";
                 tip-above: root.tips-above;
                 active: root.colour == index;
@@ -506,6 +531,7 @@ export component ScreenshotWindow inherits Window {
             }
             ToolButton {
                 icon: root.undo-icon;
+                name: "Undo";
                 tip: "Undo (Ctrl+Z)";
                 tip-above: root.tips-above;
                 enabled: root.can-undo;
@@ -525,6 +551,7 @@ export component ScreenshotWindow inherits Window {
 
             for item in root.actions: ToolButton {
                 icon: item.icon;
+                name: item.name;
                 tip: item.tip;
                 tip-above: root.tips-above;
                 primary: item.primary;

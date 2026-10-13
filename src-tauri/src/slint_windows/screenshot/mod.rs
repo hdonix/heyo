@@ -133,18 +133,24 @@ struct Overlay {
     typing: Option<selecting::Point>,
 }
 
-/// The toolbar's tools and what they are called there.
+/// The toolbar's tools: what each is known by, its symbol, and what it is
+/// called (which is also what its tip says).
 const TOOLS: [(Tool, &str, &str, &str); 5] =
     [(Tool::Rect, "rect", "square", "Rectangle"), (Tool::Arrow, "arrow", "arrow-up-right", "Arrow"), (Tool::Pen, "pen", "pen", "Pen"), (Tool::Text, "text", "type", "Text"), (Tool::Blur, "blur", "grid-3x3", "Blur")];
 
-/// The buttons that say what becomes of the selection. None is Cancel.
-const ACTIONS: [(Option<Action>, &str, &str, &str); 5] = [
-    (Some(Action::Text), "text", "scan-text", "Copy text in the selection"),
-    (Some(Action::Pin), "pin", "pin", "Pin to screen"),
-    (Some(Action::Save), "save", "download", "Save (Ctrl+S)"),
-    (Some(Action::Copy), "copy", "copy", "Copy (Enter)"),
-    (None, "cancel", "x", "Cancel (Esc)"),
+/// The buttons that say what becomes of the selection: what each is known
+/// by, its symbol, what it is called, and what its tip says. None is
+/// Cancel.
+const ACTIONS: [(Option<Action>, &str, &str, &str, &str); 5] = [
+    (Some(Action::Text), "text", "scan-text", "Copy Text", "Copy text in the selection"),
+    (Some(Action::Pin), "pin", "pin", "Pin", "Pin to screen"),
+    (Some(Action::Save), "save", "download", "Save", "Save (Ctrl+S)"),
+    (Some(Action::Copy), "copy", "copy", "Copy", "Copy (Enter)"),
+    (None, "cancel", "x", "Cancel", "Cancel (Esc)"),
 ];
+
+/// What the colours are called, in the order of `selecting::COLOURS`.
+const COLOUR_NAMES: [&str; 4] = ["Red", "Yellow", "Green", "Blue"];
 
 /// A symbol by its name, as a picture.
 fn symbol(name: &str) -> Image {
@@ -173,9 +179,10 @@ impl Lives for Overlay {
         window.set_handles(ModelRc::from(handles.clone()));
         let marks = Rc::new(VecModel::default());
         window.set_marks(ModelRc::from(marks.clone()));
-        let item = |id: &str, icon: &str, tip: &str, primary: bool| ui::ToolItem { id: id.into(), icon: symbol(icon), tip: tip.into(), primary };
-        window.set_tools(ModelRc::new(VecModel::from(TOOLS.iter().map(|(_, id, icon, tip)| item(id, icon, tip, false)).collect::<Vec<_>>())));
-        window.set_actions(ModelRc::new(VecModel::from(ACTIONS.iter().map(|(action, id, icon, tip)| item(id, icon, tip, *action == Some(Action::Copy))).collect::<Vec<_>>())));
+        let item = |id: &str, icon: &str, name: &str, tip: &str, primary: bool| ui::ToolItem { id: id.into(), name: name.into(), icon: symbol(icon), tip: tip.into(), primary };
+        window.set_tools(ModelRc::new(VecModel::from(TOOLS.iter().map(|(_, id, icon, name)| item(id, icon, name, name, false)).collect::<Vec<_>>())));
+        window.set_actions(ModelRc::new(VecModel::from(ACTIONS.iter().map(|(action, id, icon, name, tip)| item(id, icon, name, tip, *action == Some(Action::Copy))).collect::<Vec<_>>())));
+        window.set_colour_names(ModelRc::new(VecModel::from(COLOUR_NAMES.iter().map(|name| slint::SharedString::from(*name)).collect::<Vec<_>>())));
         window.set_undo_icon(symbol("undo-2"));
         window.set_colours(ModelRc::new(VecModel::from((0..selecting::COLOURS.len()).map(marks::colour).collect::<Vec<_>>())));
         // The toolbar's buttons: each says what was pressed.
