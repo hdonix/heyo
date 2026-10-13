@@ -621,6 +621,7 @@ msgid "failed to start the download: {0}"
 msgstr ""
 
 #: src-tauri/src/i18n.rs
+#: shared/i18n.ts
 msgctxt "between a number's thousands"
 msgid ","
 msgstr ""

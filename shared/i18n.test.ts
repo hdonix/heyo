@@ -48,9 +48,15 @@ describe("a number of things", () => {
     expect(tn("{0} entry", "{0} entries", 1234, "1,234")).toBe("1,234 entries");
   });
 
+  it("is written with its thousands apart, by what the language parts them with", () => {
+    expect([999, 1000, 1234567].map((n) => tn("{n} entry", "{n} entries", n))).toEqual(["999 entries", "1,000 entries", "1,234,567 entries"]);
+    speak({ language: "de", plural: [1, 0], messages: { "between a number's thousands\u0004,": ["."] } });
+    expect(tn("{n} entry", "{n} entries", 12345)).toBe("12.345 entries");
+  });
+
   it("takes the form its language has for it, past what the host wrote out too", () => {
     speak({ language: "ru", plural: russian, messages: { "{n} entry": ["{n} запись", "{n} записи", "{n} записей"] } });
-    expect([1, 3, 5, 21, 111, 1001, 1002, 1011].map((n) => tn("{n} entry", "{n} entries", n))).toEqual(["1 запись", "3 записи", "5 записей", "21 запись", "111 записей", "1001 запись", "1002 записи", "1011 записей"]);
+    expect([1, 3, 5, 21, 111, 1001, 1002, 1011].map((n) => tn("{n} entry", "{n} entries", n))).toEqual(["1 запись", "3 записи", "5 записей", "21 запись", "111 записей", "1,001 запись", "1,002 записи", "1,011 записей"]);
     speak({ language: "zh_CN", plural: Array(200).fill(0), messages: { "{n} entry": ["{n} 个条目"] } });
     expect(tn("{n} entry", "{n} entries", 1)).toBe("1 个条目");
   });

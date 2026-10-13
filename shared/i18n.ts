@@ -45,12 +45,20 @@ export function onLanguage(hear: () => void) {
   return () => void hearers.delete(hear);
 }
 
+/// A whole number as the language spoken writes it: its thousands apart,
+/// by what that language parts them with. (As the host writes one:
+/// `number` in `src-tauri/src/i18n.rs`, by the same message.)
+export function number(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+$)/g, tc("between a number's thousands", ","));
+}
+
 /// Fills a text's placeholders: `{}` is the next argument, `{0}` the one
-/// at that place, `{n}` the number. One there is nothing for stays.
-function fill(text: string, args: unknown[], n?: number) {
+/// at that place, `{n}` the number, written as `number` writes one. One
+/// there is nothing for stays.
+function fill(text: string, args: unknown[], n?: number): string {
   let next = 0;
   return text.replace(/\{(\d*|n)\}/g, (whole, name: string) => {
-    if (name === "n") return n === undefined ? whole : String(n);
+    if (name === "n") return n === undefined ? whole : number(n);
     const place = name === "" ? next++ : Number(name);
     return place < args.length ? String(args[place]) : whole;
   });

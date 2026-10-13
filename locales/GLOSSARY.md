@@ -29,15 +29,12 @@ for it. A translation uses these and no synonym; change a term here and in
 | Details | 详情 | Standard. |
 | Configure (an extension) | 配置 | Opens its 偏好设置. |
 | In Development (an extension) | 开发中 | Built by `heyo dev`. |
-| Trash | 回收站 | What Chinese Linux desktops and Windows call it; “废纸篓” is the Mac's. |
 | Folder / Enclosing folder | 文件夹 / 上层文件夹 | Standard. |
 | Show in Files | 在文件管理器中显示 | No file manager is named; it is whichever the desktop has. |
 | Quick Look | 快速查看 | Apple's Chinese for the same thing. |
-| Quit / Force Kill (a process) | 退出 / 强制结束 | As system monitors say it; “杀死” is not said to users. |
-| Log Out | 退出登录 | Standard. |
+| Quit / Force Kill (a process, in Kill Process) | 退出 / 强制结束 | Asking it to go, and ending it whatever it says; “杀死” is not said to users. |
 | Keyword (of a snippet) | 关键词 | Standard. |
 | Placeholder | 占位符 | Standard. |
-| Emoji | 表情 | Short, and what input methods call them; the section titles are Unicode's groups. |
 | Timer | 计时器 | Standard. |
 | Could not … | 无法… | One wording for every failure. |
 | Quicklink | 快速链接 | Raycast's own Chinese usage; says what it is. |
@@ -108,4 +105,11 @@ What a user types stays as it is typed, in every language: the
 calculator's syntax (`5 km in mi`), a timer's length (`25m`), the
 placeholders of a link or a snippet (`{query}`), a snippet's keyword.
 Units written as symbols (km, MB, °C) stay; units written as words (days,
-cups) and the places a time is asked for are translated.
+cups) and the places a time is asked for are translated. In the web view
+and the runtime a command's title quoted in a sentence is put into it
+(`translate` of the host's title), not written into it.
+
+Names stay as they are: Heyo, Claude, Raycast, Wayland, GNOME Shell,
+Node.js, SenseVoice, PaddleOCR, and the names of keys (Enter, Esc, Ctrl).
+A command's title quoted in a sentence stays English for as long as the
+root search shows it in English.
