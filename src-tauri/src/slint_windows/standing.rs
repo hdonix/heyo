@@ -446,6 +446,7 @@ pub(super) enum Pointed {
     Pressed(Button),
     Released(Button),
     /// It left the window.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Left,
 }
 
@@ -458,6 +459,7 @@ pub(super) enum Button {
 /// What the keys did in a window that is not winit's and has the
 /// keyboard, as whoever hears of it for the window is told.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(super) enum Keyed {
     /// A key went down or up; `again` when it is pressed once more
     /// because it stays down.
@@ -468,6 +470,7 @@ pub(super) enum Keyed {
 
 /// Which key, as far as a window of Heyo's own has a rule about it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(super) enum KeyOf {
     Escape,
     Enter,
