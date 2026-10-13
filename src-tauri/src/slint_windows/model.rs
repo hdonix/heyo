@@ -351,17 +351,6 @@ fn list<'a>(value: &'a Value, name: &str) -> &'a [Value] {
     value.get(name).and_then(Value::as_array).map_or(&[], Vec::as_slice)
 }
 
-/// A number as it is read: its thousands apart.
-fn digits(n: u64) -> String {
-    let mut digits = n.to_string();
-    let mut at = digits.len();
-    while at > 3 {
-        at -= 3;
-        digits.insert(at, ',');
-    }
-    digits
-}
-
 /// Where the "local model" setting really points: this computer, or
 /// another (by name, and whether what is sent there is encrypted), or
 /// nowhere a model could be. Only loopback is this computer: an address in
@@ -919,9 +908,9 @@ impl Model {
             } else if let Some(problem) = self.meaning["problem"].as_str() {
                 tf("It is not working at present: {0}", &[&problem])
             } else if waiting > 0 {
-                tn("Reading the history: {0} entry to go; until then some are found by their words only.", "Reading the history: {0} entries to go; until then some are found by their words only.", waiting, &[&digits(waiting)])
+                tn("Reading the history: {0} entry to go; until then some are found by their words only.", "Reading the history: {0} entries to go; until then some are found by their words only.", waiting, &[&i18n::number(waiting)])
             } else {
-                tn("{0} entry can be found this way.", "{0} entries can be found this way.", indexed, &[&digits(indexed)])
+                tn("{0} entry can be found this way.", "{0} entries can be found this way.", indexed, &[&i18n::number(indexed)])
             };
             let row = Line::row(Id::Set("clipboardMeaning".into()), t("Find by Meaning")).says(format!("{} {state}", t("“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere.")));
             rows.push(if self.meaning.is_null() || installed {

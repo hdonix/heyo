@@ -5,6 +5,22 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: src-tauri/src/activities.rs
+msgid "{0} s"
+msgstr ""
+
+#: src-tauri/src/activities.rs
+msgid "{0} min"
+msgstr ""
+
+#: src-tauri/src/activities.rs
+msgid "{0} h"
+msgstr ""
+
+#: src-tauri/src/activities.rs
+msgid "{0} h {1} min"
+msgstr ""
+
 #: src-tauri/src/apps/desktop_entries.rs
 msgid "invalid Exec line: {0}"
 msgstr ""
@@ -578,6 +594,11 @@ msgstr ""
 
 #: src-tauri/src/helper.rs
 msgid "failed to start the download: {0}"
+msgstr ""
+
+#: src-tauri/src/i18n.rs
+msgctxt "between a number's thousands"
+msgid ","
 msgstr ""
 
 #: src-tauri/src/menubar.rs

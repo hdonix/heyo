@@ -16,6 +16,7 @@
 //! with nothing in progress, nothing runs.
 
 use std::collections::HashMap;
+use crate::i18n::tf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -305,10 +306,10 @@ pub fn clock(seconds: u64) -> String {
 pub fn relative(seconds: u64) -> String {
     let (h, m) = (seconds / 3600, seconds / 60 % 60);
     match (h, m) {
-        (0, 0) => format!("{seconds} s"),
-        (0, m) => format!("{m} min"),
-        (h, 0) => format!("{h} h"),
-        (h, m) => format!("{h} h {m} min"),
+        (0, 0) => tf("{0} s", &[&seconds]),
+        (0, m) => tf("{0} min", &[&m]),
+        (h, 0) => tf("{0} h", &[&h]),
+        (h, m) => tf("{0} h {1} min", &[&h, &m]),
     }
 }
 

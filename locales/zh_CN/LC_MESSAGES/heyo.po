@@ -8,6 +8,22 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+#: src-tauri/src/activities.rs
+msgid "{0} s"
+msgstr "{0} 秒"
+
+#: src-tauri/src/activities.rs
+msgid "{0} min"
+msgstr "{0} 分钟"
+
+#: src-tauri/src/activities.rs
+msgid "{0} h"
+msgstr "{0} 小时"
+
+#: src-tauri/src/activities.rs
+msgid "{0} h {1} min"
+msgstr "{0} 小时 {1} 分钟"
+
 #: src-tauri/src/apps/desktop_entries.rs
 msgid "invalid Exec line: {0}"
 msgstr "Exec 行无效：{0}"
@@ -582,6 +598,11 @@ msgstr "下载意外停止"
 #: src-tauri/src/helper.rs
 msgid "failed to start the download: {0}"
 msgstr "无法开始下载：{0}"
+
+#: src-tauri/src/i18n.rs
+msgctxt "between a number's thousands"
+msgid ","
+msgstr ","
 
 #: src-tauri/src/menubar.rs
 msgid "Could not run the command"

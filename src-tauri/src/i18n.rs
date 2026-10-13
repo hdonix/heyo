@@ -5,7 +5,8 @@
 //! - `tf("Hotkey for {0}", &[&title])` with its placeholders filled;
 //! - `tc("verb", "Open")` where the same English means two things;
 //! - `tn("{n} entry", "{n} entries", n, &[])` for a number of things;
-//! - `marked("General")` in a table that is shown later, with `translate`.
+//! - `marked("General")` in a table that is shown later, with `translate`;
+//! - `number(1234)` for a number as that language writes it.
 //!
 //! The translations are `locales/<language>/LC_MESSAGES/heyo.po`, gettext's
 //! files, which `build.rs` reads into the table below: they are in the
@@ -134,8 +135,25 @@ pub(crate) fn translate(text: &'static str) -> &'static str {
     said(chosen(), "", text)
 }
 
+/// A number as the language spoken writes it: its thousands apart, by what
+/// that language parts them with.
+pub(crate) fn number(n: u64) -> String {
+    grouped(n, tc("between a number's thousands", ","))
+}
+
+fn grouped(n: u64, by: &str) -> String {
+    let mut digits = n.to_string();
+    let mut at = digits.len();
+    while at > 3 {
+        at -= 3;
+        digits.insert_str(at, by);
+    }
+    digits
+}
+
 /// Fills a text's placeholders: `{}` is the next of `with`, `{0}` the one
-/// at that place, `{n}` the number. One it has nothing for stays as it is.
+/// at that place, `{n}` the number, written as `number` writes one. One it
+/// has nothing for stays as it is.
 fn fill(text: &str, with: &[&dyn Display], n: Option<u64>) -> String {
     let mut filled = String::with_capacity(text.len());
     let (mut rest, mut next) = (text, 0);
@@ -154,7 +172,7 @@ fn fill(text: &str, with: &[&dyn Display], n: Option<u64>) -> String {
         };
         match (place.and_then(|place| with.get(place)), n) {
             (Some(value), _) => filled.push_str(&value.to_string()),
-            (None, Some(n)) if name == "n" => filled.push_str(&n.to_string()),
+            (None, Some(n)) if name == "n" => filled.push_str(&number(n)),
             _ => filled.extend(["{", name, "}"]),
         }
         rest = after;
@@ -322,6 +340,7 @@ mod tests {
         assert_eq!(fill("{} of {}", &[&1, &2], None), "1 of 2");
         assert_eq!(fill("{1}的{0}", &[&"a", &"b"], None), "b的a");
         assert_eq!(fill("{n} entries from {0}", &[&"Firefox"], Some(3)), "3 entries from Firefox");
+        assert_eq!(fill("{n} entries", &[], Some(12_345)), "12,345 entries");
         // What there is nothing for is left to be seen.
         assert_eq!(fill("{2} and {n} and {", &[&"a"], None), "{2} and {n} and {");
     }
@@ -330,6 +349,12 @@ mod tests {
     fn a_number_of_things_takes_the_form_its_language_has_for_it() {
         assert_eq!((counted(0, "{n} entry", "{n} entries", 1), counted(0, "{n} entry", "{n} entries", 0)), ("{n} entry", "{n} entries"));
         assert_eq!(fill(counted(0, "{n} entry", "{n} entries", 2), &[], Some(2)), "2 entries");
+    }
+
+    #[test]
+    fn a_numbers_thousands_are_set_apart() {
+        assert_eq!([0, 999, 1_000, 1_234_567].map(|n| grouped(n, ",")), ["0", "999", "1,000", "1,234,567"]);
+        assert_eq!(grouped(1_234_567, "\u{202f}"), "1\u{202f}234\u{202f}567");
     }
 
     #[test]
