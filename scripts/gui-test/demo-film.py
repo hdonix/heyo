@@ -356,11 +356,11 @@ def storyboard(capture):
     # lower edge so that the caption has its place below the window.
     WORDS = view(nx, SCREEN[1], 2500)
     NEARER = view(nx, SCREEN[1], 2300)
-    # The cut to the words comes a beat and a half into the sentence: the
-    # window is seen hearing it first.
+    # The camera draws back from the window to the words a beat and a half
+    # into the sentence, in one movement: the window is seen hearing it first.
     listening = speech_starts(capture, "english") + SPEECH["english"]["sentences"][0][0] - 2.5 * PERIOD
     shots.append(Shot("dictation-listening", [(4, listening, "live")], [(0, WIDE), (0.6, WIDE), (2.2, PILL)], "Say it. It’s typed."))
-    shots.append(Shot("dictation-words", [(8, listening + 4 * PERIOD, "live")], [(0, WORDS)], "Say it. It’s typed."))
+    shots.append(Shot("dictation-words", [(8, listening + 4 * PERIOD, "live")], [(0, PILL), (2.5, WORDS)], "Say it. It’s typed."))
     # Chinese with English in it: the first two sentences, then the last.
     heard = speech_starts(capture, "chinese")
     sentences = SPEECH["chinese"]["sentences"]
