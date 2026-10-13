@@ -156,6 +156,7 @@ scripts/gui-test/sandbox.sh down
 | Script | What it tries |
 |---|---|
 | `look.sh`, `compact.sh`, `select.sh` | pictures of the interface: the themes, compact mode, the selection moving |
+| `language.sh` | the language changed while Heyo runs: the root search, the clipboard history with its actions and the settings pictured in English, then in 简体中文 chosen in Settings → General, then the settings in English again |
 | `settings.sh` | the settings window: every page pictured a screen at a time in both themes, a group opened on Shortcuts, Copy Diagnostics pressed and read back, a permission taken back |
 | `open.sh`, `arguments.sh`, `views.sh` | opening commands, arguments typed in the search bar, what an extension's views do |
 | `regress.sh`, `clipboard.sh`, `snap.sh`, `expand.sh`, `dictate.sh` | the platform layer on X11: pasting, layouts, the clipboard history, the screenshot overlay, snippets expanding, dictation |

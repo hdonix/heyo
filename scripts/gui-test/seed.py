@@ -10,6 +10,9 @@ import sys
 settings = {
     "hideOnBlur": False,
     "appearance": "light",
+    # Whatever language the desktop these run on speaks: the scripts find
+    # windows and controls by their English names.
+    "language": "en",
     "dictationVocabulary": [
         "TypeScript",
         "Kubernetes",
