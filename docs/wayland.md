@@ -163,6 +163,30 @@ and:
   it) and leaves the application out of `Shell.AppSystem.get_running()`
   (the Dash asks that) while all its windows are of that kind.
 
+A Wayland window also cannot say where it goes, that it floats over the
+others, or that it never has the keyboard. Heyo says a window's standing as
+data (`slint_windows/standing.rs`), and where a window cannot say it of
+itself the desktop is asked: the extension's `Stand` method (interface
+version 3) takes a title and what holds for the window of that title that
+is there and each that comes:
+
+- the dictation pill is above the others, on every workspace, at the bottom
+  centre of the primary monitor a tenth of its height up (reckoned by
+  `platform/place.rs`, as on X11, and said in the Shell's units), and never
+  has the keyboard: when the focus comes to it, by its appearing or by a
+  click, the Shell gives it back at once to the window that had it, which
+  is what lets dictated words reach that window;
+- the screenshot overlay is moved to the monitor that was read and made to
+  fill it, keeping the keyboard, which the Shell gives back to the window
+  that had it when the overlay goes.
+
+Nothing of these windows exists before it is wanted: a Wayland window that
+exists is on the screen, and the Shell would list it. With an extension
+older than version 3, or under another compositor, the pill is an ordinary
+window where the compositor puts it, with the keyboard; pinned screenshots
+are that everywhere on Wayland still (not placed where they were read, not
+above).
+
 The settings window is an ordinary window and is listed. It is not the
 web view's but Slint's ([slint-settings.md](slint-settings.md)), a Wayland
 client of its own beside GTK: it is drawn on the CPU, which on Wayland
