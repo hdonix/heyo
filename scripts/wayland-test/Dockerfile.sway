@@ -1,0 +1,15 @@
+# Sway beside GNOME: a Wayland compositor that offers the layer shell
+# (wlr-layer-shell), which GNOME does not. Built on the GNOME image, which
+# has what Heyo links against and the tools of in/:
+#
+#   scripts/wayland-test/sway.sh build
+FROM heyo-wayland-test
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      # The compositor, headless; pictures of its screen.
+      sway grim \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY sway-session.sh /usr/local/bin/sway-session.sh
+RUN chmod +x /usr/local/bin/sway-session.sh
+ENTRYPOINT ["/usr/local/bin/sway-session.sh"]
