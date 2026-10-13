@@ -5,7 +5,7 @@
 # marked TODO, run `makepkg -si` in a clean chroot, and `namcap` on the
 # result.
 pkgname=heyo
-pkgver=0.1.0
+pkgver=0.0.1
 pkgrel=1
 pkgdesc='Command palette launcher that runs Raycast extensions'
 arch=('x86_64' 'aarch64')

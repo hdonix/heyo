@@ -1,6 +1,6 @@
 [package]
 name = "heyo"
-version = "0.1.0"
+version = "0.0.1"
 description = "A cross-platform command palette launcher"
 authors = ["hdonix <cpage31@gmail.com>"]
 license = "GPL-3.0-only"

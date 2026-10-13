@@ -173,7 +173,7 @@ windows, the screen, dictation, the clipboard history, live activities.
 | **Linux, GNOME on X11** | Where Heyo is developed and used every day (Ubuntu 24.04, arm64; CI builds and tests on x86_64). Everything on this page works here. |
 | **Linux, GNOME on Wayland** | Through a small Shell extension that Heyo carries and offers to install (GNOME 45 to 50). Windows, pasting, the clipboard history and screenshots then work as on X11; snippets do not expand as you type. Tested in a container running GNOME 50, not yet on a real session. |
 | **Linux, other X11 desktops** | The X11 code is not GNOME's alone, but hotkeys are only set up for you on GNOME (elsewhere, bind a shortcut to `heyo`), and no other desktop has had daily use. |
-| **KDE, Sway, Hyprland and other Wayland desktops** | Not supported. Heyo has no adapter for them, which leaves launching, extensions and what generic tools can do; [docs/wayland.md](docs/wayland.md) says what each would take. |
+| **KDE, Sway, Hyprland and other Wayland desktops** | Not supported. Heyo has no adapter for them, which leaves launching, extensions and what generic tools can do; [docs/wayland.md](docs/wayland.md) says what each would take. Where the compositor offers the layer shell, the dictation pill, pinned captures and the screenshot overlay are placed by it; that much has been tried, under Sway only, in a container. |
 | **Windows** | Behind. It compiles in CI, and a build ran in a Windows 11 virtual machine: the palette on `Alt+Space`, the Start menu's applications, a window layout, pasting, the clipboard history. Screen capture, the selected text, the hold-to-talk key, application icons and the installer are written and have only been compiled. Dictation does not work there yet. |
 | **macOS** | No. |
 

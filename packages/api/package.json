@@ -1,6 +1,6 @@
 {
   "name": "@heyo/api",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "The Heyo extension API: everything of @raycast/api, and windows, the screen, dictation, the clipboard history, files and the system on top.",
   "license": "GPL-3.0-only",
   "repository": {

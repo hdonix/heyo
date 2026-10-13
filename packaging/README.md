@@ -127,7 +127,7 @@ installers can be made anywhere.
 ### In GitHub Actions: `.github/workflows/package.yml`
 
     gh workflow run package.yml            # the packages, left on the run to download
-    git tag v0.1.0 && git push origin v0.1.0     # the same, and a draft release
+    git tag v0.0.1 && git push origin v0.0.1     # the same, and a draft release
 
 One job on x86_64 Ubuntu 22.04 (the oldest with WebKitGTK 4.1: a program
 runs where the C library is at least as new as where it was built) compiles
