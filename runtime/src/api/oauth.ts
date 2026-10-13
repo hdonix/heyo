@@ -159,7 +159,7 @@ export class PKCEClient {
     try {
       const code = await new Promise<string>((resolve, reject) => {
         waiting.set(id, { state, resolve, reject });
-        setTimeout(() => waiting.delete(id) && reject(new Error("Timed out waiting for the sign-in")), TIMEOUT).unref();
+        setTimeout(() => waiting.delete(id) && reject(new Error(t("Timed out waiting for the sign-in"))), TIMEOUT).unref();
         open(url).catch(reject);
       });
       // The browser has the focus; come back to the command, if it is the

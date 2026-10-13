@@ -3074,6 +3074,10 @@ msgid "Continue in your browser…"
 msgstr ""
 
 #: runtime/src/api/oauth.ts
+msgid "Timed out waiting for the sign-in"
+msgstr ""
+
+#: runtime/src/api/oauth.ts
 msgid "Signed in to {0}"
 msgstr ""
 

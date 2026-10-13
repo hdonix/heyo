@@ -3074,6 +3074,10 @@ msgid "Continue in your browser…"
 msgstr "请在浏览器中继续…"
 
 #: runtime/src/api/oauth.ts
+msgid "Timed out waiting for the sign-in"
+msgstr "等待登录超时"
+
+#: runtime/src/api/oauth.ts
 msgid "Signed in to {0}"
 msgstr "已登录 {0}"
 
