@@ -17,6 +17,7 @@ use std::collections::BTreeSet;
 
 use serde_json::{json, Map, Value};
 
+use super::host::Command;
 use super::keys;
 
 /// The pages: id, title, and the symbol on its tile in the sidebar.
@@ -219,8 +220,7 @@ pub(crate) struct Entry {
 /// Something to ask of the host, and what its answer is for.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Ask {
-    pub command: &'static str,
-    pub args: Value,
+    pub command: Command,
     pub then: Then,
 }
 
@@ -258,8 +258,8 @@ pub(crate) enum Then {
     Nothing,
 }
 
-fn ask(command: &'static str, args: Value, then: Then) -> Ask {
-    Ask { command, args, then }
+fn ask(command: Command, then: Then) -> Ask {
+    Ask { command, then }
 }
 
 /// Everything the window was told, and where it is.
@@ -986,7 +986,7 @@ impl Model {
         let changes = Map::from_iter([(name.to_string(), value)]);
         // Shown at once, before the host has answered.
         self.settings.extend(changes.clone());
-        vec![ask("change_settings", json!({ "changes": changes }), Then::Settings)]
+        vec![ask(Command::ChangeSettings(changes), Then::Settings)]
     }
 
     /// A list of the settings with `item` added to it or taken out.
@@ -1013,10 +1013,12 @@ impl Model {
     pub(crate) fn bind(&mut self, id: &str, accelerator: &str) -> Vec<Ask> {
         self.error.clear();
         if let Some(name) = id.strip_prefix('@') {
-            return vec![ask("set_hotkey", json!({ "name": name, "accelerator": accelerator }), Then::Hotkeys)];
+            // One of the host's own, by the name the host has for it.
+            let Ok(name) = serde_json::from_value(json!(name)) else { return Vec::new() };
+            return vec![ask(Command::SetHotkey { name, accelerator: accelerator.to_string() }, Then::Hotkeys)];
         }
         let Some(title) = self.item_title(id) else { return Vec::new() };
-        vec![ask("set_item_hotkey", json!({ "id": id, "title": title, "accelerator": accelerator }), Then::Bound(id.to_string(), accelerator.to_string()))]
+        vec![ask(Command::SetItemHotkey { id: id.to_string(), title, accelerator: accelerator.to_string() }, Then::Bound(id.to_string(), accelerator.to_string()))]
     }
 
     /// The control `id` was used and now says `value`: what to ask of the
@@ -1081,18 +1083,20 @@ impl Model {
             } else {
                 values["commands"][command][name] = value;
             }
-            return vec![ask("set_extension_preferences", json!({ "extension": extension, "values": values }), Then::Reload)];
+            return vec![ask(Command::SetExtensionPreferences { extension: extension.to_string(), values }, Then::Reload)];
         }
         if let Some(rest) = id.strip_prefix("revoke:") {
             let Some((extension, permission)) = rest.split_once(SEP) else { return Vec::new() };
-            return vec![ask("revoke_extension_permission", json!({ "extension": extension, "permission": permission }), Then::Permissions(self.page.clone())), ask("extension_permissions", json!({ "id": self.page }), Then::Permissions(self.page.clone()))];
+            // By the name the host has for it, as the host said it.
+            let Ok(permission) = serde_json::from_value(json!(permission)) else { return Vec::new() };
+            return vec![ask(Command::RevokeExtensionPermission { extension: extension.to_string(), permission }, Then::Permissions(self.page.clone())), ask(Command::ExtensionPermissions(self.page.clone()), Then::Permissions(self.page.clone()))];
         }
         if let Some(extension) = id.strip_prefix("activities:") {
             let off = self.listed("activitiesOff", extension, !on);
             return self.change("activitiesOff", off);
         }
         if let Some(extension) = id.strip_prefix("uninstall:") {
-            return vec![ask("uninstall_extension", json!({ "id": extension }), Then::Uninstalled)];
+            return vec![ask(Command::UninstallExtension(extension.to_string()), Then::Uninstalled)];
         }
         match id {
             "words" => {
@@ -1104,32 +1108,32 @@ impl Model {
             "expand:add" => self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", value, true)),
             // The key has a command of its own, which is the only way it is set.
             "apikey" if value.trim().is_empty() => Vec::new(),
-            "apikey" => vec![ask("set_anthropic_api_key", json!({ "key": value }), Then::Settings)],
-            "more:apikey" => vec![ask("set_anthropic_api_key", json!({ "key": "" }), Then::Settings)],
-            "act:install-shell-extension" => vec![ask("install_shell_extension", Value::Null, Then::Capabilities)],
+            "apikey" => vec![ask(Command::SetAnthropicApiKey(value.to_string()), Then::Settings)],
+            "more:apikey" => vec![ask(Command::SetAnthropicApiKey(String::new()), Then::Settings)],
+            "act:install-shell-extension" => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
             "act:install-dictation" => {
                 self.progress = Some("Starting…".into());
-                vec![ask("dictation_install", Value::Null, Then::Started("dictation"))]
+                vec![ask(Command::DictationInstall, Then::Started("dictation"))]
             }
             "act:install-ocr" => {
                 self.ocr_installing = true;
-                vec![ask("ocr_install", Value::Null, Then::Started("ocr"))]
+                vec![ask(Command::OcrInstall, Then::Started("ocr"))]
             }
             "act:install-meaning" => {
                 self.meaning_installing = true;
-                vec![ask("clipboard_meaning_install", Value::Null, Then::Started("meaning"))]
+                vec![ask(Command::ClipboardMeaningInstall, Then::Started("meaning"))]
             }
-            "act:open-extensions" => vec![ask("open_extensions_folder", Value::Null, Then::Nothing)],
-            "act:clear-clipboard" => vec![ask("clear_clipboard_history", Value::Null, Then::Nothing)],
-            "act:copy-diagnostics" => vec![ask("copy_diagnostics", Value::Null, Then::Copied)],
+            "act:open-extensions" => vec![ask(Command::OpenExtensionsFolder, Then::Nothing)],
+            "act:clear-clipboard" => vec![ask(Command::ClearClipboardHistory, Then::Nothing)],
+            "act:copy-diagnostics" => vec![ask(Command::CopyDiagnostics, Then::Copied)],
             "act:update" => match self.update.clone() {
                 Update::Newer(version) => {
                     self.update = Update::Installing(version);
-                    vec![ask("install_update", Value::Null, Then::Installed)]
+                    vec![ask(Command::InstallUpdate, Then::Installed)]
                 }
                 Update::Unknown | Update::Newest => {
                     self.update = Update::Checking;
-                    vec![ask("check_for_update", Value::Null, Then::Checked)]
+                    vec![ask(Command::CheckForUpdate, Then::Checked)]
                 }
                 Update::Checking | Update::Installing(_) => Vec::new(),
             },
@@ -1149,13 +1153,13 @@ impl Model {
 
     /// Everything about the extensions and the applications, read again.
     fn reload() -> Vec<Ask> {
-        vec![ask("list_extensions", Value::Null, Then::Extensions), ask("list_applications", Value::Null, Then::Applications), ask("item_hotkeys", Value::Null, Then::ItemHotkeys)]
+        vec![ask(Command::ListExtensions, Then::Extensions), ask(Command::ListApplications, Then::Applications), ask(Command::ItemHotkeys, Then::ItemHotkeys)]
     }
 
     /// What is read when the window is shown: it may have changed while
     /// the window was away.
     pub(crate) fn opened(&self) -> Vec<Ask> {
-        let mut asks = vec![ask("get_settings", Value::Null, Then::Settings), ask("get_hotkeys", Value::Null, Then::Hotkeys), ask("get_capabilities", Value::Null, Then::Capabilities)];
+        let mut asks = vec![ask(Command::GetSettings, Then::Settings), ask(Command::GetHotkeys, Then::Hotkeys), ask(Command::GetCapabilities, Then::Capabilities)];
         asks.extend(Self::reload());
         asks.extend(self.entered());
         asks
@@ -1164,14 +1168,14 @@ impl Model {
     /// What the page that is shown needs to know besides.
     pub(crate) fn entered(&self) -> Vec<Ask> {
         match self.page.as_str() {
-            "dictation" => vec![ask("dictation_status", Value::Null, Then::Dictation)],
-            "screenshots" => vec![ask("ocr_status", Value::Null, Then::Ocr)],
+            "dictation" => vec![ask(Command::DictationStatus, Then::Dictation)],
+            "screenshots" => vec![ask(Command::OcrStatus, Then::Ocr)],
             "advanced" if self.chosen("aiProvider") == "local" => {
                 let url = self.chosen("localModelUrl");
-                vec![ask("local_models", json!({ "url": url }), Then::Models(url))]
+                vec![ask(Command::LocalModels(url.clone()), Then::Models(url))]
             }
-            BUILTIN => vec![ask("clipboard_sources", Value::Null, Then::Sources), ask("clipboard_meaning_status", Value::Null, Then::Meaning)],
-            page if self.extensions.iter().any(|extension| extension["id"] == page && !flag(extension, "builtin")) => vec![ask("extension_permissions", json!({ "id": page }), Then::Permissions(page.to_string()))],
+            BUILTIN => vec![ask(Command::ClipboardSources, Then::Sources), ask(Command::ClipboardMeaningStatus, Then::Meaning)],
+            page if self.extensions.iter().any(|extension| extension["id"] == page && !flag(extension, "builtin")) => vec![ask(Command::ExtensionPermissions(page.to_string()), Then::Permissions(page.to_string()))],
             _ => Vec::new(),
         }
     }
@@ -1180,7 +1184,7 @@ impl Model {
     /// finding by meaning, so that the page says how much is left.
     pub(crate) fn poll(&self) -> Vec<Ask> {
         let reading = self.page == BUILTIN && self.set("clipboardMeaning") && flag(&self.meaning, "installed") && self.meaning["waiting"].as_u64().unwrap_or(0) > 0;
-        if reading { vec![ask("clipboard_meaning_status", Value::Null, Then::Meaning)] } else { Vec::new() }
+        if reading { vec![ask(Command::ClipboardMeaningStatus, Then::Meaning)] } else { Vec::new() }
     }
 
     /// Another page is shown.
@@ -1217,7 +1221,7 @@ impl Model {
                 }
                 self.error = message;
                 // What was shown before the host answered may not be so.
-                return if then == Then::Settings { vec![ask("get_settings", Value::Null, Then::Reread)] } else { Vec::new() };
+                return if then == Then::Settings { vec![ask(Command::GetSettings, Then::Reread)] } else { Vec::new() };
             }
         };
         match then {
@@ -1287,12 +1291,12 @@ impl Model {
         match event {
             // Favorites and aliases also change from the palette. The event
             // leaves out what only this window may know: ask for the whole.
-            event::SETTINGS_CHANGED => vec![ask("get_settings", Value::Null, Then::Settings)],
+            event::SETTINGS_CHANGED => vec![ask(Command::GetSettings, Then::Settings)],
             event::INDEX_READY => Self::reload(),
             event::DICTATION_INSTALL => {
                 if over {
                     self.progress = None;
-                    return vec![ask("dictation_status", Value::Null, Then::Dictation)];
+                    return vec![ask(Command::DictationStatus, Then::Dictation)];
                 }
                 let percent = match (told["received"].as_f64(), told["total"].as_f64()) {
                     (received, Some(total)) if total > 0.0 => format!(" {}%", (received.unwrap_or(0.0) / total * 100.0).round()),
@@ -1303,11 +1307,11 @@ impl Model {
             }
             event::OCR_INSTALL => {
                 self.ocr_installing = !over;
-                if over { vec![ask("ocr_status", Value::Null, Then::Ocr)] } else { Vec::new() }
+                if over { vec![ask(Command::OcrStatus, Then::Ocr)] } else { Vec::new() }
             }
             event::CLIPBOARD_MEANING_INSTALL => {
                 self.meaning_installing = !over;
-                if over { vec![ask("clipboard_meaning_status", Value::Null, Then::Meaning)] } else { Vec::new() }
+                if over { vec![ask(Command::ClipboardMeaningStatus, Then::Meaning)] } else { Vec::new() }
             }
             _ => Vec::new(),
         }
@@ -1337,10 +1341,26 @@ mod tests {
         line.choices.iter().map(|(_, title)| title.as_str()).collect()
     }
 
-    /// The one thing asked of the host, as command and arguments.
-    fn asked(asks: &[Ask]) -> (&'static str, Value) {
+    /// The one thing asked of the host.
+    fn asked(asks: &[Ask]) -> Command {
         assert_eq!(asks.len(), 1, "{asks:?}");
-        (asks[0].command, asks[0].args.clone())
+        asks[0].command.clone()
+    }
+
+    /// The settings the one thing asked of the host changes, and what to.
+    fn changes(asks: &[Ask]) -> Value {
+        match asked(asks) {
+            Command::ChangeSettings(changes) => Value::Object(changes),
+            other => panic!("{other:?} changes no settings"),
+        }
+    }
+
+    /// The preferences the one thing asked of the host saves, and whose.
+    fn saved(asks: &[Ask]) -> (String, Value) {
+        match asked(asks) {
+            Command::SetExtensionPreferences { extension, values } => (extension, values),
+            other => panic!("{other:?} saves no preferences"),
+        }
     }
 
     #[test]
@@ -1361,14 +1381,14 @@ mod tests {
     #[test]
     fn a_switch_is_shown_at_once_and_asked_of_the_host() {
         let mut model = told(json!({ "compactMode": false }), json!({}));
-        assert_eq!(asked(&model.acted("set:compactMode", "true")), ("change_settings", json!({ "changes": { "compactMode": true } })));
+        assert_eq!(changes(&model.acted("set:compactMode", "true")), json!({ "compactMode": true }));
         assert!(row(&model.lines(), "Compact Mode").on);
-        assert_eq!(asked(&model.acted("set:appearance", "light")), ("change_settings", json!({ "changes": { "appearance": "light" } })));
+        assert_eq!(changes(&model.acted("set:appearance", "light")), json!({ "appearance": "light" }));
         // The host's answer is what is then so; its refusal is said, and
         // the settings are read again.
         assert!(model.answered(Then::Settings, Ok(json!({ "compactMode": false, "appearance": "dark" }))).is_empty());
         assert!(!row(&model.lines(), "Compact Mode").on);
-        assert_eq!(asked(&model.answered(Then::Settings, Err("no".into()))).0, "get_settings");
+        assert_eq!(asked(&model.answered(Then::Settings, Err("no".into()))).name(), "get_settings");
         assert_eq!(model.error, "no");
     }
 
@@ -1397,9 +1417,9 @@ mod tests {
     fn a_hotkey_is_bound_as_one_of_heyos_own_or_as_an_items() {
         let mut model = told(json!({}), json!({}));
         model.applications = vec![json!({ "id": "app:files.desktop", "title": "Files" })];
-        assert_eq!(asked(&model.bind("@toggle", "<Super>space")), ("set_hotkey", json!({ "name": "toggle", "accelerator": "<Super>space" })));
-        assert_eq!(asked(&model.bind("app:files.desktop", "<Super>e")), ("set_item_hotkey", json!({ "id": "app:files.desktop", "title": "Files", "accelerator": "<Super>e" })));
-        assert_eq!(asked(&model.bind("heyo:screenshot", "")).1["title"], "Capture Screenshot");
+        assert_eq!(asked(&model.bind("@toggle", "<Super>space")), Command::SetHotkey { name: crate::commands::settings::HotkeyName::Toggle, accelerator: "<Super>space".into() });
+        assert_eq!(asked(&model.bind("app:files.desktop", "<Super>e")), Command::SetItemHotkey { id: "app:files.desktop".into(), title: "Files".into(), accelerator: "<Super>e".into() });
+        assert_eq!(asked(&model.bind("heyo:screenshot", "")), Command::SetItemHotkey { id: "heyo:screenshot".into(), title: "Capture Screenshot".into(), accelerator: String::new() });
         assert!(model.bind("app:gone.desktop", "<Super>g").is_empty());
         model.answered(Then::Bound("app:files.desktop".into(), "<Super>e".into()), Ok(Value::Null));
         assert_eq!(model.item_hotkeys["app:files.desktop"], "<Super>e");
@@ -1427,7 +1447,7 @@ mod tests {
         assert_eq!(lines.iter().find(|line| line.kind == "area").unwrap().value, "TypeScript\n杰森 -> JSON");
         assert!(row(&lines, "Mode").value == "clean" && row(&lines, "Mode").description.contains("filler words"));
         assert!(has(&lines, "Claude API Key"));
-        assert_eq!(model.entered()[0].command, "dictation_status");
+        assert_eq!(model.entered()[0].command, Command::DictationStatus);
     }
 
     #[test]
@@ -1450,13 +1470,13 @@ mod tests {
         let mut model = told(json!({}), json!({}));
         model.page = "dictation".into();
         use crate::wire::event;
-        assert_eq!(asked(&model.acted("act:install-dictation", "")).0, "dictation_install");
+        assert_eq!(asked(&model.acted("act:install-dictation", "")).name(), "dictation_install");
         assert_eq!(row(&model.lines(), "Speech Recognition").value, "Starting…");
         assert!(model.heard(event::DICTATION_INSTALL, &json!({ "type": "progress", "step": "Downloading model", "received": 135, "total": 270 })).is_empty());
         assert_eq!(row(&model.lines(), "Speech Recognition").value, "Downloading model 50%");
         model.heard(event::DICTATION_INSTALL, &json!({ "type": "progress", "step": "Unpacking" }));
         assert_eq!(row(&model.lines(), "Speech Recognition").value, "Unpacking…");
-        assert_eq!(asked(&model.heard(event::DICTATION_INSTALL, &json!({ "type": "error", "message": "no space left" }))).0, "dictation_status");
+        assert_eq!(asked(&model.heard(event::DICTATION_INSTALL, &json!({ "type": "error", "message": "no space left" }))).name(), "dictation_status");
         assert_eq!((row(&model.lines(), "Speech Recognition").control, model.error.as_str()), ("button", "no space left"));
         // What that asked is answered; why it failed stays said, until
         // something else is done.
@@ -1474,7 +1494,7 @@ mod tests {
     fn the_vocabulary_is_saved_as_its_lines() {
         let mut model = told(json!({ "dictationVocabulary": ["TypeScript", "jason -> JSON"] }), json!({}));
         assert!(model.acted("words", "  TypeScript \n\n jason -> JSON\n").is_empty());
-        assert_eq!(asked(&model.acted("words", "TypeScript\n杰森 -> JSON\n\n")).1, json!({ "changes": { "dictationVocabulary": ["TypeScript", "杰森 -> JSON"] } }));
+        assert_eq!(changes(&model.acted("words", "TypeScript\n杰森 -> JSON\n\n")), json!({ "dictationVocabulary": ["TypeScript", "杰森 -> JSON"] }));
     }
 
     #[test]
@@ -1486,9 +1506,9 @@ mod tests {
         let lines = model.lines();
         assert_eq!((row(&lines, "Capture Screenshot").hotkey.as_str(), row(&lines, "Capture Screenshot").keys.len()), ("heyo:screenshot", 3));
         assert_eq!(row(&lines, "Recognition Engine").control, "button");
-        assert_eq!(asked(&model.acted("act:install-ocr", "")).0, "ocr_install");
+        assert_eq!(asked(&model.acted("act:install-ocr", "")).name(), "ocr_install");
         assert_eq!(row(&model.lines(), "Recognition Engine").value, "Downloading…");
-        assert_eq!(asked(&model.heard(crate::wire::event::OCR_INSTALL, &json!({ "type": "installed" }))).0, "ocr_status");
+        assert_eq!(asked(&model.heard(crate::wire::event::OCR_INSTALL, &json!({ "type": "installed" }))).name(), "ocr_status");
         model.answered(Then::Ocr, Ok(json!({ "installed": true, "installing": false })));
         assert_eq!(row(&model.lines(), "Recognition Engine").control, "badge");
     }
@@ -1537,12 +1557,12 @@ mod tests {
         assert!(row(&lines, "Node.js").danger && row(&lines, "Node.js").description == "node was not found HEYO_NODE overrides this setting. Extensions need Node.js 22 or newer.");
         assert_eq!((row(&lines, "API Key").control, row(&lines, "API Key").more.as_str(), row(&lines, "API Key").value.as_str()), ("secret", "Remove", ""));
         assert!(!has(&lines, "Server"));
-        assert_eq!(asked(&model.acted("apikey", "sk-ant-1")), ("set_anthropic_api_key", json!({ "key": "sk-ant-1" })));
+        assert_eq!(asked(&model.acted("apikey", "sk-ant-1")), Command::SetAnthropicApiKey("sk-ant-1".into()));
         assert!(model.acted("apikey", "  ").is_empty());
-        assert_eq!(asked(&model.acted("more:apikey", "")).1, json!({ "key": "" }));
+        assert_eq!(asked(&model.acted("more:apikey", "")), Command::SetAnthropicApiKey(String::new()));
         // A local model: its server is asked, and what is not this computer is a warning.
         let asks = model.acted("set:aiProvider", "local");
-        assert_eq!(asks.iter().map(|ask| ask.command).collect::<Vec<_>>(), ["change_settings", "local_models"]);
+        assert_eq!(asks.iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["change_settings", "local_models"]);
         let server = row(&model.lines(), "Server").clone();
         assert!(server.danger && server.description.starts_with("Checking…") && server.description.contains("sent to 10.0.0.5:8000 over plain http"));
         model.answered(Then::Models("http://10.0.0.5:8000/v1".into()), Ok(json!(["qwen", "llama"])));
@@ -1564,14 +1584,14 @@ mod tests {
         assert_eq!((about(&model).value.as_str(), about(&model).more.as_str()), ("0.1.0", ""));
         model.settings.insert("canUpdate".into(), json!(true));
         assert_eq!(about(&model).more, "Check for Updates");
-        assert_eq!(asked(&model.acted("act:update", "")).0, "check_for_update");
+        assert_eq!(asked(&model.acted("act:update", "")).name(), "check_for_update");
         assert!(about(&model).busy && model.acted("act:update", "").is_empty());
         model.answered(Then::Checked, Ok(Value::Null));
         assert_eq!(about(&model).more, "Heyo Is Up to Date");
         model.acted("act:update", "");
         model.answered(Then::Checked, Ok(json!("0.2.0")));
         assert_eq!(about(&model).more, "Install Heyo 0.2.0 and Restart");
-        assert_eq!(asked(&model.acted("act:update", "")).0, "install_update");
+        assert_eq!(asked(&model.acted("act:update", "")).name(), "install_update");
         model.answered(Then::Installed, Err("no network".into()));
         assert_eq!((about(&model).more.as_str(), model.error.as_str()), ("Install Heyo 0.2.0 and Restart", "no network"));
         model.answered(Then::Copied, Ok(Value::Null));
@@ -1635,7 +1655,7 @@ mod tests {
     #[test]
     fn an_extension_has_its_preferences_commands_permissions_and_removal() {
         let mut model = with_extensions();
-        assert_eq!(asked(&model.show("/data/zeta")), ("extension_permissions", json!({ "id": "/data/zeta" })));
+        assert_eq!(asked(&model.show("/data/zeta")), Command::ExtensionPermissions("/data/zeta".into()));
         model.answered(Then::Permissions("/data/zeta".into()), Ok(json!([{ "permission": "windows", "allows": "see and move windows", "state": "allowed" }, { "permission": "ai", "allows": "ask the model", "state": "asks" }, { "permission": "activity", "allows": "show live activities", "state": "free" }])));
         let lines = model.lines();
         assert_eq!((lines[0].label.as_str(), lines[0].description.as_str(), lines[1].kind, lines[1].label.as_str()), ("Zeta Tools", "by someone", "note", "Tools."));
@@ -1650,20 +1670,19 @@ mod tests {
         assert!(has(&lines, "First Thing Preferences"));
         // Commands: on unless disabled, each with its hotkey.
         assert!(row(&lines, "First Thing").on && !row(&lines, "Second Thing").on && row(&lines, "First Thing").icon.as_deref() == Some("star-16"));
-        assert_eq!(asked(&model.acted("enable:cmd:zeta:two", "true")).1, json!({ "changes": { "disabledCommands": [] } }));
+        assert_eq!(changes(&model.acted("enable:cmd:zeta:two", "true")), json!({ "disabledCommands": [] }));
         // Permissions: what was allowed can be taken back; activities have a switch.
         let lines = model.lines();
         assert_eq!((row(&lines, "See and move windows").control, row(&lines, "See and move windows").description.as_str()), ("button", "Allowed by you"));
         assert_eq!((row(&lines, "Ask the model").control, row(&lines, "Show live activities").control, row(&lines, "Show live activities").on), ("", "switch", true));
-        assert_eq!(model.acted(&row(&lines, "See and move windows").id, "")[0], ask("revoke_extension_permission", json!({ "extension": "zeta", "permission": "windows" }), Then::Permissions("/data/zeta".into())));
-        assert_eq!(asked(&model.acted("activities:zeta", "false")).1, json!({ "changes": { "activitiesOff": ["zeta"] } }));
+        assert_eq!(model.acted(&row(&lines, "See and move windows").id, "")[0], ask(Command::RevokeExtensionPermission { extension: "zeta".into(), permission: crate::permissions::Permission::Windows }, Then::Permissions("/data/zeta".into())));
+        assert_eq!(changes(&model.acted("activities:zeta", "false")), json!({ "activitiesOff": ["zeta"] }));
         // A preference is saved among the others of the extension.
-        let saved = asked(&model.acted(&sound.id, "false"));
-        assert_eq!(saved, ("set_extension_preferences", json!({ "extension": "zeta", "values": { "extension": { "mode": "careful", "token": "tok_1" }, "commands": { "one": { "loud": false } } } })));
-        assert_eq!(asked(&model.acted(&row(&lines, "Token *").id, "secret")).1["values"]["extension"], json!({ "mode": "careful", "token": "secret" }));
+        assert_eq!(saved(&model.acted(&sound.id, "false")), ("zeta".to_string(), json!({ "extension": { "mode": "careful", "token": "tok_1" }, "commands": { "one": { "loud": false } } })));
+        assert_eq!(saved(&model.acted(&row(&lines, "Token *").id, "secret")).1["extension"], json!({ "mode": "careful", "token": "secret" }));
         // Removal, after which the window is elsewhere.
         assert_eq!((row(&lines, "Uninstall Extension").control, row(&lines, "Uninstall Extension").placeholder.as_str()), ("confirm", "Click Again to Uninstall"));
-        assert_eq!(asked(&model.acted("uninstall:/data/zeta", "")), ("uninstall_extension", json!({ "id": "/data/zeta" })));
+        assert_eq!(asked(&model.acted("uninstall:/data/zeta", "")), Command::UninstallExtension("/data/zeta".into()));
         assert_eq!(model.answered(Then::Uninstalled, Ok(Value::Null)).len(), 3);
         assert_eq!(model.page, "general");
         model.page = "/src/alpha".into();
@@ -1673,7 +1692,7 @@ mod tests {
     #[test]
     fn heyos_commands_have_the_clipboard_and_snippets() {
         let mut model = with_extensions();
-        assert_eq!(model.show(BUILTIN).iter().map(|ask| ask.command).collect::<Vec<_>>(), ["clipboard_sources", "clipboard_meaning_status"]);
+        assert_eq!(model.show(BUILTIN).iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["clipboard_sources", "clipboard_meaning_status"]);
         model.meaning = json!({ "installed": true, "installing": false, "indexed": 1200, "waiting": 3400, "problem": null });
         model.settings.insert("clipboardMeaning".into(), json!(true));
         let lines = model.lines();
@@ -1682,15 +1701,15 @@ mod tests {
         assert!(row(&lines, "Clipboard History").hotkey.is_empty() && row(&lines, "Dictate").hotkey == "cmd:@heyo:dictate");
         assert_eq!((row(&lines, "Hotkey").hotkey.as_str(), row(&lines, "Hotkey").keys.clone()), ("@clipboard", vec!["Super".to_string(), "V".to_string()]));
         assert_eq!((row(&lines, "Keep History For").value.as_str(), titles(row(&lines, "Keep History For"))[3]), ("90", "3 Months"));
-        assert_eq!(asked(&model.acted("num:clipboardRetentionDays", "7")).1, json!({ "changes": { "clipboardRetentionDays": 7 } }));
+        assert_eq!(changes(&model.acted("num:clipboardRetentionDays", "7")), json!({ "clipboardRetentionDays": 7 }));
         assert_eq!(row(&lines, "Clear History").control, "confirm");
         assert!(row(&lines, "Find by Meaning").description.ends_with("Reading the history: 3,400 entries to go; until then some are found by their words only."));
         assert_eq!(model.poll().len(), 1);
         // Left out of the history: by name where the application is known.
         assert_eq!((row(&lines, "KeePassXC").icon.as_deref(), row(&lines, "gone.desktop").description.as_str(), row(&lines, "gone.desktop").icon.as_deref()), (Some("/icons/keepassxc.png"), "Not installed", Some("app-window-16")));
         assert_eq!(titles(row(&lines, "Never Record Copies From")), ["Add Application…", "Firefox", "Files"]);
-        assert_eq!(asked(&model.acted("ignore:add", "firefox.desktop")).1, json!({ "changes": { "clipboardIgnoredApps": ["org.keepassxc.KeePassXC.desktop", "gone.desktop", "firefox.desktop"] } }));
-        assert_eq!(asked(&model.acted("ignore:remove:gone.desktop", "")).1["changes"]["clipboardIgnoredApps"], json!(["org.keepassxc.KeePassXC.desktop", "firefox.desktop"]));
+        assert_eq!(changes(&model.acted("ignore:add", "firefox.desktop")), json!({ "clipboardIgnoredApps": ["org.keepassxc.KeePassXC.desktop", "gone.desktop", "firefox.desktop"] }));
+        assert_eq!(changes(&model.acted("ignore:remove:gone.desktop", ""))["clipboardIgnoredApps"], json!(["org.keepassxc.KeePassXC.desktop", "firefox.desktop"]));
         assert!(model.acted("ignore:add", "").is_empty());
         // With recording off, what only matters while it is on is not shown.
         model.settings.insert("clipboardHistory".into(), json!(false));
@@ -1710,7 +1729,7 @@ mod tests {
         model.meaning = json!({ "installed": false, "installing": false, "indexed": 0, "waiting": 0, "problem": null });
         let lines = model.lines();
         assert_eq!((row(&lines, "Find by Meaning").control, row(&lines, "Find by Meaning").id.as_str()), ("button", "act:install-meaning"));
-        assert_eq!(asked(&model.acted("act:install-meaning", "")).0, "clipboard_meaning_install");
+        assert_eq!(asked(&model.acted("act:install-meaning", "")).name(), "clipboard_meaning_install");
         assert_eq!(row(&model.lines(), "Find by Meaning").value, "Downloading…");
         model.heard(crate::wire::event::CLIPBOARD_MEANING_INSTALL, &json!({ "type": "installed" }));
         model.meaning = json!({ "installed": true, "installing": false, "indexed": 1, "waiting": 0, "problem": "the model would not load" });
@@ -1737,10 +1756,10 @@ mod tests {
         assert!(second.checkable && !second.on && second.indent);
         // Some of its commands are on: neither ticked nor empty.
         assert!(zeta.checkable && zeta.on && zeta.mixed && zeta.open);
-        assert_eq!(asked(&model.acted(&format!("enable-all:{}", zeta.id), "false")).1["changes"]["disabledCommands"], json!(["cmd:zeta:one", "cmd:zeta:two"]));
-        assert_eq!(asked(&model.acted("alias:app:files.desktop", " fm ")).1, json!({ "changes": { "aliases": { "app:firefox.desktop": "ff", "app:files.desktop": "fm" } } }));
+        assert_eq!(changes(&model.acted(&format!("enable-all:{}", zeta.id), "false"))["disabledCommands"], json!(["cmd:zeta:one", "cmd:zeta:two"]));
+        assert_eq!(changes(&model.acted("alias:app:files.desktop", " fm ")), json!({ "aliases": { "app:firefox.desktop": "ff", "app:files.desktop": "fm" } }));
         assert!(model.acted("alias:app:files.desktop", "fm").is_empty());
-        assert_eq!(asked(&model.acted("alias:app:firefox.desktop", "")).1["changes"]["aliases"], json!({ "app:files.desktop": "fm" }));
+        assert_eq!(changes(&model.acted("alias:app:firefox.desktop", ""))["aliases"], json!({ "app:files.desktop": "fm" }));
         // Searching opens everything it finds something in, by a command's
         // title or its group's.
         model.find = "zeta".into();
@@ -1769,9 +1788,9 @@ mod tests {
     fn what_changes_elsewhere_is_read_again() {
         let mut model = with_extensions();
         use crate::wire::event;
-        assert_eq!(asked(&model.heard(event::SETTINGS_CHANGED, &Value::Null)).0, "get_settings");
-        assert_eq!(model.heard(event::INDEX_READY, &Value::Null).iter().map(|ask| ask.command).collect::<Vec<_>>(), ["list_extensions", "list_applications", "item_hotkeys"]);
-        assert_eq!(model.opened().iter().map(|ask| ask.command).collect::<Vec<_>>(), ["get_settings", "get_hotkeys", "get_capabilities", "list_extensions", "list_applications", "item_hotkeys"]);
+        assert_eq!(asked(&model.heard(event::SETTINGS_CHANGED, &Value::Null)).name(), "get_settings");
+        assert_eq!(model.heard(event::INDEX_READY, &Value::Null).iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["list_extensions", "list_applications", "item_hotkeys"]);
+        assert_eq!(model.opened().iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["get_settings", "get_hotkeys", "get_capabilities", "list_extensions", "list_applications", "item_hotkeys"]);
         // A preference that was saved: the extensions are read again.
         assert_eq!(model.answered(Then::Reload, Ok(Value::Null)).len(), 3);
         model.answered(Then::Extensions, Ok(json!([])));

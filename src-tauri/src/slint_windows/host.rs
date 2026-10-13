@@ -2,7 +2,8 @@
 //!
 //! The window is in the host's own process, but asks as a web view would:
 //! a command by its name, arguments and an answer as JSON, and the events
-//! the host emits. So what it may do is a list one can read (`COMMANDS`),
+//! the host emits. So what it may do is a list one can read (`Command`:
+//! each thing it may ask, with what it says in asking, written once),
 //! the model that decides what to ask needs no host to be tested, and
 //! nothing the host decides is decided a second time here. Most of these
 //! are functions only this window calls; `get_settings` and
@@ -10,9 +11,8 @@
 
 use std::sync::Arc;
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use tauri::async_runtime::block_on;
 use tauri::{AppHandle, Listener, Manager};
 
@@ -22,8 +22,8 @@ use crate::wire::event;
 
 /// The host, as a settings window that is not a web view sees it.
 pub(crate) trait Host: Send + Sync + 'static {
-    /// Calls a command of the host by the name `invoke` knows it by.
-    fn call(&self, command: &str, args: Value) -> Result<Value, String>;
+    /// Asks the host for one of the things this window may ask.
+    fn call(&self, command: Command) -> Result<Value, String>;
     /// Hears the events the host emits to its windows, by their names.
     fn listen(&self, hear: Box<dyn Fn(&str, Value) + Send + Sync>);
     /// Whether the desktop shows applications dark.
@@ -38,37 +38,88 @@ pub(crate) trait Host: Send + Sync + 'static {
     fn screenshot(&self, outcome: crate::screenshot::selecting::Outcome, drawn: Option<image::RgbaImage>);
 }
 
-/// The commands this window calls: each is answered in `call` below.
-pub(crate) const COMMANDS: &[&str] = &[
-    "get_settings",
-    "change_settings",
-    "get_hotkeys",
-    "set_hotkey",
-    "set_item_hotkey",
-    "item_hotkeys",
-    "list_extensions",
-    "list_applications",
-    "get_capabilities",
-    "install_shell_extension",
-    "dictation_status",
-    "dictation_install",
-    "copy_diagnostics",
-    "check_for_update",
-    "install_update",
-    "set_anthropic_api_key",
-    "open_extensions_folder",
-    "set_extension_preferences",
-    "uninstall_extension",
-    "clear_clipboard_history",
-    "local_models",
-    "ocr_status",
-    "ocr_install",
-    "clipboard_sources",
-    "clipboard_meaning_status",
-    "clipboard_meaning_install",
-    "extension_permissions",
-    "revoke_extension_permission",
-];
+/// What this window may ask of the host, each with what it says in
+/// asking. This is the one place a command is written: the model makes
+/// these, and `Running::call` answers every one of them, or does not
+/// compile.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Command {
+    GetSettings,
+    /// The settings to change, by their names, and what each is to be.
+    ChangeSettings(Map<String, Value>),
+    GetHotkeys,
+    /// One of Heyo's own hotkeys, by its name; none, when the accelerator is empty.
+    SetHotkey { name: settings::HotkeyName, accelerator: String },
+    /// The hotkey of an item of the palette, which is called `title`.
+    SetItemHotkey { id: String, title: String, accelerator: String },
+    ItemHotkeys,
+    ListExtensions,
+    ListApplications,
+    GetCapabilities,
+    InstallShellExtension,
+    DictationStatus,
+    DictationInstall,
+    CopyDiagnostics,
+    CheckForUpdate,
+    InstallUpdate,
+    /// The key; none, when it is empty.
+    SetAnthropicApiKey(String),
+    OpenExtensionsFolder,
+    /// All the preferences of the extension of that name, as they are to be.
+    SetExtensionPreferences { extension: String, values: Value },
+    /// By the extension's id.
+    UninstallExtension(String),
+    ClearClipboardHistory,
+    /// The models the server at that address lists.
+    LocalModels(String),
+    OcrStatus,
+    OcrInstall,
+    ClipboardSources,
+    ClipboardMeaningStatus,
+    ClipboardMeaningInstall,
+    /// By the extension's id.
+    ExtensionPermissions(String),
+    RevokeExtensionPermission { extension: String, permission: permissions::Permission },
+}
+
+impl Command {
+    /// What the host calls it: the name `invoke` knows it by where a web
+    /// view may call it too, and the function's name where none may. For
+    /// the tests, which hold which of these a web view may call.
+    #[cfg(test)]
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Command::GetSettings => "get_settings",
+            Command::ChangeSettings(_) => "change_settings",
+            Command::GetHotkeys => "get_hotkeys",
+            Command::SetHotkey { .. } => "set_hotkey",
+            Command::SetItemHotkey { .. } => "set_item_hotkey",
+            Command::ItemHotkeys => "item_hotkeys",
+            Command::ListExtensions => "list_extensions",
+            Command::ListApplications => "list_applications",
+            Command::GetCapabilities => "get_capabilities",
+            Command::InstallShellExtension => "install_shell_extension",
+            Command::DictationStatus => "dictation_status",
+            Command::DictationInstall => "dictation_install",
+            Command::CopyDiagnostics => "copy_diagnostics",
+            Command::CheckForUpdate => "check_for_update",
+            Command::InstallUpdate => "install_update",
+            Command::SetAnthropicApiKey(_) => "set_anthropic_api_key",
+            Command::OpenExtensionsFolder => "open_extensions_folder",
+            Command::SetExtensionPreferences { .. } => "set_extension_preferences",
+            Command::UninstallExtension(_) => "uninstall_extension",
+            Command::ClearClipboardHistory => "clear_clipboard_history",
+            Command::LocalModels(_) => "local_models",
+            Command::OcrStatus => "ocr_status",
+            Command::OcrInstall => "ocr_install",
+            Command::ClipboardSources => "clipboard_sources",
+            Command::ClipboardMeaningStatus => "clipboard_meaning_status",
+            Command::ClipboardMeaningInstall => "clipboard_meaning_install",
+            Command::ExtensionPermissions(_) => "extension_permissions",
+            Command::RevokeExtensionPermission { .. } => "revoke_extension_permission",
+        }
+    }
+}
 
 /// The events it listens to.
 const EVENTS: &[&str] = &[event::SETTINGS_CHANGED, event::INDEX_READY, event::DICTATION_INSTALL, event::OCR_INSTALL, event::CLIPBOARD_MEANING_INSTALL];
@@ -76,52 +127,45 @@ const EVENTS: &[&str] = &[event::SETTINGS_CHANGED, event::INDEX_READY, event::DI
 /// Heyo itself.
 pub(crate) struct Running(pub AppHandle);
 
-/// The argument `name` of a command, as the window sent it.
-fn arg<T: DeserializeOwned>(args: &Value, name: &str) -> Result<T, String> {
-    serde_json::from_value(args.get(name).cloned().unwrap_or(Value::Null)).map_err(|e| format!("{name}: {e}"))
-}
-
 /// A command's answer, as a window sees it.
 fn answer(value: impl Serialize) -> Result<Value, String> {
     serde_json::to_value(value).map_err(|e| e.to_string())
 }
 
 impl Host for Running {
-    fn call(&self, command: &str, args: Value) -> Result<Value, String> {
-        if !COMMANDS.contains(&command) {
-            return Err(format!("{command} is not available to this window"));
-        }
+    fn call(&self, command: Command) -> Result<Value, String> {
         let app = self.0.clone();
         match command {
-            "get_settings" => answer(settings::settings_for_its_window(&app)),
-            "change_settings" => answer(settings::change_settings(arg(&args, "changes")?, app)?),
-            "get_hotkeys" => answer(block_on(settings::get_hotkeys())),
-            "set_hotkey" => answer(block_on(settings::set_hotkey(arg(&args, "name")?, arg(&args, "accelerator")?))?),
-            "set_item_hotkey" => answer(block_on(settings::set_item_hotkey(arg(&args, "id")?, arg(&args, "title")?, arg(&args, "accelerator")?, app))?),
-            "item_hotkeys" => answer(settings::item_hotkeys(app.state())),
-            "list_extensions" => answer(settings::list_extensions()),
-            "list_applications" => answer(root::list_applications(app)),
-            "get_capabilities" => answer(settings::get_capabilities()),
-            "install_shell_extension" => answer(settings::install_shell_extension()?),
-            "dictation_status" => answer(media::dictation_status(app)),
-            "dictation_install" => answer(media::dictation_install(app)?),
-            "copy_diagnostics" => answer(settings::copy_diagnostics(app)?),
-            "check_for_update" => answer(block_on(updates::check_for_update(app))?),
-            "install_update" => answer(block_on(updates::install_update(app))?),
-            "set_anthropic_api_key" => answer(settings::set_anthropic_api_key(arg(&args, "key")?, app)?),
-            "open_extensions_folder" => answer(settings::open_extensions_folder()?),
-            "set_extension_preferences" => answer(settings::set_extension_preferences(arg(&args, "extension")?, arg(&args, "values")?)?),
-            "uninstall_extension" => answer(settings::uninstall_extension(arg(&args, "id")?, app)?),
-            "clear_clipboard_history" => answer(settings::clear_clipboard_history(app.state())),
-            "local_models" => answer(block_on(settings::local_models(arg(&args, "url")?))?),
-            "ocr_status" => answer(media::ocr_status()),
-            "ocr_install" => answer(media::ocr_install(app)?),
-            "clipboard_sources" => answer(clipboard::clipboard_sources(app)),
-            "clipboard_meaning_status" => answer(clipboard::clipboard_meaning_status(app)),
-            "clipboard_meaning_install" => answer(clipboard::clipboard_meaning_install(app)?),
-            "extension_permissions" => answer(permissions::extension_permissions(arg(&args, "id")?)),
-            "revoke_extension_permission" => answer(permissions::revoke_extension_permission(arg(&args, "extension")?, arg(&args, "permission")?)?),
-            _ => Err(format!("{command} is not available to this window")),
+            Command::GetSettings => answer(settings::settings_for_its_window(&app)),
+            Command::ChangeSettings(changes) => answer(settings::change_settings(changes, app)?),
+            Command::GetHotkeys => answer(block_on(settings::get_hotkeys())),
+            Command::SetHotkey { name, accelerator } => answer(block_on(settings::set_hotkey(name, accelerator))?),
+            Command::SetItemHotkey { id, title, accelerator } => answer(block_on(settings::set_item_hotkey(id, title, accelerator, app))?),
+            Command::ItemHotkeys => answer(settings::item_hotkeys(app.state())),
+            Command::ListExtensions => answer(settings::list_extensions()),
+            Command::ListApplications => answer(root::list_applications(app)),
+            Command::GetCapabilities => answer(settings::get_capabilities()),
+            Command::InstallShellExtension => answer(settings::install_shell_extension()?),
+            Command::DictationStatus => answer(media::dictation_status(app)),
+            Command::DictationInstall => answer(media::dictation_install(app)?),
+            Command::CopyDiagnostics => answer(settings::copy_diagnostics(app)?),
+            Command::CheckForUpdate => answer(block_on(updates::check_for_update(app))?),
+            Command::InstallUpdate => answer(block_on(updates::install_update(app))?),
+            Command::SetAnthropicApiKey(key) => answer(settings::set_anthropic_api_key(key, app)?),
+            Command::OpenExtensionsFolder => answer(settings::open_extensions_folder()?),
+            // The preferences are the host's own shape, which the model
+            // was given and hands back with one of them changed.
+            Command::SetExtensionPreferences { extension, values } => answer(settings::set_extension_preferences(extension, serde_json::from_value(values).map_err(|e| format!("values: {e}"))?)?),
+            Command::UninstallExtension(id) => answer(settings::uninstall_extension(id, app)?),
+            Command::ClearClipboardHistory => answer(settings::clear_clipboard_history(app.state())),
+            Command::LocalModels(url) => answer(block_on(settings::local_models(url))?),
+            Command::OcrStatus => answer(media::ocr_status()),
+            Command::OcrInstall => answer(media::ocr_install(app)?),
+            Command::ClipboardSources => answer(clipboard::clipboard_sources(app)),
+            Command::ClipboardMeaningStatus => answer(clipboard::clipboard_meaning_status(app)),
+            Command::ClipboardMeaningInstall => answer(clipboard::clipboard_meaning_install(app)?),
+            Command::ExtensionPermissions(id) => answer(permissions::extension_permissions(id)),
+            Command::RevokeExtensionPermission { extension, permission } => answer(permissions::revoke_extension_permission(extension, permission)?),
         }
     }
 
@@ -172,31 +216,32 @@ impl Host for Running {
 mod tests {
     use super::*;
 
-    /// Every command the window may call is answered here.
-    #[test]
-    fn every_command_the_window_calls_is_answered() {
-        let source = include_str!("host.rs");
-        for command in COMMANDS {
-            assert!(source.contains(&format!("\"{command}\" => ")), "{command} is not answered in host.rs");
-        }
-    }
-
     /// No web view may change the settings: what does is not a command of
     /// theirs at all.
     #[test]
     fn what_changes_settings_is_no_command_of_a_web_view() {
         let registered = crate::commands::bindings::registered();
-        for command in ["change_settings", "set_anthropic_api_key", "set_extension_preferences", "uninstall_extension", "revoke_extension_permission", "install_update"] {
-            assert!(COMMANDS.contains(&command) && !registered.iter().any(|known| known == command), "{command}");
+        let (none, nothing) = (String::new, Value::Null);
+        let changing = [
+            Command::ChangeSettings(Map::new()),
+            Command::SetAnthropicApiKey(none()),
+            Command::SetExtensionPreferences { extension: none(), values: nothing },
+            Command::UninstallExtension(none()),
+            Command::RevokeExtensionPermission { extension: none(), permission: permissions::Permission::Windows },
+            Command::InstallUpdate,
+        ];
+        for command in changing {
+            assert!(!registered.iter().any(|known| known == command.name()), "{}", command.name());
         }
     }
 
-    /// Nothing is answered that the window was not said to call: the list
-    /// is the whole of what this window can do.
+    /// The two that a web view may call too are called here by the names
+    /// it calls them by.
     #[test]
-    fn nothing_else_is_answered() {
-        let source = include_str!("host.rs");
-        let answered = source.lines().filter(|line| line.trim_start().starts_with('"') && line.contains("\" => answer(")).count();
-        assert_eq!(answered, COMMANDS.len());
+    fn what_a_web_view_may_call_too_has_its_name() {
+        let registered = crate::commands::bindings::registered();
+        for command in [Command::GetSettings, Command::SetItemHotkey { id: String::new(), title: String::new(), accelerator: String::new() }] {
+            assert!(registered.iter().any(|known| known == command.name()), "{}", command.name());
+        }
     }
 }

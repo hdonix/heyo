@@ -25,6 +25,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, VecModel};
 
 use super::keys::{self, Held};
+use super::host::Command;
 use super::model::{Ask, Line, Model, Then};
 use super::thread::{self, Job};
 use super::life::{self, Life, Lives, Slot, Slotted};
@@ -244,9 +245,9 @@ impl Live {
     /// and hands each answer to the model back here; what the model then
     /// wants asked is asked too.
     fn ask(&self, asks: Vec<Ask>) {
-        for Ask { command, args, then } in asks {
+        for Ask { command, then } in asks {
             let _ = self.asking.send(Box::new(move |host| {
-                let answer = host.call(command, args);
+                let answer = host.call(command);
                 let _ = slint::invoke_from_event_loop(move || {
                     with(|live| live.answered(then, answer));
                 });
@@ -577,7 +578,7 @@ fn make() -> Result<Live, String> {
     // up as it is, not empty and then filled.
     let (first, read) = mpsc::channel();
     let _ = asking.send(Box::new(move |host| {
-        let _ = first.send((host.call("get_settings", Value::Null), host.call("get_hotkeys", Value::Null), host.call("get_capabilities", Value::Null), host.system_dark()));
+        let _ = first.send((host.call(Command::GetSettings), host.call(Command::GetHotkeys), host.call(Command::GetCapabilities), host.system_dark()));
     }));
     let (settings, hotkeys, capabilities, dark) = read.recv().map_err(|_| "the host did not answer".to_string())?;
     let mut model = Model::new();

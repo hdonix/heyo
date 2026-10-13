@@ -230,7 +230,7 @@ pub(crate) async fn get_hotkeys() -> Hotkeys {
 }
 
 /// The hotkeys that open Heyo itself, named as in `Hotkeys`.
-#[derive(Clone, Copy, serde::Deserialize, ts_rs::TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) enum HotkeyName {
