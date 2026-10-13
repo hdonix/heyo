@@ -9,14 +9,17 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 #: src-tauri/src/activities.rs
+#: runtime/src/builtins/timer.tsx
 msgid "{0} s"
 msgstr "{0} 秒"
 
 #: src-tauri/src/activities.rs
+#: runtime/src/builtins/timer.tsx
 msgid "{0} min"
 msgstr "{0} 分钟"
 
 #: src-tauri/src/activities.rs
+#: runtime/src/builtins/timer.tsx
 msgid "{0} h"
 msgstr "{0} 小时"
 
@@ -50,6 +53,7 @@ msgid "Language model"
 msgstr "语言模型"
 
 #: src-tauri/src/clipboard.rs
+#: runtime/src/builtins/clipboard.tsx
 msgid "Clipboard history is paused"
 msgstr "剪贴板历史已暂停"
 
@@ -58,6 +62,7 @@ msgid "Nothing you copy is recorded until you resume it."
 msgstr "恢复之前，你复制的内容都不会被记录。"
 
 #: src-tauri/src/clipboard.rs
+#: runtime/src/builtins/clipboard.tsx
 msgid "Clipboard history resumed"
 msgstr "剪贴板历史已恢复"
 
@@ -66,6 +71,7 @@ msgid "What you copy is recorded again."
 msgstr "你复制的内容会重新被记录。"
 
 #: src-tauri/src/clipboard.rs
+#: runtime/src/builtins/clipboard.tsx
 msgid "Could not change clipboard history"
 msgstr "无法更改剪贴板历史"
 
@@ -332,6 +338,7 @@ msgstr "对话, 聊天, 历史, 助手, 大模型"
 
 #: src-tauri/src/extensions.rs
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/library.tsx
 msgid "Create Quicklink"
 msgstr "创建快速链接"
 
@@ -357,6 +364,7 @@ msgstr "书签, 网址, 链接"
 
 #: src-tauri/src/extensions.rs
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/library.tsx
 msgid "Create Snippet"
 msgstr "创建文本片段"
 
@@ -574,6 +582,7 @@ msgid "system, sound, silence"
 msgstr "系统, 声音, 静音"
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/timer.tsx
 msgid "Timer"
 msgstr "计时器"
 
@@ -658,6 +667,7 @@ msgstr "每一行一经粘贴，终端就会把它当作命令执行。"
 
 #: src-tauri/src/pasting.rs
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/emoji.tsx
 msgid "Paste"
 msgstr "粘贴"
 
@@ -2046,6 +2056,7 @@ msgstr "画笔"
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src/arguments.ts
+#: runtime/src/builtins/clipboard.tsx
 msgid "Text"
 msgstr "文字"
 
@@ -2078,6 +2089,7 @@ msgid "Save (Ctrl+S)"
 msgstr "保存 (Ctrl+S)"
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
+#: runtime/src/builtins/emoji.tsx
 msgid "Copy"
 msgstr "复制"
 
@@ -2126,6 +2138,7 @@ msgid "Tools"
 msgstr "工具"
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint
+#: runtime/src/builtins/clipboard.tsx
 msgid "Color"
 msgstr "颜色"
 
@@ -2155,6 +2168,7 @@ msgstr "复制诊断信息"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 #: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/library.tsx
 msgid "Name"
 msgstr "名称"
 
@@ -2264,6 +2278,7 @@ msgstr "操作"
 
 #: src/arguments.ts
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Query"
 msgstr "查询"
 
@@ -2598,6 +2613,7 @@ msgid "In an Hour"
 msgstr "一小时后"
 
 #: src/raycast/dates.ts
+#: runtime/src/builtins/clipboard.tsx
 msgid "Today"
 msgstr "今天"
 
@@ -2666,6 +2682,7 @@ msgid "now"
 msgstr "刚刚"
 
 #: src/rows.ts
+#: runtime/src/builtins/clipboard.tsx
 msgid "Application"
 msgstr "应用程序"
 
@@ -2678,6 +2695,7 @@ msgid "Quicklink"
 msgstr "快速链接"
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Snippet"
 msgstr "文本片段"
 
@@ -2694,6 +2712,8 @@ msgid "In Progress"
 msgstr "进行中"
 
 #: src/rows.ts
+#: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/emoji.tsx
 msgid "Results"
 msgstr "结果"
 
@@ -2742,10 +2762,12 @@ msgid "Open Application"
 msgstr "打开应用程序"
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Paste Snippet"
 msgstr "粘贴文本片段"
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Open Quicklink"
 msgstr "打开快速链接"
 
@@ -2754,10 +2776,12 @@ msgid "Open Command"
 msgstr "打开命令"
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Copy Snippet"
 msgstr "复制文本片段"
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Copy Link"
 msgstr "复制链接"
 
@@ -2880,6 +2904,7 @@ msgstr "复制到剪贴板"
 
 #: runtime/src/api/components.ts
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/library.tsx
 msgid "Copied to Clipboard"
 msgstr "已复制到剪贴板"
 
@@ -3069,6 +3094,109 @@ msgid "OK"
 msgstr "好"
 
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/library.tsx
+msgid "Link"
+msgstr "链接"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "File"
+msgstr "文件"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Image"
+msgstr "图片"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "All Types"
+msgstr "所有类型"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Images"
+msgstr "图片"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Links"
+msgstr "链接"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Colors"
+msgstr "颜色"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Files"
+msgstr "文件"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Image ({0}×{1})"
+msgstr "图片（{0}×{1}）"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Found by its meaning: the words you typed are not in it"
+msgstr "按含义找到：其中没有你输入的词"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copied from {0}"
+msgstr "复制自 {0}"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pinned"
+msgstr "已固定"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Yesterday"
+msgstr "昨天"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "This Week"
+msgstr "本周"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Older"
+msgstr "更早"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "from {0}"
+msgstr "来自 {0}"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Unknown"
+msgstr "未知"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Content type"
+msgstr "内容类型"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Dimensions"
+msgstr "尺寸"
+
+#: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/emoji.tsx
+#: runtime/src/builtins/library.tsx
+msgid "Characters"
+msgstr "字符"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Words"
+msgstr "词数"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Times copied"
+msgstr "复制次数"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Last copied"
+msgstr "上次复制"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "First copied"
+msgstr "首次复制"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Could not load clipboard history"
+msgstr "无法载入剪贴板历史"
+
+#: runtime/src/builtins/clipboard.tsx
 msgid "Resume Recording"
 msgstr "继续记录"
 
@@ -3121,6 +3249,178 @@ msgstr "全部删除"
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
 msgstr "搜索，或说出时间和来源：昨天下午、last week、from firefox…"
 
+#: runtime/src/builtins/clipboard.tsx
+msgid "Filter by type"
+msgstr "按类型筛选"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "No matching entries"
+msgstr "没有匹配的条目"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard history is empty"
+msgstr "剪贴板历史是空的"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is turned off. Turn it on in Heyo Settings, under Heyo Commands."
+msgstr "记录已关闭。请在 Heyo 设置的“Heyo 命令”中开启。"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is paused. Run “{0}” to record again."
+msgstr "记录已暂停。运行“{0}”可重新开始记录。"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copy something and it will show up here."
+msgstr "复制点什么，它就会出现在这里。"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Smileys & Emotion"
+msgstr "笑脸与情感"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "People & Body"
+msgstr "人物与身体"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Animals & Nature"
+msgstr "动物与自然"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Food & Drink"
+msgstr "食物与饮料"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Travel & Places"
+msgstr "旅行与地点"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Activities"
+msgstr "活动"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Objects"
+msgstr "物品"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Symbols"
+msgstr "符号"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Flags"
+msgstr "旗帜"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Copied {0}"
+msgstr "已复制 {0}"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Recently Used"
+msgstr "最近使用"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Search emoji and symbols… (English or 中文)"
+msgstr "搜索表情与符号…（中文或英文）"
+
+#: runtime/src/builtins/emoji.tsx
+msgid "No emoji found"
+msgstr "没有找到表情"
+
+#: runtime/src/builtins/library.tsx
+msgid "Placeholders: {0} (text you type), {1}."
+msgstr "占位符：{0}（你输入的文本）、{1}。"
+
+#: runtime/src/builtins/library.tsx
+msgid "Required"
+msgstr "必填"
+
+#: runtime/src/builtins/library.tsx
+msgid "Quicklink saved"
+msgstr "快速链接已保存"
+
+#: runtime/src/builtins/library.tsx
+msgid "Quicklink created"
+msgstr "快速链接已创建"
+
+#: runtime/src/builtins/library.tsx
+msgid "Edit Quicklink"
+msgstr "编辑快速链接"
+
+#: runtime/src/builtins/library.tsx
+msgid "Save Quicklink"
+msgstr "保存快速链接"
+
+#: runtime/src/builtins/library.tsx
+msgid "Search GitHub"
+msgstr "搜索 GitHub"
+
+#: runtime/src/builtins/library.tsx
+msgid "Tip: give it an alias in the root search (Ctrl+K → Set Alias), then type “<alias> <text>” to open it directly. {0}"
+msgstr "提示：在主搜索中为它设置别名（Ctrl+K → 设置别名），之后输入“<别名> <文本>”即可直接打开。{0}"
+
+#: runtime/src/builtins/library.tsx
+msgid "Search quicklinks…"
+msgstr "搜索快速链接…"
+
+#: runtime/src/builtins/library.tsx
+msgid "No quicklinks yet"
+msgstr "还没有快速链接"
+
+#: runtime/src/builtins/library.tsx
+msgid "Press Enter to create one."
+msgstr "按 Enter 创建一个。"
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete Quicklink"
+msgstr "删除快速链接"
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete “{0}”?"
+msgstr "删除“{0}”？"
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete"
+msgstr "删除"
+
+#: runtime/src/builtins/library.tsx
+msgid "Typing the keyword in the root search selects this snippet. With “Expand Snippets as You Type” on (Heyo Settings), typing it in any application replaces it with the snippet: at once if it begins or ends with a symbol (;sig), after the next space or punctuation mark if it is a plain word (sig). 2 to 32 characters, capitals matter."
+msgstr "在主搜索中输入关键词会选中这个文本片段。开启“输入时展开文本片段”（Heyo 设置）后，在任何应用程序中输入关键词都会把它替换为文本片段：以符号开头或结尾的（;sig）立即替换，普通单词（sig）在下一个空格或标点之后替换。长度为 2 到 32 个字符，区分大小写。"
+
+#: runtime/src/builtins/library.tsx
+msgid "Snippet saved"
+msgstr "文本片段已保存"
+
+#: runtime/src/builtins/library.tsx
+msgid "Snippet created"
+msgstr "文本片段已创建"
+
+#: runtime/src/builtins/library.tsx
+msgid "Edit Snippet"
+msgstr "编辑文本片段"
+
+#: runtime/src/builtins/library.tsx
+msgid "Save Snippet"
+msgstr "保存文本片段"
+
+#: runtime/src/builtins/library.tsx
+msgid "Email signature"
+msgstr "邮件签名"
+
+#: runtime/src/builtins/library.tsx
+msgid "Keyword"
+msgstr "关键词"
+
+#: runtime/src/builtins/library.tsx
+msgid "Search snippets…"
+msgstr "搜索文本片段…"
+
+#: runtime/src/builtins/library.tsx
+msgid "No snippets yet"
+msgstr "还没有文本片段"
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete Snippet"
+msgstr "删除文本片段"
+
 #: runtime/src/builtins/setup.tsx
 msgid "Required preferences missing"
 msgstr "缺少必填的偏好设置"
@@ -3144,6 +3444,46 @@ msgstr "缺少必填的参数"
 #: runtime/src/builtins/setup.tsx
 msgid "Run {0}"
 msgstr "运行 {0}"
+
+#: runtime/src/builtins/timer.tsx
+msgid "Resume"
+msgstr "继续"
+
+#: runtime/src/builtins/timer.tsx
+msgid "Pause"
+msgstr "暂停"
+
+#: runtime/src/builtins/timer.tsx
+msgid "+1 min"
+msgstr "+1 分钟"
+
+#: runtime/src/builtins/timer.tsx
+msgid "End"
+msgstr "结束"
+
+#: runtime/src/builtins/timer.tsx
+msgid "Paused"
+msgstr "已暂停"
+
+#: runtime/src/builtins/timer.tsx
+msgid "Until {0}"
+msgstr "到 {0}"
+
+#: runtime/src/builtins/timer.tsx
+msgid "Time's up"
+msgstr "时间到"
+
+#: runtime/src/builtins/timer.tsx
+msgid "The timer has run out."
+msgstr "计时已结束。"
+
+#: runtime/src/builtins/timer.tsx
+msgid "Say how long"
+msgstr "请说明时长"
+
+#: runtime/src/builtins/timer.tsx
+msgid "For example 25m, 1h 10m or 90s"
+msgstr "例如 25m、1h 10m 或 90s"
 
 #: runtime/src/llm.ts
 msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"

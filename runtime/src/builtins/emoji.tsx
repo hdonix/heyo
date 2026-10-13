@@ -11,6 +11,7 @@ import { Action, ActionPanel, Grid } from "../api/components";
 import { Icon } from "../api/icon";
 import { Clipboard, showHUD } from "../api/system";
 import { extensionsDir, readJson, writeJson } from "../context";
+import { language, t } from "../../../shared/i18n";
 
 interface Emoji {
   char: string;
@@ -19,7 +20,20 @@ interface Emoji {
   group: number;
 }
 
-const GROUPS = ["Smileys & Emotion", "People & Body", "", "Animals & Nature", "Food & Drink", "Travel & Places", "Activities", "Objects", "Symbols", "Flags"];
+/// Unicode's groups by their numbers, as each is titled. (The third is the
+/// components, which are not shown.)
+const GROUPS = [
+  () => t("Smileys & Emotion"),
+  () => t("People & Body"),
+  () => "",
+  () => t("Animals & Nature"),
+  () => t("Food & Drink"),
+  () => t("Travel & Places"),
+  () => t("Activities"),
+  () => t("Objects"),
+  () => t("Symbols"),
+  () => t("Flags"),
+];
 
 // Characters people look for that are not emoji.
 const SYMBOLS: [string, string][] = [
@@ -42,6 +56,10 @@ const EMOJI: Emoji[] = en
     return { char: e.unicode, name: e.label, group: e.group!, keywords: [local?.label ?? "", ...(e.tags ?? []), ...(local?.tags ?? [])] };
   });
 
+/// What an emoji is called under it: in Chinese where that is spoken and
+/// the emoji has such a name (keywords[0]), else in English.
+const nameOf = (emoji: Emoji) => (language().startsWith("zh") && emoji.keywords[0]) || emoji.name;
+
 const recentFile = () => path.join(path.dirname(extensionsDir), "emoji-recent.json");
 
 function matches(query: string, name: string, keywords: string[]) {
@@ -61,7 +79,7 @@ export function EmojiPicker() {
     if (paste) await Clipboard.paste(char);
     else {
       await Clipboard.copy(char);
-      await showHUD(`Copied ${char}`);
+      await showHUD(t("Copied {0}", char));
     }
   };
 
@@ -72,8 +90,8 @@ export function EmojiPicker() {
       title={query ? name : undefined}
       actions={
         <ActionPanel>
-          <Action title="Paste" icon={Icon.Clipboard} onAction={() => use(char, true)} />
-          <Action title="Copy" icon={Icon.CopyClipboard} onAction={() => use(char, false)} />
+          <Action title={t("Paste")} icon={Icon.Clipboard} onAction={() => use(char, true)} />
+          <Action title={t("Copy")} icon={Icon.CopyClipboard} onAction={() => use(char, false)} />
         </ActionPanel>
       }
     />
@@ -89,21 +107,21 @@ export function EmojiPicker() {
       const starts = (e: Emoji) => Number(e.name.toLowerCase().startsWith(q) || e.keywords[0].startsWith(q));
       const ranked = [...emoji].sort((a, b) => starts(b) - starts(a));
       return [
-        { title: "Results", items: ranked.slice(0, 160).map((e) => item(e.char, e.name, e.char)) },
-        { title: "Characters", items: symbols.map(([char, words]) => item(char, words.split(" ")[0], char)) },
+        { title: t("Results"), items: ranked.slice(0, 160).map((e) => item(e.char, nameOf(e), e.char)) },
+        { title: t("Characters"), items: symbols.map(([char, words]) => item(char, words.split(" ")[0], char)) },
       ];
     }
-    const names = new Map<string, string>([...EMOJI.map((e) => [e.char, e.name] as const), ...SYMBOLS.map(([c, w]) => [c, w] as const)]);
+    const names = new Map<string, string>([...EMOJI.map((e) => [e.char, nameOf(e)] as const), ...SYMBOLS.map(([c, w]) => [c, w] as const)]);
     return [
-      { title: "Recently Used", items: recent.map((char) => item(char, names.get(char) ?? "", `recent-${char}`)) },
-      ...GROUPS.map((title, group) => ({ title, items: EMOJI.filter((e) => e.group === group).map((e) => item(e.char, e.name, e.char)) })),
-      { title: "Characters", items: symbols.map(([char, words]) => item(char, words, char)) },
+      { title: t("Recently Used"), items: recent.map((char) => item(char, names.get(char) ?? "", `recent-${char}`)) },
+      ...GROUPS.map((title, group) => ({ title: title(), items: EMOJI.filter((e) => e.group === group).map((e) => item(e.char, nameOf(e), e.char)) })),
+      { title: t("Characters"), items: symbols.map(([char, words]) => item(char, words, char)) },
     ];
-  }, [query, recent]);
+  }, [query, recent, language()]);
 
   return (
-    <Grid columns={10} inset="small" filtering={false} onSearchTextChange={setQuery} searchBarPlaceholder="Search emoji and symbols… (English or 中文)">
-      <Grid.EmptyView icon={Icon.Emoji} title="No emoji found" />
+    <Grid columns={10} inset="small" filtering={false} onSearchTextChange={setQuery} searchBarPlaceholder={t("Search emoji and symbols… (English or 中文)")}>
+      <Grid.EmptyView icon={Icon.Emoji} title={t("No emoji found")} />
       {sections
         .filter((s) => s.items.length)
         .map((s) => (

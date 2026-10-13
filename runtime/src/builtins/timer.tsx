@@ -12,6 +12,7 @@
 
 import { closeMainWindow, showToast, Toast } from "../api/system";
 import { LiveActivity, type Button, type Content, type Event } from "../heyo/activity";
+import { locale, t } from "../../../shared/i18n";
 
 /// Where a timer stands: its span, and where it was paused.
 export interface Span {
@@ -45,15 +46,15 @@ export function parseDuration(text: string): number | undefined {
 export function describe(ms: number): string {
   const seconds = Math.round(ms / 1000);
   const parts = [
-    [Math.floor(seconds / 3600), "h"],
-    [Math.floor((seconds % 3600) / 60), "min"],
-    [seconds % 60, "s"],
+    [Math.floor(seconds / 3600), (n: number) => t("{0} h", n)],
+    [Math.floor((seconds % 3600) / 60), (n: number) => t("{0} min", n)],
+    [seconds % 60, (n: number) => t("{0} s", n)],
   ] as const;
-  const said = parts.filter(([n]) => n > 0).map(([n, unit]) => `${n} ${unit}`);
-  return said.length ? said.join(" ") : "0 s";
+  const said = parts.filter(([n]) => n > 0).map(([n, say]) => say(n));
+  return said.length ? said.join(" ") : t("{0} s", 0);
 }
 
-const clock = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+const clock = (at: number) => new Date(at).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
 
 /// The activity's content for a span: the countdown in both forms, and
 /// the buttons, each carrying the span so the handler can go on from it.
@@ -61,13 +62,13 @@ export function content(span: Span): Content {
   const timer = { start: new Date(span.start), end: new Date(span.end), pausedAt: span.pausedAt === undefined ? undefined : new Date(span.pausedAt) };
   const paused = span.pausedAt !== undefined;
   const actions: Button[] = [
-    paused ? { title: "Resume", icon: "play-16", action: { event: "resume", data: span } } : { title: "Pause", icon: "pause-16", action: { event: "pause", data: span } },
-    { title: "+1 min", icon: "plus-16", action: { event: "plus", data: span } },
-    { title: "End", icon: "stop-16", style: "destructive", action: { end: true } },
+    paused ? { title: t("Resume"), icon: "play-16", action: { event: "resume", data: span } } : { title: t("Pause"), icon: "pause-16", action: { event: "pause", data: span } },
+    { title: t("+1 min"), icon: "plus-16", action: { event: "plus", data: span } },
+    { title: t("End"), icon: "stop-16", style: "destructive", action: { end: true } },
   ];
   return {
     title: describe(span.end - span.start),
-    subtitle: paused ? "Paused" : `Until ${clock(span.end)}`,
+    subtitle: paused ? t("Paused") : t("Until {0}", clock(span.end)),
     compact: { timer },
     body: { timer },
     actions,
@@ -79,7 +80,7 @@ async function handle(event: Event) {
   const activity = await LiveActivity.get(event.id);
   if (!activity) return;
   if (event.kind === "elapsed") {
-    await activity.end({ title: "Time's up", subtitle: "", compact: "0:00", body: { text: "The timer has run out." }, actions: [] });
+    await activity.end({ title: t("Time's up"), subtitle: "", compact: "0:00", body: { text: t("The timer has run out.") }, actions: [] });
     return;
   }
   if (event.kind !== "action") return;
@@ -113,10 +114,10 @@ export async function Timer(props: TimerProps) {
   if (event) return handle(event);
   const length = parseDuration(props.arguments?.duration ?? "");
   if (!length) {
-    await showToast({ style: Toast.Style.Failure, title: "Say how long", message: "For example 25m, 1h 10m or 90s" });
+    await showToast({ style: Toast.Style.Failure, title: t("Say how long"), message: t("For example 25m, 1h 10m or 90s") });
     return;
   }
   await closeMainWindow();
   const start = Date.now();
-  await LiveActivity.start({ id: `timer-${start}`, name: "Timer", icon: "clock-16" }, content({ start, end: start + length }));
+  await LiveActivity.start({ id: `timer-${start}`, name: t("Timer"), icon: "clock-16" }, content({ start, end: start + length }));
 }

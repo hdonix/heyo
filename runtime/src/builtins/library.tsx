@@ -21,6 +21,7 @@ import {
 } from "../api/system";
 import { extensionsDir, readJson, writeJson } from "../context";
 import { request } from "../protocol";
+import { t } from "../../../shared/i18n";
 
 interface Quicklink {
   id: string;
@@ -57,10 +58,11 @@ function useStore<T extends { id: string }>(file: string) {
   };
 }
 
-const readClipboard = () => Clipboard.readText().then((t) => t ?? "");
+const readClipboard = () => Clipboard.readText().then((text) => text ?? "");
 
-const PLACEHOLDER_HELP =
-  "Placeholders: {query} (text you type), {clipboard}, {date}, {time}, {datetime}, {day}, {uuid}, {date format=\"yyyy-MM-dd\"}.";
+/// What a link or a snippet can have filled in. The placeholders are
+/// written as they are typed, in every language.
+const placeholderHelp = () => t("Placeholders: {0} (text you type), {1}.", "{query}", '{clipboard}, {date}, {time}, {datetime}, {day}, {uuid}, {date format="yyyy-MM-dd"}');
 
 // --- Quicklinks --------------------------------------------------------------
 
@@ -74,34 +76,34 @@ export function QuicklinkForm(props: { quicklink?: Quicklink; draft?: { name?: s
   const submit = async (values: { name: string; link: string }) => {
     const name = values.name.trim();
     const link = values.link.trim();
-    setNameError(name ? undefined : "Required");
-    setLinkError(link ? undefined : "Required");
+    setNameError(name ? undefined : t("Required"));
+    setLinkError(link ? undefined : t("Required"));
     if (!name || !link) return;
     await store.upsert({ ...props.quicklink, id: props.quicklink?.id ?? randomUUID(), name, link });
-    await showToast({ title: props.quicklink ? "Quicklink saved" : "Quicklink created", message: name });
+    await showToast({ title: props.quicklink ? t("Quicklink saved") : t("Quicklink created"), message: name });
     if (props.onSaved) props.onSaved();
     else await popToRoot();
   };
 
   return (
     <Form
-      navigationTitle={props.quicklink ? "Edit Quicklink" : "Create Quicklink"}
+      navigationTitle={props.quicklink ? t("Edit Quicklink") : t("Create Quicklink")}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title={props.quicklink ? "Save Quicklink" : "Create Quicklink"} onSubmit={submit} />
+          <Action.SubmitForm title={props.quicklink ? t("Save Quicklink") : t("Create Quicklink")} onSubmit={submit} />
         </ActionPanel>
       }
     >
-      <Form.TextField id="name" title="Name" placeholder="Search GitHub" defaultValue={props.quicklink?.name ?? props.draft?.name} error={nameError} autoFocus />
+      <Form.TextField id="name" title={t("Name")} placeholder={t("Search GitHub")} defaultValue={props.quicklink?.name ?? props.draft?.name} error={nameError} autoFocus />
       <Form.TextField
         id="link"
-        title="Link"
+        title={t("Link")}
         placeholder="https://github.com/search?q={query}"
         defaultValue={props.quicklink?.link ?? props.draft?.link}
         error={linkError}
-        info={PLACEHOLDER_HELP}
+        info={placeholderHelp()}
       />
-      <Form.Description text={`Tip: give it an alias in the root search (Ctrl+K → Set Alias), then type "<alias> <text>" to open it directly. ${PLACEHOLDER_HELP}`} />
+      <Form.Description text={t("Tip: give it an alias in the root search (Ctrl+K → Set Alias), then type “<alias> <text>” to open it directly. {0}", placeholderHelp())} />
     </Form>
   );
 }
@@ -122,11 +124,11 @@ function QuicklinkQuery({ quicklink }: { quicklink: Quicklink }) {
       navigationTitle={quicklink.name}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Open Quicklink" onSubmit={(v: { query: string }) => openQuicklink(quicklink, v.query)} />
+          <Action.SubmitForm title={t("Open Quicklink")} onSubmit={(v: { query: string }) => openQuicklink(quicklink, v.query)} />
         </ActionPanel>
       }
     >
-      <Form.TextField id="query" title="Query" placeholder={quicklink.link} autoFocus />
+      <Form.TextField id="query" title={t("Query")} placeholder={quicklink.link} autoFocus />
     </Form>
   );
 }
@@ -136,14 +138,14 @@ export function SearchQuicklinks() {
   const { pop } = useNavigation();
 
   return (
-    <List searchBarPlaceholder="Search quicklinks…">
+    <List searchBarPlaceholder={t("Search quicklinks…")}>
       <List.EmptyView
         icon={Icon.Link}
-        title="No quicklinks yet"
-        description="Press Enter to create one."
+        title={t("No quicklinks yet")}
+        description={t("Press Enter to create one.")}
         actions={
           <ActionPanel>
-            <Action.Push title="Create Quicklink" icon={Icon.Plus} target={<QuicklinkForm onSaved={pop} />} />
+            <Action.Push title={t("Create Quicklink")} icon={Icon.Plus} target={<QuicklinkForm onSaved={pop} />} />
           </ActionPanel>
         }
       />
@@ -158,32 +160,32 @@ export function SearchQuicklinks() {
             <ActionPanel>
               <ActionPanel.Section>
                 {needsArgument(q.link) ? (
-                  <Action.Push title="Open Quicklink" icon={Icon.Globe} target={<QuicklinkQuery quicklink={q} />} />
+                  <Action.Push title={t("Open Quicklink")} icon={Icon.Globe} target={<QuicklinkQuery quicklink={q} />} />
                 ) : (
-                  <Action title="Open Quicklink" icon={Icon.Globe} onAction={() => openQuicklink(q)} />
+                  <Action title={t("Open Quicklink")} icon={Icon.Globe} onAction={() => openQuicklink(q)} />
                 )}
-                <Action.CopyToClipboard title="Copy Link" content={q.link} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
+                <Action.CopyToClipboard title={t("Copy Link")} content={q.link} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
               </ActionPanel.Section>
               <ActionPanel.Section>
                 <Action.Push
-                  title="Edit Quicklink"
+                  title={t("Edit Quicklink")}
                   icon={Icon.Pencil}
                   shortcut={{ modifiers: ["cmd"], key: "e" }}
                   target={<QuicklinkForm quicklink={q} onSaved={pop} />}
                 />
                 <Action.Push
-                  title="Create Quicklink"
+                  title={t("Create Quicklink")}
                   icon={Icon.Plus}
                   shortcut={{ modifiers: ["cmd"], key: "n" }}
                   target={<QuicklinkForm onSaved={pop} />}
                 />
                 <Action
-                  title="Delete Quicklink"
+                  title={t("Delete Quicklink")}
                   icon={Icon.Trash}
                   style="destructive"
                   shortcut={{ modifiers: ["ctrl"], key: "x" }}
                   onAction={async () => {
-                    if (await confirmAlert({ title: `Delete "${q.name}"?`, primaryAction: { title: "Delete", style: "DESTRUCTIVE" } })) {
+                    if (await confirmAlert({ title: t("Delete “{0}”?", q.name), primaryAction: { title: t("Delete"), style: "DESTRUCTIVE" } })) {
                       await store.remove(q.id);
                     }
                   }}
@@ -199,8 +201,10 @@ export function SearchQuicklinks() {
 
 // --- Snippets ----------------------------------------------------------------
 
-const KEYWORD_HELP =
-  "Typing the keyword in the root search selects this snippet. With “Expand Snippets as You Type” on (Heyo Settings), typing it in any application replaces it with the snippet: at once if it begins or ends with a symbol (;sig), after the next space or punctuation mark if it is a plain word (sig). 2 to 32 characters, capitals matter.";
+const keywordHelp = () =>
+  t(
+    "Typing the keyword in the root search selects this snippet. With “Expand Snippets as You Type” on (Heyo Settings), typing it in any application replaces it with the snippet: at once if it begins or ends with a symbol (;sig), after the next space or punctuation mark if it is a plain word (sig). 2 to 32 characters, capitals matter.",
+  );
 
 /// `snippet` is one being edited; `draft` fills in a new one (an extension's
 /// `Action.CreateSnippet`).
@@ -211,33 +215,33 @@ export function SnippetForm(props: { snippet?: Snippet; draft?: { name?: string;
 
   const submit = async (values: { name: string; text: string; keyword: string }) => {
     const name = values.name.trim();
-    setNameError(name ? undefined : "Required");
-    setTextError(values.text ? undefined : "Required");
+    setNameError(name ? undefined : t("Required"));
+    setTextError(values.text ? undefined : t("Required"));
     if (!name || !values.text) return;
     const keyword = values.keyword.trim() || undefined;
     await store.upsert({ id: props.snippet?.id ?? randomUUID(), name, text: values.text, keyword });
-    await showToast({ title: props.snippet ? "Snippet saved" : "Snippet created", message: name });
+    await showToast({ title: props.snippet ? t("Snippet saved") : t("Snippet created"), message: name });
     if (props.onSaved) props.onSaved();
     else await popToRoot();
   };
 
   return (
     <Form
-      navigationTitle={props.snippet ? "Edit Snippet" : "Create Snippet"}
+      navigationTitle={props.snippet ? t("Edit Snippet") : t("Create Snippet")}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title={props.snippet ? "Save Snippet" : "Create Snippet"} onSubmit={submit} />
+          <Action.SubmitForm title={props.snippet ? t("Save Snippet") : t("Create Snippet")} onSubmit={submit} />
         </ActionPanel>
       }
     >
-      <Form.TextField id="name" title="Name" placeholder="Email signature" defaultValue={props.snippet?.name ?? props.draft?.name} error={nameError} autoFocus />
-      <Form.TextArea id="text" title="Snippet" defaultValue={props.snippet?.text ?? props.draft?.text} error={textError} info={PLACEHOLDER_HELP} />
+      <Form.TextField id="name" title={t("Name")} placeholder={t("Email signature")} defaultValue={props.snippet?.name ?? props.draft?.name} error={nameError} autoFocus />
+      <Form.TextArea id="text" title={t("Snippet")} defaultValue={props.snippet?.text ?? props.draft?.text} error={textError} info={placeholderHelp()} />
       <Form.TextField
         id="keyword"
-        title="Keyword"
+        title={t("Keyword")}
         placeholder="sig"
         defaultValue={props.snippet?.keyword ?? props.draft?.keyword}
-        info={KEYWORD_HELP}
+        info={keywordHelp()}
       />
     </Form>
   );
@@ -255,7 +259,7 @@ async function deliverSnippet(snippet: Snippet, paste: boolean) {
     await pasteKeystroke();
   } else {
     await Clipboard.copy(text);
-    await showHUD("Copied to Clipboard");
+    await showHUD(t("Copied to Clipboard"));
   }
 }
 
@@ -264,14 +268,14 @@ export function SearchSnippets() {
   const { pop } = useNavigation();
 
   return (
-    <List searchBarPlaceholder="Search snippets…" isShowingDetail={store.items.length > 0}>
+    <List searchBarPlaceholder={t("Search snippets…")} isShowingDetail={store.items.length > 0}>
       <List.EmptyView
         icon={Icon.Snippets}
-        title="No snippets yet"
-        description="Press Enter to create one."
+        title={t("No snippets yet")}
+        description={t("Press Enter to create one.")}
         actions={
           <ActionPanel>
-            <Action.Push title="Create Snippet" icon={Icon.Plus} target={<SnippetForm onSaved={pop} />} />
+            <Action.Push title={t("Create Snippet")} icon={Icon.Plus} target={<SnippetForm onSaved={pop} />} />
           </ActionPanel>
         }
       />
@@ -287,9 +291,9 @@ export function SearchSnippets() {
               markdown={"```\n" + s.text.replace(/```/g, "ˋˋˋ") + "\n```"}
               metadata={
                 <List.Item.Detail.Metadata>
-                  <List.Item.Detail.Metadata.Label title="Name" text={s.name} />
-                  {s.keyword && <List.Item.Detail.Metadata.Label title="Keyword" text={s.keyword} />}
-                  <List.Item.Detail.Metadata.Label title="Characters" text={String([...s.text].length)} />
+                  <List.Item.Detail.Metadata.Label title={t("Name")} text={s.name} />
+                  {s.keyword && <List.Item.Detail.Metadata.Label title={t("Keyword")} text={s.keyword} />}
+                  <List.Item.Detail.Metadata.Label title={t("Characters")} text={String([...s.text].length)} />
                 </List.Item.Detail.Metadata>
               }
             />
@@ -297,29 +301,29 @@ export function SearchSnippets() {
           actions={
             <ActionPanel>
               <ActionPanel.Section>
-                <Action title="Paste Snippet" icon={Icon.Clipboard} onAction={() => deliverSnippet(s, true)} />
-                <Action title="Copy Snippet" icon={Icon.CopyClipboard} onAction={() => deliverSnippet(s, false)} />
+                <Action title={t("Paste Snippet")} icon={Icon.Clipboard} onAction={() => deliverSnippet(s, true)} />
+                <Action title={t("Copy Snippet")} icon={Icon.CopyClipboard} onAction={() => deliverSnippet(s, false)} />
               </ActionPanel.Section>
               <ActionPanel.Section>
                 <Action.Push
-                  title="Edit Snippet"
+                  title={t("Edit Snippet")}
                   icon={Icon.Pencil}
                   shortcut={{ modifiers: ["cmd"], key: "e" }}
                   target={<SnippetForm snippet={s} onSaved={pop} />}
                 />
                 <Action.Push
-                  title="Create Snippet"
+                  title={t("Create Snippet")}
                   icon={Icon.Plus}
                   shortcut={{ modifiers: ["cmd"], key: "n" }}
                   target={<SnippetForm onSaved={pop} />}
                 />
                 <Action
-                  title="Delete Snippet"
+                  title={t("Delete Snippet")}
                   icon={Icon.Trash}
                   style="destructive"
                   shortcut={{ modifiers: ["ctrl"], key: "x" }}
                   onAction={async () => {
-                    if (await confirmAlert({ title: `Delete "${s.name}"?`, primaryAction: { title: "Delete", style: "DESTRUCTIVE" } })) {
+                    if (await confirmAlert({ title: t("Delete “{0}”?", s.name), primaryAction: { title: t("Delete"), style: "DESTRUCTIVE" } })) {
                       await store.remove(s.id);
                     }
                   }}

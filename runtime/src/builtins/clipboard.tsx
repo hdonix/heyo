@@ -14,7 +14,7 @@ import { Action, ActionPanel, List } from "../api/components";
 import { Icon } from "../api/icon";
 import { closeMainWindow, confirmAlert, pasteKeystroke, showHUD, showToast, Toast } from "../api/system";
 import type { Kind } from "../../../shared/bindings/Kind";
-import { t, tn } from "../../../shared/i18n";
+import { language, locale, t, tn, translate } from "../../../shared/i18n";
 import type { MemoryItem } from "../../../shared/bindings/MemoryItem";
 import type { MemoryResult } from "../../../shared/bindings/MemoryResult";
 import { ClipboardHistory as History, Memory } from "../heyo/plain";
@@ -49,25 +49,25 @@ const MEANING_PAUSE = 150;
 /// The entry's number in the history, which is what its keeping goes by.
 const numberOf = (entry: Entry) => Number(entry.id.slice(entry.id.indexOf(":") + 1));
 
-const KIND_LABELS: Record<Entry["kind"], string> = {
-  text: "Text",
-  link: "Link",
-  color: "Color",
-  file: "File",
-  image: "Image",
+const KIND_LABELS: Record<Entry["kind"], () => string> = {
+  text: () => t("Text"),
+  link: () => t("Link"),
+  color: () => t("Color"),
+  file: () => t("File"),
+  image: () => t("Image"),
 };
 
 const FILTERS = [
-  { value: "all", title: "All Types" },
-  { value: "text", title: "Text" },
-  { value: "image", title: "Images" },
-  { value: "link", title: "Links" },
-  { value: "color", title: "Colors" },
-  { value: "file", title: "Files" },
+  { value: "all", title: () => t("All Types") },
+  { value: "text", title: () => t("Text") },
+  { value: "image", title: () => t("Images") },
+  { value: "link", title: () => t("Links") },
+  { value: "color", title: () => t("Colors") },
+  { value: "file", title: () => t("Files") },
 ];
 
 function title(entry: Entry) {
-  if (entry.kind === "image") return `Image (${entry.width}×${entry.height})`;
+  if (entry.kind === "image") return t("Image ({0}×{1})", entry.width, entry.height);
   const line = (entry.text ?? "").trim().split("\n")[0];
   return line.length > 80 ? `${line.slice(0, 80)}…` : line;
 }
@@ -96,8 +96,8 @@ function icon(entry: Entry) {
 /// The application an entry came from, at the end of its row.
 function accessories(entry: Entry) {
   // Said, since the row itself does not show why it is there.
-  const meant = entry.byMeaning ? [{ icon: Icon.Stars, tooltip: "Found by its meaning: the words you typed are not in it" }] : [];
-  const source = entry.appName ? [{ icon: entry.appIcon, text: entry.appIcon ? undefined : entry.appName, tooltip: `Copied from ${entry.appName}` }] : [];
+  const meant = entry.byMeaning ? [{ icon: Icon.Stars, tooltip: t("Found by its meaning: the words you typed are not in it") }] : [];
+  const source = entry.appName ? [{ icon: entry.appIcon, text: entry.appIcon ? undefined : entry.appName, tooltip: t("Copied from {0}", entry.appName) }] : [];
   const pin = entry.pinned ? [{ icon: { source: Icon.Pin, tintColor: Color.Orange } }] : [];
   return meant.length || source.length || pin.length ? [...meant, ...source, ...pin] : undefined;
 }
@@ -129,10 +129,17 @@ function section(entry: Entry, now: Date) {
   return "Older";
 }
 
-const SECTIONS = ["Pinned", "Today", "Yesterday", "This Week", "Older"];
+/// The sections in their order: what `section` calls each, and its title.
+const SECTIONS: [string, () => string][] = [
+  ["Pinned", () => t("Pinned")],
+  ["Today", () => t("Today")],
+  ["Yesterday", () => t("Yesterday")],
+  ["This Week", () => t("This Week")],
+  ["Older", () => t("Older")],
+];
 
 function formatTime(ms: number) {
-  return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(ms).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" });
 }
 
 /// How the query was read, for the heading of the results.
@@ -146,13 +153,13 @@ function reading(query: Found["understood"]) {
     const time: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
     const span = sameDay
       ? whole
-        ? from.toLocaleDateString(undefined, day)
-        : `${from.toLocaleDateString(undefined, day)}, ${from.toLocaleTimeString(undefined, time)} – ${new Date(query.to).toLocaleTimeString(undefined, time)}`
-      : `${from.toLocaleDateString(undefined, day)} – ${to.toLocaleDateString(undefined, day)}`;
+        ? from.toLocaleDateString(locale(), day)
+        : `${from.toLocaleDateString(locale(), day)}, ${from.toLocaleTimeString(locale(), time)} – ${new Date(query.to).toLocaleTimeString(locale(), time)}`
+      : `${from.toLocaleDateString(locale(), day)} – ${to.toLocaleDateString(locale(), day)}`;
     parts.push(span);
   }
-  if (query.app) parts.push(`from ${query.app}`);
-  if (query.kind) parts.push(KIND_LABELS[query.kind]);
+  if (query.app) parts.push(t("from {0}", query.app));
+  if (query.kind) parts.push(KIND_LABELS[query.kind]());
   if (query.terms.length) parts.push(`“${query.terms.join(" ")}”`);
   return parts.join(" · ");
 }
@@ -161,19 +168,19 @@ function Metadata({ entry }: { entry: Entry }) {
   const text = entry.text ?? "";
   return (
     <List.Item.Detail.Metadata>
-      <List.Item.Detail.Metadata.Label title="Application" text={entry.appName ?? entry.app ?? "Unknown"} icon={entry.appIcon} />
-      <List.Item.Detail.Metadata.Label title="Content type" text={KIND_LABELS[entry.kind]} />
+      <List.Item.Detail.Metadata.Label title={t("Application")} text={entry.appName ?? entry.app ?? t("Unknown")} icon={entry.appIcon} />
+      <List.Item.Detail.Metadata.Label title={t("Content type")} text={KIND_LABELS[entry.kind]()} />
       {entry.kind === "image" ? (
-        <List.Item.Detail.Metadata.Label title="Dimensions" text={`${entry.width} × ${entry.height}`} />
+        <List.Item.Detail.Metadata.Label title={t("Dimensions")} text={`${entry.width} × ${entry.height}`} />
       ) : (
         <>
-          <List.Item.Detail.Metadata.Label title="Characters" text={String([...text].length)} />
-          <List.Item.Detail.Metadata.Label title="Words" text={String(text.split(/\s+/).filter(Boolean).length)} />
+          <List.Item.Detail.Metadata.Label title={t("Characters")} text={String([...text].length)} />
+          <List.Item.Detail.Metadata.Label title={t("Words")} text={String(text.split(/\s+/).filter(Boolean).length)} />
         </>
       )}
-      {entry.timesCopied !== undefined && <List.Item.Detail.Metadata.Label title="Times copied" text={String(entry.timesCopied)} />}
-      <List.Item.Detail.Metadata.Label title="Last copied" text={formatTime(entry.at)} />
-      {entry.firstAt !== undefined && <List.Item.Detail.Metadata.Label title="First copied" text={formatTime(entry.firstAt)} />}
+      {entry.timesCopied !== undefined && <List.Item.Detail.Metadata.Label title={t("Times copied")} text={String(entry.timesCopied)} />}
+      <List.Item.Detail.Metadata.Label title={t("Last copied")} text={formatTime(entry.at)} />
+      {entry.firstAt !== undefined && <List.Item.Detail.Metadata.Label title={t("First copied")} text={formatTime(entry.firstAt)} />}
     </List.Item.Detail.Metadata>
   );
 }
@@ -214,7 +221,7 @@ export function ClipboardHistory() {
       })
       .catch((e) => {
         setFound((last) => ({ items: [], understood: { terms: [] }, relaxed: false, recording: last?.recording, paused: last?.paused }));
-        showToast({ style: Toast.Style.Failure, title: "Could not load clipboard history", message: e instanceof Error ? e.message : String(e) });
+        showToast({ style: Toast.Style.Failure, title: t("Could not load clipboard history"), message: e instanceof Error ? e.message : String(e) });
       });
   };
   // The host searches: the history is too long to hand over whole.
@@ -230,12 +237,12 @@ export function ClipboardHistory() {
     const all = entries ?? [];
     // When the query named a time, a source or a kind, say how it was read
     // instead of dividing the results by day.
-    if (read || ranked) return all.length ? [{ name: "Results", subtitle: read && (reading(read) as string | undefined), entries: all }] : [];
+    if (read || ranked) return all.length ? [{ name: "Results", title: t("Results"), subtitle: read && (reading(read) as string | undefined), entries: all }] : [];
     const now = new Date();
-    return SECTIONS.map((name) => ({ name, subtitle: undefined as string | undefined, entries: all.filter((e) => section(e, now) === name) })).filter(
+    return SECTIONS.map(([name, title]) => ({ name, title: title(), subtitle: undefined as string | undefined, entries: all.filter((e) => section(e, now) === name) })).filter(
       (g) => g.entries.length,
     );
-  }, [found]);
+  }, [found, language()]);
 
   const copy = async (entry: Entry) => {
     await History.copy(entry.id);
@@ -250,9 +257,9 @@ export function ClipboardHistory() {
   const setPaused = async (value: boolean) => {
     try {
       await request("host.clipboardHistory.pause", { paused: value });
-      await showToast({ style: Toast.Style.Success, title: value ? "Clipboard history is paused" : "Clipboard history resumed" });
+      await showToast({ style: Toast.Style.Success, title: value ? t("Clipboard history is paused") : t("Clipboard history resumed") });
     } catch (e) {
-      await showToast({ style: Toast.Style.Failure, title: "Could not change clipboard history", message: e instanceof Error ? e.message : String(e) });
+      await showToast({ style: Toast.Style.Failure, title: t("Could not change clipboard history"), message: e instanceof Error ? e.message : String(e) });
     }
     reload();
   };
@@ -270,7 +277,7 @@ export function ClipboardHistory() {
   const notRecording = off ? t("Recording is turned off") : paused ? t("Recording is paused") : undefined;
   /// While entries are still being read, a search by meaning misses some.
   const waiting = found?.meaning?.waiting ?? 0;
-  const stillReading = waiting > 0 && query.trim() ? tn("Finding by meaning is still reading {0} entry", "Finding by meaning is still reading {0} entries", waiting, waiting.toLocaleString()) : undefined;
+  const stillReading = waiting > 0 && query.trim() ? tn("Finding by meaning is still reading {0} entry", "Finding by meaning is still reading {0} entries", waiting, waiting.toLocaleString(locale())) : undefined;
 
   const actions = (entry: Entry) => (
     <ActionPanel>
@@ -344,31 +351,31 @@ export function ClipboardHistory() {
       navigationTitle={t("Clipboard History")}
       searchBarPlaceholder={`${notRecording ? `${notRecording} · ` : ""}${t("Search, or say when and where: 昨天下午, last week, from firefox…")}`}
       searchBarAccessory={
-        <List.Dropdown tooltip="Filter by type" value={filter} onChange={(value: string) => setFilter(value as Kind | "all")}>
+        <List.Dropdown tooltip={t("Filter by type")} value={filter} onChange={(value: string) => setFilter(value as Kind | "all")}>
           {FILTERS.map((f) => (
-            <List.Dropdown.Item key={f.value} value={f.value} title={f.title} />
+            <List.Dropdown.Item key={f.value} value={f.value} title={f.title()} />
           ))}
         </List.Dropdown>
       }
     >
       <List.EmptyView
         icon={Icon.Clipboard}
-        title={query || filter !== "all" ? "No matching entries" : "Clipboard history is empty"}
+        title={query || filter !== "all" ? t("No matching entries") : t("Clipboard history is empty")}
         description={
           query || filter !== "all"
             ? undefined
             : off
-              ? "Recording is turned off. Turn it on in Heyo Settings, under Heyo Commands."
+              ? t("Recording is turned off. Turn it on in Heyo Settings, under Heyo Commands.")
               : paused
-                ? "Recording is paused. Run “Pause or Resume Clipboard History” to record again."
-                : "Copy something and it will show up here."
+                ? t("Recording is paused. Run “{0}” to record again.", translate("Pause or Resume Clipboard History"))
+                : t("Copy something and it will show up here.")
         }
         actions={pauseAction ? <ActionPanel>{pauseAction}</ActionPanel> : undefined}
       />
       {groups.map((group) => (
         <List.Section
           key={group.name}
-          title={group.name}
+          title={group.title}
           subtitle={group === groups[0] ? [notRecording, group.subtitle, stillReading].filter(Boolean).join(" · ") || undefined : group.subtitle}
         >
           {group.entries.map((entry) => (

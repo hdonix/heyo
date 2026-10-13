@@ -6,14 +6,17 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: src-tauri/src/activities.rs
+#: runtime/src/builtins/timer.tsx
 msgid "{0} s"
 msgstr ""
 
 #: src-tauri/src/activities.rs
+#: runtime/src/builtins/timer.tsx
 msgid "{0} min"
 msgstr ""
 
 #: src-tauri/src/activities.rs
+#: runtime/src/builtins/timer.tsx
 msgid "{0} h"
 msgstr ""
 
@@ -47,6 +50,7 @@ msgid "Language model"
 msgstr ""
 
 #: src-tauri/src/clipboard.rs
+#: runtime/src/builtins/clipboard.tsx
 msgid "Clipboard history is paused"
 msgstr ""
 
@@ -55,6 +59,7 @@ msgid "Nothing you copy is recorded until you resume it."
 msgstr ""
 
 #: src-tauri/src/clipboard.rs
+#: runtime/src/builtins/clipboard.tsx
 msgid "Clipboard history resumed"
 msgstr ""
 
@@ -63,6 +68,7 @@ msgid "What you copy is recorded again."
 msgstr ""
 
 #: src-tauri/src/clipboard.rs
+#: runtime/src/builtins/clipboard.tsx
 msgid "Could not change clipboard history"
 msgstr ""
 
@@ -329,6 +335,7 @@ msgstr ""
 
 #: src-tauri/src/extensions.rs
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/library.tsx
 msgid "Create Quicklink"
 msgstr ""
 
@@ -354,6 +361,7 @@ msgstr ""
 
 #: src-tauri/src/extensions.rs
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/library.tsx
 msgid "Create Snippet"
 msgstr ""
 
@@ -571,6 +579,7 @@ msgid "system, sound, silence"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/timer.tsx
 msgid "Timer"
 msgstr ""
 
@@ -656,6 +665,7 @@ msgstr ""
 
 #: src-tauri/src/pasting.rs
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/emoji.tsx
 msgid "Paste"
 msgstr ""
 
@@ -2046,6 +2056,7 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src/arguments.ts
+#: runtime/src/builtins/clipboard.tsx
 msgid "Text"
 msgstr ""
 
@@ -2078,6 +2089,7 @@ msgid "Save (Ctrl+S)"
 msgstr ""
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
+#: runtime/src/builtins/emoji.tsx
 msgid "Copy"
 msgstr ""
 
@@ -2126,6 +2138,7 @@ msgid "Tools"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint
+#: runtime/src/builtins/clipboard.tsx
 msgid "Color"
 msgstr ""
 
@@ -2155,6 +2168,7 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 #: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/library.tsx
 msgid "Name"
 msgstr ""
 
@@ -2264,6 +2278,7 @@ msgstr ""
 
 #: src/arguments.ts
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Query"
 msgstr ""
 
@@ -2598,6 +2613,7 @@ msgid "In an Hour"
 msgstr ""
 
 #: src/raycast/dates.ts
+#: runtime/src/builtins/clipboard.tsx
 msgid "Today"
 msgstr ""
 
@@ -2666,6 +2682,7 @@ msgid "now"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/clipboard.tsx
 msgid "Application"
 msgstr ""
 
@@ -2678,6 +2695,7 @@ msgid "Quicklink"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Snippet"
 msgstr ""
 
@@ -2694,6 +2712,8 @@ msgid "In Progress"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/emoji.tsx
 msgid "Results"
 msgstr ""
 
@@ -2742,10 +2762,12 @@ msgid "Open Application"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Paste Snippet"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Open Quicklink"
 msgstr ""
 
@@ -2754,10 +2776,12 @@ msgid "Open Command"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Copy Snippet"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/library.tsx
 msgid "Copy Link"
 msgstr ""
 
@@ -2880,6 +2904,7 @@ msgstr ""
 
 #: runtime/src/api/components.ts
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/library.tsx
 msgid "Copied to Clipboard"
 msgstr ""
 
@@ -3069,6 +3094,109 @@ msgid "OK"
 msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/library.tsx
+msgid "Link"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "File"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Image"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "All Types"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Images"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Links"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Colors"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Files"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Image ({0}×{1})"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Found by its meaning: the words you typed are not in it"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copied from {0}"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pinned"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Yesterday"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "This Week"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Older"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "from {0}"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Unknown"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Content type"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Dimensions"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/emoji.tsx
+#: runtime/src/builtins/library.tsx
+msgid "Characters"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Words"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Times copied"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Last copied"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "First copied"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Could not load clipboard history"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
 msgid "Resume Recording"
 msgstr ""
 
@@ -3122,6 +3250,178 @@ msgstr ""
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
 msgstr ""
 
+#: runtime/src/builtins/clipboard.tsx
+msgid "Filter by type"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "No matching entries"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard history is empty"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is turned off. Turn it on in Heyo Settings, under Heyo Commands."
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is paused. Run “{0}” to record again."
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copy something and it will show up here."
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Smileys & Emotion"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "People & Body"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Animals & Nature"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Food & Drink"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Travel & Places"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Activities"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Objects"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Symbols"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Flags"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Copied {0}"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Recently Used"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "Search emoji and symbols… (English or 中文)"
+msgstr ""
+
+#: runtime/src/builtins/emoji.tsx
+msgid "No emoji found"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Placeholders: {0} (text you type), {1}."
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Required"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Quicklink saved"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Quicklink created"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Edit Quicklink"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Save Quicklink"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Search GitHub"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Tip: give it an alias in the root search (Ctrl+K → Set Alias), then type “<alias> <text>” to open it directly. {0}"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Search quicklinks…"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "No quicklinks yet"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Press Enter to create one."
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete Quicklink"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete “{0}”?"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Typing the keyword in the root search selects this snippet. With “Expand Snippets as You Type” on (Heyo Settings), typing it in any application replaces it with the snippet: at once if it begins or ends with a symbol (;sig), after the next space or punctuation mark if it is a plain word (sig). 2 to 32 characters, capitals matter."
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Snippet saved"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Snippet created"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Edit Snippet"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Save Snippet"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Email signature"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Keyword"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Search snippets…"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "No snippets yet"
+msgstr ""
+
+#: runtime/src/builtins/library.tsx
+msgid "Delete Snippet"
+msgstr ""
+
 #: runtime/src/builtins/setup.tsx
 msgid "Required preferences missing"
 msgstr ""
@@ -3144,6 +3444,46 @@ msgstr ""
 
 #: runtime/src/builtins/setup.tsx
 msgid "Run {0}"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "Resume"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "Pause"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "+1 min"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "End"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "Paused"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "Until {0}"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "Time's up"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "The timer has run out."
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "Say how long"
+msgstr ""
+
+#: runtime/src/builtins/timer.tsx
+msgid "For example 25m, 1h 10m or 90s"
 msgstr ""
 
 #: runtime/src/llm.ts
