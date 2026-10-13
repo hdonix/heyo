@@ -14,6 +14,12 @@ after; a click beside the pill, inside its 360 by 44, going to the window
 underneath (which Sway then gives the keyboard, and the pill is not
 pressed); and the pill gone afterwards.
 
+And two pinned captures, which are layer surfaces too (Heyo is started
+with HEYO_TEST_PIN, since it cannot read the screen under Sway yet): each
+where it was said, pixel for pixel, above the windows; one dragged, which
+must go as far as the pointer went; closed by a double click and by the
+other button; none of it moving the keyboard.
+
 Whether dictated words reach an application here is not checked: Heyo has
 no way of typing into another application under Sway yet.
 """
@@ -80,24 +86,46 @@ def dark(colour):
     return max(colour) < 60
 
 
-def point(x, y):
-    sway("seat", "-", "cursor", "set", str(int(x)), str(int(y)))
-    time.sleep(0.4)
-
-
-def click():
-    sway("seat", "-", "cursor", "press", "button1")
-    time.sleep(0.15)
-    sway("seat", "-", "cursor", "release", "button1")
-    time.sleep(0.6)
-
-
 output = next(output for output in json.loads(sway("-t", "get_outputs")) if output.get("active"))
 scale = output["scale"]
 # In the output's own logical pixels, which the pointer goes by.
 width, height = output["rect"]["width"], output["rect"]["height"]
 # Where the pill's window is: 360 by 44, at the bottom centre, a tenth up.
 left, top = (width - 360) // 2, height - 44 - height // 10
+
+# A pointer of the session's own (pointer.py): headless Sway has none, and
+# its clients are told nothing of one that `swaymsg seat - cursor` moves.
+POINTER = subprocess.Popen([os.path.join(HERE, "pointer.py")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+POINTER.stdout.readline()
+
+
+def pointer(*words):
+    POINTER.stdin.write(" ".join(str(word) for word in words) + "\n")
+    POINTER.stdin.flush()
+    POINTER.stdout.readline()
+
+
+def point(x, y, settle=0.4):
+    pointer("to", int(x), int(y), width, height)
+    time.sleep(settle)
+
+
+def press(button="left"):
+    pointer("down", button)
+    time.sleep(0.12)
+
+
+def release(button="left"):
+    pointer("up", button)
+    time.sleep(0.12)
+
+
+def click():
+    press()
+    release()
+    time.sleep(0.5)
+
+
 
 
 def pill_there():
@@ -153,6 +181,49 @@ if not gone:
 check("the pill is gone afterwards", bool(gone), pill_there()[1])
 check("... and the application still has the keyboard", focused() == "Right", focused())
 sway("fullscreen", "disable")
+time.sleep(0.6)
+
+# The pinned captures: 300 by 200 at 200,160 and 200 by 120 at 800,160, in
+# the screen's own pixels, each pink on its left half and blue on its right.
+PINK, BLUE = (216, 27, 96), (30, 136, 229)
+
+
+def is_colour(seen, colour):
+    return all(abs(a - b) <= 3 for a, b in zip(seen, colour))
+
+
+def pinned(x, y, w, h):
+    """Whether a pinned capture of that size is at that place of the picture."""
+    shot = picture()
+    return is_colour(at(shot, x + w // 4, y + h // 2), PINK) and is_colour(at(shot, x + 3 * w // 4, y + h // 2), BLUE)
+
+
+check("two pinned captures are where they were said, pixel for pixel, above the windows", pinned(200, 160, 300, 200) and pinned(800, 160, 200, 120))
+# The pointer goes by logical pixels; the pictures are in the screen's own.
+point((200 + 150) / scale, (160 + 100) / scale)
+press()
+for step in range(1, 9):
+    point((350 + step * 20) / scale, (260 + step * 10) / scale, 0.06)
+release()
+time.sleep(0.5)
+moved = [(dx, dy) for dx in range(140, 164, 2) for dy in range(70, 84, 2) if pinned(200 + dx, 160 + dy, 300, 200)] if not pinned(200, 160, 300, 200) else []
+check("one dragged by 160,80 has gone about as far (less the few pixels before a drag is one)", bool(moved), moved or "still where it was")
+check("... and the other has not moved", pinned(800, 160, 200, 120))
+check("... and the keyboard is where it was", focused() == "Right", focused())
+if moved:
+    dx, dy = moved[0]
+    point((350 + dx) / scale, (260 + dy) / scale)
+    for _ in range(2):
+        press()
+        release()
+    time.sleep(0.6)
+    check("a double click closes it", not pinned(200 + dx, 160 + dy, 300, 200))
+point((800 + 100) / scale, (160 + 60) / scale)
+press("right")
+release("right")
+time.sleep(0.6)
+check("the other button closes the other", not pinned(800, 160, 200, 120))
+check("... and the keyboard is still where it was", focused() == "Right", focused())
 for app in apps:
     app.terminate()
 

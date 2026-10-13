@@ -313,6 +313,30 @@ def own():
     check("Escape closes the overlay", bool(wait(lambda: not window("Heyo Screenshot"), 5)))
     time.sleep(0.4)
     check("... and the keyboard is back with the application", focused() == "Notes", focused())
+    # Pinned captures: two pictures pinned when Heyo starts (HEYO_TEST_PIN),
+    # at places given as a capture gives them, in the toolkit's pixels.
+    subprocess.run(["env", "HEYO_TEST_PIN=200,160,300,200;800,160,200,120", os.path.join(HERE, "start-heyo.sh")], check=True, stdout=subprocess.DEVNULL)
+    pins = lambda: run("""global.get_window_actors().map(a => a.meta_window).filter(w => w.get_title() === 'Heyo Pinned Screenshot')
+        .map(w => (r => ({x: r.x, y: r.y, above: w.is_above(), skip: w.skip_taskbar}))(w.get_frame_rect()))""")
+    wait(lambda: len(pins()) == 2, 12)
+    time.sleep(1.0)
+    first = monitors()[0]
+    # How many of the toolkit's pixels one of the Shell's units is there.
+    per = 1 if first["density"] == 1 else -(-first["scale"] // 1)
+    places = sorted((pin["x"], pin["y"]) for pin in pins())
+    expected = sorted((first["x"] + round(x / per), first["y"] + round(160 / per)) for x in (200, 800))
+    check("two pinned captures are where they were read", len(places) == 2 and all(abs(a - b) <= 1 for place, wanted in zip(places, expected) for a, b in zip(place, wanted)), f"{places} and not {expected}")
+    check("... above the other windows, and out of the lists", len(pins()) == 2 and all(pin["above"] and pin["skip"] for pin in pins()), pins())
+    if places:
+        # A click on one gives it the keyboard, and Escape closes it: the other stays where it is.
+        point(places[0][0] + 20, places[0][1] + 20)
+        subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:3", "wait:0.3", "nudge:-3", "wait:0.3", "press:left", "wait:0.6", "tap:Escape"], check=True)
+        check("Escape closes the one that was clicked", bool(wait(lambda: len(pins()) == 1, 5)), pins())
+        left = [(pin["x"], pin["y"]) for pin in pins()]
+        check("... and the other is still where it was read", len(left) == 1 and all(abs(a - b) <= 1 for a, b in zip(left[0], expected[1])), f"{left} and not {expected[1]}")
+    # Heyo as it is started for the other checks.
+    subprocess.run([os.path.join(HERE, "start-heyo.sh")], check=True, stdout=subprocess.DEVNULL)
+    time.sleep(4)
     app.terminate()
 
 def relock():

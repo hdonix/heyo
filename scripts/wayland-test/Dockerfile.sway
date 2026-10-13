@@ -5,10 +5,19 @@
 #   scripts/wayland-test/sway.sh build
 FROM heyo-wayland-test
 
+# The protocol in/pointer.py speaks, as wlroots publishes it (its licence
+# is in the file).
+COPY wlr-virtual-pointer-unstable-v1.xml /opt/wlr-virtual-pointer-unstable-v1.xml
 RUN apt-get update && apt-get install -y --no-install-recommends \
       # The compositor, headless; pictures of its screen.
       sway grim \
-    && rm -rf /var/lib/apt/lists/*
+      # A pointer for a session that has none (in/pointer.py): the Wayland
+      # client library for Python, which makes its own bindings of a
+      # protocol from its description.
+      python3-pywayland python3-cffi-backend libwayland-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pywayland.scanner -i /usr/share/wayland/wayland.xml /opt/wlr-virtual-pointer-unstable-v1.xml -o /opt/heyo_protocols \
+    && touch /opt/heyo_protocols/__init__.py
 
 COPY sway-session.sh /usr/local/bin/sway-session.sh
 RUN chmod +x /usr/local/bin/sway-session.sh

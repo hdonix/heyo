@@ -36,7 +36,9 @@ case "${1:-}" in
         "$0" exec swaymsg -t get_version >/dev/null 2>&1 && break
         sleep 0.5
       done
-      "$0" exec "$IN/start-heyo.sh" >/dev/null
+      # With two pictures pinned from the start (the screen cannot be
+      # read under Sway yet, so nothing can be pinned by hand).
+      "$0" exec env HEYO_TEST_PIN="200,160,300,200;800,160,200,120" "$IN/start-heyo.sh" >/dev/null
       sleep 5
       "$0" exec "$IN/check-sway.py" 2>&1 || true
       "$0" exec test -e /tmp/check-passed || failed=1
