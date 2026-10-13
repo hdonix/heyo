@@ -35,6 +35,7 @@ mod fonts;
 mod guard;
 mod host;
 mod icons;
+mod ids;
 mod keys;
 #[cfg(target_os = "linux")]
 mod layer;

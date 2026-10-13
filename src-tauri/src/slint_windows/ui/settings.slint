@@ -63,9 +63,14 @@ export struct Line {
     hotkey: string,
     keys: [string],
     more: string,
-    // A table's row: its alias, and whether it has a box to tick.
+    // What its further button acts on, as the model named it.
+    more-id: string,
+    // A table's row: its alias, and whether it has a box to tick; and
+    // what each of the two acts on.
     alias: string,
+    alias-id: string,
     checkable: bool,
+    check-id: string,
     open: bool,
     busy: bool,
 }
@@ -234,7 +239,7 @@ component AboutPage inherits VerticalLayout {
             text: root.line.more;
             enabled: !root.line.busy;
             clicked => {
-                Host.act("act:update", "");
+                Host.act(root.line.more-id, "");
             }
         }
     }
@@ -244,7 +249,7 @@ component AboutPage inherits VerticalLayout {
         Button {
             text: root.line.on ? "Copied" : "Copy Diagnostics";
             clicked => {
-                Host.act("act:copy-diagnostics", "");
+                Host.act(root.line.id, "");
             }
         }
     }
@@ -386,7 +391,7 @@ component LineView inherits VerticalLayout {
             if root.line.more != "": Button {
                 text: root.line.more;
                 clicked => {
-                    Host.act("more:" + root.line.id, "");
+                    Host.act(root.line.more-id, "");
                 }
             }
             if root.line.control == "switch": Switch {
@@ -497,7 +502,7 @@ component LineView inherits VerticalLayout {
                         checked: root.line.on;
                         mixed: root.line.mixed;
                         toggled(on) => {
-                            Host.act("enable-all:" + root.line.id, on ? "true" : "false");
+                            Host.act(root.line.check-id, on ? "true" : "false");
                         }
                     }
                 }
@@ -584,7 +589,7 @@ component LineView inherits VerticalLayout {
                     width: 130px;
                     height: Tokens.height-md;
                     bare: true;
-                    name: "alias:" + root.line.id;
+                    name: root.line.alias-id;
                     stored: root.line.alias;
                     label: "Alias for " + root.line.label;
                     placeholder: "Add Alias";
@@ -613,7 +618,7 @@ component LineView inherits VerticalLayout {
                         label: root.line.label + " enabled";
                         checked: root.line.on;
                         toggled(on) => {
-                            Host.act("enable:" + root.line.id, on ? "true" : "false");
+                            Host.act(root.line.check-id, on ? "true" : "false");
                         }
                     }
                 }

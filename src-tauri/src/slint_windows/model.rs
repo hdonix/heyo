@@ -18,6 +18,7 @@ use std::collections::BTreeSet;
 use serde_json::{json, Map, Value};
 
 use super::host::Command;
+use super::ids::{Act, Bound, Id};
 use super::keys;
 
 /// The pages: id, title, and the symbol on its tile in the sidebar.
@@ -36,9 +37,6 @@ pub(crate) const APPLICATIONS: &str = "@applications";
 pub(crate) const BUILTIN: &str = "@heyo";
 /// The command whose hotkey is one of Heyo's own, set on its own row.
 const CLIPBOARD_COMMAND: &str = "cmd:@heyo:clipboard-history";
-/// Between the parts of an id that names several things.
-const SEP: char = '\u{1f}';
-
 const DICTATION_LANGUAGES: &[(&str, &str)] = &[("auto", "Detect Automatically"), ("zh", "Chinese (Mandarin)"), ("yue", "Cantonese"), ("en", "English"), ("ja", "Japanese"), ("ko", "Korean")];
 
 const POLISH_MODES: &[(&str, &str, &str)] = &[
@@ -78,8 +76,13 @@ pub(crate) struct Line {
     pub hotkey: String,
     pub keys: Vec<String>,
     pub more: String,
+    /// What its further button acts on, its box to tick, and the field
+    /// of its alias: a line with more than one control has an id for each.
+    pub more_id: String,
     pub alias: String,
+    pub alias_id: String,
     pub checkable: bool,
+    pub check_id: String,
     pub open: bool,
     pub busy: bool,
 }
@@ -149,8 +152,9 @@ impl Line {
         self
     }
 
-    fn more(mut self, words: &str) -> Line {
-        self.more = words.to_string();
+    /// A further button, and what it acts on.
+    fn more(mut self, words: &str, id: Id) -> Line {
+        (self.more, self.more_id) = (words.to_string(), id.into());
         self
     }
 
@@ -466,20 +470,22 @@ impl Model {
         }
         let title = CATEGORIES.iter().find(|(id, _)| *id == self.category).map_or("All categories", |(_, title)| title);
         let mut picks = vec![(String::new(), "Modifications".to_string(), true, false)];
-        picks.extend(MODIFICATIONS.iter().map(|(id, title)| (format!("mod:{id}"), title.to_string(), false, self.modifications.contains(*id))));
+        picks.extend(MODIFICATIONS.iter().map(|(id, title)| (Id::Modification(id.to_string()).into(), title.to_string(), false, self.modifications.contains(*id))));
         picks.push((String::new(), "Categories".to_string(), true, false));
-        picks.extend(CATEGORIES.iter().map(|(id, title)| (format!("cat:{id}"), title.to_string(), false, self.category == *id)));
+        picks.extend(CATEGORIES.iter().map(|(id, title)| (Id::Category(id.to_string()).into(), title.to_string(), false, self.category == *id)));
         Some((title.to_string(), self.modifications.len(), picks))
     }
 
     /// An entry of that menu was ticked.
     pub(crate) fn pick(&mut self, id: &str) {
-        if let Some(modification) = id.strip_prefix("mod:") {
-            if !self.modifications.remove(modification) {
-                self.modifications.insert(modification.to_string());
+        match Id::parse(id) {
+            Id::Modification(modification) => {
+                if !self.modifications.remove(&modification) {
+                    self.modifications.insert(modification);
+                }
             }
-        } else if let Some(category) = id.strip_prefix("cat:") {
-            self.category = category.to_string();
+            Id::Category(category) => self.category = category,
+            _ => {}
         }
     }
 
@@ -509,27 +515,27 @@ impl Model {
             _ => None,
         };
         if let Some((description, action)) = extension {
-            let row = Line::row("act:install-shell-extension", "GNOME Shell Extension").says(description);
+            let row = Line::row(Id::Act(Act::InstallShellExtension), "GNOME Shell Extension").says(description);
             page.card("Wayland", vec![if action.is_empty() { row } else { row.button(action) }]);
         }
         let hotkey = Line::row("", "Heyo Hotkey");
         page.card(
             "",
             vec![
-                Line::row("set:launchAtLogin", "Open at Login").switch(self.set("launchAtLogin")),
-                if self.hotkeys_supported() { hotkey.hotkey("@toggle", self.hotkeys.get("toggle")) } else { hotkey.says("Bind a desktop keyboard shortcut to heyo.") },
+                Line::row(Id::Set("launchAtLogin".into()), "Open at Login").switch(self.set("launchAtLogin")),
+                if self.hotkeys_supported() { hotkey.hotkey(&Bound::Own("toggle".into()).to_string(), self.hotkeys.get("toggle")) } else { hotkey.says("Bind a desktop keyboard shortcut to heyo.") },
             ],
         );
-        page.card("Appearance", vec![Line::row("set:appearance", "Theme").says("Light, dark, or whichever the system is using").select(&self.chosen("appearance"), [("system", "System"), ("light", "Light"), ("dark", "Dark")])]);
+        page.card("Appearance", vec![Line::row(Id::Set("appearance".into()), "Theme").says("Light, dark, or whichever the system is using").select(&self.chosen("appearance"), [("system", "System"), ("light", "Light"), ("dark", "Dark")])]);
         page.card(
             "Window",
             vec![
-                Line::row("set:compactMode", "Compact Mode").says("Show only the search field until you type").switch(self.set("compactMode")),
-                Line::row("set:hideOnBlur", "Hide When Focus Is Lost").says("Close the window when you click elsewhere").switch(self.set("hideOnBlur")),
-                Line::row("set:keepCommand", "Keep the Running Command").says("Reopening Heyo returns to the command you were using instead of the root search").switch(self.set("keepCommand")),
+                Line::row(Id::Set("compactMode".into()), "Compact Mode").says("Show only the search field until you type").switch(self.set("compactMode")),
+                Line::row(Id::Set("hideOnBlur".into()), "Hide When Focus Is Lost").says("Close the window when you click elsewhere").switch(self.set("hideOnBlur")),
+                Line::row(Id::Set("keepCommand".into()), "Keep the Running Command").says("Reopening Heyo returns to the command you were using instead of the root search").switch(self.set("keepCommand")),
             ],
         );
-        page.card("Live Activities", vec![Line::row("set:liveActivities", "Show What Is in Progress").says("Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you").switch(self.set("liveActivities"))]);
+        page.card("Live Activities", vec![Line::row(Id::Set("liveActivities".into()), "Show What Is in Progress").says("Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you").switch(self.set("liveActivities"))]);
         page.done()
     }
 
@@ -568,6 +574,8 @@ impl Model {
                 label: text(command, "title"),
                 icon: Self::icon(extension, &command["icon"]),
                 alias: text(aliases, &id),
+                alias_id: Id::Alias(id.clone()).into(),
+                check_id: Id::Enable(id.clone()).into(),
                 hotkey: if id == CLIPBOARD_COMMAND { String::new() } else { id.clone() },
                 keys: self.item_hotkeys.get(&id).and_then(Value::as_str).map(keys::parts).unwrap_or_default(),
                 checkable: !application,
@@ -577,7 +585,7 @@ impl Model {
                 ..Line::default()
             }
         };
-        let group = |id: &str, label: &str, icon: &str| Line { kind: "group", id: format!("open:{id}"), label: label.to_string(), icon: Some(icon.to_string()), open: open(id), ..Line::default() };
+        let group = |id: &str, label: &str, icon: &str| Line { kind: "group", id: Id::Open(id.to_string()).into(), label: label.to_string(), icon: Some(icon.to_string()), open: open(id), ..Line::default() };
         let mut page = Page::default();
 
         let applications = self.applications_extension();
@@ -605,7 +613,7 @@ impl Model {
                     }
                     let id = text(extension, "id");
                     let enabled = all.iter().filter(|command| !disabled.contains(text(command, "id").as_str())).count();
-                    rows.push(Line { kind: "group", id: format!("open:{id}"), label: Self::extension_title(extension), icon: Self::icon(extension, &extension["icon"]), indent: true, open: open(&id), checkable: true, on: enabled > 0, mixed: enabled > 0 && enabled < all.len(), ..Line::default() });
+                    rows.push(Line { kind: "group", id: Id::Open(id.to_string()).into(), label: Self::extension_title(extension), icon: Self::icon(extension, &extension["icon"]), indent: true, open: open(&id), checkable: true, check_id: Id::EnableAll(id.to_string()).into(), on: enabled > 0, mixed: enabled > 0 && enabled < all.len(), ..Line::default() });
                     if open(&id) {
                         rows.extend(commands.iter().map(|command| entry(extension, command, true, false)));
                     }
@@ -645,7 +653,7 @@ impl Model {
         let mut page = Page::default();
         page.note("Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer.");
         let installed = flag(&self.dictation, "installed");
-        let engine = Line::row("act:install-dictation", "Speech Recognition").says(if installed { "SenseVoice is installed. Audio never leaves this computer." } else { "A one-time download of about 270 MB (SenseVoice speech model)." });
+        let engine = Line::row(Id::Act(Act::InstallDictation), "Speech Recognition").says(if installed { "SenseVoice is installed. Audio never leaves this computer." } else { "A one-time download of about 270 MB (SenseVoice speech model)." });
         let engine = if installed {
             engine.badge("Installed")
         } else if self.progress.is_some() || flag(&self.dictation, "installing") {
@@ -654,9 +662,9 @@ impl Model {
             engine.button("Download")
         };
         let hotkey = Line::row("", "Hotkey");
-        let hotkey = if self.hotkeys_supported() { hotkey.says("Tap to start and tap again to finish, or hold it while you speak").hotkey("@dictation", self.hotkeys.get("dictation")) } else { hotkey.says("Bind a desktop keyboard shortcut to heyo --dictate.") };
+        let hotkey = if self.hotkeys_supported() { hotkey.says("Tap to start and tap again to finish, or hold it while you speak").hotkey(&Bound::Own("dictation".into()).to_string(), self.hotkeys.get("dictation")) } else { hotkey.says("Bind a desktop keyboard shortcut to heyo --dictate.") };
         let known = !self.capabilities.is_null();
-        let hold = Line::row("set:dictationHoldKey", "Hold-to-Talk Key");
+        let hold = Line::row(Id::Set("dictationHoldKey".into()), "Hold-to-Talk Key");
         let hold = if self.capabilities["holdKey"] == "none" {
             hold.says("A single key cannot be watched in this desktop session; use the hotkey instead.")
         } else {
@@ -666,7 +674,7 @@ impl Model {
         let mut rows = vec![engine, hotkey, hold];
         let live = self.live_description();
         if !live.is_empty() {
-            let row = Line::row("set:dictationLive", "Type as You Speak").says(live);
+            let row = Line::row(Id::Set("dictationLive".into()), "Type as You Speak").says(live);
             rows.push(if list(&self.capabilities, "dictationWords").first().is_some_and(|way| way != "pasted") { row.switch(self.set("dictationLive")) } else { row });
         }
         page.card("", rows);
@@ -676,20 +684,20 @@ impl Model {
         page.card(
             "Input",
             vec![
-                Line::row("set:dictationSource", "Microphone").says(if none { "No microphone found. Connect one to use dictation." } else { "" }).warns(none).select(&self.chosen("dictationSource"), std::iter::once(("", "System Default")).chain(microphones.iter().filter_map(|m| Some((m["name"].as_str()?, m["description"].as_str()?))))),
-                Line::row("set:dictationLanguage", "Language").says("Automatic detection handles mixed Chinese and English").select(&self.chosen("dictationLanguage"), DICTATION_LANGUAGES.iter().copied()),
+                Line::row(Id::Set("dictationSource".into()), "Microphone").says(if none { "No microphone found. Connect one to use dictation." } else { "" }).warns(none).select(&self.chosen("dictationSource"), std::iter::once(("", "System Default")).chain(microphones.iter().filter_map(|m| Some((m["name"].as_str()?, m["description"].as_str()?))))),
+                Line::row(Id::Set("dictationLanguage".into()), "Language").says("Automatic detection handles mixed Chinese and English").select(&self.chosen("dictationLanguage"), DICTATION_LANGUAGES.iter().copied()),
             ],
         );
         page.card(
             "Vocabulary",
             vec![
                 Line::row("", "Your Words").says("Names, jargon and product names, one to a line, written the way you want them: “type script” then comes out as TypeScript. For a word that is heard as something else, write heard as -> written as. The recognizer cannot be taught new words, so these are put right in its text; a Chinese name heard as other characters of the same sound is only fixed if you list those characters as “heard as”. Polishing with AI is given the list too."),
-                Line { kind: "area", id: "words".into(), label: "Your Words".into(), value: self.names("dictationVocabulary").join("\n"), placeholder: "TypeScript\nKubernetes\njason -> JSON\n杰森 -> JSON".into(), ..Line::default() },
+                Line { kind: "area", id: Id::Words.into(), label: "Your Words".into(), value: self.names("dictationVocabulary").join("\n"), placeholder: "TypeScript\nKubernetes\njason -> JSON\n杰森 -> JSON".into(), ..Line::default() },
             ],
         );
         let polish = self.chosen("dictationPolish");
         let mode = POLISH_MODES.iter().find(|(value, ..)| *value == polish).unwrap_or(&POLISH_MODES[0]);
-        let mut rows = vec![Line::row("set:dictationPolish", "Mode").says(mode.2).select(mode.0, POLISH_MODES.iter().map(|(value, title, _)| (*value, *title)))];
+        let mut rows = vec![Line::row(Id::Set("dictationPolish".into()), "Mode").says(mode.2).select(mode.0, POLISH_MODES.iter().map(|(value, title, _)| (*value, *title)))];
         if mode.0 != "off" && self.chosen("aiProvider") != "local" && !self.set("anthropicApiKeySet") {
             rows.push(Line::row("", "Claude API Key").says("Polishing needs a Claude API key or a local model. Set either in Advanced."));
         }
@@ -708,7 +716,7 @@ impl Model {
         };
         page.card("Hotkeys", vec![hotkey("heyo:screenshot", "Capture Screenshot", "Enter copies, Ctrl+S saves, Esc cancels"), hotkey("heyo:screenshot-text", "Capture Text from Screen", "Drag over text and it is copied")]);
         let installed = flag(&self.ocr, "installed");
-        let engine = Line::row("act:install-ocr", "Recognition Engine").says(if installed { "PaddleOCR is installed. Chinese and English; images never leave this computer." } else { "A one-time download of about 340 MB (PaddleOCR, Chinese and English)." });
+        let engine = Line::row(Id::Act(Act::InstallOcr), "Recognition Engine").says(if installed { "PaddleOCR is installed. Chinese and English; images never leave this computer." } else { "A one-time download of about 340 MB (PaddleOCR, Chinese and English)." });
         page.card("Text Recognition", vec![if installed { engine.badge("Installed") } else if self.ocr_installing || flag(&self.ocr, "installing") { engine.text("Downloading…") } else { engine.button("Download") }]);
         page.done()
     }
@@ -744,27 +752,27 @@ impl Model {
         page.card(
             "Extensions",
             vec![
-                Line::row("set:nodePath", "Node.js").says(format!("{version}{} Extensions need Node.js 22 or newer.", if self.set("nodeOverridden") { " HEYO_NODE overrides this setting." } else { "" })).warns(found.is_none()).field(self.chosen("nodePath"), "node (from PATH)"),
-                Line::row("act:open-extensions", "Extensions Folder").says(self.chosen("extensionsDir")).button("Open"),
+                Line::row(Id::Set("nodePath".into()), "Node.js").says(format!("{version}{} Extensions need Node.js 22 or newer.", if self.set("nodeOverridden") { " HEYO_NODE overrides this setting." } else { "" })).warns(found.is_none()).field(self.chosen("nodePath"), "node (from PATH)"),
+                Line::row(Id::Act(Act::OpenExtensions), "Extensions Folder").says(self.chosen("extensionsDir")).button("Open"),
             ],
         );
         page.card(
             "Rendering",
-            vec![Line::row("set:renderer", "Renderer").says("How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started.").select(&self.chosen("renderer"), RENDERERS.iter().copied())],
+            vec![Line::row(Id::Set("renderer".into()), "Renderer").says("How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started.").select(&self.chosen("renderer"), RENDERERS.iter().copied())],
         );
         let local = self.chosen("aiProvider") == "local";
-        let mut rows = vec![Line::row("set:aiProvider", "Model").says("Answers Selected Text Actions and polishes dictation.").select(if local { "local" } else { "claude" }, [("claude", "Claude"), ("local", "Local Model")])];
+        let mut rows = vec![Line::row(Id::Set("aiProvider".into()), "Model").says("Answers Selected Text Actions and polishes dictation.").select(if local { "local" } else { "claude" }, [("claude", "Claude"), ("local", "Local Model")])];
         if local {
             let (description, warning) = self.server_description();
-            rows.push(Line::row("set:localModelUrl", "Server").says(description).warns(warning).field(self.chosen("localModelUrl"), "http://127.0.0.1:8000/v1"));
-            rows.push(Line::row("set:localModelName", "Model Name").says("Leave empty to use the first model the server offers.").field(self.chosen("localModelName"), "automatic"));
+            rows.push(Line::row(Id::Set("localModelUrl".into()), "Server").says(description).warns(warning).field(self.chosen("localModelUrl"), "http://127.0.0.1:8000/v1"));
+            rows.push(Line::row(Id::Set("localModelName".into()), "Model Name").says("Leave empty to use the first model the server offers.").field(self.chosen("localModelName"), "automatic"));
         } else {
             let saved = self.set("anthropicApiKeySet");
-            let key = Line::row("apikey", "API Key").says("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.").secret(if saved { "Saved — type a new key to replace it" } else { "sk-ant-…" });
-            rows.push(if saved { key.more("Remove") } else { key });
+            let key = Line::row(Id::ApiKey, "API Key").says("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.").secret(if saved { "Saved — type a new key to replace it" } else { "sk-ant-…" });
+            rows.push(if saved { key.more("Remove", Id::ForgetApiKey) } else { key });
         }
         page.card("AI", rows);
-        page.card("Pasting", vec![Line::row("set:confirmTerminalPaste", "Ask Before Pasting Several Lines into a Terminal").says("A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces.").switch(self.set("confirmTerminalPaste"))]);
+        page.card("Pasting", vec![Line::row(Id::Set("confirmTerminalPaste".into()), "Ask Before Pasting Several Lines into a Terminal").says("A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces.").switch(self.set("confirmTerminalPaste"))]);
         page.card("Data", vec![Line::row("", "Settings File").says(self.chosen("settingsPath"))]);
         page.done()
     }
@@ -782,6 +790,9 @@ impl Model {
         };
         vec![Line {
             kind: "about",
+            // Its two buttons: the diagnostics, and the update.
+            id: Id::Act(Act::CopyDiagnostics).into(),
+            more_id: Id::Act(Act::Update).into(),
             value: self.chosen("version"),
             description: "A command palette launcher for Linux that runs Raycast extensions.".into(),
             placeholder: "For a bug report: versions, the desktop session and the end of Heyo's log, with keys and tokens removed. Read it before you share it.".into(),
@@ -800,7 +811,7 @@ impl Model {
         let kind = text(preference, "type");
         let value = if stored.is_null() { &preference["default"] } else { stored };
         let (title, label) = (preference["title"].as_str(), preference["label"].as_str());
-        let row = Line::row(format!("pref:{}{SEP}{command}{SEP}{name}{SEP}{kind}", text(extension, "name")), format!("{}{}", title.or(label).unwrap_or(&name), if flag(preference, "required") { " *" } else { "" }));
+        let row = Line::row(Id::Preference { extension: text(extension, "name"), command: command.to_string(), name: name.to_string(), kind: kind.to_string() }, format!("{}{}", title.or(label).unwrap_or(&name), if flag(preference, "required") { " *" } else { "" }));
         // A checkbox's label says what ticking it does, where it has a title too.
         let row = row.says(if kind == "checkbox" && label.is_some() && title.is_some() { label.unwrap_or_default().to_string() } else { text(preference, "description") });
         match kind.as_str() {
@@ -828,9 +839,9 @@ impl Model {
 
     /// An application as a row of a card: one that is left out of
     /// something, with the button that takes it off the list.
-    fn left_out(&self, id: &str, remove: &str, missing: &str) -> Line {
+    fn left_out(&self, id: &str, remove: fn(String) -> Id, missing: &str) -> Line {
         let source = self.sources.iter().find(|source| source["id"] == id);
-        Line::row(format!("{remove}{id}"), source.map_or(id.to_string(), |source| text(source, "name")))
+        Line::row(remove(id.to_string()), source.map_or(id.to_string(), |source| text(source, "name")))
             .says(if source.is_some() { "" } else { missing })
             .pictured(Some(source.and_then(|source| source["icon"].as_str()).unwrap_or("app-window-16").to_string()))
             .button("Remove")
@@ -841,14 +852,14 @@ impl Model {
         let recording = self.set("clipboardHistory");
         let mut rows = Vec::new();
         if self.hotkeys_supported() {
-            rows.push(Line::row("", "Hotkey").says("Opens Clipboard History from anywhere").hotkey("@clipboard", self.hotkeys.get("clipboard")));
+            rows.push(Line::row("", "Hotkey").says("Opens Clipboard History from anywhere").hotkey(&Bound::Own("clipboard".into()).to_string(), self.hotkeys.get("clipboard")));
         }
-        rows.push(Line::row("set:clipboardHistory", "Record Clipboard History").says("Copies marked as secret by password managers are never recorded").switch(recording));
+        rows.push(Line::row(Id::Set("clipboardHistory".into()), "Record Clipboard History").says("Copies marked as secret by password managers are never recorded").switch(recording));
         if recording {
-            rows.push(Line::row("set:clipboardPaused", "Pause Recording").says("Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey.").switch(self.set("clipboardPaused")));
+            rows.push(Line::row(Id::Set("clipboardPaused".into()), "Pause Recording").says("Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey.").switch(self.set("clipboardPaused")));
         }
-        rows.push(Line::row("num:clipboardRetentionDays", "Keep History For").says("Pinned entries are kept forever").select(&self.setting("clipboardRetentionDays").to_string(), RETENTION.iter().copied()));
-        rows.push(Line::row("act:clear-clipboard", "Clear History").says("Pinned entries are not deleted").confirm("Clear…", "Click Again to Clear"));
+        rows.push(Line::row(Id::Num("clipboardRetentionDays".into()), "Keep History For").says("Pinned entries are kept forever").select(&self.setting("clipboardRetentionDays").to_string(), RETENTION.iter().copied()));
+        rows.push(Line::row(Id::Act(Act::ClearClipboard), "Clear History").says("Pinned entries are not deleted").confirm("Clear…", "Click Again to Clear"));
         if recording {
             // Finding entries by what they mean: the switch, the download
             // it needs, and how far reading the history has got.
@@ -865,22 +876,22 @@ impl Model {
             } else {
                 format!("{} can be found this way.", count(indexed, "entry", "entries"))
             };
-            let row = Line::row("set:clipboardMeaning", "Find by Meaning").says(format!("“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere. {state}"));
+            let row = Line::row(Id::Set("clipboardMeaning".into()), "Find by Meaning").says(format!("“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere. {state}"));
             rows.push(if self.meaning.is_null() || installed {
                 row.switch(on)
             } else if self.meaning_installing || flag(&self.meaning, "installing") {
                 row.text("Downloading…")
             } else {
-                Line { id: "act:install-meaning".into(), ..row }.button("Download")
+                Line { id: Id::Act(Act::InstallMeaning).into(), ..row }.button("Download")
             });
         }
         page.card("Clipboard History", rows);
         if recording {
             let ignored = self.names("clipboardIgnoredApps");
-            let mut rows: Vec<Line> = ignored.iter().map(|id| self.left_out(id, "ignore:remove:", "Not installed")).collect();
+            let mut rows: Vec<Line> = ignored.iter().map(|id| self.left_out(id, Id::IgnoreRemove, "Not installed")).collect();
             // Those copied from first, then the rest of the installed.
             let offered = |seen: bool| -> Vec<(&str, &str)> { self.sources.iter().filter(|source| flag(source, "seen") == seen && !ignored.contains(&source["id"].as_str().unwrap_or_default())).filter_map(|source| Some((source["id"].as_str()?, source["name"].as_str()?))).collect() };
-            rows.push(Line::row("ignore:add", "Never Record Copies From").says("What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out.").select("", std::iter::once(("", "Add Application…")).chain(offered(true)).chain(offered(false))));
+            rows.push(Line::row(Id::IgnoreAdd, "Never Record Copies From").says("What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out.").select("", std::iter::once(("", "Add Application…")).chain(offered(true)).chain(offered(false))));
             page.card("Ignored Applications", rows);
         }
     }
@@ -893,7 +904,7 @@ impl Model {
         }
         let available = self.capabilities["snippetExpansion"] != "none";
         let on = self.set("snippetExpansion");
-        let row = Line::row("set:snippetExpansion", "Expand Snippets as You Type");
+        let row = Line::row(Id::Set("snippetExpansion".into()), "Expand Snippets as You Type");
         let mut rows = vec![if available {
             row.says("Typing a snippet's keyword in any application replaces it with the snippet's text. While this is on, Heyo watches what you type to find the keywords; none of it is stored. “Pause or Resume Snippet Expansion” in the root search switches it too.").switch(on)
         } else if self.capabilities["session"] == "wayland" {
@@ -903,8 +914,8 @@ impl Model {
         }];
         if available && on {
             let excluded = self.names("snippetExpansionIgnoredApps");
-            rows.extend(excluded.iter().map(|id| self.left_out(id, "expand:remove:", "")));
-            rows.push(Line::row("expand:add", "Never Expand In").says("Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use.").select("", std::iter::once(("", "Add Application…")).chain(self.sources.iter().filter(|source| !excluded.contains(&source["id"].as_str().unwrap_or_default())).filter_map(|source| Some((source["id"].as_str()?, source["name"].as_str()?))))));
+            rows.extend(excluded.iter().map(|id| self.left_out(id, Id::ExpandRemove, "")));
+            rows.push(Line::row(Id::ExpandAdd, "Never Expand In").says("Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use.").select("", std::iter::once(("", "Add Application…")).chain(self.sources.iter().filter(|source| !excluded.contains(&source["id"].as_str().unwrap_or_default())).filter_map(|source| Some((source["id"].as_str()?, source["name"].as_str()?))))));
         }
         page.card("Snippet Expansion", rows);
     }
@@ -932,7 +943,7 @@ impl Model {
             .filter(|command| query.is_empty() || text(command, "title").to_lowercase().contains(&query))
             .map(|command| {
                 let command_id = text(command, "id");
-                let row = Line::row(format!("enable:{command_id}"), text(command, "title")).says(text(command, "description")).pictured(Self::icon(extension, &command["icon"]));
+                let row = Line::row(Id::Enable(command_id.to_string()), text(command, "title")).says(text(command, "description")).pictured(Self::icon(extension, &command["icon"]));
                 let row = if command_id == CLIPBOARD_COMMAND { row } else { row.hotkey(&command_id, self.item_hotkeys.get(&command_id)) };
                 if applications { row } else { row.switch(!disabled.contains(command_id.as_str())) }
             })
@@ -961,9 +972,9 @@ impl Model {
                 let mut letters = allows.chars();
                 let label = letters.next().map(|first| first.to_uppercase().chain(letters).collect::<String>()).unwrap_or_default();
                 if permission == "activity" {
-                    return Line::row(format!("activities:{name}"), label).says(if activities { "Declared; turn it off here" } else { "Live activities are off in General" }).switch(activities && !self.names("activitiesOff").contains(&name.as_str()));
+                    return Line::row(Id::Activities(name.to_string()), label).says(if activities { "Declared; turn it off here" } else { "Live activities are off in General" }).switch(activities && !self.names("activitiesOff").contains(&name.as_str()));
                 }
-                let line = Line::row(format!("revoke:{name}{SEP}{permission}"), label).says(match row["state"].as_str() {
+                let line = Line::row(Id::Revoke { extension: name.to_string(), permission: permission.to_string() }, label).says(match row["state"].as_str() {
                     Some("allowed") => "Allowed by you",
                     Some("asks") => "Asks you the first time it is used",
                     _ => "Needs no asking",
@@ -975,7 +986,7 @@ impl Model {
         }
         if !builtin {
             let developed = extension["development"].is_string();
-            page.card("", vec![Line::row(format!("uninstall:{id}"), if developed { "Stop Developing" } else { "Uninstall Extension" }).says(if developed { "Takes it out of Heyo; its sources are not touched" } else { "Its preferences are kept" }).confirm(if developed { "Remove" } else { "Uninstall" }, if developed { "Click Again to Remove" } else { "Click Again to Uninstall" })]);
+            page.card("", vec![Line::row(Id::Uninstall(id.to_string()), if developed { "Stop Developing" } else { "Uninstall Extension" }).says(if developed { "Takes it out of Heyo; its sources are not touched" } else { "Its preferences are kept" }).confirm(if developed { "Remove" } else { "Uninstall" }, if developed { "Click Again to Remove" } else { "Click Again to Uninstall" })]);
         }
         page.done()
     }
@@ -1012,7 +1023,7 @@ impl Model {
     /// hotkeys or to an item.
     pub(crate) fn bind(&mut self, id: &str, accelerator: &str) -> Vec<Ask> {
         self.error.clear();
-        if let Some(name) = id.strip_prefix('@') {
+        if let Bound::Own(name) = Bound::parse(id) {
             // One of the host's own, by the name the host has for it.
             let Ok(name) = serde_json::from_value(json!(name)) else { return Vec::new() };
             return vec![ask(Command::SetHotkey { name, accelerator: accelerator.to_string() }, Then::Hotkeys)];
@@ -1029,104 +1040,100 @@ impl Model {
         // download that failed is followed by a look at what is installed).
         self.error.clear();
         let on = value == "true";
-        if let Some(name) = id.strip_prefix("set:") {
-            // A switch says true or false; everything else its words.
-            let value = if value == "true" || value == "false" { json!(on) } else { json!(value) };
-            let mut asks = self.change(name, value);
-            if name == "localModelUrl" || name == "aiProvider" {
-                asks.extend(self.entered());
+        match Id::parse(id) {
+            Id::Set(name) => {
+                // A switch says true or false; everything else its words.
+                let value = if value == "true" || value == "false" { json!(on) } else { json!(value) };
+                let mut asks = self.change(&name, value);
+                if name == "localModelUrl" || name == "aiProvider" {
+                    asks.extend(self.entered());
+                }
+                asks
             }
-            return asks;
-        }
-        if let Some(name) = id.strip_prefix("num:") {
-            return value.parse::<u64>().map(|number| self.change(name, json!(number))).unwrap_or_default();
-        }
-        if let Some(item) = id.strip_prefix("alias:") {
-            let mut aliases = self.setting("aliases").as_object().cloned().unwrap_or_default();
-            let alias = value.trim();
-            if aliases.get(item).and_then(Value::as_str).unwrap_or_default() == alias {
-                return Vec::new();
+            Id::Num(name) => value.parse::<u64>().map(|number| self.change(&name, json!(number))).unwrap_or_default(),
+            Id::Alias(item) => {
+                let mut aliases = self.setting("aliases").as_object().cloned().unwrap_or_default();
+                let alias = value.trim();
+                if aliases.get(&item).and_then(Value::as_str).unwrap_or_default() == alias {
+                    return Vec::new();
+                }
+                if alias.is_empty() {
+                    aliases.remove(&item);
+                } else {
+                    aliases.insert(item, json!(alias));
+                }
+                self.change("aliases", Value::Object(aliases))
             }
-            if alias.is_empty() {
-                aliases.remove(item);
-            } else {
-                aliases.insert(item.to_string(), json!(alias));
+            Id::Enable(command) => {
+                let disabled = self.listed("disabledCommands", &command, !on);
+                self.change("disabledCommands", disabled)
             }
-            return self.change("aliases", Value::Object(aliases));
-        }
-        if let Some(command) = id.strip_prefix("enable:") {
-            let disabled = self.listed("disabledCommands", command, !on);
-            return self.change("disabledCommands", disabled);
-        }
-        if let Some(extension) = id.strip_prefix("enable-all:open:") {
-            let Some(extension) = self.extensions.iter().find(|other| other["id"] == extension) else { return Vec::new() };
-            let ids: Vec<String> = list(extension, "commands").iter().map(|command| text(command, "id")).collect();
-            let mut disabled: Vec<String> = self.names("disabledCommands").into_iter().filter(|other| !ids.iter().any(|id| id == other)).map(str::to_string).collect();
-            if !on {
-                disabled.extend(ids);
+            Id::EnableAll(extension) => {
+                let Some(extension) = self.extensions.iter().find(|other| other["id"] == extension.as_str()) else { return Vec::new() };
+                let ids: Vec<String> = list(extension, "commands").iter().map(|command| text(command, "id")).collect();
+                let mut disabled: Vec<String> = self.names("disabledCommands").into_iter().filter(|other| !ids.iter().any(|id| id == other)).map(str::to_string).collect();
+                if !on {
+                    disabled.extend(ids);
+                }
+                self.change("disabledCommands", json!(disabled))
             }
-            return self.change("disabledCommands", json!(disabled));
-        }
-        if let Some(group) = id.strip_prefix("open:") {
-            if !self.expanded.remove(group) {
-                self.expanded.insert(group.to_string());
+            Id::Open(group) => {
+                if !self.expanded.remove(&group) {
+                    self.expanded.insert(group);
+                }
+                Vec::new()
             }
-            return Vec::new();
-        }
-        if let Some(rest) = id.strip_prefix("pref:") {
-            let &[extension, command, name, kind] = rest.split(SEP).collect::<Vec<_>>().as_slice() else { return Vec::new() };
-            let Some(found) = self.extensions.iter().find(|other| other["name"] == extension) else { return Vec::new() };
-            let mut values = found["values"].clone();
-            let value = if kind == "checkbox" { json!(on) } else { json!(value) };
-            if command.is_empty() {
-                values["extension"][name] = value;
-            } else {
-                values["commands"][command][name] = value;
+            Id::Preference { extension, command, name, kind } => {
+                let Some(found) = self.extensions.iter().find(|other| other["name"] == extension.as_str()) else { return Vec::new() };
+                let mut values = found["values"].clone();
+                let value = if kind == "checkbox" { json!(on) } else { json!(value) };
+                if command.is_empty() {
+                    values["extension"][name.as_str()] = value;
+                } else {
+                    values["commands"][command.as_str()][name.as_str()] = value;
+                }
+                vec![ask(Command::SetExtensionPreferences { extension, values }, Then::Reload)]
             }
-            return vec![ask(Command::SetExtensionPreferences { extension: extension.to_string(), values }, Then::Reload)];
-        }
-        if let Some(rest) = id.strip_prefix("revoke:") {
-            let Some((extension, permission)) = rest.split_once(SEP) else { return Vec::new() };
-            // By the name the host has for it, as the host said it.
-            let Ok(permission) = serde_json::from_value(json!(permission)) else { return Vec::new() };
-            return vec![ask(Command::RevokeExtensionPermission { extension: extension.to_string(), permission }, Then::Permissions(self.page.clone())), ask(Command::ExtensionPermissions(self.page.clone()), Then::Permissions(self.page.clone()))];
-        }
-        if let Some(extension) = id.strip_prefix("activities:") {
-            let off = self.listed("activitiesOff", extension, !on);
-            return self.change("activitiesOff", off);
-        }
-        if let Some(extension) = id.strip_prefix("uninstall:") {
-            return vec![ask(Command::UninstallExtension(extension.to_string()), Then::Uninstalled)];
-        }
-        match id {
-            "words" => {
+            Id::Revoke { extension, permission } => {
+                // By the name the host has for it, as the host said it.
+                let Ok(permission) = serde_json::from_value(json!(permission)) else { return Vec::new() };
+                vec![ask(Command::RevokeExtensionPermission { extension, permission }, Then::Permissions(self.page.clone())), ask(Command::ExtensionPermissions(self.page.clone()), Then::Permissions(self.page.clone()))]
+            }
+            Id::Activities(extension) => {
+                let off = self.listed("activitiesOff", &extension, !on);
+                self.change("activitiesOff", off)
+            }
+            Id::Uninstall(extension) => vec![ask(Command::UninstallExtension(extension), Then::Uninstalled)],
+            Id::Words => {
                 let lines: Vec<&str> = value.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
                 if lines == self.names("dictationVocabulary") { Vec::new() } else { self.change("dictationVocabulary", json!(lines)) }
             }
-            "ignore:add" | "expand:add" if value.is_empty() => Vec::new(),
-            "ignore:add" => self.change("clipboardIgnoredApps", self.listed("clipboardIgnoredApps", value, true)),
-            "expand:add" => self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", value, true)),
+            Id::IgnoreAdd | Id::ExpandAdd if value.is_empty() => Vec::new(),
+            Id::IgnoreAdd => self.change("clipboardIgnoredApps", self.listed("clipboardIgnoredApps", value, true)),
+            Id::ExpandAdd => self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", value, true)),
+            Id::IgnoreRemove(application) => self.change("clipboardIgnoredApps", self.listed("clipboardIgnoredApps", &application, false)),
+            Id::ExpandRemove(application) => self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", &application, false)),
             // The key has a command of its own, which is the only way it is set.
-            "apikey" if value.trim().is_empty() => Vec::new(),
-            "apikey" => vec![ask(Command::SetAnthropicApiKey(value.to_string()), Then::Settings)],
-            "more:apikey" => vec![ask(Command::SetAnthropicApiKey(String::new()), Then::Settings)],
-            "act:install-shell-extension" => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
-            "act:install-dictation" => {
+            Id::ApiKey if value.trim().is_empty() => Vec::new(),
+            Id::ApiKey => vec![ask(Command::SetAnthropicApiKey(value.to_string()), Then::Settings)],
+            Id::ForgetApiKey => vec![ask(Command::SetAnthropicApiKey(String::new()), Then::Settings)],
+            Id::Act(Act::InstallShellExtension) => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
+            Id::Act(Act::InstallDictation) => {
                 self.progress = Some("Starting…".into());
                 vec![ask(Command::DictationInstall, Then::Started("dictation"))]
             }
-            "act:install-ocr" => {
+            Id::Act(Act::InstallOcr) => {
                 self.ocr_installing = true;
                 vec![ask(Command::OcrInstall, Then::Started("ocr"))]
             }
-            "act:install-meaning" => {
+            Id::Act(Act::InstallMeaning) => {
                 self.meaning_installing = true;
                 vec![ask(Command::ClipboardMeaningInstall, Then::Started("meaning"))]
             }
-            "act:open-extensions" => vec![ask(Command::OpenExtensionsFolder, Then::Nothing)],
-            "act:clear-clipboard" => vec![ask(Command::ClearClipboardHistory, Then::Nothing)],
-            "act:copy-diagnostics" => vec![ask(Command::CopyDiagnostics, Then::Copied)],
-            "act:update" => match self.update.clone() {
+            Id::Act(Act::OpenExtensions) => vec![ask(Command::OpenExtensionsFolder, Then::Nothing)],
+            Id::Act(Act::ClearClipboard) => vec![ask(Command::ClearClipboardHistory, Then::Nothing)],
+            Id::Act(Act::CopyDiagnostics) => vec![ask(Command::CopyDiagnostics, Then::Copied)],
+            Id::Act(Act::Update) => match self.update.clone() {
                 Update::Newer(version) => {
                     self.update = Update::Installing(version);
                     vec![ask(Command::InstallUpdate, Then::Installed)]
@@ -1137,15 +1144,8 @@ impl Model {
                 }
                 Update::Checking | Update::Installing(_) => Vec::new(),
             },
-            _ => {
-                if let Some(app) = id.strip_prefix("ignore:remove:") {
-                    return self.change("clipboardIgnoredApps", self.listed("clipboardIgnoredApps", app, false));
-                }
-                if let Some(app) = id.strip_prefix("expand:remove:") {
-                    return self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", app, false));
-                }
-                Vec::new()
-            }
+            // The menu's entries are `pick`'s; a line that only has a name does nothing.
+            Id::Modification(_) | Id::Category(_) | Id::Named(_) => Vec::new(),
         }
     }
 
@@ -1756,7 +1756,7 @@ mod tests {
         assert!(second.checkable && !second.on && second.indent);
         // Some of its commands are on: neither ticked nor empty.
         assert!(zeta.checkable && zeta.on && zeta.mixed && zeta.open);
-        assert_eq!(changes(&model.acted(&format!("enable-all:{}", zeta.id), "false"))["disabledCommands"], json!(["cmd:zeta:one", "cmd:zeta:two"]));
+        assert_eq!(changes(&model.acted(&zeta.check_id, "false"))["disabledCommands"], json!(["cmd:zeta:one", "cmd:zeta:two"]));
         assert_eq!(changes(&model.acted("alias:app:files.desktop", " fm ")), json!({ "aliases": { "app:firefox.desktop": "ff", "app:files.desktop": "fm" } }));
         assert!(model.acted("alias:app:files.desktop", "fm").is_empty());
         assert_eq!(changes(&model.acted("alias:app:firefox.desktop", ""))["aliases"], json!({ "app:files.desktop": "fm" }));

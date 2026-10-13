@@ -185,8 +185,11 @@ impl slint::Model for Lines {
             hotkey: line.hotkey.as_str().into(),
             keys: strings(&line.keys),
             more: line.more.as_str().into(),
+            more_id: line.more_id.as_str().into(),
             alias: line.alias.as_str().into(),
+            alias_id: line.alias_id.as_str().into(),
             checkable: line.checkable,
+            check_id: line.check_id.as_str().into(),
             open: line.open,
             busy: line.busy,
         })
