@@ -201,6 +201,11 @@ impl<C: ComponentHandle + 'static> Life<C> {
         standing::pointed_of(self.told, self.window.window(), hear);
     }
 
+    /// How the pointer is to look over the window (`standing::cursor_of`).
+    pub(super) fn cursor(&self, icon: slint::winit_030::winit::window::CursorIcon) {
+        standing::cursor_of(self.told, self.window.window(), icon);
+    }
+
     /// The same for the keys (`standing::keyed_of`).
     pub(super) fn keyed(&self, hear: impl Fn(standing::Keyed) -> bool + 'static) {
         standing::keyed_of(self.told, self.window.window(), hear);

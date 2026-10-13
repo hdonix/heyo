@@ -454,7 +454,7 @@ impl Overlay {
                 eprintln!("heyo: the screenshot overlay could not be shown: {e}");
             }
         });
-        self.life.window().window().with_winit_window(|made| made.set_cursor(CursorIcon::Crosshair));
+        self.life.cursor(CursorIcon::Crosshair);
         crate::screenshot::mark("overlay put on screen", asked);
         self.held_tries = 0;
         self.hold();
@@ -796,7 +796,7 @@ impl Overlay {
         // (`frame_throttle.rs` of Slint's winit backend): the selection
         // would follow the pointer that much later.
         if changed {
-            window.window().with_winit_window(|made| made.set_cursor(icon(cursor)));
+            self.life.cursor(icon(cursor));
         }
         self.life.draw();
     }

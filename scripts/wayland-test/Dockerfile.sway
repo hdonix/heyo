@@ -8,6 +8,9 @@ FROM heyo-wayland-test
 # The protocol in/pointer.py speaks, as wlroots publishes it (its licence
 # is in the file).
 COPY wlr-virtual-pointer-unstable-v1.xml /opt/wlr-virtual-pointer-unstable-v1.xml
+# The protocol in/ime.py speaks, an input method's, and the one it names
+# (their licences are in the files).
+COPY input-method-unstable-v2.xml text-input-unstable-v3.xml /opt/
 RUN apt-get update && apt-get install -y --no-install-recommends \
       # The compositor, headless; pictures of its screen.
       sway grim \
@@ -18,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       # Keys for a session that has no keyboard either.
       wtype \
     && rm -rf /var/lib/apt/lists/* \
-    && python3 -m pywayland.scanner -i /usr/share/wayland/wayland.xml /opt/wlr-virtual-pointer-unstable-v1.xml -o /opt/heyo_protocols \
+    && python3 -m pywayland.scanner -i /usr/share/wayland/wayland.xml /opt/wlr-virtual-pointer-unstable-v1.xml /opt/text-input-unstable-v3.xml /opt/input-method-unstable-v2.xml -o /opt/heyo_protocols \
     && touch /opt/heyo_protocols/__init__.py
 
 COPY sway-session.sh /usr/local/bin/sway-session.sh

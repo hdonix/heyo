@@ -146,6 +146,23 @@ def heyo(*arguments):
     subprocess.run([HEYO, *arguments], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def input_method():
+    """An input method for the session (ime.py), and how to tell it what to do: its answer comes back."""
+    method = subprocess.Popen([os.path.join(HERE, "ime.py")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    atexit.register(method.terminate)
+    if method.stdout.readline().strip() != "ok":
+        return None
+
+    def tell(*words):
+        method.stdin.write(" ".join(words) + "\n")
+        method.stdin.flush()
+        answer = method.stdout.readline().strip()
+        time.sleep(0.4)
+        return answer
+
+    return tell
+
+
 def same(a, b, points):
     """How many of those places of two pictures are not the same, pixel for pixel."""
     return len(differing(a, b, points))

@@ -24,6 +24,8 @@ has every key while it is there: the screen dimmed from corner to corner;
 a key typed not reaching the application; what is selected drawn as the
 screen was, pixel for pixel; a line typed with the text tool, with a key
 held down pressed again and again, and undone with Control and a key;
+a line typed through an input method (ime.py), which is asked for text
+when the line is begun, whose composing is shown and whose choice stays;
 Escape giving it up, the keyboard back where it was, and what is typed
 then reaching the application. And with a second output beside the
 first, the overlay on the one the pointer is on, and on that one only.
@@ -39,7 +41,7 @@ no way of typing into another application under Sway yet.
 import os, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from swaybed import application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, output, outputs, picture, point, pointer, press, release, same, scale, sway, typed, wait, width, windows
+from swaybed import input_method, application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, output, outputs, picture, point, pointer, press, release, same, scale, sway, typed, wait, width, windows
 
 # Where the pill's window is: 360 by 44, at the bottom centre, a tenth up.
 left, top = (width - 360) // 2, height - 44 - height // 10
@@ -196,6 +198,23 @@ check("a key held down is pressed again and again", one > 0 and many > 6 * one, 
 keys("-M", "ctrl", "z", "-m", "ctrl")
 shot = picture()
 check("Control and Z take the last line back, and not the first", marked(shot, 200) == 0 and marked(shot, 90) == one, (marked(shot, 200), marked(shot, 90)))
+
+# A line typed through an input method, with no key pressed.
+method = input_method()
+check("the session takes an input method", bool(method))
+if method:
+    check("... which nothing asks for text while no line is being typed", method("active") == "no")
+    point(x0 + 40, y0 + 300)
+    click()
+    check("it is asked for text when a line is begun", method("active") == "yes")
+    method("compose", "nihao")
+    composing = marked(picture(), 300)
+    check("what it is composing is shown in the line", composing > 2 * one, f"{composing} pixels wide, one letter {one}")
+    method("choose", "你好你好你好你好")
+    keys("-k", "Return")
+    chosen = marked(picture(), 300)
+    check("what is chosen is the line, and stays when Enter ends it", chosen > 3 * one and chosen != composing, f"{chosen} pixels wide, composing was {composing}")
+    check("... after which it is asked for nothing", method("active") == "no")
 
 # Escape gives the screenshot up; the keyboard is where it was.
 keys("-k", "Escape")

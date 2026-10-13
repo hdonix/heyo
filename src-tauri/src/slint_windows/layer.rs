@@ -34,6 +34,9 @@ use slint::{LogicalPosition, LogicalSize, PhysicalSize, PlatformError};
 use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState, Region};
 use smithay_client_toolkit::output::{OutputHandler, OutputState};
 use smithay_client_toolkit::registry::{ProvidesRegistryState, RegistryState};
+use slint::winit_030::winit::window::CursorIcon;
+use smithay_client_toolkit::reexports::protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::{Shape, WpCursorShapeDeviceV1};
+use smithay_client_toolkit::seat::pointer::cursor_shape::CursorShapeManager;
 use smithay_client_toolkit::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
 use smithay_client_toolkit::seat::{Capability, SeatHandler, SeatState};
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure};
@@ -175,6 +178,12 @@ pub(super) struct Layered {
     hears: RefCell<Option<Rc<dyn Fn(Pointed) -> bool>>>,
     /// The same for the keys, for one that has the keyboard.
     keyed: RefCell<Option<Rc<dyn Fn(Keyed) -> bool>>>,
+    /// What the pointer looks like over it.
+    cursor: Cell<Shape>,
+    /// Slint said that something in it takes text now, with its cursor
+    /// there, or that nothing does any more: to be said to the
+    /// compositor at the next turn.
+    typing: Cell<Option<Option<composing::Cursor>>>,
     /// Something in it changed since it was drawn.
     dirty: Cell<bool>,
     /// A frame was handed over and the compositor has not shown it yet.
@@ -248,6 +257,8 @@ impl Layered {
             at: Cell::new((0, 0)),
             hears: RefCell::new(None),
             keyed: RefCell::new(None),
+            cursor: Cell::new(Shape::Default),
+            typing: Cell::new(None),
             dirty: Cell::new(false),
             waiting: Cell::new(false),
         });
@@ -356,6 +367,7 @@ impl Layered {
     fn take_off(&self) {
         self.configured.set(false);
         self.waiting.set(false);
+        self.typing.set(Some(None));
         if let Renderer::Solid(skia, given) = &self.renderer {
             // What it drew into goes with the surface.
             let _ = skia.suspend();
@@ -386,6 +398,17 @@ impl Layered {
             // All of it.
             _ => layer.wl_surface().set_input_region(None),
         }
+    }
+
+    /// Has the pointer look as the window wants it, if it is over it.
+    fn shape(&self) {
+        with(|wayland| {
+            if let (Some(device), Some((surface, serial))) = (wayland.state.shape.as_ref(), wayland.state.inside.as_ref()) {
+                if self.is(surface) {
+                    device.set_shape(*serial, self.cursor.get());
+                }
+            }
+        });
     }
 
     /// A key went down or up in it, or is pressed again because it stays
@@ -493,8 +516,26 @@ impl WindowAdapter for Layered {
         self.dirty.set(true);
         soon();
     }
+
+    fn internal(&self, _: i_slint_core::InternalToken) -> Option<&dyn i_slint_core::window::WindowAdapterInternal> {
+        Some(self)
+    }
 }
 
+/// What Slint asks of a window besides what `WindowAdapter` has: here,
+/// that the input method be told when a line is being typed, and where.
+impl i_slint_core::window::WindowAdapterInternal for Layered {
+    fn input_method_request(&self, request: i_slint_core::window::InputMethodRequest) {
+        use i_slint_core::window::InputMethodRequest;
+        self.typing.set(Some(match request {
+            InputMethodRequest::Enable(typed) | InputMethodRequest::Update(typed) => Some((typed.cursor_rect_origin.x.round() as i32, typed.cursor_rect_origin.y.round() as i32, typed.cursor_rect_size.width.round().max(1.0) as i32, typed.cursor_rect_size.height.round().max(1.0) as i32)),
+            _ => None,
+        }));
+        soon();
+    }
+}
+
+mod composing;
 mod keys;
 
 /// What draws a window, and for Skia the size of the surface it was given.
@@ -547,6 +588,9 @@ enum Said {
     Key(wl_surface::WlSurface, keys::Press, bool),
     /// Whether Control and Alt are held.
     Held(wl_surface::WlSurface, bool, bool),
+    /// The input method: the text that was chosen, and what is being
+    /// composed now, with the part of it that is marked (in bytes).
+    Composed(wl_surface::WlSurface, Option<String>, Option<(String, i32, i32)>),
 }
 
 struct State {
@@ -558,6 +602,13 @@ struct State {
     shm: Shm,
     pool: SlotPool,
     pointer: Option<wl_pointer::WlPointer>,
+    /// What says to the compositor how the pointer is to look, where it
+    /// takes that by name; and the surface the pointer is over, with the
+    /// number it came in under, which has to be said back.
+    shapes: Option<CursorShapeManager>,
+    shape: Option<WpCursorShapeDeviceV1>,
+    inside: Option<(wl_surface::WlSurface, u32)>,
+    composing: composing::Composing,
     keyboard: Option<wl_keyboard::WlKeyboard>,
     keys: keys::Keyboard,
     /// The surface that has the keyboard.
@@ -581,12 +632,13 @@ fn connect() -> Result<Wayland, String> {
     let layers = LayerShell::bind(&globals, &handle).map_err(|e| e.to_string())?;
     let shm = Shm::bind(&globals, &handle).map_err(|e| e.to_string())?;
     let pool = SlotPool::new(360 * 44 * 4 * 4, &shm).map_err(|e| e.to_string())?;
-    let state = State { registry: RegistryState::new(&globals), outputs: OutputState::new(&globals, &handle), seats: SeatState::new(&globals, &handle), compositor, layers, shm, pool, pointer: None, keyboard: None, keys: keys::Keyboard::new(), keyed: None, said: Vec::new() };
+    let state = State { registry: RegistryState::new(&globals), outputs: OutputState::new(&globals, &handle), seats: SeatState::new(&globals, &handle), compositor, layers, shm, pool, pointer: None, shapes: CursorShapeManager::bind(&globals, &handle).ok(), shape: None, inside: None, composing: composing::Composing::default(), keyboard: None, keys: keys::Keyboard::new(), keyed: None, said: Vec::new() };
     let mut wayland = Wayland { connection, queue, state };
     // The outputs and the seat are known after this.
     for _ in 0..2 {
         wayland.queue.roundtrip(&mut wayland.state).map_err(|e| e.to_string())?;
     }
+    wayland.state.composing = composing::Composing::new(&globals, &handle, wayland.state.seats.seats().next().as_ref());
     SOCKET.store(wayland.connection.as_fd().as_raw_fd(), Ordering::SeqCst);
     watch(wayland.connection.as_fd().as_raw_fd());
     Ok(wayland)
@@ -728,8 +780,32 @@ fn turn() {
                     REPEAT.set(Some((press.code, Rc::downgrade(window), timer)));
                 }
             }
+            Said::Composed(surface, chosen, composed) => {
+                use i_slint_core::input::{InternalKeyEvent, KeyEvent, KeyEventType};
+                use i_slint_core::platform::InternalEvent;
+                let Some(window) = of(&surface) else { continue };
+                // As Slint's own backend hands them over: what was chosen
+                // first, then what is being composed after it.
+                if let Some(chosen) = chosen {
+                    let mut key_event = KeyEvent::default();
+                    key_event.text = chosen.as_str().into();
+                    let _ = window.window.dispatch_event_with_result(WindowEvent::internal(InternalEvent::Key(InternalKeyEvent { event_type: KeyEventType::CommitComposition, key_event, ..Default::default() })));
+                }
+                let (text, marked) = composed.map_or((String::new(), None), |(text, from, to)| (text, (from >= 0 && to >= 0).then_some(from..to)));
+                let _ = window.window.dispatch_event_with_result(WindowEvent::internal(InternalEvent::Key(InternalKeyEvent { event_type: KeyEventType::UpdateComposition, preedit_text: text.as_str().into(), preedit_selection: marked, ..Default::default() })));
+            }
             Said::Pointer(surface, kind, at) => {
                 let Some(window) = of(&surface) else { continue };
+                match kind {
+                    PointerEventKind::Enter { serial } => {
+                        with(|wayland| wayland.state.inside = Some((surface.clone(), serial)));
+                        window.shape();
+                    }
+                    PointerEventKind::Leave { .. } => {
+                        with(|wayland| wayland.state.inside = None);
+                    }
+                    _ => {}
+                }
                 // A window that hears of the pointer itself, in its device pixels.
                 let hears = window.hears.borrow().clone();
                 if let Some(hears) = hears {
@@ -762,6 +838,9 @@ fn turn() {
         }
     }
     for window in &windows {
+        if let Some(typing) = window.typing.take() {
+            with(|wayland| wayland.state.composing.want(typing));
+        }
         if window.dirty.get() && window.configured.get() && !window.waiting.get() {
             with(|wayland| window.draw(wayland));
         }
@@ -788,6 +867,30 @@ pub(super) fn hear(window: &slint::Window, hear: impl Fn(Pointed) -> bool + 'sta
     if let Some(layered) = of(window) {
         *layered.hears.borrow_mut() = Some(Rc::new(hear));
     }
+}
+
+/// How the pointer is to look over the window, where the compositor
+/// takes that by name (the protocol cursor-shape); elsewhere it stays as
+/// it was when it came over the window.
+pub(super) fn cursor(window: &slint::Window, icon: CursorIcon) {
+    let Some(layered) = of(window) else { return };
+    layered.cursor.set(match icon {
+        CursorIcon::Crosshair => Shape::Crosshair,
+        CursorIcon::Move => Shape::Move,
+        CursorIcon::NsResize => Shape::NsResize,
+        CursorIcon::EwResize => Shape::EwResize,
+        CursorIcon::NwseResize => Shape::NwseResize,
+        CursorIcon::NeswResize => Shape::NeswResize,
+        CursorIcon::Grab => Shape::Grab,
+        CursorIcon::Grabbing => Shape::Grabbing,
+        CursorIcon::Pointer => Shape::Pointer,
+        CursorIcon::Text => Shape::Text,
+        _ => Shape::Default,
+    });
+    layered.shape();
+    with(|wayland| {
+        let _ = wayland.connection.flush();
+    });
 }
 
 /// The same for the keys of a window that has the keyboard.
@@ -887,6 +990,7 @@ impl SeatHandler for State {
     fn new_capability(&mut self, _: &Connection, queue: &QueueHandle<Self>, seat: wl_seat::WlSeat, capability: Capability) {
         if capability == Capability::Pointer && self.pointer.is_none() {
             self.pointer = self.seats.get_pointer(queue, &seat).ok();
+            self.shape = self.shapes.as_ref().zip(self.pointer.as_ref()).map(|(shapes, pointer)| shapes.get_shape_device(pointer, queue));
         }
         if capability == Capability::Keyboard && self.keyboard.is_none() {
             self.keyboard = Some(seat.get_keyboard(queue, ()));
@@ -898,6 +1002,10 @@ impl SeatHandler for State {
             if let Some(pointer) = self.pointer.take() {
                 pointer.release();
             }
+            if let Some(shape) = self.shape.take() {
+                shape.destroy();
+            }
+            self.inside = None;
         }
         if capability == Capability::Keyboard {
             if let Some(keyboard) = self.keyboard.take() {

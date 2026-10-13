@@ -481,6 +481,17 @@ pub(super) enum KeyOf {
     Other,
 }
 
+/// How the pointer is to look over a window, whoever's it is.
+pub(super) fn cursor_of(told: Told, window: &slint::Window, icon: slint::winit_030::winit::window::CursorIcon) {
+    #[cfg(target_os = "linux")]
+    if told.layered {
+        return super::layer::cursor(window, icon);
+    }
+    let _ = told;
+    use slint::winit_030::WinitWindowAccessor;
+    window.with_winit_window(|made| made.set_cursor(icon));
+}
+
 /// Has a window that is not winit's and has the keyboard hear of the keys
 /// (winit's hear of them from winit), before Slint does: `hear` says
 /// whether Slint is to have a key too.
