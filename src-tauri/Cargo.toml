@@ -69,6 +69,14 @@ gdkx11 = "0.18"
 # with this (`slint_windows::guard`).
 x11-dl = "2.21"
 libc = "0.2"
+# A layer surface of Heyo's own on Wayland (`slint_windows::layer`): the
+# Wayland client and toolkit winit is built on, and Slint's winit backend
+# and core by their own names, to wrap the one and be handed a token of
+# the other. All four are in the build already, through Slint and winit.
+smithay-client-toolkit = { version = "0.19.2", default-features = false }
+wayland-client = "0.31"
+i-slint-backend-winit = "=1.18.1"
+i-slint-core = "=1.18.1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

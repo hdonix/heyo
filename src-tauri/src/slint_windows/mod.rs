@@ -15,6 +15,8 @@
 //! - `window` is the settings window: it puts the two together.
 //! - `pill` is the dictation pill: what it shows, and its window.
 //! - `screenshot` is the screenshot overlay and the pinned captures.
+//! - `layer` is a window as a layer surface of Heyo's own, where a Wayland
+//!   compositor offers that: the way a window floats there.
 //! - `standing` is what a desktop is told of each of them (that it floats
 //!   over everything, that it never has the keyboard), said by the window
 //!   as data and carried out once for each desktop.
@@ -34,6 +36,8 @@ mod guard;
 mod host;
 mod icons;
 mod keys;
+#[cfg(target_os = "linux")]
+mod layer;
 mod life;
 mod model;
 pub(crate) mod pill;

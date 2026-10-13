@@ -65,7 +65,12 @@ pub(super) struct Standing {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Desktop {
     X11,
+    /// A Wayland compositor without the layer shell (GNOME).
     Wayland,
+    /// A Wayland compositor that offers the layer shell (Sway and the
+    /// other wlroots compositors, KWin, COSMIC).
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    Layers,
     Windows,
     /// One nothing is known of: the window is as winit makes it.
     Other,
@@ -132,15 +137,24 @@ pub(super) struct Told {
     /// off the screen there, which is why none is kept, and none is made
     /// before it is wanted: a window that exists is on the screen.)
     pub unplaced: bool,
+    /// The window is a layer surface of Heyo's own (`layer`), where the
+    /// compositor offers that: on the overlay layer, so over everything on
+    /// every workspace; anchored where its window says; never with the
+    /// keyboard; taking the pointer where it is told. It is not one of
+    /// winit's windows, and nothing else need be asked of anybody. (Only a
+    /// window that never has the keyboard, for now: the pill.)
+    pub layered: bool,
 }
 
 /// What is done about a standing on a desktop.
 pub(super) fn told(standing: Standing, desktop: Desktop) -> Told {
     let (over, all) = (standing.layer == Layer::Over, standing.keyboard == Keyboard::All);
-    let nothing = Told { unmanaged: false, utility: false, unlisted: false, made_inactive: false, never_active: false, above: standing.layer == Layer::Above, raised: false, keys: Keys::Left, opaque: !standing.clear, kept: false, unplaced: false };
+    let nothing = Told { unmanaged: false, utility: false, unlisted: false, made_inactive: false, never_active: false, above: standing.layer == Layer::Above, raised: false, keys: Keys::Left, opaque: !standing.clear, kept: false, unplaced: false, layered: false };
+    let layered = over && standing.keyboard == Keyboard::Never;
     match desktop {
         Desktop::X11 => Told { unmanaged: over, utility: !over && !standing.listed, raised: over && all, keys: if all { Keys::Grabbed } else { Keys::Left }, kept: over, ..nothing },
         Desktop::Wayland => Told { keys: if all { Keys::Focused } else { Keys::Left }, unplaced: over, ..nothing },
+        Desktop::Layers => Told { keys: if all { Keys::Focused } else { Keys::Left }, unplaced: over && !layered, layered, ..nothing },
         Desktop::Windows => Told { unlisted: !standing.listed, made_inactive: over, never_active: standing.keyboard == Keyboard::Never, keys: if all { Keys::Focused } else { Keys::Left }, kept: over, ..nothing },
         Desktop::Other => Told { keys: if all { Keys::Focused } else { Keys::Left }, kept: over, ..nothing },
     }
@@ -151,7 +165,13 @@ pub(super) fn told(standing: Standing, desktop: Desktop) -> Told {
 /// known to the desktop by its title, and `at` says where it goes. It
 /// does not wait: the desktop gives the standing to the window when it
 /// comes, or to the one that is there.
-pub(super) fn ask_desktop(standing: Standing, told: Told, title: &'static str, at: Option<OwnPlace>) {
+pub(super) fn ask_desktop(standing: Standing, told: Told, window: &slint::Window, title: &'static str, at: Option<OwnPlace>) {
+    // A layer surface is put where it says by the compositor itself.
+    #[cfg(target_os = "linux")]
+    if told.layered {
+        return super::layer::place(window, at);
+    }
+    let _ = window;
     if !told.unplaced {
         return;
     }
@@ -166,6 +186,10 @@ pub(super) fn desktop() -> Desktop {
     if cfg!(windows) {
         Desktop::Windows
     } else if super::thread::wayland() {
+        #[cfg(target_os = "linux")]
+        if super::layer::offered() {
+            return Desktop::Layers;
+        }
         Desktop::Wayland
     } else if cfg!(target_os = "linux") {
         Desktop::X11
@@ -405,6 +429,31 @@ pub(super) fn reach(window: &Window, within: Option<Rect>) {
     let _ = (window, within);
 }
 
+/// Whether what is behind a window shows where it draws nothing, for a
+/// window that is not winit's and so not drawn by the renderer the others
+/// are: a layer surface always is seen through. None for winit's windows,
+/// where that depends on what draws them (`thread::seen_through`).
+pub(super) fn drawn_clear(window: &slint::Window) -> Option<bool> {
+    #[cfg(target_os = "linux")]
+    if super::layer::is(window) {
+        return Some(true);
+    }
+    let _ = window;
+    None
+}
+
+/// The same for a window that may not be winit's: a layer surface says
+/// it to the compositor.
+pub(super) fn reach_of(told: Told, window: &slint::Window, within: Option<Rect>) {
+    #[cfg(target_os = "linux")]
+    if told.layered {
+        return super::layer::reach(window, within);
+    }
+    let _ = told;
+    use slint::winit_030::WinitWindowAccessor;
+    window.with_winit_window(|made| reach(made, within));
+}
+
 /// A window on winit's own connection to the X server: the one place its
 /// handles are taken.
 #[cfg(target_os = "linux")]
@@ -452,11 +501,23 @@ mod tests {
     const PILL: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::Never, listed: false, clear: true };
     const OVERLAY: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::All, listed: false, clear: false };
 
-    const NOTHING: Told = Told { unmanaged: false, utility: false, unlisted: false, made_inactive: false, never_active: false, above: false, raised: false, keys: Keys::Left, opaque: false, kept: false, unplaced: false };
+    const NOTHING: Told = Told { unmanaged: false, utility: false, unlisted: false, made_inactive: false, never_active: false, above: false, raised: false, keys: Keys::Left, opaque: false, kept: false, unplaced: false, layered: false };
+
+    #[test]
+    fn where_wayland_has_the_layer_shell_the_pill_is_a_layer_surface_and_nobody_is_asked() {
+        assert_eq!(told(PILL, Desktop::Layers), Told { layered: true, ..NOTHING });
+        // The overlay is not one yet: it is still the compositor's to place.
+        assert_eq!(told(OVERLAY, Desktop::Layers), Told { unplaced: true, keys: Keys::Focused, opaque: true, ..NOTHING });
+        assert_eq!(told(PINNED, Desktop::Layers), Told { above: true, opaque: true, ..NOTHING });
+        // And where it has not (GNOME), the desktop itself is asked.
+        assert!(!told(PILL, Desktop::Wayland).layered && told(PILL, Desktop::Wayland).unplaced);
+        // A layer surface is never one of those winit keeps.
+        assert!(![SETTINGS, PINNED, PILL, OVERLAY].iter().any(|standing| told(*standing, Desktop::Layers).kept));
+    }
 
     #[test]
     fn an_ordinary_window_is_told_nothing_of_anywhere() {
-        for desktop in [Desktop::X11, Desktop::Wayland, Desktop::Windows, Desktop::Other] {
+        for desktop in [Desktop::X11, Desktop::Wayland, Desktop::Layers, Desktop::Windows, Desktop::Other] {
             assert_eq!(told(SETTINGS, desktop), NOTHING, "{desktop:?}");
         }
     }

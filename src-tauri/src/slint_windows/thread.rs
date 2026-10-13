@@ -132,8 +132,7 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
     let begin = || -> Result<(), String> {
         guard::test_no_start()?;
         let renderer = renderer();
-        let selector = slint::BackendSelector::new().backend_name("winit".into()).renderer_name(renderer.clone());
-        let selector = selector.with_winit_window_attributes_hook(|attributes| {
+        let told = |attributes| {
             #[cfg(target_os = "linux")]
             let attributes = {
                 use slint::winit_030::winit::platform::wayland::WindowAttributesExtWayland;
@@ -143,9 +142,24 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
                 WindowAttributesExtWayland::with_name(WindowAttributesExtX11::with_name(attributes, "Heyo", "heyo"), "heyo", "heyo")
             };
             standing::attributes(standing::here(MAKING.get()), attributes)
-        });
-        let selector = if super::window::frames::wanted().is_some() { selector.with_winit_custom_application_handler(super::window::frames::Timing) } else { selector };
-        selector.select().map_err(|e| format!("Slint has no backend: {e}"))?;
+        };
+        // On Linux Slint's platform is winit's backend with a wrapper round
+        // it, which hands out winit's windows to all but a window that is
+        // to be a layer surface (`layer`).
+        #[cfg(target_os = "linux")]
+        {
+            let winit = i_slint_backend_winit::Backend::builder().with_renderer_name(renderer.clone()).with_window_attributes_hook(told);
+            let winit = if super::window::frames::wanted().is_some() { winit.with_custom_application_handler(Box::new(super::window::frames::Timing)) } else { winit };
+            let winit = winit.build().map_err(|e| format!("Slint has no backend: {e}"))?;
+            let layered = || standing::here(MAKING.get()).layered;
+            slint::platform::set_platform(Box::new(super::layer::Platform::over(winit, layered))).map_err(|e| format!("Slint has no backend: {e}"))?;
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let selector = slint::BackendSelector::new().backend_name("winit".into()).renderer_name(renderer.clone()).with_winit_window_attributes_hook(told);
+            let selector = if super::window::frames::wanted().is_some() { selector.with_winit_custom_application_handler(super::window::frames::Timing) } else { selector };
+            selector.select().map_err(|e| format!("Slint has no backend: {e}"))?;
+        }
         // A Wayland window is made anew each time it is shown, and the
         // second time Slint leaves out what the hook above gave the first:
         // the window had no application to belong to, and the Shell did

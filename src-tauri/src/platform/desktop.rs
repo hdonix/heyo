@@ -65,6 +65,8 @@ impl Supported {
 
 /// The standing the desktop itself is asked to give one of Heyo's windows
 /// (`Desktop::stand_own`).
+// Read only where a desktop is asked: on Linux.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 #[derive(Clone, Copy)]
 pub struct OwnStanding {
     /// Above the other windows.
@@ -80,6 +82,8 @@ pub struct OwnStanding {
 
 /// Where the desktop is asked to put a window: the rule is
 /// `platform::place`'s, and the desktop's adapter knows its units.
+// Read only where a desktop is asked: on Linux.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 #[derive(Clone, Copy)]
 pub enum OwnPlace {
     /// At the bottom centre of the primary monitor, a tenth of its height

@@ -192,7 +192,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// for it (`standing::ask_desktop`): the window is known there by its
     /// title, and `at` is where it goes. To be said before it is shown.
     pub(super) fn ask_desktop(&self, title: &'static str, at: Option<OwnPlace>) {
-        standing::ask_desktop(self.standing, self.told, title, at);
+        standing::ask_desktop(self.standing, self.told, self.window.window(), title, at);
     }
 
     /// What the desktop is told of it here, and what it cannot be told.
@@ -211,7 +211,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// Has the window take the pointer in `within` only, in its own
     /// device pixels, or everywhere (`standing::reach`).
     pub(super) fn reach(&self, within: Option<Rect>) {
-        self.window.window().with_winit_window(|made| standing::reach(made, within));
+        standing::reach_of(self.told, self.window.window(), within);
     }
 
     /// Slint's window: for what it shows, never to show or hide it.
@@ -260,6 +260,11 @@ impl<C: ComponentHandle + 'static> Life<C> {
             Do::Show => {
                 if let Err(e) = self.window.show() {
                     return then(Err(e.to_string()));
+                }
+                // A window that is not winit's has no window of winit's
+                // to wait for: it is where its standing put it.
+                if self.told.layered {
+                    return then(Ok(()));
                 }
                 self.waiting.borrow_mut().push(Box::new(then));
                 self.wait(false);
@@ -551,6 +556,11 @@ pub(super) fn display(made: &Window, rooms: bool) -> Display {
 /// draws it allows (`thread::seen_through`), and corrected when that is
 /// only learnt at its first frame.
 pub(super) fn seen_through(window: &slint::Window, renderer: &str, set_opaque: impl Fn(bool) + 'static) {
+    // A window that is not winit's is not drawn by `renderer`: its
+    // standing says whether it is seen through.
+    if let Some(clear) = standing::drawn_clear(window) {
+        return set_opaque(!clear);
+    }
     set_opaque(!thread::seen_through(renderer));
     let set_opaque = Rc::new(set_opaque);
     thread::watch(window, renderer, move |clear| {

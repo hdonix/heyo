@@ -1,0 +1,606 @@
+//! A window as a layer surface: what Wayland has for a window that floats
+//! over the others, on every workspace, where it says, without the
+//! keyboard (the protocol wlr-layer-shell, which Sway, Hyprland and the
+//! other wlroots compositors, KWin and COSMIC offer, and GNOME does not).
+//!
+//! winit makes no such surface, and Slint draws only into winit's windows,
+//! so this one is Heyo's own: a connection of its own to the compositor,
+//! a surface on it, Slint's own renderer drawing the same markup into a
+//! buffer that is handed to the compositor, and the pointer's events
+//! handed to Slint. To Slint it is a window like another (a
+//! `WindowAdapter`); the rest of Heyo's Slint code does not know it from
+//! winit's. Slint's platform is winit's backend, wrapped ([`Platform`]):
+//! it hands out winit's windows, except to a window whose standing is
+//! carried out here (`standing::Told::layered`).
+//!
+//! What is here: one kind of window, the dictation pill's. A surface on
+//! the overlay layer of an output, anchored to its bottom centre with the
+//! margin the place module's rule gives, never with the keyboard, taking
+//! the pointer where it is told to (`reach`), drawn at the output's scale.
+//! Not here: the keyboard, a text being composed, more than one output.
+
+use std::cell::{Cell, RefCell};
+use std::os::fd::{AsFd, AsRawFd};
+use std::rc::{Rc, Weak};
+use std::sync::OnceLock;
+
+use slint::platform::software_renderer::{PremultipliedRgbaColor, RepaintBufferType, SoftwareRenderer};
+use slint::platform::{PointerEventButton, WindowAdapter, WindowEvent};
+use slint::{LogicalPosition, LogicalSize, PhysicalSize, PlatformError};
+use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState, Region};
+use smithay_client_toolkit::output::{OutputHandler, OutputState};
+use smithay_client_toolkit::registry::{ProvidesRegistryState, RegistryState};
+use smithay_client_toolkit::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
+use smithay_client_toolkit::seat::{Capability, SeatHandler, SeatState};
+use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure};
+use smithay_client_toolkit::shell::WaylandSurface;
+use smithay_client_toolkit::shm::slot::SlotPool;
+use smithay_client_toolkit::shm::{Shm, ShmHandler};
+use smithay_client_toolkit::{delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry, delegate_seat, delegate_shm, registry_handlers};
+use wayland_client::globals::registry_queue_init;
+use wayland_client::protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface};
+use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
+
+use crate::platform::desktop::OwnPlace;
+use crate::platform::place::{Monitor, Rect};
+
+/// Whether the compositor offers the layer shell. Asked once, on a
+/// connection that is then let go.
+pub(super) fn offered() -> bool {
+    static OFFERED: OnceLock<bool> = OnceLock::new();
+    *OFFERED.get_or_init(|| {
+        let Ok(connection) = Connection::connect_to_env() else { return false };
+        let Ok((globals, _queue)) = registry_queue_init::<Probe>(&connection) else { return false };
+        globals.contents().with_list(|all| all.iter().any(|global| global.interface == "zwlr_layer_shell_v1"))
+    })
+}
+
+/// Hears nothing: the list of what the compositor offers is all that is
+/// wanted of it.
+struct Probe;
+
+impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry, wayland_client::globals::GlobalListContents> for Probe {
+    fn event(_: &mut Self, _: &wayland_client::protocol::wl_registry::WlRegistry, _: wayland_client::protocol::wl_registry::Event, _: &wayland_client::globals::GlobalListContents, _: &Connection, _: &QueueHandle<Self>) {}
+}
+
+// --- Slint's platform, wrapped --------------------------------------------------------
+
+/// winit's backend, which is Slint's platform for every window but those
+/// made here.
+pub(super) struct Platform {
+    winit: i_slint_backend_winit::Backend,
+    /// Whether the window being made is to be a layer surface.
+    layered: Box<dyn Fn() -> bool>,
+}
+
+impl Platform {
+    pub(super) fn over(winit: i_slint_backend_winit::Backend, layered: impl Fn() -> bool + 'static) -> Self {
+        Self { winit, layered: Box::new(layered) }
+    }
+}
+
+impl slint::platform::Platform for Platform {
+    fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+        if (self.layered)() {
+            Ok(Layered::new())
+        } else {
+            self.winit.create_window_adapter()
+        }
+    }
+
+    fn run_event_loop(&self) -> Result<(), PlatformError> {
+        self.winit.run_event_loop()
+    }
+
+    fn process_events(&self, timeout: Option<core::time::Duration>, token: i_slint_core::InternalToken) -> Result<core::ops::ControlFlow<()>, PlatformError> {
+        self.winit.process_events(timeout, token)
+    }
+
+    fn bind_context(&self, context: i_slint_core::SlintContextWeak, token: i_slint_core::InternalToken) {
+        self.winit.bind_context(context, token)
+    }
+
+    fn new_event_loop_proxy(&self) -> Option<Box<dyn slint::platform::EventLoopProxy>> {
+        self.winit.new_event_loop_proxy()
+    }
+
+    fn duration_since_start(&self) -> core::time::Duration {
+        self.winit.duration_since_start()
+    }
+
+    fn click_interval(&self) -> core::time::Duration {
+        self.winit.click_interval()
+    }
+
+    fn cursor_flash_cycle(&self) -> core::time::Duration {
+        self.winit.cursor_flash_cycle()
+    }
+
+    fn set_clipboard_text(&self, text: &str, clipboard: slint::platform::Clipboard) {
+        self.winit.set_clipboard_text(text, clipboard)
+    }
+
+    fn clipboard_text(&self, clipboard: slint::platform::Clipboard) -> Option<String> {
+        self.winit.clipboard_text(clipboard)
+    }
+
+    fn debug_log(&self, arguments: core::fmt::Arguments) {
+        self.winit.debug_log(arguments)
+    }
+
+    fn open_url(&self, url: &str) -> Result<(), PlatformError> {
+        self.winit.open_url(url)
+    }
+}
+
+// --- One window ----------------------------------------------------------------------
+
+/// A window of Slint's that is a layer surface.
+pub(super) struct Layered {
+    window: slint::Window,
+    renderer: SoftwareRenderer,
+    /// Where it goes, as its window said (`place`).
+    place: Cell<Option<OwnPlace>>,
+    /// Where in it the pointer is its own, in its device pixels (`reach`).
+    reach: Cell<Option<Rect>>,
+    surface: RefCell<Option<LayerSurface>>,
+    /// The compositor has said how large it is: it may be drawn.
+    configured: Cell<bool>,
+    /// Its size in logical pixels, and how many device pixels one is.
+    size: Cell<(u32, u32)>,
+    scale: Cell<i32>,
+    /// Something in it changed since it was drawn.
+    dirty: Cell<bool>,
+    /// A frame was handed over and the compositor has not shown it yet.
+    waiting: Cell<bool>,
+}
+
+thread_local! {
+    /// The layer surfaces there are, on Slint's thread.
+    static WINDOWS: RefCell<Vec<Weak<Layered>>> = const { RefCell::new(Vec::new()) };
+    static WAYLAND: RefCell<Option<Wayland>> = const { RefCell::new(None) };
+    /// A turn has been asked for and not taken yet.
+    static ASKED: Cell<bool> = const { Cell::new(false) };
+}
+
+impl Layered {
+    fn new() -> Rc<Self> {
+        let made = Rc::new_cyclic(|own: &Weak<Self>| Self {
+            window: slint::Window::new(own.clone() as Weak<dyn WindowAdapter>),
+            renderer: SoftwareRenderer::new_with_repaint_buffer_type(RepaintBufferType::NewBuffer),
+            place: Cell::new(None),
+            reach: Cell::new(None),
+            surface: RefCell::new(None),
+            configured: Cell::new(false),
+            size: Cell::new((1, 1)),
+            scale: Cell::new(1),
+            dirty: Cell::new(false),
+            waiting: Cell::new(false),
+        });
+        WINDOWS.with_borrow_mut(|windows| {
+            windows.retain(|window| window.strong_count() > 0);
+            windows.push(Rc::downgrade(&made));
+        });
+        made
+    }
+
+    fn is(&self, surface: &wl_surface::WlSurface) -> bool {
+        self.surface.borrow().as_ref().is_some_and(|own| own.wl_surface().id() == surface.id())
+    }
+
+    /// Tells Slint how large the window is and at what scale it is drawn.
+    fn measured(&self) {
+        let (size, scale) = (self.size.get(), self.scale.get());
+        let _ = self.window.dispatch_event_with_result(WindowEvent::ScaleFactorChanged { scale_factor: scale as f32 });
+        let _ = self.window.dispatch_event_with_result(WindowEvent::Resized { size: LogicalSize::new(size.0 as f32, size.1 as f32) });
+        self.dirty.set(true);
+    }
+
+    /// Makes the surface, where the window said it goes. It is drawn once
+    /// the compositor has answered.
+    fn put_on(&self) -> Result<(), String> {
+        if self.surface.borrow().is_some() {
+            return Ok(());
+        }
+        with(|wayland| {
+            let Some(OwnPlace::BottomCentre { size }) = self.place.get() else { return Err("it was not said where it goes".to_string()) };
+            // The first output: Wayland knows no primary one.
+            let output = wayland.state.outputs.outputs().next();
+            let info = output.as_ref().and_then(|output| wayland.state.outputs.info(output));
+            let scale = info.as_ref().map_or(1, |info| info.scale_factor.max(1));
+            // The same rule as everywhere (`place`): what it gives as a
+            // place is said here as a margin from the bottom.
+            let lifted = info.as_ref().and_then(|info| info.logical_size).map_or(0, |(width, height)| {
+                let whole = Monitor::new((0, 0, width.max(0) as u32, height.max(0) as u32), 1.0, true, None);
+                let (_, y) = whole.bottom_centre((size.0.round() as u32, size.1.round() as u32));
+                height - y - size.1.round() as i32
+            });
+            let queue = wayland.queue.handle();
+            let surface = wayland.state.compositor.create_surface(&queue);
+            let layer = wayland.state.layers.create_layer_surface(&queue, surface, Layer::Overlay, Some("heyo"), output.as_ref());
+            layer.set_anchor(Anchor::BOTTOM);
+            layer.set_margin(0, 0, lifted.max(0), 0);
+            layer.set_size(size.0.round() as u32, size.1.round() as u32);
+            layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+            // It is over the others without taking room from them.
+            layer.set_exclusive_zone(-1);
+            layer.wl_surface().set_buffer_scale(scale);
+            layer.commit();
+            self.size.set((size.0.round() as u32, size.1.round() as u32));
+            self.scale.set(scale);
+            *self.surface.borrow_mut() = Some(layer);
+            let _ = wayland.connection.flush();
+            Ok(())
+        })
+        .unwrap_or_else(|| Err("no connection to the compositor".to_string()))?;
+        self.measured();
+        Ok(())
+    }
+
+    fn take_off(&self) {
+        self.configured.set(false);
+        self.waiting.set(false);
+        if self.surface.borrow_mut().take().is_some() {
+            with(|wayland| {
+                let _ = wayland.connection.flush();
+            });
+        }
+    }
+
+    /// Says to the compositor where the pointer is the window's.
+    fn reaches(&self, wayland: &Wayland) {
+        let surface = self.surface.borrow();
+        let Some(layer) = surface.as_ref() else { return };
+        let scale = self.scale.get().max(1);
+        match (self.reach.get(), Region::new(&wayland.state.compositor)) {
+            (Some((x, y, width, height)), Ok(region)) => {
+                region.add(x / scale, y / scale, (width as i32 + scale - 1) / scale, (height as i32 + scale - 1) / scale);
+                layer.wl_surface().set_input_region(Some(region.wl_region()));
+            }
+            // All of it.
+            _ => layer.wl_surface().set_input_region(None),
+        }
+    }
+
+    /// Draws the window and hands the picture to the compositor.
+    fn draw(&self, wayland: &mut Wayland) {
+        let surface = self.surface.borrow();
+        let Some(layer) = surface.as_ref() else { return };
+        let (size, scale) = (self.size.get(), self.scale.get().max(1) as u32);
+        let (width, height) = ((size.0 * scale) as usize, (size.1 * scale) as usize);
+        let mut drawn = vec![PremultipliedRgbaColor::default(); width * height];
+        self.renderer.render(&mut drawn, width);
+        let Ok((buffer, canvas)) = wayland.state.pool.create_buffer(width as i32, height as i32, width as i32 * 4, wl_shm::Format::Argb8888) else { return };
+        for (pixel, out) in drawn.iter().zip(canvas.chunks_exact_mut(4)) {
+            out.copy_from_slice(&[pixel.blue, pixel.green, pixel.red, pixel.alpha]);
+        }
+        let queue = wayland.queue.handle();
+        let surface = layer.wl_surface();
+        self.reaches(wayland);
+        surface.damage_buffer(0, 0, width as i32, height as i32);
+        surface.frame(&queue, surface.clone());
+        if buffer.attach_to(surface).is_ok() {
+            self.waiting.set(true);
+        }
+        layer.commit();
+        self.dirty.set(false);
+    }
+}
+
+impl WindowAdapter for Layered {
+    fn window(&self) -> &slint::Window {
+        &self.window
+    }
+
+    fn size(&self) -> PhysicalSize {
+        let (size, scale) = (self.size.get(), self.scale.get().max(1) as u32);
+        PhysicalSize::new(size.0 * scale, size.1 * scale)
+    }
+
+    fn renderer(&self) -> &dyn slint::platform::Renderer {
+        &self.renderer
+    }
+
+    fn set_visible(&self, visible: bool) -> Result<(), PlatformError> {
+        if visible {
+            self.put_on().map_err(|reason| PlatformError::Other(format!("no layer surface: {reason}")))?;
+        } else {
+            self.take_off();
+        }
+        soon();
+        Ok(())
+    }
+
+    fn request_redraw(&self) {
+        self.dirty.set(true);
+        soon();
+    }
+}
+
+// --- The connection ------------------------------------------------------------------
+
+/// What the compositor said, to be done with once it has been heard out:
+/// what Slint does about it may come back here.
+enum Said {
+    Sized(wl_surface::WlSurface, (u32, u32)),
+    Scaled(wl_surface::WlSurface, i32),
+    Shown(wl_surface::WlSurface),
+    Closed(wl_surface::WlSurface),
+    Pointer(wl_surface::WlSurface, PointerEventKind, (f64, f64)),
+}
+
+struct State {
+    registry: RegistryState,
+    outputs: OutputState,
+    seats: SeatState,
+    compositor: CompositorState,
+    layers: LayerShell,
+    shm: Shm,
+    pool: SlotPool,
+    pointer: Option<wl_pointer::WlPointer>,
+    said: Vec<Said>,
+}
+
+struct Wayland {
+    connection: Connection,
+    queue: EventQueue<State>,
+    state: State,
+}
+
+/// Connects, the first time a layer surface is wanted, and has the loop
+/// woken whenever the compositor says something.
+fn connect() -> Result<Wayland, String> {
+    let connection = Connection::connect_to_env().map_err(|e| e.to_string())?;
+    let (globals, queue) = registry_queue_init::<State>(&connection).map_err(|e| e.to_string())?;
+    let handle = queue.handle();
+    let compositor = CompositorState::bind(&globals, &handle).map_err(|e| e.to_string())?;
+    let layers = LayerShell::bind(&globals, &handle).map_err(|e| e.to_string())?;
+    let shm = Shm::bind(&globals, &handle).map_err(|e| e.to_string())?;
+    let pool = SlotPool::new(360 * 44 * 4 * 4, &shm).map_err(|e| e.to_string())?;
+    let state = State { registry: RegistryState::new(&globals), outputs: OutputState::new(&globals, &handle), seats: SeatState::new(&globals, &handle), compositor, layers, shm, pool, pointer: None, said: Vec::new() };
+    let mut wayland = Wayland { connection, queue, state };
+    // The outputs and the seat are known after this.
+    for _ in 0..2 {
+        wayland.queue.roundtrip(&mut wayland.state).map_err(|e| e.to_string())?;
+    }
+    watch(wayland.connection.as_fd().as_raw_fd());
+    Ok(wayland)
+}
+
+/// A thread that waits for the compositor to say something and has it
+/// heard on Slint's thread, one hearing at a time.
+fn watch(socket: i32) {
+    let _ = std::thread::Builder::new().name("heyo-slint-layer".into()).spawn(move || loop {
+        let mut waited = libc::pollfd { fd: socket, events: libc::POLLIN, revents: 0 };
+        // SAFETY: one descriptor, which the connection keeps open for as long as Slint's thread lives.
+        let ready = unsafe { libc::poll(&mut waited, 1, -1) };
+        if ready < 0 || waited.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0 {
+            break;
+        }
+        let (heard, done) = std::sync::mpsc::channel();
+        if slint::invoke_from_event_loop(move || {
+            turn();
+            let _ = heard.send(());
+        })
+        .is_err()
+            || done.recv().is_err()
+        {
+            break;
+        }
+    });
+}
+
+/// Does `work` with the connection, made first if this is the first time.
+/// None when there is none to be had, or it is in the middle of something.
+fn with<R>(work: impl FnOnce(&mut Wayland) -> R) -> Option<R> {
+    WAYLAND.with(|slot| {
+        let mut slot = slot.try_borrow_mut().ok()?;
+        if slot.is_none() {
+            match connect() {
+                Ok(wayland) => *slot = Some(wayland),
+                Err(reason) => eprintln!("heyo: no layer surfaces: {reason}"),
+            }
+        }
+        slot.as_mut().map(work)
+    })
+}
+
+/// Has a turn taken at the next turn of Slint's loop.
+fn soon() {
+    if !ASKED.replace(true) {
+        slint::Timer::single_shot(std::time::Duration::ZERO, turn);
+    }
+}
+
+/// Hears what the compositor said, tells Slint, and draws what changed.
+fn turn() {
+    ASKED.set(false);
+    let said = with(|wayland| {
+        let _ = wayland.connection.flush();
+        if let Some(reading) = wayland.connection.prepare_read() {
+            let _ = reading.read();
+        }
+        let _ = wayland.queue.dispatch_pending(&mut wayland.state);
+        std::mem::take(&mut wayland.state.said)
+    })
+    .unwrap_or_default();
+    let windows: Vec<Rc<Layered>> = WINDOWS.with_borrow(|windows| windows.iter().filter_map(Weak::upgrade).collect());
+    let of = |surface: &wl_surface::WlSurface| windows.iter().find(|window| window.is(surface));
+    for said in said {
+        match said {
+            Said::Sized(surface, size) => {
+                if let Some(window) = of(&surface) {
+                    if size.0 > 0 && size.1 > 0 {
+                        window.size.set(size);
+                    }
+                    window.configured.set(true);
+                    window.measured();
+                }
+            }
+            Said::Scaled(surface, scale) => {
+                if let Some(window) = of(&surface).filter(|window| window.scale.get() != scale) {
+                    window.scale.set(scale.max(1));
+                    surface.set_buffer_scale(scale.max(1));
+                    window.measured();
+                }
+            }
+            Said::Shown(surface) => {
+                if let Some(window) = of(&surface) {
+                    window.waiting.set(false);
+                    // What moves is drawn again as often as the compositor shows it.
+                    if window.window.has_active_animations() {
+                        window.dirty.set(true);
+                    }
+                }
+            }
+            Said::Closed(surface) => {
+                if let Some(window) = of(&surface) {
+                    window.take_off();
+                }
+            }
+            Said::Pointer(surface, kind, at) => {
+                let Some(window) = of(&surface) else { continue };
+                let position = LogicalPosition::new(at.0 as f32, at.1 as f32);
+                let event = match kind {
+                    PointerEventKind::Enter { .. } | PointerEventKind::Motion { .. } => WindowEvent::PointerMoved { position },
+                    PointerEventKind::Leave { .. } => WindowEvent::PointerExited,
+                    // The left button (BTN_LEFT).
+                    PointerEventKind::Press { button: 0x110, .. } => WindowEvent::PointerPressed { position, button: PointerEventButton::Left },
+                    PointerEventKind::Release { button: 0x110, .. } => WindowEvent::PointerReleased { position, button: PointerEventButton::Left },
+                    _ => continue,
+                };
+                let _ = window.window.dispatch_event_with_result(event);
+            }
+        }
+    }
+    for window in &windows {
+        if window.dirty.get() && window.configured.get() && !window.waiting.get() {
+            with(|wayland| window.draw(wayland));
+        }
+    }
+    with(|wayland| {
+        let _ = wayland.connection.flush();
+    });
+}
+
+// --- What a window says ---------------------------------------------------------------
+
+fn of(window: &slint::Window) -> Option<Rc<Layered>> {
+    WINDOWS.with_borrow(|windows| windows.iter().filter_map(Weak::upgrade).find(|layered| std::ptr::eq(&layered.window, window)))
+}
+
+/// Whether the window is a layer surface.
+pub(super) fn is(window: &slint::Window) -> bool {
+    of(window).is_some()
+}
+
+/// Where the window goes, to be said before it is shown.
+pub(super) fn place(window: &slint::Window, at: Option<OwnPlace>) {
+    if let Some(layered) = of(window) {
+        layered.place.set(at);
+    }
+}
+
+/// Where in the window the pointer is its own, in its device pixels; or
+/// everywhere.
+pub(super) fn reach(window: &slint::Window, within: Option<Rect>) {
+    if let Some(layered) = of(window) {
+        layered.reach.set(within);
+        layered.dirty.set(true);
+        soon();
+    }
+}
+
+// --- What the compositor says ---------------------------------------------------------
+
+impl CompositorHandler for State {
+    fn scale_factor_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, surface: &wl_surface::WlSurface, scale: i32) {
+        self.said.push(Said::Scaled(surface.clone(), scale));
+    }
+
+    fn transform_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: wl_output::Transform) {}
+
+    fn frame(&mut self, _: &Connection, _: &QueueHandle<Self>, surface: &wl_surface::WlSurface, _: u32) {
+        self.said.push(Said::Shown(surface.clone()));
+    }
+
+    fn surface_enter(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: &wl_output::WlOutput) {}
+
+    fn surface_leave(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: &wl_output::WlOutput) {}
+}
+
+impl OutputHandler for State {
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.outputs
+    }
+
+    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+
+    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+
+    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+}
+
+impl LayerShellHandler for State {
+    fn closed(&mut self, _: &Connection, _: &QueueHandle<Self>, layer: &LayerSurface) {
+        self.said.push(Said::Closed(layer.wl_surface().clone()));
+    }
+
+    fn configure(&mut self, _: &Connection, _: &QueueHandle<Self>, layer: &LayerSurface, configure: LayerSurfaceConfigure, _: u32) {
+        self.said.push(Said::Sized(layer.wl_surface().clone(), configure.new_size));
+    }
+}
+
+impl SeatHandler for State {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seats
+    }
+
+    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+
+    fn new_capability(&mut self, _: &Connection, queue: &QueueHandle<Self>, seat: wl_seat::WlSeat, capability: Capability) {
+        if capability == Capability::Pointer && self.pointer.is_none() {
+            self.pointer = self.seats.get_pointer(queue, &seat).ok();
+        }
+    }
+
+    fn remove_capability(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat, capability: Capability) {
+        if capability == Capability::Pointer {
+            if let Some(pointer) = self.pointer.take() {
+                pointer.release();
+            }
+        }
+    }
+
+    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+}
+
+impl PointerHandler for State {
+    fn pointer_frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_pointer::WlPointer, events: &[PointerEvent]) {
+        for event in events {
+            self.said.push(Said::Pointer(event.surface.clone(), event.kind.clone(), event.position));
+        }
+    }
+}
+
+impl ShmHandler for State {
+    fn shm_state(&mut self) -> &mut Shm {
+        &mut self.shm
+    }
+}
+
+impl ProvidesRegistryState for State {
+    fn registry(&mut self) -> &mut RegistryState {
+        &mut self.registry
+    }
+
+    registry_handlers![OutputState, SeatState];
+}
+
+delegate_compositor!(State);
+delegate_output!(State);
+delegate_layer!(State);
+delegate_seat!(State);
+delegate_pointer!(State);
+delegate_shm!(State);
+delegate_registry!(State);
