@@ -46,6 +46,7 @@ mod reach;
 pub(crate) mod screenshot;
 mod standing;
 mod thread;
+mod watch;
 #[cfg(test)]
 mod tokens;
 mod window;

@@ -208,6 +208,18 @@ pub(super) fn test_in_drag(movements: u32) {
     }
 }
 
+/// For testing that nothing of Slint's is left on the screen when its
+/// thread stops answering: with `HEYO_SLINT_STALL_AFTER` set to a number
+/// of milliseconds, the thread stops for a minute that long after its
+/// loop starts.
+pub(super) fn test_stall() {
+    let Some(after) = std::env::var("HEYO_SLINT_STALL_AFTER").ok().and_then(|ms| ms.parse().ok()) else { return };
+    slint::Timer::single_shot(std::time::Duration::from_millis(after), || {
+        eprintln!("heyo: HEYO_SLINT_STALL_AFTER asked Slint's thread to stop for a minute");
+        std::thread::sleep(std::time::Duration::from_secs(60));
+    });
+}
+
 /// For testing that Slint cannot start at all: with `HEYO_SLINT_NO_START`
 /// set, it does not.
 pub(super) fn test_no_start() -> Result<(), String> {

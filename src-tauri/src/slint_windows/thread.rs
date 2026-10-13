@@ -193,6 +193,7 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
         return;
     }
     guard::test_panic();
+    guard::test_stall();
     if let Err(e) = slint::run_event_loop_until_quit() {
         eprintln!("heyo: slint's event loop ended: {e}");
     }

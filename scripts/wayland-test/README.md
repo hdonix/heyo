@@ -69,8 +69,9 @@ does (`src-tauri/src/slint_windows/layer.rs`). `sway.sh` is a second
 session, headless Sway, on an image built on this one:
 
     scripts/wayland-test/sway.sh build     # after run.sh build
-    scripts/wayland-test/sway.sh test      # in/check-sway.py at scale 1 and 2, then `safe`
+    scripts/wayland-test/sway.sh test      # in/check-sway.py at scale 1 and 2, then `safe` and `lost`
     scripts/wayland-test/sway.sh safe      # the overlay cannot trap anyone (in/safe-sway.py)
+    scripts/wayland-test/sway.sh lost      # nothing is left on the screen when what draws it stops (in/lost-sway.py)
     SCALE=2 MONITORS=3840x2160 scripts/wayland-test/sway.sh drag   # how soon the overlay follows the pointer
 
 A headless Sway has no pointer and no keyboard. The checks bring their

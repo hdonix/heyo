@@ -47,6 +47,7 @@ use crate::platform::desktop::OwnPlace;
 use crate::platform::place::{self, Display, Monitor, Rect};
 use super::guard::{self, State};
 use super::standing::{self, Standing, Told};
+use super::watch::{self, Watched};
 use super::{pointer, thread};
 
 // --- On and off the screen, as values ---------------------------------------------
@@ -175,6 +176,39 @@ pub(super) struct Life<C: ComponentHandle + 'static> {
     known: Rc<Cell<Option<WindowId>>>,
     /// What waits for the window to be made.
     waiting: Rc<RefCell<Vec<Then>>>,
+    /// What the watcher of Slint's thread knows it by, and what whoever
+    /// it is for hears if it was lost with that thread (`watch`).
+    watched: u64,
+    lost: Rc<Cell<Option<fn()>>>,
+}
+
+/// Tells the watcher that a window is on the screen, and how it is told
+/// if it was taken off from outside: as far as its life knows it is off
+/// the screen from then.
+fn seen<C: ComponentHandle + 'static>(window: &C, id: u64, told: Told, stage: &Rc<Cell<Stage>>, lost: Option<fn()>) {
+    let outside = standing::outside(told, window.window());
+    let (weak, stage) = (window.as_weak(), stage.clone());
+    watch::on(Watched { id, outside, keys: told.keys != standing::Keys::Left, lost }, move || {
+        if let Some(window) = weak.upgrade() {
+            leave(&window, &stage, told);
+        }
+    });
+}
+
+/// Takes a window off the screen, as its stage has it done.
+fn leave<C: ComponentHandle + 'static>(window: &C, stage: &Cell<Stage>, told: Told) {
+    let mut now = stage.get();
+    let what = now.off();
+    stage.set(now);
+    match what {
+        Do::Hide => {
+            let _ = window.hide();
+        }
+        Do::TakeOff => {
+            window.window().with_winit_window(|made| standing::off(told, made));
+        }
+        _ => {}
+    }
 }
 
 impl<C: ComponentHandle + 'static> Life<C> {
@@ -185,7 +219,13 @@ impl<C: ComponentHandle + 'static> Life<C> {
     pub(super) fn new(standing: Standing, make: impl FnOnce() -> Result<C, slint::PlatformError>, arrive: impl Fn(&C, &Window, bool) + 'static) -> Result<Self, String> {
         let window = thread::making(standing, make).map_err(|e| format!("Slint could not make it: {e}"))?;
         let told = standing::here(standing);
-        Ok(Self { window, standing, told, stage: Rc::new(Cell::new(Stage::new(told.kept))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default() })
+        Ok(Self { window, standing, told, stage: Rc::new(Cell::new(Stage::new(told.kept))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default(), watched: watch::id(), lost: Rc::default() })
+    }
+
+    /// What whoever the window is for is told when it was on the screen
+    /// and Slint's thread was lost: from another thread, once.
+    pub(super) fn when_lost(&self, lost: fn()) {
+        self.lost.set(Some(lost));
     }
 
     /// Where a window cannot say its standing of itself, asks the desktop
@@ -293,6 +333,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
                 // A window that is not winit's has no window of winit's
                 // to wait for: it is where its standing put it.
                 if self.told.layered {
+                    seen(&self.window, self.watched, self.told, &self.stage, self.lost.get());
                     return then(Ok(()));
                 }
                 self.waiting.borrow_mut().push(Box::new(then));
@@ -309,6 +350,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
                     standing::on(told, made);
                     made.request_redraw();
                 });
+                seen(&self.window, self.watched, self.told, &self.stage, self.lost.get());
                 then(Ok(()));
             }
             _ => self.waiting.borrow_mut().push(Box::new(then)),
@@ -317,16 +359,8 @@ impl<C: ComponentHandle + 'static> Life<C> {
 
     /// Takes it off the screen.
     pub(super) fn off(&self) {
-        match self.step(Stage::off) {
-            Do::Hide => {
-                let _ = self.window.hide();
-            }
-            Do::TakeOff => {
-                let told = self.told;
-                self.window.window().with_winit_window(|made| standing::off(told, made));
-            }
-            _ => {}
-        }
+        watch::off(self.watched);
+        leave(&self.window, &self.stage, self.told);
     }
 
     /// Has what changed in the window drawn at the next turn of the
@@ -359,6 +393,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// to be made.
     fn wait(&self, making: bool) {
         let (window, stage, arrive, known, waiting, told) = (self.window.as_weak(), self.stage.clone(), self.arrive.clone(), self.known.clone(), self.waiting.clone(), self.told);
+        let (watched, lost) = (self.watched, self.lost.clone());
         let waited = slint::spawn_local(async move {
             let heard = |outcome: Result<(), String>| {
                 for then in waiting.take() {
@@ -381,6 +416,9 @@ impl<C: ComponentHandle + 'static> Life<C> {
                 standing::made(told, &made);
             }
             arrive(&window, &made, first);
+            // Shown by Slint, it is on the screen; made ahead, it is if
+            // it was wanted meanwhile.
+            let mut on = !making && stage.get().wanted();
             if making {
                 let mut now = stage.get();
                 let what = now.arrived();
@@ -389,12 +427,16 @@ impl<C: ComponentHandle + 'static> Life<C> {
                     Do::PutOn => {
                         standing::on(told, &made);
                         made.request_redraw();
+                        on = true;
                     }
                     Do::TakeOff => standing::off(told, &made),
                     _ => {}
                 }
             }
             drop(made);
+            if on {
+                seen(&window, watched, told, &stage, lost.get());
+            }
             heard(Ok(()));
         });
         if let Err(e) = waited {
@@ -405,6 +447,7 @@ impl<C: ComponentHandle + 'static> Life<C> {
 
 impl<C: ComponentHandle + 'static> Drop for Life<C> {
     fn drop(&mut self) {
+        watch::off(self.watched);
         // Slint keeps a window it was asked to show until it is asked to
         // hide it.
         let _ = self.window.hide();

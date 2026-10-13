@@ -41,19 +41,7 @@ no way of typing into another application under Sway yet.
 import os, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from swaybed import input_method, application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, output, outputs, picture, point, pointer, press, release, same, scale, sway, typed, wait, width, windows
-
-# Where the pill's window is: 360 by 44, at the bottom centre, a tenth up.
-left, top = (width - 360) // 2, height - 44 - height // 10
-
-
-def pill_there():
-    """Whether the pill is drawn where it should be: dark in its middle band, and not at the corners of its window."""
-    shot = picture()
-    middle = [dark(at(shot, (left + 180 + dx) * scale, (top + 22 + dy) * scale)) for dx, dy in ((-30, -10), (30, -10), (-30, 10), (30, 10))]
-    corners = [dark(at(shot, x * scale, y * scale)) for x, y in ((left + 1, top + 1), (left + 358, top + 1), (left + 1, top + 42), (left + 358, top + 42))]
-    return all(middle) and not any(corners), (middle, corners)
-
+from swaybed import left, pill_there, pinned, top, input_method, application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, output, outputs, picture, point, pointer, press, release, same, scale, sway, typed, wait, width, windows
 
 # Two windows side by side, light ones, one after the other: Sway puts
 # the second on the right and gives it the keyboard.
@@ -99,20 +87,7 @@ sway("fullscreen", "disable")
 time.sleep(0.6)
 
 # The pinned captures: 300 by 200 at 200,160 and 200 by 120 at 800,160, in
-# the screen's own pixels, each pink on its left half and blue on its right.
-PINK, BLUE = (216, 27, 96), (30, 136, 229)
-
-
-def is_colour(seen, colour):
-    return all(abs(a - b) <= 3 for a, b in zip(seen, colour))
-
-
-def pinned(x, y, w, h):
-    """Whether a pinned capture of that size is at that place of the picture."""
-    shot = picture()
-    return is_colour(at(shot, x + w // 4, y + h // 2), PINK) and is_colour(at(shot, x + 3 * w // 4, y + h // 2), BLUE)
-
-
+# the screen's own pixels.
 check("two pinned captures are where they were said, pixel for pixel, above the windows", pinned(200, 160, 300, 200) and pinned(800, 160, 200, 120))
 # The pointer goes by logical pixels; the pictures are in the screen's own.
 point((200 + 150) / scale, (160 + 100) / scale)

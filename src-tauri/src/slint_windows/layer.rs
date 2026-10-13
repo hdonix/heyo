@@ -22,7 +22,7 @@
 use std::cell::{Cell, RefCell};
 use std::os::fd::{AsFd, AsRawFd};
 use std::rc::{Rc, Weak};
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -201,31 +201,37 @@ thread_local! {
     static REPEAT: RefCell<Option<(u32, Weak<Layered>, slint::Timer)>> = const { RefCell::new(None) };
 }
 
-/// The surface that has every key, and the connection it is on, as they
-/// are known outside Slint's thread (`take_down`).
-static HELD: Mutex<Option<(Connection, wl_surface::WlSurface)>> = Mutex::new(None);
-/// It was taken off the screen from outside: nothing is drawn into it.
-static DOWN: AtomicBool = AtomicBool::new(false);
+/// The surfaces on the screen, as they are known outside Slint's thread
+/// (`take_down`): each by the compositor's number for it, with the
+/// connection it is on, and whether it was taken off the screen from
+/// outside, after which nothing is drawn into it.
+static SURFACES: Mutex<Vec<(u64, Connection, wl_surface::WlSurface, bool)>> = Mutex::new(Vec::new());
 /// The socket of the connection, for `lost`. -1 while there is none.
 static SOCKET: AtomicI32 = AtomicI32::new(-1);
 
-/// Takes the surface that has every key off the screen, from any thread,
-/// when Slint's does not answer: the compositor gives the keyboard back
-/// to what had it when the surface is no longer shown. A surface is not
-/// its thread's, so this says it on the connection Slint's thread has;
-/// that thread, if it ever goes on, draws nothing into it and takes it
-/// away as it would have. False when no surface has the keys.
-pub(super) fn take_down() -> bool {
-    let Ok(held) = HELD.lock() else { return false };
-    let Some((connection, surface)) = held.as_ref() else { return false };
-    DOWN.store(true, Ordering::SeqCst);
+fn number(surface: &wl_surface::WlSurface) -> u64 {
+    u64::from(surface.id().protocol_id())
+}
+
+/// What a window that is on the screen is known by outside Slint's thread.
+pub(super) fn outside(window: &slint::Window) -> Option<u64> {
+    of(window).and_then(|layered| layered.surface.borrow().as_ref().map(|layer| number(layer.wl_surface())))
+}
+
+/// Takes a surface off the screen, from any thread, when Slint's does not
+/// answer: the compositor gives the keyboard back to what had it when a
+/// surface that had every key is no longer shown. A surface is not its
+/// thread's, so this says it on the connection Slint's thread has; that
+/// thread, if it ever goes on, draws nothing into it and takes it away as
+/// it would have. False when there is no such surface.
+pub(super) fn take_down(surface: u64) -> bool {
+    let Ok(mut surfaces) = SURFACES.lock() else { return false };
+    let Some((_, connection, surface, down)) = surfaces.iter_mut().find(|(known, ..)| *known == surface) else { return false };
+    *down = true;
     // A surface without a picture is not shown.
     surface.attach(None, 0, 0);
     surface.commit();
-    if connection.flush().is_err() {
-        eprintln!("heyo: the surface that holds the keyboard could not be taken off the screen from outside");
-    }
-    true
+    connection.flush().is_ok()
 }
 
 /// Slint's thread is lost for good (it panicked): the compositor is to
@@ -237,6 +243,21 @@ pub(super) fn lost() {
     if socket >= 0 {
         // SAFETY: a socket of this process's, which stays open.
         unsafe { libc::shutdown(socket, libc::SHUT_RDWR) };
+    }
+}
+
+impl Layered {
+    /// The compositor has a surface for it: known outside from now.
+    fn known(&self, wayland: &Wayland) {
+        if let (Some(layer), Ok(mut surfaces)) = (self.surface.borrow().as_ref(), SURFACES.lock()) {
+            surfaces.push((number(layer.wl_surface()), wayland.connection.clone(), layer.wl_surface().clone(), false));
+        }
+    }
+
+    /// It was taken off the screen from outside.
+    fn down(&self) -> bool {
+        let Some(surface) = self.surface.borrow().as_ref().map(|layer| number(layer.wl_surface())) else { return false };
+        SURFACES.lock().is_ok_and(|surfaces| surfaces.iter().any(|(known, _, _, down)| *known == surface && *down))
     }
 }
 
@@ -337,11 +358,8 @@ impl Layered {
                     layer.commit();
                     self.size.set(((area.width as i32 / scale).max(1) as u32, (area.height as i32 / scale).max(1) as u32));
                     self.scale.set(scale);
-                    DOWN.store(false, Ordering::SeqCst);
-                    if let Ok(mut held) = HELD.lock() {
-                        *held = Some((wayland.connection.clone(), layer.wl_surface().clone()));
-                    }
                     *self.surface.borrow_mut() = Some(layer);
+                    self.known(wayland);
                     let _ = wayland.connection.flush();
                     return Ok(());
                 }
@@ -356,6 +374,7 @@ impl Layered {
             self.size.set(size);
             self.scale.set(scale);
             *self.surface.borrow_mut() = Some(layer);
+            self.known(wayland);
             let _ = wayland.connection.flush();
             Ok(())
         })
@@ -373,10 +392,8 @@ impl Layered {
             let _ = skia.suspend();
             given.set(None);
         }
-        if let Ok(mut held) = HELD.lock() {
-            if held.as_ref().is_some_and(|(_, surface)| self.is(surface)) {
-                *held = None;
-            }
+        if let Ok(mut surfaces) = SURFACES.lock() {
+            surfaces.retain(|(_, _, surface, _)| !self.is(surface));
         }
         if self.surface.borrow_mut().take().is_some() {
             with(|wayland| {
@@ -436,13 +453,13 @@ impl Layered {
         let Some(layer) = surface.as_ref() else { return };
         let (size, scale) = (self.size.get(), self.scale.get().max(1) as u32);
         let (width, height) = ((size.0 * scale) as usize, (size.1 * scale) as usize);
+        if self.down() {
+            return;
+        }
         super::screenshot::trace("layer surface is drawn");
         let software = match &self.renderer {
             Renderer::Clear(software) => software,
             Renderer::Solid(skia, given) => {
-                if DOWN.load(Ordering::SeqCst) {
-                    return;
-                }
                 // Skia is given the surface once it has its size, and
                 // hands each picture to the compositor itself.
                 let surface = layer.wl_surface();

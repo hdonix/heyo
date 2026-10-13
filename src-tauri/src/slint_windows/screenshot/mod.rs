@@ -29,7 +29,7 @@ mod marks;
 pub(crate) mod pin;
 
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -40,7 +40,7 @@ use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, Image, Model as _, ModelRc, Rgba8Pixel, SharedPixelBuffer, VecModel};
 use tauri::AppHandle;
 
-use super::guard::{self, State};
+use super::guard;
 use super::life::{self, Life, Lives, Slot, Slotted};
 use super::standing::{self, KeyOf, Keyboard, Keyed, Layer, Pointed, Standing};
 use super::thread::{self, Job};
@@ -58,10 +58,6 @@ const HOLD_AGAIN: Duration = Duration::from_millis(50);
 const HOLD_TIMES: u32 = 60;
 /// How long the window is waited for to have the monitor's size.
 const UNSIZED: Duration = Duration::from_millis(150);
-/// How often Slint's thread is asked whether it is there while the overlay
-/// is up, and how many times it may not answer.
-const BEAT: Duration = Duration::from_millis(250);
-const MISSED_BEATS: u32 = 6;
 /// How long after a screenshot the window is kept as it is, at the
 /// monitor's size, for the next one to be as quick as can be.
 const RESTING: Duration = Duration::from_secs(60);
@@ -77,8 +73,6 @@ const TITLE: &str = "Heyo Screenshot";
 
 /// The overlay is on screen, or about to be.
 static UP: AtomicBool = AtomicBool::new(false);
-/// Counts answers from Slint's thread, for `watch`.
-static BEATS: AtomicU64 = AtomicU64::new(0);
 
 /// A monitor as it was read, ready to be shown: dimmed, which is what is
 /// seen first. The same as it was read follows (`Overlay::cleared`).
@@ -215,6 +209,7 @@ impl Lives for Overlay {
             });
             slint_too
         });
+        life.when_lost(lost);
         life.keyed(|keyed| {
             let mut slint_too = false;
             with(|overlay| {
@@ -838,38 +833,11 @@ fn picture(shot: &Shot, light: u16) -> SharedPixelBuffer<Rgba8Pixel> {
     picture
 }
 
-/// While the overlay is up, asks Slint's thread whether it is there. When
-/// it is not, the overlay is taken off the screen from here, and the host
-/// told that the capture came to nothing.
-fn watch() {
-    static WATCHING: AtomicBool = AtomicBool::new(false);
-    if WATCHING.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    let watching = std::thread::Builder::new().name("heyo-slint-shot-watch".into()).spawn(move || {
-        let mut missed = 0;
-        let mut lost = false;
-        while UP.load(Ordering::SeqCst) && !lost {
-            let before = BEATS.load(Ordering::SeqCst);
-            let asked = thread::on(|| {
-                BEATS.fetch_add(1, Ordering::SeqCst);
-            });
-            std::thread::sleep(BEAT);
-            missed = if BEATS.load(Ordering::SeqCst) == before { missed + 1 } else { 0 };
-            lost = !asked || guard::state() != State::Running || missed >= MISSED_BEATS;
-        }
-        WATCHING.store(false, Ordering::SeqCst);
-        if lost && UP.swap(false, Ordering::SeqCst) {
-            // A thread that panicked has had its windows taken away already (`guard`).
-            if guard::state() == State::Running {
-                eprintln!("heyo: what draws the screenshot overlay does not answer; the overlay is taken off the screen");
-                standing::take_down();
-            }
-            crate::screenshot::cancel();
-        }
-    });
-    if watching.is_err() {
-        WATCHING.store(false, Ordering::SeqCst);
+/// The overlay was on the screen when Slint's thread was lost: the host
+/// is told that the capture came to nothing. From the watcher's thread.
+fn lost() {
+    if UP.swap(false, Ordering::SeqCst) {
+        crate::screenshot::cancel();
     }
 }
 
@@ -899,7 +867,6 @@ pub(crate) fn show(app: &AppHandle, area: Area, shot: &Shot, mode: Mode, asked: 
         UP.store(false, Ordering::SeqCst);
         return false;
     }
-    watch();
     true
 }
 

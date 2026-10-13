@@ -146,6 +146,33 @@ def heyo(*arguments):
     subprocess.run([HEYO, *arguments], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+# Where the pill's window is: 360 by 44, at the bottom centre, a tenth up.
+left, top = (width - 360) // 2, height - 44 - height // 10
+
+
+def pill_there():
+    """Whether the pill is drawn where it should be: dark in its middle band, and not at the corners of its window."""
+    shot = picture()
+    middle = [dark(at(shot, (left + 180 + dx) * scale, (top + 22 + dy) * scale)) for dx, dy in ((-30, -10), (30, -10), (-30, 10), (30, 10))]
+    corners = [dark(at(shot, x * scale, y * scale)) for x, y in ((left + 1, top + 1), (left + 358, top + 1), (left + 1, top + 42), (left + 358, top + 42))]
+    return all(middle) and not any(corners), (middle, corners)
+
+
+# A pinned capture of the test's (HEYO_TEST_PIN): pink on its left half
+# and blue on its right.
+PINK, BLUE = (216, 27, 96), (30, 136, 229)
+
+
+def is_colour(seen, colour):
+    return all(abs(a - b) <= 3 for a, b in zip(seen, colour))
+
+
+def pinned(x, y, w, h):
+    """Whether a pinned capture of that size is at that place of the picture."""
+    shot = picture()
+    return is_colour(at(shot, x + w // 4, y + h // 2), PINK) and is_colour(at(shot, x + 3 * w // 4, y + h // 2), BLUE)
+
+
 def input_method():
     """An input method for the session (ime.py), and how to tell it what to do: its answer comes back."""
     method = subprocess.Popen([os.path.join(HERE, "ime.py")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)

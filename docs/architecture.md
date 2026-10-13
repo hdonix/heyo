@@ -601,12 +601,37 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
     `told` too (Wayland: no window places itself or refuses the keyboard),
     not found out by a window. A window that has every key has its ways
     out with them: the adapter that takes the keys gives them back when
-    the window goes off the screen, and takes that window down from any
-    thread when Slint's does not answer (`take_down`, which the overlay's
-    watcher calls without knowing how).
+    the window goes off the screen. And any window on the screen can be
+    taken off it from another thread when Slint's does not answer: it
+    says what it is known by outside (`outside`), and `take_down` does it
+    by that, each desktop's way (X11: unmapped on a connection of its
+    own; a layer surface: by its own name; Windows: cloaked, which is
+    written and not tried yet; a window of winit's on Wayland: no way).
   - What a caller must never do: ask which desktop this is, take a
     window's native handle, or tell winit anything of a window's standing
     itself.
+- `watch.rs` is the one watcher of whatever of Slint's is on the screen.
+  Its interface:
+  - What a caller says: nothing of watching. `life.rs` tells the watcher
+    when a window goes on the screen and when it goes off. A window says
+    one thing, once, when it is made, and only if somebody is to hear of
+    it: what the host is told if the window was on the screen when
+    Slint's thread was lost (`Life::when_lost`; the overlay's is that
+    the capture came to nothing).
+  - What it is promised: while anything of Slint's is on the screen, one
+    thread asks Slint's for a beat every 250 ms. After six that were not
+    answered, every window then on the screen is taken off it from
+    outside (`standing::take_down`), the one that has every key first,
+    and each one's `when_lost` is called once; when the guard says the
+    thread is gone, its windows are gone with it already and only that
+    is said. If a thread that stalled goes on after all, each window
+    that was taken off is off the screen as far as its life knows, and
+    comes on again when it is next wanted; nothing is drawn into it
+    meanwhile. The rule is two values that are tested: what has become
+    of the thread (`verdict`), and the order windows go in (`order`).
+  - What a caller must never do: keep beats or a watcher of its own,
+    look at the guard's state to know whether it is still on the screen,
+    or take another window down.
 - `layer.rs` is a window that is not winit's: a layer surface, on a
   Wayland compositor that offers the layer shell (tried on Sway; the other
   wlroots ones and KWin offer it too), where the pill, a pinned capture and the overlay
@@ -631,10 +656,10 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
     keys held, a letter made of two keys, a key pressed again while it
     stays down), and what an input method composes and chooses reaches
     Slint as its own backend hands it over (`layer/composing.rs`,
-    text-input version 3). The surface that has every key can be taken
-    off the screen from any thread (`take_down`), and all of them are
-    dropped by the compositor when Slint's thread is lost (`lost`, which
-    the guard calls).
+    text-input version 3). Any of its surfaces can be taken off the
+    screen from any thread (`take_down`, for the watcher), and all of
+    them are dropped by the compositor when Slint's thread is lost
+    (`lost`, which the guard calls).
   - What it does not do: a scale that is not a whole number (the surface
     is drawn at the next whole one and the compositor scales it), a
     shadow, and names on the accessibility bus (a layer surface has none

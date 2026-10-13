@@ -175,6 +175,7 @@ scripts/gui-test/sandbox.sh down
 | `screenshot-tools.sh` | each tool, undo, save and copy checked against the screen, a window selected by a click, Escape and right click, the pointer's shapes, pin |
 | `screenshot-pin.sh` | pinned captures: where they are, what they show, dragged, closed three ways |
 | `screenshot-safe.sh [escape\|panic\|stall\|kill]` | the overlay cannot trap whoever uses it: the keyboard comes back whatever happens to what draws it |
+| `slint-lost.sh` | nothing of Heyo's is left on the screen when what draws it stops answering: the pill and two pinned captures are taken off, and Heyo goes on |
 | `updates.sh` | serves an update on this computer for About's "Check for Updates" to find |
 
 Two things to know when writing one. Under GNOME Shell a notification is

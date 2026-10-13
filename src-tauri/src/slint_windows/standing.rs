@@ -19,7 +19,6 @@
 //! A window never asks which desktop this is, never takes its native
 //! handle, and tells winit nothing of its standing itself.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use slint::winit_030::winit::window::{Window, WindowAttributes, WindowLevel};
 
@@ -252,14 +251,12 @@ pub(super) fn made(told: Told, window: &Window) {
     }
 }
 
-/// The window that has every key, as it is known outside Slint's thread:
-/// 0 when none has.
-static HOLDER: AtomicU64 = AtomicU64::new(0);
-
 /// Puts a kept window on the screen, as its standing has it there.
 pub(super) fn on(told: Told, window: &Window) {
-    if told.keys != Keys::Left {
-        HOLDER.store(id(window), Ordering::SeqCst);
+    // One that was taken off the screen from outside is drawn again.
+    #[cfg(windows)]
+    if let Some(window) = windows::handle(window) {
+        windows::cloak(window, false);
     }
     #[cfg(windows)]
     if told.never_active {
@@ -317,9 +314,6 @@ pub(super) fn hold(told: Told, window: &Window) -> bool {
 /// Takes a kept window off the screen; it stays, for the next time. A
 /// window that had every key gives them back first.
 pub(super) fn off(told: Told, window: &Window) {
-    if told.keys != Keys::Left {
-        HOLDER.store(0, Ordering::SeqCst);
-    }
     #[cfg(target_os = "linux")]
     if told.keys == Keys::Grabbed {
         if let Some(x11) = x11::of(window) {
@@ -350,49 +344,80 @@ pub(super) fn off(told: Told, window: &Window) {
     }
 }
 
-/// Takes the window that has every key off the screen, from any thread,
-/// when Slint's does not answer: by a connection of its own, since
-/// winit's is that thread's. The server lets the keyboard go when the
-/// window that holds it is no longer on the screen. (X11, where a window
-/// can hold the keyboard against everything, and a layer surface, which
-/// the compositor gives every key; elsewhere the desktop still has its
-/// own ways of taking the focus away.)
-pub(super) fn take_down() {
-    let id = HOLDER.swap(0, Ordering::SeqCst);
+/// What a window on the screen is known by outside Slint's thread, for
+/// whoever has to take it off the screen when that thread does not
+/// answer (`watch`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Outside {
+    /// Nothing: it cannot be taken off from outside (a window of winit's
+    /// on Wayland, which is on winit's connection and known to nobody
+    /// else).
+    None,
+    /// The X server's number for it.
     #[cfg(target_os = "linux")]
-    {
-        use x11rb::protocol::xproto::ConnectionExt;
-        // A surface of Heyo's own is taken down on its own connection.
-        if super::layer::take_down() {
-            return;
-        }
-        if id == 0 || desktop() != Desktop::X11 {
-            return;
-        }
-        let taken = x11rb::connect(None).ok().and_then(|(x, _)| {
-            x.unmap_window(id as u32).ok()?.check().ok()?;
-            // Asked back, so that the server has done it before this
-            // connection ends.
-            let now = x.get_window_attributes(id as u32).ok()?.reply().ok()?;
-            Some(now.map_state == x11rb::protocol::xproto::MapState::UNMAPPED)
-        });
-        if taken != Some(true) {
-            eprintln!("heyo: the window that holds the keyboard ({id:#x}) could not be taken off the screen from outside");
-        }
-    }
-    #[cfg(not(target_os = "linux"))]
-    let _ = id;
+    X11(u32),
+    /// A layer surface, by the compositor's number for it.
+    #[cfg(target_os = "linux")]
+    Layer(u64),
+    /// Its handle on Windows.
+    #[cfg(windows)]
+    Windows(isize),
 }
 
-/// What a window is known by outside Slint's thread. 0 where there is no
-/// such thing.
-fn id(window: &Window) -> u64 {
+/// What a window that is on the screen is known by outside.
+pub(super) fn outside(told: Told, window: &slint::Window) -> Outside {
+    use slint::winit_030::WinitWindowAccessor;
     #[cfg(target_os = "linux")]
-    if let Some(x11) = x11::of(window) {
-        return x11.window as u64;
+    {
+        if told.layered {
+            return super::layer::outside(window).map_or(Outside::None, Outside::Layer);
+        }
+        window.with_winit_window(|made| x11::of(made).map(|x11| x11.window as u32)).flatten().map_or(Outside::None, Outside::X11)
     }
-    let _ = window;
-    0
+    #[cfg(windows)]
+    {
+        let _ = told;
+        window.with_winit_window(|made| windows::handle(made).map(|handle| handle as isize)).flatten().map_or(Outside::None, Outside::Windows)
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        let _ = (told, window.has_winit_window());
+        Outside::None
+    }
+}
+
+/// Takes a window off the screen, from any thread, when Slint's does not
+/// answer. False when it could not be.
+///
+/// - X11: by a connection of its own, since winit's is that thread's. The
+///   server lets the keyboard go when the window that holds it is no
+///   longer on the screen.
+/// - A layer surface: by its own name, on the connection Slint's thread
+///   has (`layer::take_down`).
+/// - Windows: a window is its thread's, and one whose thread does not
+///   answer cannot be hidden or moved by another. What another thread
+///   may do is have the desktop stop drawing it (it is cloaked), after
+///   which it is not there for the pointer either; `on` has it drawn
+///   again. Written from the documentation and not tried on Windows yet.
+pub(super) fn take_down(outside: Outside) -> bool {
+    match outside {
+        Outside::None => false,
+        #[cfg(target_os = "linux")]
+        Outside::Layer(surface) => super::layer::take_down(surface),
+        #[cfg(target_os = "linux")]
+        Outside::X11(id) => {
+            use x11rb::protocol::xproto::ConnectionExt;
+            x11rb::connect(None).ok().and_then(|(x, _)| {
+                x.unmap_window(id).ok()?.check().ok()?;
+                // Asked back, so that the server has done it before this
+                // connection ends.
+                let now = x.get_window_attributes(id).ok()?.reply().ok()?;
+                Some(now.map_state == x11rb::protocol::xproto::MapState::UNMAPPED)
+            }) == Some(true)
+        }
+        #[cfg(windows)]
+        Outside::Windows(handle) => windows::cloak(handle as windows_sys::Win32::Foundation::HWND, true),
+    }
 }
 
 /// Has the window take the pointer in `within` only, in its own device
@@ -623,6 +648,16 @@ pub(super) mod windows {
             RawWindowHandle::Win32(handle) => Some(handle.hwnd.get() as windows_sys::Win32::Foundation::HWND),
             _ => None,
         }
+    }
+
+    /// Has the desktop stop drawing a window, or draw it again. From any
+    /// thread. False when the desktop would not.
+    #[cfg(windows)]
+    pub(in super::super) fn cloak(window: windows_sys::Win32::Foundation::HWND, cloaked: bool) -> bool {
+        use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_CLOAK};
+        let value: i32 = cloaked.into();
+        // SAFETY: a window of this process's, and a value of the size said.
+        unsafe { DwmSetWindowAttribute(window, DWMWA_CLOAK as u32, std::ptr::addr_of!(value).cast(), std::mem::size_of::<i32>() as u32) >= 0 }
     }
 }
 

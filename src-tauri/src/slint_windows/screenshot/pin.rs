@@ -99,6 +99,9 @@ impl Slotted for Pins {
 
 impl Pins {
     fn add(&mut self, picture: Image, at: (i32, i32)) {
+        // One that was taken off the screen from outside, when Slint's
+        // thread did not answer, is not coming back.
+        self.pinned.retain(|pin| pin.life.wanted());
         let life = match Life::new(STANDING, ui::PinWindow::new, |_, _, _| {}) {
             Ok(life) => life,
             Err(e) => return eprintln!("heyo: the capture could not be pinned: {e}"),

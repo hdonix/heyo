@@ -8,10 +8,12 @@
 #   scripts/wayland-test/sway.sh exec CMD…   run a command inside the session
 #   scripts/wayland-test/sway.sh stop
 #   scripts/wayland-test/sway.sh test        the checks of in/check-sway.py, at scale 1 and at 2,
-#                                            and the trials of `safe`
+#                                            and the trials of `safe` and `lost`
 #   scripts/wayland-test/sway.sh safe        that the screenshot overlay cannot trap whoever uses
 #                                            it (in/safe-sway.py): Escape, a panic, a stall and
 #                                            Heyo killed, each in the middle of a drag
+#   scripts/wayland-test/sway.sh lost        that nothing of Heyo's is left on the screen when
+#                                            what draws it stops answering (in/lost-sway.py)
 #   SCALE=2 MONITORS=3840x2160 scripts/wayland-test/sway.sh drag
 #                                            how soon the overlay follows a pointer that jumps
 #                                            (in/drag.py)
@@ -62,6 +64,17 @@ case "${1:-}" in
     [ -n "${HEYO_SWAY_KEEP:-}" ] || "$0" stop >/dev/null
     [ $failed = 0 ] && echo "all passed" || { echo "SOME FAILED"; exit 1; }
     ;;
+  lost)
+    "$0" session
+    # Two pictures pinned from the start, and what draws them stopped
+    # for a minute twenty seconds on.
+    "$0" exec env HEYO_BUILD="$BUILD" HEYO_TEST_PIN="200,160,300,200;800,160,200,120" HEYO_SLINT_STALL_AFTER=20000 "$IN/start-heyo.sh" >/dev/null
+    sleep 5
+    failed=0
+    "$0" exec env HEYO_BUILD="$BUILD" "$IN/lost-sway.py" 2>&1 || failed=1
+    [ -n "${HEYO_SWAY_KEEP:-}" ] || "$0" stop >/dev/null
+    [ $failed = 0 ] && echo "all passed" || { echo "SOME FAILED"; exit 1; }
+    ;;
   drag)
     "$0" session
     "$0" exec env HEYO_BUILD="$BUILD" HEYO_OVERLAY_TRACE=1 "$IN/start-heyo.sh" >/dev/null
@@ -82,7 +95,9 @@ case "${1:-}" in
     done
     echo "== Sway, the overlay's safety =="
     SCALE=1 "$0" safe || failed=1
+    echo "== Sway, what is on the screen when what draws it stops =="
+    SCALE=1 "$0" lost || failed=1
     [ $failed = 0 ] && echo "all passed" || { echo "SOME FAILED"; exit 1; }
     ;;
-  *) echo "usage: $0 build|start|exec CMD…|stop|test|safe|drag" >&2; exit 2 ;;
+  *) echo "usage: $0 build|start|exec CMD…|stop|test|safe|lost|drag" >&2; exit 2 ;;
 esac
