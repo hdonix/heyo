@@ -367,6 +367,12 @@ impl Desktop for Generic {
 
     #[cfg(target_os = "linux")]
     fn grab(&self, area: Area) -> Result<Shot, String> {
+        // A Wayland compositor that lets its screen be read outright
+        // (Sway and the other wlroots ones): asked, in the output's own
+        // pixels. Else the desktop's screenshot tool, where there is one.
+        if super::session() == super::Session::Wayland && super::wlr::offered() {
+            return super::wlr::grab(area);
+        }
         super::capture::grab_with_tool(area)
     }
 

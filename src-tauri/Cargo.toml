@@ -75,6 +75,9 @@ libc = "0.2"
 # the other. All four are in the build already, through Slint and winit.
 smithay-client-toolkit = { version = "0.19.2", default-features = false }
 wayland-client = "0.31"
+# Reading the screen on the wlroots compositors (`platform::wlr`): in the
+# build already, through the toolkit above.
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 i-slint-backend-winit = "=1.18.1"
 i-slint-core = "=1.18.1"
 

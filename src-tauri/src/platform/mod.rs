@@ -32,6 +32,8 @@ pub(crate) mod win;
 #[cfg(any(windows, test))]
 mod win_rules;
 #[cfg(target_os = "linux")]
+mod wlr;
+#[cfg(target_os = "linux")]
 mod x11;
 
 /// The kind of desktop session Heyo is running in.
