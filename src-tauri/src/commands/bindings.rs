@@ -19,6 +19,7 @@ use ts_rs::{Config, Dependency, TypeVisitor, TS};
 use crate::activities::ActivityView;
 use crate::commands::settings::SettingsView;
 use crate::helper::InstallProgress;
+use crate::i18n::Translations;
 use crate::open::Arguments;
 use crate::root::Item;
 use crate::wire::WebviewMessage;
@@ -30,6 +31,7 @@ commands! {
     runtime_send(message: WebviewMessage);
     hide();
     get_settings() -> SettingsView;
+    translations() -> Translations;
     open_settings();
     set_item_hotkey(id: String, title: String, accelerator: String);
     show_window();
@@ -62,6 +64,7 @@ events! {
     EXPAND_SNIPPET: expand::ExpandSnippet;
     CLIPBOARD_MEANING_INSTALL: InstallProgress;
     ACTIVITIES: Vec<ActivityView>;
+    LANGUAGE_CHANGED: Translations;
 }
 
 /// What the runtime tells the webview. The host passes it on unread, so it

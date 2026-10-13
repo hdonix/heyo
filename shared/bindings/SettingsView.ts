@@ -16,6 +16,11 @@ anthropicApiKeySet: boolean, launchAtLogin: boolean, nodeVersion: { Ok : string 
  */
 canUpdate: boolean, appearance: Appearance, 
 /**
+ * The language Heyo speaks: `system`, `en`, or a translation's code
+ * (`i18n::languages`).
+ */
+language: string, 
+/**
  * Hide the window when it loses focus.
  */
 hideOnBlur: boolean, 

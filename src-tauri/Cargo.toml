@@ -23,6 +23,9 @@ updater = ["dep:tauri-plugin-updater"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 slint-build = "=1.18.1"
+# Reads the translations (`locales/`) into the program: the reader Slint's
+# compiler reads the same files with, in the build already.
+rspolib = "0.1"
 
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
@@ -41,6 +44,9 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
 ts-rs = "12.0.1"
 tauri-plugin-updater = { version = "2", optional = true }
+# The languages the system prefers, for following it (`i18n`). In the
+# build already, through Slint.
+sys-locale = "0.3"
 # For telling whether an address is this computer (the local model's).
 url = "2"
 # The settings window is drawn by Slint, on a thread of its own

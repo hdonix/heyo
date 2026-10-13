@@ -1,0 +1,295 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: heyo\n"
+"Language: zh_CN\n"
+"X-Language-Name: 简体中文\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "General"
+msgstr "通用"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Shortcuts"
+msgstr "快捷键"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Dictation"
+msgstr "听写"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Screenshots"
+msgstr "截图"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Advanced"
+msgstr "高级"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "About"
+msgstr "关于"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Applications"
+msgstr "应用程序"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Heyo Commands"
+msgstr "Heyo 命令"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Settings"
+msgstr "设置"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use."
+msgstr "在 Wayland 上，切换和排列窗口、粘贴、剪贴板历史、截图以及按住说话键，都要通过一个仅供 Heyo 使用的小型 GNOME Shell 扩展来完成。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Install"
+msgstr "安装"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This version of Heyo comes with a newer extension than the one installed. Update it, then log out and back in. An extension that is already running keeps working until then, without what the new one adds."
+msgstr "此版本的 Heyo 附带的扩展比已安装的更新。请更新，然后注销并重新登录。在此之前，正在运行的扩展仍可继续使用，只是没有新版增加的功能。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Update"
+msgstr "更新"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "In place. Log out and back in to finish: GNOME loads a new or updated extension only when a session starts."
+msgstr "已就绪。请注销并重新登录以完成：GNOME 只在会话开始时加载新安装或更新的扩展。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "GNOME Shell Extension"
+msgstr "GNOME Shell 扩展"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Heyo Hotkey"
+msgstr "Heyo 快捷键"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Open at Login"
+msgstr "登录时打开"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Bind a desktop keyboard shortcut to heyo."
+msgstr "请在桌面的键盘快捷键设置中为 heyo 绑定一个快捷键。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "System"
+msgstr "跟随系统"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Appearance"
+msgstr "外观"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Theme"
+msgstr "主题"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Light, dark, or whichever the system is using"
+msgstr "浅色、深色，或与系统保持一致"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Light"
+msgstr "浅色"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Dark"
+msgstr "深色"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Language"
+msgstr "语言"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "What Heyo itself says. Extensions speak their own."
+msgstr "Heyo 自身界面的语言。扩展使用各自的语言。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Window"
+msgstr "窗口"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Compact Mode"
+msgstr "紧凑模式"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Show only the search field until you type"
+msgstr "输入之前只显示搜索框"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hide When Focus Is Lost"
+msgstr "失去焦点时隐藏"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Close the window when you click elsewhere"
+msgstr "点击其他位置时关闭窗口"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Keep the Running Command"
+msgstr "保留正在运行的命令"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Reopening Heyo returns to the command you were using instead of the root search"
+msgstr "再次打开 Heyo 时回到上次使用的命令，而不是主搜索"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Live Activities"
+msgstr "实时活动"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Show What Is in Progress"
+msgstr "显示进行中的事项"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you"
+msgstr "计时器、下载以及扩展报告的进行中事项会显示在主搜索顶部，结束或需要你处理时会发出通知"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Hotkey for {}"
+msgstr "{} 的快捷键"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Name"
+msgstr "名称"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Alias"
+msgstr "别名"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Hotkey"
+msgstr "快捷键"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Enabled"
+msgstr "启用"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Alias for {}"
+msgstr "{} 的别名"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Add Alias"
+msgstr "添加别名"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Heyo Settings"
+msgstr "Heyo 设置"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Search settings"
+msgstr "搜索设置"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Search settings…"
+msgstr "搜索设置…"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Pages"
+msgstr "页面"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Close"
+msgstr "关闭"
+
+#: src/RootSearch.tsx
+msgid "Search apps, commands, or calculate…"
+msgstr "搜索应用、命令，或进行计算…"
+
+#: src/RootSearch.tsx
+msgid "No results"
+msgstr "没有结果"
+
+#: src/RootSearch.tsx
+#: src/raycast/CommandView.tsx
+msgid "Actions"
+msgstr "操作"
+
+#: src/raycast/CommandView.tsx
+msgid "Search…"
+msgstr "搜索…"
+
+#: src/raycast/actions.tsx
+msgid "No actions"
+msgstr "没有操作"
+
+#: src/raycast/actions.tsx
+msgid "Search for actions…"
+msgstr "搜索操作…"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Resume Recording"
+msgstr "继续记录"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pause Recording"
+msgstr "暂停记录"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is turned off"
+msgstr "记录已关闭"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is paused"
+msgstr "记录已暂停"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Finding by meaning is still reading {0} entry"
+msgid_plural "Finding by meaning is still reading {0} entries"
+msgstr[0] "按含义查找仍在读取 {0} 个条目"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Paste to Active App"
+msgstr "粘贴到当前应用"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copy to Clipboard"
+msgstr "复制到剪贴板"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copied to Clipboard"
+msgstr "已复制到剪贴板"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Unpin Entry"
+msgstr "取消固定"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pin Entry"
+msgstr "固定条目"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete Entry"
+msgstr "删除条目"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete All Entries"
+msgstr "删除所有条目"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete all entries?"
+msgstr "删除所有条目？"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pinned entries are kept."
+msgstr "已固定的条目会保留。"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete All"
+msgstr "全部删除"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard History"
+msgstr "剪贴板历史"
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
+msgstr "搜索，或说出时间和来源：昨天下午、last week、from firefox…"

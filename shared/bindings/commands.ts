@@ -5,6 +5,7 @@ import type { InstallProgress } from "./InstallProgress";
 import type { Item } from "./Item";
 import type { RuntimeMessage } from "../wire";
 import type { SettingsView } from "./SettingsView";
+import type { Translations } from "./Translations";
 import type { WebviewMessage } from "./WebviewMessage";
 
 /** The commands the host takes from its windows: the arguments of each, and what it answers. */
@@ -21,6 +22,8 @@ export type Commands = {
   runtime_send: { args: { message: WebviewMessage }; result: null };
   hide: { args: null; result: null };
   get_settings: { args: null; result: SettingsView };
+  /** The language Heyo speaks, for a web view to say its own text in. */
+  translations: { args: null; result: Translations };
   /** Opens the settings window, or brings it back if it is already open. */
   open_settings: { args: null; result: null };
   /** Binds a global hotkey to a root search item; an empty accelerator removes it. */
@@ -91,4 +94,5 @@ export type Events = {
   expandSnippet: ExpandSnippet;
   clipboardMeaningInstall: InstallProgress;
   activities: Array<ActivityView>;
+  languageChanged: Translations;
 };

@@ -218,6 +218,9 @@ impl<C: ComponentHandle + 'static> Life<C> {
     /// place is its to say then.
     pub(super) fn new(standing: Standing, make: impl FnOnce() -> Result<C, slint::PlatformError>, arrive: impl Fn(&C, &Window, bool) + 'static) -> Result<Self, String> {
         let window = thread::making(standing, make).map_err(|e| format!("Slint could not make it: {e}"))?;
+        // Left to itself Slint speaks the system's language from its first
+        // window on: the language is Heyo's to choose.
+        thread::speak();
         let told = standing::here(standing);
         Ok(Self { window, standing, told, stage: Rc::new(Cell::new(Stage::new(told.kept))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default(), watched: watch::id(), lost: Rc::default() })
     }

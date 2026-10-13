@@ -12,6 +12,7 @@ import { step, underPointer, useReveal } from "../selection";
 import { dateChoices, fromDateInput, inRange, toDateInput } from "./dates";
 import { Image } from "./Image";
 import { content, matchesQuery, type Node } from "./model";
+import { t } from "../../shared/i18n";
 
 /// What the panel shows of an action, and how the action takes part in it.
 export interface PanelAction {
@@ -324,13 +325,13 @@ export function ActionOverlay<A extends PanelAction>(props: {
               })}
             </div>
           ))}
-          {flat.length === 0 && <div className="empty">No actions</div>}
+          {flat.length === 0 && <div className="empty">{t("No actions")}</div>}
         </div>
         {!top.picker && (
           <input
             ref={inputRef}
             className="action-search"
-            placeholder="Search for actions…"
+            placeholder={t("Search for actions…")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             spellCheck={false}

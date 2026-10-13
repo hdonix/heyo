@@ -138,6 +138,13 @@ fn follow() {
     life::again();
 }
 
+/// Heyo speaks another language: the windows say what is theirs in it.
+/// (What the host hands them they ask for again when they hear the
+/// settings changed.)
+pub(crate) fn speak() {
+    life::ask(thread::speak);
+}
+
 /// Sees to it that Slint's thread runs: starts it the first time, and
 /// waits for it while another is starting it. False when it does not run,
 /// and will not in this run.

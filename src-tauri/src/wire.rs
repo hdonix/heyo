@@ -45,6 +45,8 @@ events! {
     CLIPBOARD_MEANING_INSTALL = "heyo://clipboard-meaning-install";
     /// The live activities changed; carries the ordered `ActivityView[]`.
     ACTIVITIES = "heyo://activities";
+    /// Heyo speaks another language; carries its `Translations`.
+    LANGUAGE_CHANGED = "heyo://language-changed";
 }
 
 /// What the extension runtime asks of the host for itself: what Raycast's API
@@ -211,6 +213,9 @@ pub enum HostMessage {
     DevReload { extension: String },
     /// The interface went light or dark (`environment.appearance`).
     Appearance { dark: bool },
+    /// The language Heyo's own commands speak: said when the runtime
+    /// starts, and when it changes.
+    Language { translations: crate::i18n::Translations },
     /// Something happened that a command subscribed to with an `ext.*`
     /// request (a sentence was recognized, say).
     Event {

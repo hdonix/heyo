@@ -117,7 +117,7 @@ export global Host {
 component LineHotkey inherits Hotkey {
     in property <string> name;
     in property <string> title;
-    label: "Hotkey for " + title;
+    label: @tr("Hotkey for {}", title);
     recording: Host.recording == name;
     held: Host.held;
     record => {
@@ -519,28 +519,28 @@ component LineView inherits VerticalLayout {
             spacing: Tokens.unit * 2;
             TextXs {
                 horizontal-stretch: 1;
-                text: "Name";
+                text: @tr("Name");
                 color: Tokens.text-faint;
                 horizontal-alignment: left;
             }
 
             TextXs {
                 width: 130px;
-                text: "Alias";
+                text: @tr("Alias");
                 color: Tokens.text-faint;
                 horizontal-alignment: left;
             }
 
             TextXs {
                 width: 150px;
-                text: "Hotkey";
+                text: @tr("Hotkey");
                 color: Tokens.text-faint;
                 horizontal-alignment: left;
             }
 
             TextXs {
                 width: 56px;
-                text: "Enabled";
+                text: @tr("Enabled");
                 color: Tokens.text-faint;
                 horizontal-alignment: center;
             }
@@ -591,8 +591,8 @@ component LineView inherits VerticalLayout {
                     bare: true;
                     name: root.line.alias-id;
                     stored: root.line.alias;
-                    label: "Alias for " + root.line.label;
-                    placeholder: "Add Alias";
+                    label: @tr("Alias for {}", root.line.label);
+                    placeholder: @tr("Add Alias");
                 }
             }
 
@@ -745,7 +745,7 @@ export component SettingsWindow inherits Window {
     pure function nav-y(index: int) -> length {
         return index * 34px + (index >= Host.nav-pages && Host.nav-pages > 0 ? 14px : 0px);
     }
-    title: "Heyo Settings";
+    title: @tr("Heyo Settings");
     icon: @image-url("../../../icons/128x128.png");
     no-frame: true;
     background: transparent;
@@ -866,8 +866,8 @@ export component SettingsWindow inherits Window {
                     bare: true;
                     has-icon: true;
                     icon: @image-url("icons/search.svg");
-                    label: "Search settings";
-                    placeholder: "Search settings…";
+                    label: @tr("Search settings");
+                    placeholder: @tr("Search settings…");
                     edited(text) => {
                         Host.search(text);
                     }
@@ -881,7 +881,7 @@ export component SettingsWindow inherits Window {
                     content-width: self.width;
                     content-height: root.nav-y(Host.nav.length) + 12px;
                     accessible-role: AccessibleRole.list;
-                    accessible-label: "Pages";
+                    accessible-label: @tr("Pages");
                     // What is selected: one shape that moves to it.
                     Rectangle {
                         y: root.nav-y(max(0, Host.nav-selected));
@@ -945,7 +945,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 14px;
                     background: close-touch.pressed ? Tokens.fill-3 : close-touch.has-hover ? Tokens.fill-2 : transparent;
                     accessible-role: button;
-                    accessible-label: "Close";
+                    accessible-label: @tr("Close");
                     accessible-action-default => {
                         Host.close();
                     }

@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::helper::{self, Helper};
-use crate::wire::{event, HostRequest};
+use crate::wire::{event, HostMessage, HostRequest};
 
 #[derive(Default)]
 pub struct Runtime {
@@ -64,6 +64,9 @@ impl Runtime {
         let mut guard = self.process.lock().unwrap();
         if guard.is_none() {
             *guard = Some(spawn(app, self.spawned.fetch_add(1, Ordering::Relaxed), self.background)?);
+            // Before anything else it is told: the language its own
+            // commands speak.
+            write(&mut guard, &HostMessage::Language { translations: crate::i18n::translations() }.json())?;
         }
         write(&mut guard, message)
     }

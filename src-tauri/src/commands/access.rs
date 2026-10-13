@@ -55,6 +55,7 @@ const TABLE: &[(&str, &[Caller])] = &[
     // Both read the settings (the palette for its appearance and layout),
     // and both bind a hotkey to an item.
     ("get_settings", &[Palette]),
+    ("translations", &[Palette]),
     ("set_item_hotkey", &[Palette]),
 ];
 

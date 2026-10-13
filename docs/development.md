@@ -62,7 +62,7 @@ Two things to know:
 |---|---|
 | `cargo test` in `src-tauri/` | the host's tests; also writes `shared/bindings/` |
 | `cargo test -- --ignored with_an_ibus_daemon` in `src-tauri/` | Heyo as an input method, against an `ibus-daemon` the test starts for itself, with directories of its own |
-| `pnpm test` | Vitest: the web view (`src/`), the runtime (`runtime/src/`), `shared/` and the compatibility tool (`scripts/compat/`) |
+| `pnpm test` | Vitest: the web view (`src/`), the runtime (`runtime/src/`), `shared/`, the compatibility tool (`scripts/compat/`) and the translations against the sources (`scripts/i18n.test.mjs`) |
 | `pnpm exec tsc --noEmit` | type-checks the web view |
 | `pnpm exec tsc --noEmit -p runtime` | type-checks the runtime |
 | `pnpm build` | both type checks, the runtime's bundles and the web view's build |
@@ -106,6 +106,45 @@ These are committed, and made again by a command rather than edited:
 | `src/assets/shadows/*.png`: the shadow round Heyo's windows | `python3 scripts/window-shadow.py` (Pillow) | the numbers at its top, which mirror `--shadow-window` in `src/styles/base/_tokens.scss` |
 | `docs/images/*.png`: the README's pictures | `scripts/gui-test/readme-shots.sh` | the interface as it is ([below](#the-readmes-pictures)) |
 | `docs/compatibility/`: which Raycast extensions run | `node scripts/compat/run.mjs` | the Raycast Store ([compatibility.md](compatibility.md)) |
+| `locales/heyo.pot`: every text Heyo says, for translating; and what each `locales/<language>/LC_MESSAGES/heyo.po` has to translate | `pnpm i18n` | the calls that mark a text in the sources ([below](#translations)) |
+
+## Translations
+
+What Heyo says is written in English where it is said, and the English is
+what a translation is found by: search the sources for the words on screen
+and you are at the code. The translations are gettext's files, one set for
+the whole program: `locales/<language>/LC_MESSAGES/heyo.po`.
+
+A text is marked for translating by the call it is in, as a literal:
+
+| Where | Plain | With a context | For a number of things |
+|---|---|---|---|
+| Rust (`src-tauri/src/i18n.rs`) | `t("Open at Login")`, `tf("Hotkey for {0}", &[&title])` | `tc("verb", "Open")` | `tn("{n} entry", "{n} entries", n, &[])` |
+| TypeScript (`shared/i18n.ts`) | `t("No results")`, `t("Running {0}…", title)` | `tc("verb", "Open")` | `tn("{n} entry", "{n} entries", n)` |
+| Slint (`ui/*.slint`) | `@tr("Close")`, `@tr("Hotkey for {}", title)` | `@tr("verb" => "Open")` | `@tr("{n} entry" \| "{n} entries" % n)` |
+
+In Rust a text kept in a table is `marked("General")` there and shown with
+`translate(…)`. Placeholders are the same in all three: `{}` the next
+argument, `{0}` one by its place, `{n}` the number. A context is for
+English that means two things; text without one is one message wherever
+it is said.
+
+`pnpm i18n` gathers the marked texts into `locales/heyo.pot` and brings
+every language's file up to it: new texts empty, texts no longer said
+gone, translations kept. `pnpm test` fails when the template is behind the
+sources, a file is behind the template, or a translation's placeholders
+are not its text's.
+
+The files are built into the program (`src-tauri/build.rs`): Slint's
+compiler bundles them for the markup, and the host carries them as a table
+for its own text and hands the chosen language's to the web view and the
+runtime. The language is the host's to choose (Settings → General, or the
+system's), and changes while Heyo runs.
+
+A new language is a directory under `locales/` with a `heyo.po` whose
+header says `Language`, `X-Language-Name` (its own name for itself, as the
+settings list it) and `Plural-Forms`; `pnpm i18n` fills it with what there
+is to translate.
 
 ## The GUI sandbox
 

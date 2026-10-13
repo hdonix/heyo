@@ -200,6 +200,18 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
     guard::gone();
 }
 
+/// Has what the windows' markup says (`@tr`) said in the language Heyo
+/// speaks now. On Slint's thread, which is where Slint keeps the language,
+/// and once a window has been made, which is when it learns what languages
+/// there are: so after each is made (`life`), and whenever the language
+/// changes. A window on screen is drawn again with it.
+pub(super) fn speak() {
+    let language = crate::i18n::language();
+    if let Err(e) = slint::select_bundled_translation(if language == crate::i18n::SOURCE { "" } else { language }) {
+        eprintln!("heyo: Slint's windows do not speak {language}: {e}");
+    }
+}
+
 /// Has `work` done on Slint's thread, from any other. False when its loop
 /// is no longer there to hear it.
 pub(super) fn on(work: impl FnOnce() + Send + 'static) -> bool {

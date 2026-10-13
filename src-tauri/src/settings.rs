@@ -36,6 +36,9 @@ pub enum Appearance {
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct Settings {
     pub appearance: Appearance,
+    /// The language Heyo speaks: `system`, `en`, or a translation's code
+    /// (`i18n::languages`).
+    pub language: String,
     /// Hide the window when it loses focus.
     pub hide_on_blur: bool,
     /// Show only the search field until something is typed.
@@ -135,6 +138,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             appearance: Appearance::System,
+            language: crate::i18n::SYSTEM.into(),
             hide_on_blur: true,
             compact_mode: false,
             keep_command: false,
@@ -184,6 +188,9 @@ pub enum Consequence {
     RefreshIndex,
     /// Extensions read `environment.appearance`: both runtimes are told.
     TellAppearance,
+    /// Heyo speaks another language from now on: its windows and both
+    /// runtimes are told.
+    TellLanguage,
     /// Clipboard entries older than this many days go now.
     PruneClipboard { days: u32 },
     /// Finding clipboard entries by meaning was turned on or off (with the
@@ -209,6 +216,9 @@ pub fn consequences(previous: &Settings, next: &Settings, node_given: bool) -> V
     all.push(if previous.disabled_commands != next.disabled_commands { Consequence::ReloadCommands } else { Consequence::RefreshIndex });
     if previous.appearance != next.appearance {
         all.push(Consequence::TellAppearance);
+    }
+    if previous.language != next.language {
+        all.push(Consequence::TellLanguage);
     }
     if previous.clipboard_retention_days != next.clipboard_retention_days {
         all.push(Consequence::PruneClipboard { days: next.clipboard_retention_days });
@@ -461,6 +471,7 @@ mod tests {
             (Settings { favorites: vec!["app:a".into()], ..was.clone() }, vec![RefreshIndex]),
             (Settings { aliases: BTreeMap::from([("app:a".into(), "a".into())]), ..was.clone() }, vec![RefreshIndex]),
             (Settings { appearance: Appearance::Dark, ..was.clone() }, vec![RefreshIndex, TellAppearance]),
+            (Settings { language: "zh_CN".into(), ..was.clone() }, vec![RefreshIndex, TellLanguage]),
             (Settings { clipboard_retention_days: 7, ..was.clone() }, vec![RefreshIndex, PruneClipboard { days: 7 }]),
             (Settings { clipboard_meaning: true, ..was.clone() }, vec![RefreshIndex, WakeMeaning]),
             // Without a history there is nothing to find by meaning either.
@@ -499,7 +510,7 @@ mod tests {
     /// setting it is.
     #[test]
     fn a_setting_read_where_it_is_used_sets_nothing_else_in_motion() {
-        let with_their_own = ["nodePath", "disabledCommands", "appearance", "clipboardRetentionDays", "clipboardMeaning", "clipboardHistory", "renderer"];
+        let with_their_own = ["nodePath", "disabledCommands", "appearance", "language", "clipboardRetentionDays", "clipboardMeaning", "clipboardHistory", "renderer"];
         let defaults = serde_json::to_value(Settings::default()).unwrap();
         for (name, value) in defaults.as_object().unwrap() {
             if with_their_own.contains(&name.as_str()) {

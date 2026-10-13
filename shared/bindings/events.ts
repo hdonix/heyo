@@ -12,4 +12,5 @@ export const event = {
   expandSnippet: "heyo://expand-snippet",
   clipboardMeaningInstall: "heyo://clipboard-meaning-install",
   activities: "heyo://activities",
+  languageChanged: "heyo://language-changed",
 } as const;

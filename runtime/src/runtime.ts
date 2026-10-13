@@ -4,6 +4,7 @@
 
 import { setAppearance } from "./api";
 import { open } from "./api/system";
+import { speak } from "../../shared/i18n";
 import { startBackground } from "./background";
 import { builtinExtension } from "./builtins";
 import { readManifest, runAs, scopedReact } from "./context";
@@ -81,6 +82,10 @@ export function start(host: Transport, identity: Identity): Promise<void> {
   });
 
   on("appearance", (message) => setAppearance(message.dark));
+
+  // What Heyo's own commands say from now on; one on screen says it when
+  // it next draws.
+  on("language", (message) => speak(message.translations));
 
   // `heyo dev` built an extension: its command on screen starts again.
   on("dev-reload", (message) => {

@@ -60,10 +60,31 @@ fn carry_out(app: &AppHandle, next: &Settings, consequence: settings::Consequenc
             // Neither running: nobody to tell.
             let _ = crate::runtime::tell_running(app, &HostMessage::Appearance { dark: next.dark() }.json());
         }
+        TellLanguage => {
+            if crate::i18n::choose(&next.language) {
+                tell_language(app);
+            }
+        }
         PruneClipboard { days } => app.state::<ClipboardHistory>().prune(days),
         WakeMeaning => app.state::<ClipboardHistory>().wake_meaning(),
         AtNextStart => eprintln!("heyo: the renderer changes when Heyo is next started"),
     }
+}
+
+/// Has everything that shows text say it in the language now spoken: the
+/// windows Slint draws, the palette, and whichever runtime is running (one
+/// started later is told as it starts).
+fn tell_language(app: &AppHandle) {
+    slint_windows::speak();
+    let translations = crate::i18n::translations();
+    let _ = crate::runtime::tell_running(app, &HostMessage::Language { translations: translations.clone() }.json());
+    let _ = app.emit(crate::wire::event::LANGUAGE_CHANGED, translations);
+}
+
+/// The language Heyo speaks, for a web view to say its own text in.
+#[tauri::command]
+pub(crate) fn translations() -> crate::i18n::Translations {
+    crate::i18n::translations()
 }
 
 /// Held from reading the settings to committing the change made to them:

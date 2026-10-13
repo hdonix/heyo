@@ -18,17 +18,18 @@ use std::collections::BTreeSet;
 use serde_json::{json, Map, Value};
 
 use super::host::Command;
+use crate::i18n::{self, marked, t, translate};
 use super::ids::{Act, Bound, Id};
 use super::keys;
 
 /// The pages: id, title, and the symbol on its tile in the sidebar.
 pub(crate) const PAGES: &[(&str, &str, &str)] = &[
-    ("general", "General", "cog-16"),
-    ("shortcuts", "Shortcuts", "keyboard-16"),
-    ("dictation", "Dictation", "microphone-16"),
-    ("screenshots", "Screenshots", "camera-16"),
-    ("advanced", "Advanced", "wrench-screwdriver-16"),
-    ("about", "About", "info-01-16"),
+    ("general", marked("General"), "cog-16"),
+    ("shortcuts", marked("Shortcuts"), "keyboard-16"),
+    ("dictation", marked("Dictation"), "microphone-16"),
+    ("screenshots", marked("Screenshots"), "camera-16"),
+    ("advanced", marked("Advanced"), "wrench-screwdriver-16"),
+    ("about", marked("About"), "info-01-16"),
 ];
 
 /// The id the applications have among the extensions of the sidebar.
@@ -424,7 +425,7 @@ impl Model {
     /// The applications as the extension the sidebar lists them as.
     fn applications_extension(&self) -> Value {
         let commands: Vec<Value> = self.applications.iter().map(|item| json!({ "id": item["id"], "name": item["id"], "title": item["title"], "description": item["subtitle"], "icon": item["icon"], "preferences": [] })).collect();
-        json!({ "id": APPLICATIONS, "name": APPLICATIONS, "title": "Applications", "description": "Give an application a hotkey to launch it from anywhere.", "icon": "app-window-grid-3x3-16", "builtin": true, "commands": commands, "preferences": [], "values": { "extension": {}, "commands": {} } })
+        json!({ "id": APPLICATIONS, "name": APPLICATIONS, "title": t("Applications"), "description": "Give an application a hotkey to launch it from anywhere.", "icon": "app-window-grid-3x3-16", "builtin": true, "commands": commands, "preferences": [], "values": { "extension": {}, "commands": {} } })
     }
 
     /// Applications first, then Heyo's own commands, then the installed
@@ -442,7 +443,7 @@ impl Model {
     }
 
     fn extension_title(extension: &Value) -> String {
-        if extension["id"] == BUILTIN { "Heyo Commands".into() } else { text(extension, "title") }
+        if extension["id"] == BUILTIN { t("Heyo Commands").into() } else { text(extension, "title") }
     }
 
     /// What to show for an icon the host named: a file as it is, a file of
@@ -461,7 +462,8 @@ impl Model {
     pub(crate) fn nav(&self) -> (Vec<Entry>, usize) {
         let query = self.nav_search.to_lowercase();
         let found = |titles: Vec<String>| query.is_empty() || titles.iter().any(|title| title.to_lowercase().contains(&query));
-        let mut entries: Vec<Entry> = PAGES.iter().filter(|(_, title, _)| found(vec![title.to_string()])).map(|(id, title, icon)| Entry { id: id.to_string(), title: title.to_string(), icon: Some(icon.to_string()), extension: false }).collect();
+        // A page is found by its name as it is shown, and by its English.
+        let mut entries: Vec<Entry> = PAGES.iter().filter(|(_, title, _)| found(vec![translate(title).to_string(), title.to_string()])).map(|(id, title, icon)| Entry { id: id.to_string(), title: translate(title).to_string(), icon: Some(icon.to_string()), extension: false }).collect();
         let pages = entries.len();
         for extension in self.sidebar_extensions() {
             let mut titles = vec![text(&extension, "title")];
@@ -484,8 +486,8 @@ impl Model {
 
     pub(crate) fn title(&self) -> String {
         match PAGES.iter().find(|(id, ..)| *id == self.page) {
-            Some((_, title, _)) => title.to_string(),
-            None => self.extension().as_ref().map(Self::extension_title).unwrap_or_else(|| "Settings".into()),
+            Some((_, title, _)) => translate(title).to_string(),
+            None => self.extension().as_ref().map(Self::extension_title).unwrap_or_else(|| t("Settings").into()),
         }
     }
 
@@ -546,33 +548,40 @@ impl Model {
         // GNOME's Shell extension, where there is a use for it and it is
         // not running as it should.
         let extension = match self.capabilities["extension"].as_str() {
-            Some("missing") => Some(("On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use.", "Install")),
-            Some("outdated") => Some(("This version of Heyo comes with a newer extension than the one installed. Update it, then log out and back in. An extension that is already running keeps working until then, without what the new one adds.", "Update")),
-            Some("pending") => Some(("In place. Log out and back in to finish: GNOME loads a new or updated extension only when a session starts.", "")),
+            Some("missing") => Some((t("On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use."), t("Install"))),
+            Some("outdated") => Some((t("This version of Heyo comes with a newer extension than the one installed. Update it, then log out and back in. An extension that is already running keeps working until then, without what the new one adds."), t("Update"))),
+            Some("pending") => Some((t("In place. Log out and back in to finish: GNOME loads a new or updated extension only when a session starts."), "")),
             _ => None,
         };
         if let Some((description, action)) = extension {
-            let row = Line::row(Id::Act(Act::InstallShellExtension), "GNOME Shell Extension").says(description);
+            let row = Line::row(Id::Act(Act::InstallShellExtension), t("GNOME Shell Extension")).says(description);
             page.card("Wayland", vec![if action.is_empty() { row } else { row.button(action) }]);
         }
-        let hotkey = Line::row("", "Heyo Hotkey");
+        let hotkey = Line::row("", t("Heyo Hotkey"));
         page.card(
             "",
             vec![
-                Line::row(Id::Set("launchAtLogin".into()), "Open at Login").switch(self.set("launchAtLogin")),
-                if self.hotkeys_supported() { hotkey.hotkey(&Bound::Own("toggle".into()).to_string(), self.hotkeys.get("toggle")) } else { hotkey.says("Bind a desktop keyboard shortcut to heyo.") },
+                Line::row(Id::Set("launchAtLogin".into()), t("Open at Login")).switch(self.set("launchAtLogin")),
+                if self.hotkeys_supported() { hotkey.hotkey(&Bound::Own("toggle".into()).to_string(), self.hotkeys.get("toggle")) } else { hotkey.says(t("Bind a desktop keyboard shortcut to heyo.")) },
             ],
         );
-        page.card("Appearance", vec![Line::row(Id::Set("appearance".into()), "Theme").says("Light, dark, or whichever the system is using").select(&self.chosen("appearance"), [("system", "System"), ("light", "Light"), ("dark", "Dark")])]);
+        let languages = [(i18n::SYSTEM, t("System")), (i18n::SOURCE, "English")].into_iter().chain(i18n::languages());
         page.card(
-            "Window",
+            t("Appearance"),
             vec![
-                Line::row(Id::Set("compactMode".into()), "Compact Mode").says("Show only the search field until you type").switch(self.set("compactMode")),
-                Line::row(Id::Set("hideOnBlur".into()), "Hide When Focus Is Lost").says("Close the window when you click elsewhere").switch(self.set("hideOnBlur")),
-                Line::row(Id::Set("keepCommand".into()), "Keep the Running Command").says("Reopening Heyo returns to the command you were using instead of the root search").switch(self.set("keepCommand")),
+                Line::row(Id::Set("appearance".into()), t("Theme")).says(t("Light, dark, or whichever the system is using")).select(&self.chosen("appearance"), [("system", t("System")), ("light", t("Light")), ("dark", t("Dark"))]),
+                Line::row(Id::Set("language".into()), t("Language")).says(t("What Heyo itself says. Extensions speak their own.")).select(&self.chosen("language"), languages),
             ],
         );
-        page.card("Live Activities", vec![Line::row(Id::Set("liveActivities".into()), "Show What Is in Progress").says("Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you").switch(self.set("liveActivities"))]);
+        page.card(
+            t("Window"),
+            vec![
+                Line::row(Id::Set("compactMode".into()), t("Compact Mode")).says(t("Show only the search field until you type")).switch(self.set("compactMode")),
+                Line::row(Id::Set("hideOnBlur".into()), t("Hide When Focus Is Lost")).says(t("Close the window when you click elsewhere")).switch(self.set("hideOnBlur")),
+                Line::row(Id::Set("keepCommand".into()), t("Keep the Running Command")).says(t("Reopening Heyo returns to the command you were using instead of the root search")).switch(self.set("keepCommand")),
+            ],
+        );
+        page.card(t("Live Activities"), vec![Line::row(Id::Set("liveActivities".into()), t("Show What Is in Progress")).says(t("Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you")).switch(self.set("liveActivities"))]);
         page.done()
     }
 
@@ -1456,7 +1465,7 @@ mod tests {
 
     #[test]
     fn general_says_what_the_settings_are() {
-        let mut model = told(json!({ "launchAtLogin": true, "appearance": "dark", "compactMode": false, "hideOnBlur": true, "keepCommand": false, "liveActivities": true }), json!({ "extension": "none" }));
+        let mut model = told(json!({ "launchAtLogin": true, "appearance": "dark", "language": "system", "compactMode": false, "hideOnBlur": true, "keepCommand": false, "liveActivities": true }), json!({ "extension": "none" }));
         model.hotkeys = json!({ "supported": true, "toggle": "<Super>space", "clipboard": null, "dictation": null });
         let lines = model.lines();
         assert!(row(&lines, "Open at Login").on && row(&lines, "Hide When Focus Is Lost").on && row(&lines, "Show What Is in Progress").on);
@@ -1465,8 +1474,12 @@ mod tests {
         assert_eq!((row(&lines, "Heyo Hotkey").hotkey.as_str(), row(&lines, "Heyo Hotkey").keys.clone()), ("@toggle", vec!["Super".to_string(), "Space".to_string()]));
         assert!(!has(&lines, "GNOME Shell Extension"));
         // The cards: the first row of each is its first, the last its last.
-        assert!(row(&lines, "Open at Login").first && row(&lines, "Heyo Hotkey").last && row(&lines, "Theme").first && row(&lines, "Theme").last);
+        assert!(row(&lines, "Open at Login").first && row(&lines, "Heyo Hotkey").last);
         assert_eq!(lines.iter().filter(|line| line.kind == "heading").map(|line| line.label.as_str()).collect::<Vec<_>>(), ["Appearance", "Window", "Live Activities"]);
+        // The language: the system's, the sources', and every translation
+        // by its own name for itself.
+        assert_eq!((row(&lines, "Language").value.as_str(), titles(row(&lines, "Language"))), ("system", vec!["System", "English", "简体中文"]));
+        assert!(row(&lines, "Theme").first && !row(&lines, "Theme").last && row(&lines, "Language").last);
     }
 
     #[test]

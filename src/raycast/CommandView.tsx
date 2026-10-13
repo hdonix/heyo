@@ -12,6 +12,7 @@ import { ListView } from "./ListView";
 import { Memories, type ViewMemory } from "./memory";
 import { content, encode, isFn, sendToRuntime, slot, type Node, type Toast, type View } from "./model";
 import { useTyping } from "./typing";
+import { t } from "../../shared/i18n";
 
 export interface CommandState {
   session: number;
@@ -289,7 +290,7 @@ export function CommandView(props: {
             <input
               ref={inputRef}
               className="search"
-              placeholder={root.props.searchBarPlaceholder ?? "Search…"}
+              placeholder={root.props.searchBarPlaceholder ?? t("Search…")}
               value={query}
               onChange={(e) => onSearch(e.target.value)}
               {...typing.composition}
@@ -321,7 +322,7 @@ export function CommandView(props: {
             )}
             {runnable.length > 0 && (
               <button className="footer-button" onClick={() => setPanelOpen(true)}>
-                Actions <ShortcutHint shortcut={{ modifiers: ["ctrl"], key: "k" }} />
+                {t("Actions")} <ShortcutHint shortcut={{ modifiers: ["ctrl"], key: "k" }} />
               </button>
             )}
           </span>

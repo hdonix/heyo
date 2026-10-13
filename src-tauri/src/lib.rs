@@ -7,6 +7,7 @@ mod extensions;
 mod files;
 mod helper;
 mod host;
+mod i18n;
 mod links;
 mod menubar;
 mod library;
@@ -165,6 +166,9 @@ pub fn run() {
     }
     #[cfg(windows)]
     platform::win::log_to_file();
+    // Whatever Heyo says from here on is in the language the settings name.
+    let settings = Settings::load();
+    i18n::choose(&settings.language);
     // Measuring the clipboard search needs no window and no running Heyo.
     let args: Vec<String> = std::env::args().collect();
     if let Some(at) = args.iter().position(|arg| arg == "--clipboard-eval") {
@@ -197,7 +201,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(IndexState::default())
         .manage(Runtime::default())
-        .manage(SettingsState(RwLock::new(Settings::load())))
+        .manage(SettingsState(RwLock::new(settings)))
         .manage(ClipboardHistory::load())
         .manage(UsageStore::load())
         .manage(ItemHotkeys::default())
@@ -217,6 +221,7 @@ pub fn run() {
             runtime_send,
             hide,
             get_settings,
+            translations,
             open_settings,
             set_item_hotkey,
             show_window,

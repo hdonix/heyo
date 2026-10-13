@@ -14,6 +14,7 @@ import { Action, ActionPanel, List } from "../api/components";
 import { Icon } from "../api/icon";
 import { closeMainWindow, confirmAlert, pasteKeystroke, showHUD, showToast, Toast } from "../api/system";
 import type { Kind } from "../../../shared/bindings/Kind";
+import { t, tn } from "../../../shared/i18n";
 import type { MemoryItem } from "../../../shared/bindings/MemoryItem";
 import type { MemoryResult } from "../../../shared/bindings/MemoryResult";
 import { ClipboardHistory as History, Memory } from "../heyo/plain";
@@ -257,7 +258,7 @@ export function ClipboardHistory() {
   };
   const pauseAction = !off && (
     <Action
-      title={paused ? "Resume Recording" : "Pause Recording"}
+      title={paused ? t("Resume Recording") : t("Pause Recording")}
       icon={paused ? Icon.Play : Icon.Pause}
       shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
       onAction={() => setPaused(!paused)}
@@ -266,16 +267,16 @@ export function ClipboardHistory() {
   /// Said in the search field, over the first section and in place of an
   /// empty list while copies are not being recorded. Not a row of its own:
   /// the first row is what Enter pastes.
-  const notRecording = off ? "Recording is turned off" : paused ? "Recording is paused" : undefined;
+  const notRecording = off ? t("Recording is turned off") : paused ? t("Recording is paused") : undefined;
   /// While entries are still being read, a search by meaning misses some.
   const waiting = found?.meaning?.waiting ?? 0;
-  const stillReading = waiting > 0 && query.trim() ? `Finding by meaning is still reading ${waiting.toLocaleString()} ${waiting === 1 ? "entry" : "entries"}` : undefined;
+  const stillReading = waiting > 0 && query.trim() ? tn("Finding by meaning is still reading {0} entry", "Finding by meaning is still reading {0} entries", waiting, waiting.toLocaleString()) : undefined;
 
   const actions = (entry: Entry) => (
     <ActionPanel>
       <ActionPanel.Section>
         <Action
-          title="Paste to Active App"
+          title={t("Paste to Active App")}
           icon={Icon.Clipboard}
           onAction={async () => {
             await copy(entry);
@@ -284,18 +285,18 @@ export function ClipboardHistory() {
           }}
         />
         <Action
-          title="Copy to Clipboard"
+          title={t("Copy to Clipboard")}
           icon={Icon.CopyClipboard}
           onAction={async () => {
             await copy(entry);
-            await showHUD("Copied to Clipboard");
+            await showHUD(t("Copied to Clipboard"));
           }}
         />
         {entry.kind === "link" && <Action.OpenInBrowser url={entry.text!.trim()} shortcut={{ modifiers: ["cmd"], key: "o" }} />}
       </ActionPanel.Section>
       <ActionPanel.Section>
         <Action
-          title={entry.pinned ? "Unpin Entry" : "Pin Entry"}
+          title={entry.pinned ? t("Unpin Entry") : t("Pin Entry")}
           icon={entry.pinned ? Icon.PinDisabled : Icon.Pin}
           shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
           onAction={async () => {
@@ -304,7 +305,7 @@ export function ClipboardHistory() {
           }}
         />
         <Action
-          title="Delete Entry"
+          title={t("Delete Entry")}
           icon={Icon.Trash}
           style="destructive"
           shortcut={{ modifiers: ["ctrl"], key: "x" }}
@@ -314,15 +315,15 @@ export function ClipboardHistory() {
           }}
         />
         <Action
-          title="Delete All Entries"
+          title={t("Delete All Entries")}
           icon={Icon.Trash}
           style="destructive"
           shortcut={{ modifiers: ["ctrl", "shift"], key: "x" }}
           onAction={async () => {
             const confirmed = await confirmAlert({
-              title: "Delete all entries?",
-              message: "Pinned entries are kept.",
-              primaryAction: { title: "Delete All", style: "DESTRUCTIVE" },
+              title: t("Delete all entries?"),
+              message: t("Pinned entries are kept."),
+              primaryAction: { title: t("Delete All"), style: "DESTRUCTIVE" },
             });
             if (!confirmed) return;
             await request("host.clipboardHistory.clear");
@@ -340,7 +341,8 @@ export function ClipboardHistory() {
       isShowingDetail={groups.length > 0}
       filtering={false}
       onSearchTextChange={setQuery}
-      searchBarPlaceholder={`${notRecording ? `${notRecording} · ` : ""}Search, or say when and where: 昨天下午, last week, from firefox…`}
+      navigationTitle={t("Clipboard History")}
+      searchBarPlaceholder={`${notRecording ? `${notRecording} · ` : ""}${t("Search, or say when and where: 昨天下午, last week, from firefox…")}`}
       searchBarAccessory={
         <List.Dropdown tooltip="Filter by type" value={filter} onChange={(value: string) => setFilter(value as Kind | "all")}>
           {FILTERS.map((f) => (

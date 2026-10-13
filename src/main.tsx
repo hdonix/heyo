@@ -2,8 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
-import { call, reported } from "./host";
+import { call, listen, reported } from "./host";
 import { followAppearance } from "./theme";
+import { onLanguage, speak } from "../shared/i18n";
 import "@fontsource-variable/inter";
 import "./styles/index.scss";
 
@@ -27,8 +28,17 @@ if (label === "main") {
 // Measurements for development (scripts/gui-test/scroll.sh); not in a build.
 if (import.meta.env.DEV || import.meta.env.VITE_HEYO_BENCH) void import("./dev/bench");
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
+const draw = () =>
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+draw();
+
+// The language is the host's to choose: what it hands over is spoken from
+// then on, and everything on screen is said again in it.
+onLanguage(draw);
+call("translations").then(speak).catch(reported());
+listen("languageChanged", speak);

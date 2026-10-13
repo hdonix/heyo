@@ -1,0 +1,293 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: heyo\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "General"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Shortcuts"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Dictation"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Screenshots"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Advanced"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "About"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Applications"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Heyo Commands"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Settings"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Install"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This version of Heyo comes with a newer extension than the one installed. Update it, then log out and back in. An extension that is already running keeps working until then, without what the new one adds."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Update"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "In place. Log out and back in to finish: GNOME loads a new or updated extension only when a session starts."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "GNOME Shell Extension"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Heyo Hotkey"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Open at Login"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Bind a desktop keyboard shortcut to heyo."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "System"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Appearance"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Theme"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Light, dark, or whichever the system is using"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Light"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Dark"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Language"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "What Heyo itself says. Extensions speak their own."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Window"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Compact Mode"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Show only the search field until you type"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hide When Focus Is Lost"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Close the window when you click elsewhere"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Keep the Running Command"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Reopening Heyo returns to the command you were using instead of the root search"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Live Activities"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Show What Is in Progress"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Hotkey for {}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Name"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Alias"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Hotkey"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Enabled"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Alias for {}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Add Alias"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Heyo Settings"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Search settings"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Search settings…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Pages"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Close"
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "Search apps, commands, or calculate…"
+msgstr ""
+
+#: src/RootSearch.tsx
+msgid "No results"
+msgstr ""
+
+#: src/RootSearch.tsx
+#: src/raycast/CommandView.tsx
+msgid "Actions"
+msgstr ""
+
+#: src/raycast/CommandView.tsx
+msgid "Search…"
+msgstr ""
+
+#: src/raycast/actions.tsx
+msgid "No actions"
+msgstr ""
+
+#: src/raycast/actions.tsx
+msgid "Search for actions…"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Resume Recording"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pause Recording"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is turned off"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Recording is paused"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Finding by meaning is still reading {0} entry"
+msgid_plural "Finding by meaning is still reading {0} entries"
+msgstr[0] ""
+msgstr[1] ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Paste to Active App"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copy to Clipboard"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Copied to Clipboard"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Unpin Entry"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pin Entry"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete Entry"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete All Entries"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete all entries?"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pinned entries are kept."
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete All"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard History"
+msgstr ""
+
+#: runtime/src/builtins/clipboard.tsx
+msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
+msgstr ""

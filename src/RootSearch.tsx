@@ -24,8 +24,7 @@ import { SelectionIndicator } from "./SelectionIndicator";
 import { actionForShortcut, ActionOverlay, ShortcutHint } from "./raycast/actions";
 import { ToastView } from "./raycast/CommandView";
 import type { Toast } from "./raycast/model";
-
-const SEARCH_PLACEHOLDER = "Search apps, commands, or calculate…";
+import { t } from "../shared/i18n";
 
 export type { Item };
 
@@ -414,15 +413,16 @@ export function RootSearch(props: {
     }
   };
 
+  const placeholder = t("Search apps, commands, or calculate…");
   return (
     <div className={collapsed ? "panel compact" : "panel"} onKeyDown={onKeyDown}>
       <div className="search-row">
         {/* With arguments after it, the search field is only as wide as its text. */}
-        <label className={fields.length ? "search-fit fitted" : "search-fit"} data-text={query || SEARCH_PLACEHOLDER}>
+        <label className={fields.length ? "search-fit fitted" : "search-fit"} data-text={query || placeholder}>
           <input
             ref={props.inputRef}
             className="search"
-            placeholder={SEARCH_PLACEHOLDER}
+            placeholder={placeholder}
             value={query}
             onChange={(e) => props.setQuery(e.target.value)}
             autoFocus
@@ -453,7 +453,7 @@ export function RootSearch(props: {
       <ul className="list" ref={listRef}>
         <SelectionIndicator as="li" resetKey={query} />
         {rows.map(draw)}
-        {rows.length === 0 && <li className="empty">No results</li>}
+        {rows.length === 0 && <li className="empty">{t("No results")}</li>}
       </ul>
       )}
       <footer className="footer" hidden={collapsed}>
@@ -466,7 +466,7 @@ export function RootSearch(props: {
             </button>
           )}
           <button className="footer-button" onClick={() => setPanelOpen(true)}>
-            Actions <ShortcutHint shortcut={{ modifiers: ["ctrl"], key: "k" }} />
+            {t("Actions")} <ShortcutHint shortcut={{ modifiers: ["ctrl"], key: "k" }} />
           </button>
         </span>
       </footer>
