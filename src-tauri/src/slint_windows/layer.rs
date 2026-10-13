@@ -436,6 +436,7 @@ impl Layered {
         let Some(layer) = surface.as_ref() else { return };
         let (size, scale) = (self.size.get(), self.scale.get().max(1) as u32);
         let (width, height) = ((size.0 * scale) as usize, (size.1 * scale) as usize);
+        super::screenshot::trace("layer surface is drawn");
         let software = match &self.renderer {
             Renderer::Clear(software) => software,
             Renderer::Solid(skia, given) => {

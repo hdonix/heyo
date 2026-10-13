@@ -35,10 +35,10 @@ keys("-k", "Escape")
 
 events = []
 for line in open("/tmp/heyo.log", errors="replace"):
-    found = re.match(r"heyo: (pointer moved|layer surface drawn|layer surface shown) at ([0-9.]+) ms", line)
+    found = re.match(r"heyo: (pointer moved|layer surface is drawn|layer surface drawn|layer surface shown) at ([0-9.]+) ms", line)
     if found:
         events.append((float(found.group(2)), found.group(1)))
-drawn, shown = [], []
+begun, drawn, shown = [], [], []
 for mark in marks:
     after = [event for event in events if event[0] >= mark - 1]
     moved = next((at for at, what in after if what == "pointer moved"), None)
@@ -46,10 +46,17 @@ for mark in marks:
         continue
     handed = next((at for at, what in after if what == "layer surface drawn" and at >= moved), None)
     seen = next((at for at, what in after if what == "layer surface shown" and handed is not None and at >= handed), None)
+    began = next((at for at, what in after if what == "layer surface is drawn" and at >= moved), None)
+    if began is not None:
+        begun.append(began - moved)
     if handed is not None:
         drawn.append(handed - moved)
     if seen is not None:
         shown.append(seen - moved)
+between = [what for at, what in events if marks and marks[0] <= at <= marks[-1] + 400]
+print(f"each jump, in ms, until its picture was begun: {' '.join(f'{taken:.1f}' for taken in begun)}")
+print(f"... and until it was handed over: {' '.join(f'{taken:.1f}' for taken in drawn)}")
+print(f"while it went on ({(marks[-1] + 400 - marks[0]) / 1000:.1f} s): the pointer moved {between.count('pointer moved')} times, {between.count('layer surface drawn')} pictures were handed over")
 for name, taken in (("handed to the compositor", drawn), ("shown by the compositor", shown)):
     if taken:
         taken.sort()
