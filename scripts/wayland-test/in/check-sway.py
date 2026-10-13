@@ -15,117 +15,33 @@ underneath (which Sway then gives the keyboard, and the pill is not
 pressed); and the pill gone afterwards.
 
 And two pinned captures, which are layer surfaces too (Heyo is started
-with HEYO_TEST_PIN, since it cannot read the screen under Sway yet): each
-where it was said, pixel for pixel, above the windows; one dragged, which
-must go as far as the pointer went; closed by a double click and by the
-other button; none of it moving the keyboard.
+with HEYO_TEST_PIN): each where it was said, pixel for pixel, above the
+windows; one dragged, which must go as far as the pointer went; closed by
+a double click and by the other button; none of it moving the keyboard.
+
+And the screenshot overlay, a layer surface over the whole output that
+has every key while it is there: the screen dimmed from corner to corner;
+a key typed not reaching the application; what is selected drawn as the
+screen was, pixel for pixel; a line typed with the text tool, with a key
+held down pressed again and again, and undone with Control and a key;
+Escape giving it up, the keyboard back where it was, and what is typed
+then reaching the application.
+
+Where the text tool's button is, is written here as numbers (the
+toolbar's right end at the selection's, 8 below it, a button every 32
+from 20 in): a layer surface has no names to ask for on the accessibility
+bus, as a window of the toolkit's has (../../gui-test/ask.py).
 
 Whether dictated words reach an application here is not checked: Heyo has
 no way of typing into another application under Sway yet.
 """
-import json, os, subprocess, sys, time
+import os, sys, time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-HEYO = f"/heyo/src-tauri/target/{os.environ.get('HEYO_BUILD', 'release')}/heyo"
-failed = []
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from swaybed import application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, picture, point, press, release, same, scale, sway, typed, wait, width, windows
 
-
-def check(what, ok, detail=""):
-    print(("ok   " if ok else "FAIL ") + what + (f"  ({detail})" if detail and not ok else ""))
-    if not ok:
-        failed.append(what)
-
-
-def sway(*args):
-    return subprocess.run(["swaymsg", *args], capture_output=True, text=True).stdout
-
-
-def tree():
-    return json.loads(sway("-t", "get_tree"))
-
-
-def windows(node=None):
-    node = node or tree()
-    found = [node] if node.get("pid") else []
-    for child in node.get("nodes", []) + node.get("floating_nodes", []):
-        found += windows(child)
-    return found
-
-
-def focused():
-    return next((window.get("name") for window in windows() if window.get("focused")), None)
-
-
-def wait(condition, seconds=6.0):
-    end = time.time() + seconds
-    while time.time() < end:
-        value = condition()
-        if value:
-            return value
-        time.sleep(0.15)
-    return None
-
-
-def picture():
-    """The screen, as (width, height, pixels) with pixels row by row, three or four bytes each."""
-    import gi
-    gi.require_version("GdkPixbuf", "2.0")
-    from gi.repository import GdkPixbuf
-    subprocess.run(["grim", "/tmp/check-sway.png"], check=True)
-    image = GdkPixbuf.Pixbuf.new_from_file("/tmp/check-sway.png")
-    return image.get_width(), image.get_height(), image.get_rowstride(), image.get_n_channels(), image.get_pixels()
-
-
-def at(shot, x, y):
-    _, _, stride, channels, pixels = shot
-    offset = int(y) * stride + int(x) * channels
-    return tuple(pixels[offset:offset + 3])
-
-
-def dark(colour):
-    return max(colour) < 60
-
-
-output = next(output for output in json.loads(sway("-t", "get_outputs")) if output.get("active"))
-scale = output["scale"]
-# In the output's own logical pixels, which the pointer goes by.
-width, height = output["rect"]["width"], output["rect"]["height"]
 # Where the pill's window is: 360 by 44, at the bottom centre, a tenth up.
 left, top = (width - 360) // 2, height - 44 - height // 10
-
-# A pointer of the session's own (pointer.py): headless Sway has none, and
-# its clients are told nothing of one that `swaymsg seat - cursor` moves.
-POINTER = subprocess.Popen([os.path.join(HERE, "pointer.py")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-POINTER.stdout.readline()
-
-
-def pointer(*words):
-    POINTER.stdin.write(" ".join(str(word) for word in words) + "\n")
-    POINTER.stdin.flush()
-    POINTER.stdout.readline()
-
-
-def point(x, y, settle=0.4):
-    pointer("to", int(x), int(y), width, height)
-    time.sleep(settle)
-
-
-def press(button="left"):
-    pointer("down", button)
-    time.sleep(0.12)
-
-
-def release(button="left"):
-    pointer("up", button)
-    time.sleep(0.12)
-
-
-def click():
-    press()
-    release()
-    time.sleep(0.5)
-
-
 
 
 def pill_there():
@@ -138,15 +54,11 @@ def pill_there():
 
 # Two windows side by side, light ones, one after the other: Sway puts
 # the second on the right and gives it the keyboard.
-apps = []
-for title, app in (("Left", "check-sway-left"), ("Right", "check-sway-right")):
-    apps.append(subprocess.Popen([os.path.join(HERE, "window.py"), title, app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-    wait(lambda: [window for window in windows() if window.get("name") == title])
-    time.sleep(0.8)
+apps = [application("Left", "check-sway-left"), application("Right", "check-sway-right")]
 check("an application has the keyboard", focused() == "Right", focused())
 check("nothing of Heyo's is on the screen before it is asked for", not [window for window in windows() if (window.get("name") or "").startswith("Heyo")] and not pill_there()[0])
 
-subprocess.run([HEYO, "--dictate"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+heyo("--dictate")
 check("the pill comes up at the bottom centre, a tenth up, clear round its corners", bool(wait(lambda: pill_there()[0], 6)), pill_there()[1])
 check("it is no window of Sway's tree: a layer surface", not [window for window in windows() if window.get("name") == "Heyo Dictation"])
 check("the application still has the keyboard", focused() == "Right", focused())
@@ -176,7 +88,7 @@ click()
 check("... nor does a click on it", focused() == "Right", focused())
 gone = wait(lambda: not pill_there()[0], 10)
 if not gone:
-    subprocess.run([HEYO, "--dictate"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    heyo("--dictate")
     gone = wait(lambda: not pill_there()[0], 10)
 check("the pill is gone afterwards", bool(gone), pill_there()[1])
 check("... and the application still has the keyboard", focused() == "Right", focused())
@@ -224,6 +136,76 @@ release("right")
 time.sleep(0.6)
 check("the other button closes the other", not pinned(800, 160, 200, 120))
 check("... and the keyboard is still where it was", focused() == "Right", focused())
+
+# The screenshot overlay. The right window has the keyboard; what is
+# selected is in the left one, where no cursor blinks.
+point(width * 3 // 4, height // 3)
+click()
+keys("-k", "BackSpace")
+had = typed("check-sway-right")
+S = int(scale)
+W, H = width * S, height * S
+corners = [(6, 6), (W - 6, 6), (6, H - 6), (W - 6, H - 6), (W // 2, 6), (6, H // 2)]
+before = picture()
+heyo("--open", "heyo:screenshot")
+up = wait(lambda: (lambda shot: shot if same(shot, before, corners) == len(corners) else None)(picture()), 8)
+check("the overlay comes up, the screen dimmed from corner to corner", bool(up), "the corners are as they were")
+check("it is no window of Sway's tree: a layer surface", not [window for window in windows() if (window.get("name") or "").startswith("Heyo")])
+keys("a")
+check("a key typed then does not reach the application", typed("check-sway-right") == had, repr(typed("check-sway-right")))
+
+# A selection, in the output's logical pixels.
+x0, y0, x1, y1 = int(width * 0.06), int(height * 0.15), int(width * 0.4), int(height * 0.6)
+point(x0, y0)
+press()
+for step in range(1, 9):
+    point(x0 + (x1 - x0) * step // 8, y0 + (y1 - y0) * step // 8, 0.05)
+release()
+time.sleep(0.6)
+selected = picture()
+# Away from its edge, where its handles are drawn over it.
+inside = [(x, y) for x in range((x0 + 12) * S, (x1 - 12) * S, 7) for y in range((y0 + 12) * S, (y1 - 12) * S, 7)]
+check(f"what is selected is drawn as the screen was, pixel for pixel ({len(inside)} places)", same(selected, before, inside) == 0, f"{same(selected, before, inside)} differ, {around(differing(selected, before, inside))}")
+check("... and the rest of the screen stays dimmed", same(selected, before, corners) == len(corners))
+
+
+def marked(shot, down):
+    """How wide what is drawn over the selection is, in the band that far down it where a line is typed."""
+    columns = [x for x in range((x0 + 12) * S, (x1 - 12) * S) if any(at(shot, x, y) != at(before, x, y) for y in range((y0 + down - 20) * S, (y0 + down + 20) * S, 2))]
+    return (max(columns) - min(columns) + 1) if columns else 0
+
+
+# The text tool, and a line typed where it is clicked.
+toolbar_left = max(8, x1 - 499)
+point(toolbar_left + 20 + 32 * 3, y1 + 8 + 20)
+click()
+point(x0 + 40, y0 + 90)
+click()
+keys("x")
+keys("-k", "Return")
+one = marked(picture(), 90)
+check("a key typed with the text tool is drawn in the selection, and Enter ends the line", one > 0)
+# The next line, lower down: one key, held for a second and a half.
+point(x0 + 40, y0 + 200)
+click()
+keys("-P", "x", "-s", "1500", "-p", "x")
+keys("-k", "Return")
+many = marked(picture(), 200)
+check("a key held down is pressed again and again", one > 0 and many > 6 * one, f"one {one} pixels wide, held {many}")
+keys("-M", "ctrl", "z", "-m", "ctrl")
+shot = picture()
+check("Control and Z take the last line back, and not the first", marked(shot, 200) == 0 and marked(shot, 90) == one, (marked(shot, 200), marked(shot, 90)))
+
+# Escape gives the screenshot up; the keyboard is where it was.
+keys("-k", "Escape")
+gone = wait(lambda: same(picture(), before, corners) == 0, 4)
+if not gone:
+    keys("-k", "Escape")
+    gone = wait(lambda: same(picture(), before, corners) == 0, 4)
+check("Escape takes the overlay off the screen", bool(gone))
+check("... and the application has the keyboard again", focused() == "Right", focused())
+keys("hello")
+check("... and what is typed then reaches it", typed("check-sway-right") == had + "hello", repr(typed("check-sway-right")))
 for app in apps:
     app.terminate()
 

@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       # client library for Python, which makes its own bindings of a
       # protocol from its description.
       python3-pywayland python3-cffi-backend libwayland-dev pkg-config \
+      # Keys for a session that has no keyboard either.
+      wtype \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pywayland.scanner -i /usr/share/wayland/wayland.xml /opt/wlr-virtual-pointer-unstable-v1.xml -o /opt/heyo_protocols \
     && touch /opt/heyo_protocols/__init__.py
