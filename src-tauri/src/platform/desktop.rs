@@ -377,6 +377,11 @@ impl Desktop for Generic {
     }
 
     #[cfg(target_os = "linux")]
+    fn pointer_monitor(&self) -> Option<(i32, i32)> {
+        if super::session() == super::Session::Wayland { super::wlr::pointed() } else { None }
+    }
+
+    #[cfg(target_os = "linux")]
     fn hotkeys(&self) -> Option<&dyn Hotkeys> {
         super::hotkeys::gsettings()
     }

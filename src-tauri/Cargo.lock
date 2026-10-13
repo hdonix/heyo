@@ -2580,7 +2580,6 @@ dependencies = [
  "url",
  "walkdir",
  "wayland-client",
- "wayland-protocols-wlr",
  "windows",
  "windows-sys 0.59.0",
  "x11-dl",

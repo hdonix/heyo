@@ -6,13 +6,22 @@
 //!
 //! One output is read, into a buffer the compositor fills, in the
 //! output's own pixels. A connection is made for it and let go after.
+//!
+//! Which output: a Wayland program is not told where the pointer is
+//! unless it is over a surface of its own. These compositors put a layer
+//! surface that names no output on the one they hold to be in use, which
+//! is the one the pointer was last moved on or a key last typed on; so a
+//! surface of one pixel with nothing in it is put up, asked where it
+//! went, and taken away (`pointed`).
 
 use std::os::fd::{AsFd, FromRawFd, OwnedFd};
 
-use wayland_client::globals::{registry_queue_init, GlobalListContents};
-use wayland_client::protocol::{wl_buffer, wl_output, wl_registry, wl_shm, wl_shm_pool};
+use smithay_client_toolkit::reexports::protocols::xdg::xdg_output::zv1::client::{zxdg_output_manager_v1, zxdg_output_v1};
+use smithay_client_toolkit::reexports::protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
+use smithay_client_toolkit::reexports::protocols_wlr::screencopy::v1::client::{zwlr_screencopy_frame_v1, zwlr_screencopy_manager_v1};
+use wayland_client::globals::{registry_queue_init, GlobalList, GlobalListContents};
+use wayland_client::protocol::{wl_buffer, wl_compositor, wl_output, wl_region, wl_registry, wl_shm, wl_shm_pool, wl_surface};
 use wayland_client::{Connection, Dispatch, QueueHandle, WEnum};
-use wayland_protocols_wlr::screencopy::v1::client::{zwlr_screencopy_frame_v1, zwlr_screencopy_manager_v1};
 
 use super::capture::{Area, Shot};
 
@@ -25,8 +34,18 @@ struct Heard {
     upside_down: bool,
     /// The buffer is filled, or it could not be.
     done: Option<bool>,
-    /// Where each output starts on the desktop.
+    /// Where each output starts on the desktop, in the desktop's pixels:
+    /// as the output says it, and then as the desktop says it of the
+    /// output, which is the one to go by where both are said (the
+    /// wlroots compositors have every output say 0, 0).
     starts: Vec<(wl_output::WlOutput, (i32, i32))>,
+    /// How many of its own pixels one of the desktop's is, for those that say.
+    scales: Vec<(wl_output::WlOutput, i32)>,
+    /// The surface put up to find the output in use: the compositor has
+    /// answered it (with this number), it is on this output, it was refused.
+    answered: Option<u32>,
+    entered: Option<wl_output::WlOutput>,
+    refused: bool,
 }
 
 impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Heard {
@@ -35,8 +54,55 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Heard {
 
 impl Dispatch<wl_output::WlOutput, ()> for Heard {
     fn event(heard: &mut Self, output: &wl_output::WlOutput, event: wl_output::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
-        if let wl_output::Event::Geometry { x, y, .. } = event {
+        match event {
+            wl_output::Event::Geometry { x, y, .. } => heard.starts.push((output.clone(), (x, y))),
+            wl_output::Event::Scale { factor } => heard.scales.push((output.clone(), factor)),
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<zxdg_output_v1::ZxdgOutputV1, wl_output::WlOutput> for Heard {
+    fn event(heard: &mut Self, _: &zxdg_output_v1::ZxdgOutputV1, event: zxdg_output_v1::Event, output: &wl_output::WlOutput, _: &Connection, _: &QueueHandle<Self>) {
+        if let zxdg_output_v1::Event::LogicalPosition { x, y } = event {
             heard.starts.push((output.clone(), (x, y)));
+        }
+    }
+}
+
+impl Heard {
+    /// Where an output starts, by the last word on it.
+    fn start(&self, output: &wl_output::WlOutput) -> Option<(i32, i32)> {
+        self.starts.iter().rev().find(|(known, _)| known == output).map(|(_, start)| *start)
+    }
+}
+
+/// The compositor's outputs, each asked where it starts: said by the
+/// time the compositor has next been heard out.
+fn outputs(globals: &GlobalList, handle: &QueueHandle<Heard>) -> Vec<wl_output::WlOutput> {
+    let outputs: Vec<wl_output::WlOutput> = globals.contents().with_list(|all| all.iter().filter(|global| global.interface == "wl_output").map(|global| globals.registry().bind(global.name, global.version.min(2), handle, ())).collect());
+    if let Ok(desktop) = globals.bind::<zxdg_output_manager_v1::ZxdgOutputManagerV1, _, _>(handle, 1..=3, ()) {
+        for output in &outputs {
+            desktop.get_xdg_output(output, handle, output.clone());
+        }
+    }
+    outputs
+}
+
+impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for Heard {
+    fn event(heard: &mut Self, _: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, event: zwlr_layer_surface_v1::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
+        match event {
+            zwlr_layer_surface_v1::Event::Configure { serial, .. } => heard.answered = Some(serial),
+            zwlr_layer_surface_v1::Event::Closed => heard.refused = true,
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<wl_surface::WlSurface, ()> for Heard {
+    fn event(heard: &mut Self, _: &wl_surface::WlSurface, event: wl_surface::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
+        if let wl_surface::Event::Enter { output } = event {
+            heard.entered = Some(output);
         }
     }
 }
@@ -61,7 +127,84 @@ macro_rules! unheard {
         }
     )*};
 }
-unheard!(wl_shm::WlShm, wl_shm_pool::WlShmPool, wl_buffer::WlBuffer, zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1);
+unheard!(wl_shm::WlShm, wl_shm_pool::WlShmPool, wl_buffer::WlBuffer, zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1, wl_compositor::WlCompositor, wl_region::WlRegion, zwlr_layer_shell_v1::ZwlrLayerShellV1, zxdg_output_manager_v1::ZxdgOutputManagerV1);
+
+/// A file in memory of that many bytes, all zero, for the compositor and
+/// this program to share.
+fn shared(size: usize) -> Result<OwnedFd, String> {
+    // SAFETY: a new descriptor, owned from here.
+    unsafe {
+        let descriptor = libc::memfd_create(c"heyo-capture".as_ptr(), libc::MFD_CLOEXEC);
+        if descriptor < 0 {
+            return Err("no memory for the screen's picture".into());
+        }
+        let file = OwnedFd::from_raw_fd(descriptor);
+        if libc::ftruncate(descriptor, size as libc::off_t) != 0 {
+            return Err("no memory for the screen's picture".into());
+        }
+        Ok(file)
+    }
+}
+
+/// Where the output the compositor holds to be in use starts, in the
+/// pixels the toolkit counts monitors in (the output's own): the one the
+/// pointer is on, as nearly as a Wayland program can be told. None where
+/// there is one output only, or no layer shell to ask with.
+pub fn pointed() -> Option<(i32, i32)> {
+    let connection = Connection::connect_to_env().ok()?;
+    let (globals, mut queue) = registry_queue_init::<Heard>(&connection).ok()?;
+    let handle = queue.handle();
+    let shell: zwlr_layer_shell_v1::ZwlrLayerShellV1 = globals.bind(&handle, 1..=1, ()).ok()?;
+    let compositor: wl_compositor::WlCompositor = globals.bind(&handle, 1..=4, ()).ok()?;
+    let shm: wl_shm::WlShm = globals.bind(&handle, 1..=1, ()).ok()?;
+    let outputs = outputs(&globals, &handle);
+    if outputs.len() < 2 {
+        return None;
+    }
+    let mut heard = Heard::default();
+    // One pixel in a corner, with nothing in it and nothing of the
+    // pointer's, on whichever output the compositor likes. Over
+    // everything: a compositor does not say which output a surface is on
+    // while a window hides it.
+    let surface = compositor.create_surface(&handle, ());
+    let layer = shell.get_layer_surface(&surface, None, zwlr_layer_shell_v1::Layer::Overlay, "heyo".into(), &handle, ());
+    layer.set_size(1, 1);
+    layer.set_anchor(zwlr_layer_surface_v1::Anchor::Top | zwlr_layer_surface_v1::Anchor::Left);
+    let nowhere = compositor.create_region(&handle, ());
+    surface.set_input_region(Some(&nowhere));
+    nowhere.destroy();
+    surface.commit();
+    for _ in 0..3 {
+        if heard.answered.is_some() || heard.refused || queue.roundtrip(&mut heard).is_err() {
+            break;
+        }
+    }
+    let mut shown = None;
+    if let (Some(serial), Ok(file)) = (heard.answered, shared(4)) {
+        layer.ack_configure(serial);
+        let pool = shm.create_pool(file.as_fd(), 4, &handle, ());
+        let buffer = pool.create_buffer(0, 1, 1, 4, wl_shm::Format::Argb8888, &handle, ());
+        surface.attach(Some(&buffer), 0, 0);
+        surface.commit();
+        for _ in 0..3 {
+            if heard.entered.is_some() || heard.refused || queue.roundtrip(&mut heard).is_err() {
+                break;
+            }
+        }
+        shown = Some((pool, buffer));
+    }
+    layer.destroy();
+    surface.destroy();
+    if let Some((pool, buffer)) = shown {
+        buffer.destroy();
+        pool.destroy();
+    }
+    let _ = connection.flush();
+    let output = heard.entered.take()?;
+    let start = heard.start(&output)?;
+    let scale = heard.scales.iter().rev().find(|(known, _)| *known == output).map_or(1, |(_, scale)| (*scale).max(1));
+    Some((start.0 * scale, start.1 * scale))
+}
 
 /// Whether the compositor offers it.
 pub fn offered() -> bool {
@@ -105,14 +248,14 @@ pub fn grab(area: Area) -> Result<Shot, String> {
     let handle = queue.handle();
     let manager: zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1 = globals.bind(&handle, 1..=1, ()).map_err(|_| "the compositor does not let its screen be read (no wlr-screencopy)".to_string())?;
     let shm: wl_shm::WlShm = globals.bind(&handle, 1..=1, ()).map_err(|e| e.to_string())?;
-    let outputs: Vec<wl_output::WlOutput> = globals.contents().with_list(|all| all.iter().filter(|global| global.interface == "wl_output").map(|global| globals.registry().bind(global.name, global.version.min(2), &handle, ())).collect());
+    let outputs = outputs(&globals, &handle);
     let mut heard = Heard::default();
     queue.roundtrip(&mut heard).map_err(|e| e.to_string())?;
     // The output that starts where the area does, as the compositor lays
     // them out in logical pixels; the first where none does.
     let scale = if area.scale > 0.0 { area.scale } else { 1.0 };
     let at = ((f64::from(area.x) / scale).round() as i32, (f64::from(area.y) / scale).round() as i32);
-    let output = heard.starts.iter().find(|(_, start)| *start == at).map(|(output, _)| output.clone()).or_else(|| outputs.first().cloned()).ok_or("the compositor has no output")?;
+    let output = outputs.iter().find(|output| heard.start(output) == Some(at)).or(outputs.first()).cloned().ok_or("the compositor has no output")?;
 
     let frame = manager.capture_output(0, &output, &handle, ());
     while heard.wanted.is_none() && heard.done.is_none() {
@@ -121,19 +264,12 @@ pub fn grab(area: Area) -> Result<Shot, String> {
     let (format, width, height, stride) = heard.wanted.ok_or("the compositor would not hand its screen over")?;
     let size = stride as usize * height as usize;
     // A file in memory, which the compositor writes into.
-    // SAFETY: a new descriptor, owned from here; the mapping is of its whole length and is let go below.
-    let (file, mapped) = unsafe {
-        let descriptor = libc::memfd_create(c"heyo-capture".as_ptr(), libc::MFD_CLOEXEC);
-        if descriptor < 0 || libc::ftruncate(descriptor, size as libc::off_t) != 0 {
-            return Err("no memory for the screen's picture".into());
-        }
-        let file = OwnedFd::from_raw_fd(descriptor);
-        let mapped = libc::mmap(std::ptr::null_mut(), size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED, descriptor, 0);
-        if mapped == libc::MAP_FAILED {
-            return Err("no memory for the screen's picture".into());
-        }
-        (file, mapped)
-    };
+    let file = shared(size)?;
+    // SAFETY: the mapping is of the file's whole length and is let go below.
+    let mapped = unsafe { libc::mmap(std::ptr::null_mut(), size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED, std::os::fd::AsRawFd::as_raw_fd(&file), 0) };
+    if mapped == libc::MAP_FAILED {
+        return Err("no memory for the screen's picture".into());
+    }
     let pool = shm.create_pool(file.as_fd(), size as i32, &handle, ());
     let buffer = pool.create_buffer(0, width as i32, height as i32, stride as i32, format, &handle, ());
     frame.copy(&buffer);

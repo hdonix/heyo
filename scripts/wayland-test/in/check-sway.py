@@ -25,7 +25,8 @@ a key typed not reaching the application; what is selected drawn as the
 screen was, pixel for pixel; a line typed with the text tool, with a key
 held down pressed again and again, and undone with Control and a key;
 Escape giving it up, the keyboard back where it was, and what is typed
-then reaching the application.
+then reaching the application. And with a second output beside the
+first, the overlay on the one the pointer is on, and on that one only.
 
 Where the text tool's button is, is written here as numbers (the
 toolbar's right end at the selection's, 8 below it, a button every 32
@@ -38,7 +39,7 @@ no way of typing into another application under Sway yet.
 import os, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from swaybed import application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, picture, point, press, release, same, scale, sway, typed, wait, width, windows
+from swaybed import application, around, at, differing, check, click, dark, failed, focused, height, heyo, keys, output, outputs, picture, point, pointer, press, release, same, scale, sway, typed, wait, width, windows
 
 # Where the pill's window is: 360 by 44, at the bottom centre, a tenth up.
 left, top = (width - 360) // 2, height - 44 - height // 10
@@ -206,6 +207,32 @@ check("Escape takes the overlay off the screen", bool(gone))
 check("... and the application has the keyboard again", focused() == "Right", focused())
 keys("hello")
 check("... and what is typed then reaches it", typed("check-sway-right") == had + "hello", repr(typed("check-sway-right")))
+
+# A second output, which Sway puts beside the first: the screenshot is of
+# the one the pointer is on.
+sway("create_output")
+both = wait(lambda: (lambda there: there if len(there) == 2 else None)(outputs()), 5) or []
+other = next((one["rect"] for one in both if one["name"] != output["name"]), None)
+check("Sway has a second output", bool(other))
+if other:
+    time.sleep(1.5)
+    # The pointer goes by the whole desktop now, and a picture is of all of it.
+    across, down = max(one["rect"]["x"] + one["rect"]["width"] for one in both), max(one["rect"]["y"] + one["rect"]["height"] for one in both)
+    for _ in range(2):
+        pointer("to", other["x"] + other["width"] // 2, other["y"] + other["height"] // 2, across, down)
+        time.sleep(0.4)
+    # Something light on it to be dimmed: an output with nothing on it is
+    # black, and stays black under the overlay.
+    apps.append(application("Far", "check-sway-far"))
+    before = picture()
+    by = before[0] / across
+    on = lambda rect: [(int((rect["x"] + rect["width"] * fx) * by), int((rect["y"] + rect["height"] * fy) * by)) for fx, fy in ((0.03, 0.03), (0.97, 0.03), (0.03, 0.97), (0.97, 0.97), (0.5, 0.25))]
+    heyo("--open", "heyo:screenshot")
+    shot = wait(lambda: (lambda shot: shot if same(shot, before, on(other)) or same(shot, before, on(output["rect"])) else None)(picture()), 8)
+    check("the overlay is on the output the pointer is on", bool(shot) and same(shot, before, on(other)) == 5, shot and (same(shot, before, on(other)), same(shot, before, on(output["rect"]))))
+    check("... and not on the other", bool(shot) and same(shot, before, on(output["rect"])) == 0, shot and [(place, at(shot, *place), at(before, *place)) for place in differing(shot, before, on(output["rect"]))])
+    keys("-k", "Escape")
+    check("... and Escape takes it off", bool(wait(lambda: same(picture(), before, on(other)) == 0, 4)))
 for app in apps:
     app.terminate()
 

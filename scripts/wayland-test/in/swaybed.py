@@ -68,7 +68,11 @@ def dark(colour):
     return max(colour) < 60
 
 
-output = next(output for output in json.loads(sway("-t", "get_outputs")) if output.get("active"))
+def outputs():
+    return [output for output in json.loads(sway("-t", "get_outputs")) if output.get("active")]
+
+
+output = outputs()[0]
 scale = output["scale"]
 # In the output's own logical pixels, which the pointer goes by.
 width, height = output["rect"]["width"], output["rect"]["height"]
