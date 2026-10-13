@@ -16,6 +16,11 @@ pub(crate) fn focus(window: &WebviewWindow) {
     let window = window.clone();
     let _ = window.clone().run_on_main_thread(move || {
         let Ok(gtk_window) = window.gtk_window() else { return };
+        // A window made without the focus (the palette is, so that it does
+        // not take it while hidden) is made refusing it, and the toolkit
+        // lifts that only once the window has been on the screen: the
+        // first showing would be given no keyboard.
+        gtk_window.set_accept_focus(true);
         let server_time = gtk_window
             .window()
             .and_then(|w| w.downcast::<gdkx11::X11Window>().ok())
