@@ -11,7 +11,8 @@
 # screen is filmed by GStreamer (ximagesrc, VP8 in WebM: what Ubuntu has
 # without anything installed), the middle of it: 2560 by 1800.
 #
-# It needs what readme-dictation.sh needs, and gst-launch-1.0. About a
+# It needs what readme-dictation.sh needs, gst-launch-1.0, and the network
+# (the Raycast Store, from which one extension is installed). About a
 # minute and a half a theme.
 . "$(dirname "$0")/readme-env.sh"
 [ -f "$HEYO_TEST_SPEECH/models/sense-voice/model.int8.onnx" ] || { echo "demo-video: no speech engine in $HEYO_TEST_SPEECH (Settings → Dictation downloads it)" >&2; exit 1; }
@@ -190,9 +191,17 @@ for THEME in ${*:-light dark}; do
   done
   xdotool key Escape; w 1
 
-  says "And extensions written for Raycast, from its store"
-  heyo; w 1.2; types "store"; w 2.5
-  xdotool key Escape; w 0.3; xdotool key Escape; w 0.8
+  says "Extensions written for Raycast, from its store: search, press Enter, installed"
+  EXT="$XDG_DATA_HOME/heyo/extensions"
+  heyo --open cmd:@heyo:store; w 6
+  xdotool type x; w 0.6; xdotool key ctrl+a BackSpace; w 0.6
+  types "tailwind css"; w 3.5; xdotool key Return
+  for _ in $(seq 60); do [ -f "$EXT/tailwindcss/package.json" ] && break; w 1; done
+  w 2.5
+  says "The extension runs as it is: its own lists and grids, drawn by Heyo"
+  heyo --open "cmd:$EXT/tailwindcss:search-colors"; w 5
+  types "blue"; w 3
+  xdotool key Escape; w 0.3; xdotool key Escape; w 0.3; xdotool key Escape; w 0.8
 
   xdotool mousemove 3000 1500
   says "Heyo  ·  github.com/hdonix/heyo"; w 3.5
