@@ -32,7 +32,7 @@ import {
   type Conversations,
   type Exchange,
 } from "./conversations";
-import { t, tn } from "../../../shared/i18n";
+import { t, tc, tn } from "../../../shared/i18n";
 
 const SYSTEM = `You are the quick-answer assistant inside a desktop launcher. Answer the question directly and briefly: lead with the answer, then only the explanation that is needed. Use Markdown, with code blocks for code and commands. Answer in the language of the question. If you are not sure, say so rather than guess.`;
 
@@ -146,9 +146,9 @@ function ChatActions(props: { exchange?: Exchange; last: boolean; busy: boolean;
       </ActionPanel.Section>
       {exchange && (
         <ActionPanel.Section>
-          {answer && <Action title={t("Copy Answer")} icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} onAction={() => copy(answer)} />}
+          {answer && <Action title={tc("the model's", "Copy Answer")} icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} onAction={() => copy(answer)} />}
           {answer && (
-            <Action title={t("Paste Answer")} icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />
+            <Action title={tc("the model's", "Paste Answer")} icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />
           )}
           {last && !busy && (
             <Action title={answer ? t("Answer Again") : t("Try Again")} icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={commands.again} />

@@ -2755,14 +2755,10 @@ msgid "Could not copy"
 msgstr ""
 
 #: src/rows.ts
-#: runtime/src/builtins/ask.tsx
-#: runtime/src/builtins/chat.tsx
 msgid "Copy Answer"
 msgstr ""
 
 #: src/rows.ts
-#: runtime/src/builtins/ask.tsx
-#: runtime/src/builtins/chat.tsx
 msgid "Paste Answer"
 msgstr ""
 
@@ -3133,6 +3129,18 @@ msgstr ""
 
 #: runtime/src/builtins/ask.tsx
 msgid "Continue in AI Chat"
+msgstr ""
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+msgctxt "the model's"
+msgid "Copy Answer"
+msgstr ""
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+msgctxt "the model's"
+msgid "Paste Answer"
 msgstr ""
 
 #: runtime/src/builtins/ask.tsx

@@ -11,7 +11,7 @@ import { useNavigation } from "../api/navigation";
 import { Clipboard, pasteable, showHUD } from "../api/system";
 import { begin, Question, useChat } from "./chat";
 import { exchangeMarkdown, exchanges, type Conversation } from "./conversations";
-import { t } from "../../../shared/i18n";
+import { t, tc } from "../../../shared/i18n";
 
 function Answer(props: { conversation: Conversation }) {
   const chat = useChat(props.conversation);
@@ -38,7 +38,7 @@ function Answer(props: { conversation: Conversation }) {
           )}
           {answer && (
             <Action
-              title={t("Copy Answer")}
+              title={tc("the model's", "Copy Answer")}
               icon={Icon.CopyClipboard}
               shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
               onAction={async () => {
@@ -47,7 +47,7 @@ function Answer(props: { conversation: Conversation }) {
               }}
             />
           )}
-          {answer && <Action title={t("Paste Answer")} icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />}
+          {answer && <Action title={tc("the model's", "Paste Answer")} icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />}
           {busy ? (
             <Action title={t("Stop Answering")} icon={Icon.Stop} shortcut={{ modifiers: ["cmd", "shift"], key: "s" }} onAction={chat.stop} />
           ) : (

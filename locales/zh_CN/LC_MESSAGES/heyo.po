@@ -2755,14 +2755,10 @@ msgid "Could not copy"
 msgstr "无法复制"
 
 #: src/rows.ts
-#: runtime/src/builtins/ask.tsx
-#: runtime/src/builtins/chat.tsx
 msgid "Copy Answer"
 msgstr "复制答案"
 
 #: src/rows.ts
-#: runtime/src/builtins/ask.tsx
-#: runtime/src/builtins/chat.tsx
 msgid "Paste Answer"
 msgstr "粘贴答案"
 
@@ -3134,6 +3130,18 @@ msgstr "好"
 #: runtime/src/builtins/ask.tsx
 msgid "Continue in AI Chat"
 msgstr "在 AI 对话中继续"
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+msgctxt "the model's"
+msgid "Copy Answer"
+msgstr "复制回答"
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+msgctxt "the model's"
+msgid "Paste Answer"
+msgstr "粘贴回答"
 
 #: runtime/src/builtins/ask.tsx
 #: runtime/src/builtins/chat.tsx
