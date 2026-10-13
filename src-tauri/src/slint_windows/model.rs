@@ -166,6 +166,43 @@ impl Line {
     }
 }
 
+/// What is different between the lines a page showed and the lines it
+/// is to show, as Slint's list is told it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Changes {
+    /// How many lines at the beginning stay.
+    pub head: usize,
+    /// After them: how many of the old go, and how many new ones come in
+    /// their place.
+    pub out: usize,
+    pub come: usize,
+    /// Which of the lines that stay are not as they were, by their place
+    /// among the new.
+    pub changed: Vec<usize>,
+}
+
+/// What Slint's list is told when a page's lines become others: the
+/// lines that begin and end both stay (changed, where they changed), and
+/// what is between them is taken out and put in. A line stays if it is
+/// the same line of the same thing, whatever it now says (`kind`, `id`
+/// and `label`).
+///
+/// So a control that is being used stays the control it was (a switch
+/// moves, a field keeps what is typed into it), a list that is opened
+/// further down stays where it was scrolled to, and another page is not
+/// left scrolled to where the last one was: Slint's list keeps its place
+/// by the number of its first row, and forgets it only when that row is
+/// taken out.
+pub(crate) fn changes(was: &[Line], is: &[Line]) -> Changes {
+    let alike = |was: &Line, is: &Line| was.kind == is.kind && was.id == is.id && was.label == is.label;
+    let head = was.iter().zip(is).take_while(|(was, is)| alike(was, is)).count();
+    let most = was.len().min(is.len()) - head;
+    let tail = was.iter().rev().zip(is.iter().rev()).take(most).take_while(|(was, is)| alike(was, is)).count();
+    let at_head = (0..head).filter(|at| was[*at] != is[*at]);
+    let at_tail = (0..tail).filter(|back| was[was.len() - 1 - back] != is[is.len() - 1 - back]).map(|back| is.len() - 1 - back);
+    Changes { head, out: was.len() - head - tail, come: is.len() - head - tail, changed: at_head.chain(at_tail).collect() }
+}
+
 /// A page being put together.
 #[derive(Default)]
 struct Page(Vec<Line>);
@@ -1348,7 +1385,7 @@ mod tests {
     }
 
     /// The settings the one thing asked of the host changes, and what to.
-    fn changes(asks: &[Ask]) -> Value {
+    fn patch(asks: &[Ask]) -> Value {
         match asked(asks) {
             Command::ChangeSettings(changes) => Value::Object(changes),
             other => panic!("{other:?} changes no settings"),
@@ -1361,6 +1398,60 @@ mod tests {
             Command::SetExtensionPreferences { extension, values } => (extension, values),
             other => panic!("{other:?} saves no preferences"),
         }
+    }
+
+    /// A page of rows, by their ids.
+    fn page(ids: &[&str]) -> Vec<Line> {
+        ids.iter().map(|id| Line::row(*id, *id)).collect()
+    }
+
+    #[test]
+    fn a_control_that_was_used_stays_the_line_it_was() {
+        // A switch that was flipped: the line is told to be drawn again,
+        // not taken out and put back, which would make it another switch.
+        let was = page(&["a", "b", "c"]);
+        let mut is = was.clone();
+        is[1].on = true;
+        assert_eq!(changes(&was, &is), Changes { head: 3, out: 0, come: 0, changed: vec![1] });
+        // And nothing at all is said when nothing is different.
+        assert_eq!(changes(&was, &was), Changes { head: 3, ..Changes::default() });
+    }
+
+    #[test]
+    fn a_group_opened_further_down_leaves_the_lines_round_it() {
+        // The first line stays, so the list stays where it was scrolled to.
+        let (was, is) = (page(&["a", "group", "z"]), page(&["a", "group", "one", "two", "z"]));
+        assert_eq!(changes(&was, &is), Changes { head: 2, out: 0, come: 2, changed: vec![] });
+        // Closed again; and the group's own line says it is closed.
+        let mut closed = was.clone();
+        closed[1].open = true;
+        assert_eq!(changes(&is, &closed), Changes { head: 2, out: 2, come: 0, changed: vec![1] });
+        // What changed after what was put in is told by its place among the new lines.
+        let mut last = is.clone();
+        last[4].value = "now".into();
+        assert_eq!(changes(&was, &last), Changes { head: 2, out: 0, come: 2, changed: vec![4] });
+    }
+
+    #[test]
+    fn another_page_takes_the_first_line_out() {
+        // So that it is not left scrolled to where the last one was.
+        let (was, is) = (page(&["a", "b", "c"]), page(&["x", "y"]));
+        assert_eq!(changes(&was, &is), Changes { head: 0, out: 3, come: 2, changed: vec![] });
+        // Even where the two end alike: the end stays, the beginning goes.
+        let (was, is) = (page(&["a", "b", "end"]), page(&["x", "end"]));
+        assert_eq!(changes(&was, &is), Changes { head: 0, out: 2, come: 1, changed: vec![] });
+        // From nothing, and to nothing.
+        assert_eq!(changes(&[], &is), Changes { head: 0, out: 0, come: 2, changed: vec![] });
+        assert_eq!(changes(&was, &[]), Changes { head: 0, out: 3, come: 0, changed: vec![] });
+    }
+
+    #[test]
+    fn a_line_is_counted_once_where_the_pages_begin_and_end_alike() {
+        // One line taken out of a run of lines that are alike: no line is
+        // both of the beginning that stays and of the end that stays.
+        let same = |n: usize| vec![Line::row("x", "x"); n];
+        assert_eq!(changes(&same(3), &same(2)), Changes { head: 2, out: 1, come: 0, changed: vec![] });
+        assert_eq!(changes(&same(2), &same(3)), Changes { head: 2, out: 0, come: 1, changed: vec![] });
     }
 
     #[test]
@@ -1381,9 +1472,9 @@ mod tests {
     #[test]
     fn a_switch_is_shown_at_once_and_asked_of_the_host() {
         let mut model = told(json!({ "compactMode": false }), json!({}));
-        assert_eq!(changes(&model.acted("set:compactMode", "true")), json!({ "compactMode": true }));
+        assert_eq!(patch(&model.acted("set:compactMode", "true")), json!({ "compactMode": true }));
         assert!(row(&model.lines(), "Compact Mode").on);
-        assert_eq!(changes(&model.acted("set:appearance", "light")), json!({ "appearance": "light" }));
+        assert_eq!(patch(&model.acted("set:appearance", "light")), json!({ "appearance": "light" }));
         // The host's answer is what is then so; its refusal is said, and
         // the settings are read again.
         assert!(model.answered(Then::Settings, Ok(json!({ "compactMode": false, "appearance": "dark" }))).is_empty());
@@ -1494,7 +1585,7 @@ mod tests {
     fn the_vocabulary_is_saved_as_its_lines() {
         let mut model = told(json!({ "dictationVocabulary": ["TypeScript", "jason -> JSON"] }), json!({}));
         assert!(model.acted("words", "  TypeScript \n\n jason -> JSON\n").is_empty());
-        assert_eq!(changes(&model.acted("words", "TypeScript\n杰森 -> JSON\n\n")), json!({ "dictationVocabulary": ["TypeScript", "杰森 -> JSON"] }));
+        assert_eq!(patch(&model.acted("words", "TypeScript\n杰森 -> JSON\n\n")), json!({ "dictationVocabulary": ["TypeScript", "杰森 -> JSON"] }));
     }
 
     #[test]
@@ -1670,13 +1761,13 @@ mod tests {
         assert!(has(&lines, "First Thing Preferences"));
         // Commands: on unless disabled, each with its hotkey.
         assert!(row(&lines, "First Thing").on && !row(&lines, "Second Thing").on && row(&lines, "First Thing").icon.as_deref() == Some("star-16"));
-        assert_eq!(changes(&model.acted("enable:cmd:zeta:two", "true")), json!({ "disabledCommands": [] }));
+        assert_eq!(patch(&model.acted("enable:cmd:zeta:two", "true")), json!({ "disabledCommands": [] }));
         // Permissions: what was allowed can be taken back; activities have a switch.
         let lines = model.lines();
         assert_eq!((row(&lines, "See and move windows").control, row(&lines, "See and move windows").description.as_str()), ("button", "Allowed by you"));
         assert_eq!((row(&lines, "Ask the model").control, row(&lines, "Show live activities").control, row(&lines, "Show live activities").on), ("", "switch", true));
         assert_eq!(model.acted(&row(&lines, "See and move windows").id, "")[0], ask(Command::RevokeExtensionPermission { extension: "zeta".into(), permission: crate::permissions::Permission::Windows }, Then::Permissions("/data/zeta".into())));
-        assert_eq!(changes(&model.acted("activities:zeta", "false")), json!({ "activitiesOff": ["zeta"] }));
+        assert_eq!(patch(&model.acted("activities:zeta", "false")), json!({ "activitiesOff": ["zeta"] }));
         // A preference is saved among the others of the extension.
         assert_eq!(saved(&model.acted(&sound.id, "false")), ("zeta".to_string(), json!({ "extension": { "mode": "careful", "token": "tok_1" }, "commands": { "one": { "loud": false } } })));
         assert_eq!(saved(&model.acted(&row(&lines, "Token *").id, "secret")).1["extension"], json!({ "mode": "careful", "token": "secret" }));
@@ -1701,15 +1792,15 @@ mod tests {
         assert!(row(&lines, "Clipboard History").hotkey.is_empty() && row(&lines, "Dictate").hotkey == "cmd:@heyo:dictate");
         assert_eq!((row(&lines, "Hotkey").hotkey.as_str(), row(&lines, "Hotkey").keys.clone()), ("@clipboard", vec!["Super".to_string(), "V".to_string()]));
         assert_eq!((row(&lines, "Keep History For").value.as_str(), titles(row(&lines, "Keep History For"))[3]), ("90", "3 Months"));
-        assert_eq!(changes(&model.acted("num:clipboardRetentionDays", "7")), json!({ "clipboardRetentionDays": 7 }));
+        assert_eq!(patch(&model.acted("num:clipboardRetentionDays", "7")), json!({ "clipboardRetentionDays": 7 }));
         assert_eq!(row(&lines, "Clear History").control, "confirm");
         assert!(row(&lines, "Find by Meaning").description.ends_with("Reading the history: 3,400 entries to go; until then some are found by their words only."));
         assert_eq!(model.poll().len(), 1);
         // Left out of the history: by name where the application is known.
         assert_eq!((row(&lines, "KeePassXC").icon.as_deref(), row(&lines, "gone.desktop").description.as_str(), row(&lines, "gone.desktop").icon.as_deref()), (Some("/icons/keepassxc.png"), "Not installed", Some("app-window-16")));
         assert_eq!(titles(row(&lines, "Never Record Copies From")), ["Add Application…", "Firefox", "Files"]);
-        assert_eq!(changes(&model.acted("ignore:add", "firefox.desktop")), json!({ "clipboardIgnoredApps": ["org.keepassxc.KeePassXC.desktop", "gone.desktop", "firefox.desktop"] }));
-        assert_eq!(changes(&model.acted("ignore:remove:gone.desktop", ""))["clipboardIgnoredApps"], json!(["org.keepassxc.KeePassXC.desktop", "firefox.desktop"]));
+        assert_eq!(patch(&model.acted("ignore:add", "firefox.desktop")), json!({ "clipboardIgnoredApps": ["org.keepassxc.KeePassXC.desktop", "gone.desktop", "firefox.desktop"] }));
+        assert_eq!(patch(&model.acted("ignore:remove:gone.desktop", ""))["clipboardIgnoredApps"], json!(["org.keepassxc.KeePassXC.desktop", "firefox.desktop"]));
         assert!(model.acted("ignore:add", "").is_empty());
         // With recording off, what only matters while it is on is not shown.
         model.settings.insert("clipboardHistory".into(), json!(false));
@@ -1756,10 +1847,10 @@ mod tests {
         assert!(second.checkable && !second.on && second.indent);
         // Some of its commands are on: neither ticked nor empty.
         assert!(zeta.checkable && zeta.on && zeta.mixed && zeta.open);
-        assert_eq!(changes(&model.acted(&zeta.check_id, "false"))["disabledCommands"], json!(["cmd:zeta:one", "cmd:zeta:two"]));
-        assert_eq!(changes(&model.acted("alias:app:files.desktop", " fm ")), json!({ "aliases": { "app:firefox.desktop": "ff", "app:files.desktop": "fm" } }));
+        assert_eq!(patch(&model.acted(&zeta.check_id, "false"))["disabledCommands"], json!(["cmd:zeta:one", "cmd:zeta:two"]));
+        assert_eq!(patch(&model.acted("alias:app:files.desktop", " fm ")), json!({ "aliases": { "app:firefox.desktop": "ff", "app:files.desktop": "fm" } }));
         assert!(model.acted("alias:app:files.desktop", "fm").is_empty());
-        assert_eq!(changes(&model.acted("alias:app:firefox.desktop", ""))["aliases"], json!({ "app:files.desktop": "fm" }));
+        assert_eq!(patch(&model.acted("alias:app:firefox.desktop", ""))["aliases"], json!({ "app:files.desktop": "fm" }));
         // Searching opens everything it finds something in, by a command's
         // title or its group's.
         model.find = "zeta".into();

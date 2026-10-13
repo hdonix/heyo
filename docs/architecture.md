@@ -704,11 +704,20 @@ The settings window:
 
 - `model.rs` is the window without anything drawn: what each page shows,
   as a list of lines (a heading, a note, a row with its control, …), and
-  what using a control asks of the host, as values (`Ask`: a command's
-  name, its arguments and what to do with the answer). Nothing in it
+  what using a control asks of the host, as values (`Ask`: one of the
+  host's `Command`s and what to do with the answer). Nothing in it
   touches Slint or Tauri, so the tests are of this file: a page is asked
   for its lines and a control for what it asks. A new control on a page is
-  a line here, and the branch of `acted` that says what it changes.
+  a line here, and the branch of `acted` that says what it changes. What
+  Slint's list is told when a page's lines become others is a value here
+  too (`changes`: which lines stay, go, come and changed), which is what
+  keeps a control in use the control it was and a list where it was
+  scrolled to; the window carries it out and decides nothing.
+- `ids.rs` is what a control acts on (`Id`), and how that is written
+  where Slint needs a word for it. Nothing else writes an id or takes
+  one apart: the model makes lines with an `Id` and is handed one back,
+  and the markup hands back what it was given, a line with more than one
+  control carrying an id for each.
 - `ui/settings.slint` draws a line of each kind, the sidebar and the
   window; `ui/widgets.slint` is the controls (switch, field, select, hotkey
   recorder, menus), drawn here rather than taken from Slint's own set so
@@ -717,9 +726,10 @@ The settings window:
   `src/styles/abstracts/_scales.scss` and writes them as a Slint global
   (`tokens.rs` is the reading, and is tested).
 - `window.rs` shows what the model says and passes on what is done in the
-  window. `host.rs` is the list of the host's functions the window may
-  call, by name; a test holds that none of the ones that change settings
-  is a command a web view could call.
+  window. `host.rs` is what the window may ask of the host (`Command`):
+  each thing, with what it says in asking, written once, and answered in
+  `Running::call` or the host does not compile; a test holds that none
+  of the ones that change settings is a command a web view could call.
 - `fonts.rs` puts Inter and Noto Sans SC, which Heyo carries
   (`src-tauri/fonts/`), before the system's fonts; `keys.rs` names keys by
   where they are, as the palette's hotkey recorder does.

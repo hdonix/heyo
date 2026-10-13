@@ -26,7 +26,7 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 
 use super::keys::{self, Held};
 use super::host::Command;
-use super::model::{Ask, Line, Model, Then};
+use super::model::{changes, Ask, Changes, Line, Model, Then};
 use super::thread::{self, Job};
 use super::life::{self, Life, Lives, Slot, Slotted};
 use super::standing::{self, Keyboard, Layer, Standing};
@@ -115,23 +115,11 @@ struct Lines {
 }
 
 impl Lines {
-    /// Shows these lines, telling Slint only what is different: the lines
-    /// that begin and end both the old page and the new stay (changed, where
-    /// they changed), and what is between them is taken out and put in. So
-    /// a control that is being used stays the control it was (a switch
-    /// moves, a field keeps what is typed into it), a list that is opened
-    /// further down stays where it was scrolled to, and another page is
-    /// not left scrolled to where the last one was: Slint's list keeps its
-    /// place by the number of its first row, and forgets it only when that
-    /// row is taken out.
+    /// Shows these lines, telling Slint only what is different
+    /// (`model::changes` says what that is).
     fn show(&self, lines: Vec<Line>) {
         let mut shown = self.lines.borrow_mut();
-        let alike = |was: &Line, is: &Line| was.kind == is.kind && was.id == is.id && was.label == is.label;
-        let head = shown.iter().zip(&lines).take_while(|(was, is)| alike(was, is)).count();
-        let most = shown.len().min(lines.len()) - head;
-        let tail = shown.iter().rev().zip(lines.iter().rev()).take(most).take_while(|(was, is)| alike(was, is)).count();
-        let (out, come) = (shown.len() - head - tail, lines.len() - head - tail);
-        let changed: Vec<usize> = (0..head).filter(|at| shown[*at] != lines[*at]).chain((0..tail).filter(|back| shown[shown.len() - 1 - back] != lines[lines.len() - 1 - back]).map(|back| lines.len() - 1 - back)).collect();
+        let Changes { head, out, come, changed } = changes(&shown, &lines);
         // Slint asks for rows while it is told of them: first what is no
         // longer there goes, then the lines are the new ones.
         if out > 0 {
