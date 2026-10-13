@@ -607,6 +607,39 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
   - What a caller must never do: ask which desktop this is, take a
     window's native handle, or tell winit anything of a window's standing
     itself.
+- `layer.rs` is a window that is not winit's: a layer surface, on a
+  Wayland compositor that offers the layer shell (tried on Sway; the other
+  wlroots ones and KWin offer it too), where the pill, a pinned capture and the overlay
+  are surfaces of Heyo's own on a connection of Heyo's own. It is the
+  adapter `standing.rs` carries a standing out with there, and nothing
+  else calls it. Its interface:
+  - What a caller says (through `life` and `standing`, as of any
+    window): where the window goes (`place`: the bottom centre, a place
+    of the screen, or all of the output that starts at a place, which is
+    the one that has every key); where in it the pointer is its own
+    (`reach`); how the pointer looks over it (`cursor`); who hears of
+    the pointer and of the keys before Slint does, and says whether
+    Slint is to have them too (`hear`, `hear_keys`, in `standing`'s own
+    words: `Pointed`, `Keyed`); and by how much to move (`move_by`).
+  - What it is promised: Slint is given this window when the standing
+    being made is one `told` says is layered, and winit's otherwise
+    (`Platform`). A window that is seen through is drawn by Slint's own
+    renderer; one as large as a screen by Skia on the CPU, into the
+    surface, as winit's are on X11 (a jump of the pointer in a drag on a
+    3840 by 2160 output is with the compositor 4 ms after, against 29).
+    Keys are worked out with xkbcommon (`layer/keys.rs`: the layout, the
+    keys held, a letter made of two keys, a key pressed again while it
+    stays down), and what an input method composes and chooses reaches
+    Slint as its own backend hands it over (`layer/composing.rs`,
+    text-input version 3). The surface that has every key can be taken
+    off the screen from any thread (`take_down`), and all of them are
+    dropped by the compositor when Slint's thread is lost (`lost`, which
+    the guard calls).
+  - What it does not do: a scale that is not a whole number (the surface
+    is drawn at the next whole one and the compositor scales it), a
+    shadow, and names on the accessibility bus (a layer surface has none
+    of what `ask.py` asks a window of winit's for). The text round the
+    cursor is not said to the input method.
 - `platform/place.rs` is where a window is, for the palette and for
   these windows alike. Its interface:
   - What a caller says: give me the display as it is now (its toolkit's

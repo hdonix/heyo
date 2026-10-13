@@ -61,3 +61,20 @@ How it is put together, and what that means for what a test shows:
   still needs a person at a real desktop.
 - It is GNOME 50 only. The extension also declares 45 to 49, which were
   checked by reading (`docs/wayland.md`), not by running.
+
+## Sway: where a compositor offers the layer shell
+
+GNOME's does not, and Heyo's own windows are done another way where one
+does (`src-tauri/src/slint_windows/layer.rs`). `sway.sh` is a second
+session, headless Sway, on an image built on this one:
+
+    scripts/wayland-test/sway.sh build     # after run.sh build
+    scripts/wayland-test/sway.sh test      # in/check-sway.py at scale 1 and 2, then `safe`
+    scripts/wayland-test/sway.sh safe      # the overlay cannot trap anyone (in/safe-sway.py)
+    SCALE=2 MONITORS=3840x2160 scripts/wayland-test/sway.sh drag   # how soon the overlay follows the pointer
+
+A headless Sway has no pointer and no keyboard. The checks bring their
+own (`in/swaybed.py`): a virtual pointer (`in/pointer.py`), keys typed by
+`wtype`, and an input method that composes what it is told to
+(`in/ime.py`). A layer surface is in no tree, so what is on the screen is
+judged from pictures of it (`grim`).
