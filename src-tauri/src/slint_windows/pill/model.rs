@@ -3,6 +3,7 @@
 //! Nothing here draws or knows of a window: this is what is tested.
 
 use crate::dictation::Told;
+use crate::i18n::t;
 
 /// Where a recording is, as the pill shows it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,11 +88,11 @@ impl Model {
                 self.phase = Phase::Done;
                 self.partial.clear();
                 if let Some(warning) = warning.as_deref().filter(|warning| !warning.is_empty()) {
-                    self.note = format!("Not polished: {warning}");
+                    self.note = crate::i18n::tf("Not polished: {0}", &[&warning]);
                 } else if *cancelled == Some(true) {
-                    self.note = if *kept == Some(true) { "Cancelled. What was written is still there." } else { "Cancelled" }.into();
+                    self.note = if *kept == Some(true) { t("Cancelled. What was written is still there.") } else { t("Cancelled") }.into();
                 } else if raw.is_empty() {
-                    self.note = "Didn't catch anything".into();
+                    self.note = t("Didn't catch anything").into();
                 } else if !text.is_empty() {
                     self.committed = text.clone();
                 }
@@ -132,10 +133,10 @@ impl Model {
     /// What it says of itself when it has no words to show.
     pub(crate) fn saying(&self) -> &'static str {
         match self.phase {
-            Phase::Loading => "Starting…",
-            Phase::Listening => "Listening",
-            Phase::Polishing => "Polishing…",
-            Phase::Done => "Done",
+            Phase::Loading => t("Starting…"),
+            Phase::Listening => t("Listening"),
+            Phase::Polishing => t("Polishing…"),
+            Phase::Done => t("Done"),
             Phase::Error => "",
         }
     }

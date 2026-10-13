@@ -18,7 +18,7 @@ use std::collections::BTreeSet;
 use serde_json::{json, Map, Value};
 
 use super::host::Command;
-use crate::i18n::{self, marked, t, translate};
+use crate::i18n::{self, marked, t, tf, tn, translate};
 use super::ids::{Act, Bound, Id};
 use super::keys;
 
@@ -38,21 +38,21 @@ pub(crate) const APPLICATIONS: &str = "@applications";
 pub(crate) const BUILTIN: &str = "@heyo";
 /// The command whose hotkey is one of Heyo's own, set on its own row.
 const CLIPBOARD_COMMAND: &str = "cmd:@heyo:clipboard-history";
-const DICTATION_LANGUAGES: &[(&str, &str)] = &[("auto", "Detect Automatically"), ("zh", "Chinese (Mandarin)"), ("yue", "Cantonese"), ("en", "English"), ("ja", "Japanese"), ("ko", "Korean")];
+const DICTATION_LANGUAGES: &[(&str, &str)] = &[("auto", marked("Detect Automatically")), ("zh", marked("Chinese (Mandarin)")), ("yue", marked("Cantonese")), ("en", marked("English")), ("ja", marked("Japanese")), ("ko", marked("Korean"))];
 
 const POLISH_MODES: &[(&str, &str, &str)] = &[
-    ("off", "Off", "The text is left as it was recognized."),
-    ("clean", "Clean Up", "When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted."),
-    ("translate", "Translate to English", "When you finish, Claude cleans up what you said and pastes it in English."),
+    ("off", marked("Off"), marked("The text is left as it was recognized.")),
+    ("clean", marked("Clean Up"), marked("When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted.")),
+    ("translate", marked("Translate to English"), marked("When you finish, Claude cleans up what you said and pastes it in English.")),
 ];
 
-const RETENTION: &[(&str, &str)] = &[("1", "1 Day"), ("7", "7 Days"), ("30", "1 Month"), ("90", "3 Months"), ("180", "6 Months"), ("365", "1 Year")];
+const RETENTION: &[(&str, &str)] = &[("1", marked("1 Day")), ("7", marked("7 Days")), ("30", marked("1 Month")), ("90", marked("3 Months")), ("180", marked("6 Months")), ("365", marked("1 Year"))];
 
-const RENDERERS: &[(&str, &str)] = &[("auto", "Automatic"), ("cpu", "CPU"), ("gpu-shared-memory", "GPU, shared memory"), ("gpu-dma-buf", "GPU, DMA-BUF (WebKit's default)")];
+const RENDERERS: &[(&str, &str)] = &[("auto", marked("Automatic")), ("cpu", "CPU"), ("gpu-shared-memory", marked("GPU, shared memory")), ("gpu-dma-buf", marked("GPU, DMA-BUF (WebKit's default)"))];
 
 /// What the Shortcuts table can be narrowed to: id, title.
-const MODIFICATIONS: &[(&str, &str)] = &[("hotkey", "Hotkey Set"), ("alias", "Alias Set"), ("enabled", "Enabled"), ("disabled", "Disabled")];
-const CATEGORIES: &[(&str, &str)] = &[("all", "All categories"), ("applications", "Applications"), ("extensions", "Extensions")];
+const MODIFICATIONS: &[(&str, &str)] = &[("hotkey", marked("Hotkey Set")), ("alias", marked("Alias Set")), ("enabled", marked("Enabled")), ("disabled", marked("Disabled"))];
+const CATEGORIES: &[(&str, &str)] = &[("all", marked("All categories")), ("applications", marked("Applications")), ("extensions", marked("Extensions"))];
 
 /// One line of a page, as `ui/settings.slint` draws it (see `Line` there).
 /// `icon` is a file, or the name of a symbol.
@@ -351,14 +351,15 @@ fn list<'a>(value: &'a Value, name: &str) -> &'a [Value] {
     value.get(name).and_then(Value::as_array).map_or(&[], Vec::as_slice)
 }
 
-fn count(n: u64, one: &str, many: &str) -> String {
+/// A number as it is read: its thousands apart.
+fn digits(n: u64) -> String {
     let mut digits = n.to_string();
     let mut at = digits.len();
     while at > 3 {
         at -= 3;
         digits.insert(at, ',');
     }
-    format!("{digits} {}", if n == 1 { one } else { many })
+    digits
 }
 
 /// Where the "local model" setting really points: this computer, or
@@ -425,7 +426,7 @@ impl Model {
     /// The applications as the extension the sidebar lists them as.
     fn applications_extension(&self) -> Value {
         let commands: Vec<Value> = self.applications.iter().map(|item| json!({ "id": item["id"], "name": item["id"], "title": item["title"], "description": item["subtitle"], "icon": item["icon"], "preferences": [] })).collect();
-        json!({ "id": APPLICATIONS, "name": APPLICATIONS, "title": t("Applications"), "description": "Give an application a hotkey to launch it from anywhere.", "icon": "app-window-grid-3x3-16", "builtin": true, "commands": commands, "preferences": [], "values": { "extension": {}, "commands": {} } })
+        json!({ "id": APPLICATIONS, "name": APPLICATIONS, "title": t("Applications"), "description": t("Give an application a hotkey to launch it from anywhere."), "icon": "app-window-grid-3x3-16", "builtin": true, "commands": commands, "preferences": [], "values": { "extension": {}, "commands": {} } })
     }
 
     /// Applications first, then Heyo's own commands, then the installed
@@ -494,8 +495,8 @@ impl Model {
     /// The words in the field above the page's lines, if it has one.
     pub(crate) fn find_placeholder(&self) -> &'static str {
         match self.page.as_str() {
-            "shortcuts" => "Search…",
-            APPLICATIONS => "Search applications…",
+            "shortcuts" => t("Search…"),
+            APPLICATIONS => t("Search applications…"),
             _ => "",
         }
     }
@@ -507,11 +508,11 @@ impl Model {
         if self.page != "shortcuts" {
             return None;
         }
-        let title = CATEGORIES.iter().find(|(id, _)| *id == self.category).map_or("All categories", |(_, title)| title);
-        let mut picks = vec![(String::new(), "Modifications".to_string(), true, false)];
-        picks.extend(MODIFICATIONS.iter().map(|(id, title)| (Id::Modification(id.to_string()).into(), title.to_string(), false, self.modifications.contains(*id))));
-        picks.push((String::new(), "Categories".to_string(), true, false));
-        picks.extend(CATEGORIES.iter().map(|(id, title)| (Id::Category(id.to_string()).into(), title.to_string(), false, self.category == *id)));
+        let title = CATEGORIES.iter().find(|(id, _)| *id == self.category).map_or(t("All categories"), |(_, title)| translate(title));
+        let mut picks = vec![(String::new(), t("Modifications").to_string(), true, false)];
+        picks.extend(MODIFICATIONS.iter().map(|(id, title)| (Id::Modification(id.to_string()).into(), translate(title).to_string(), false, self.modifications.contains(*id))));
+        picks.push((String::new(), t("Categories").to_string(), true, false));
+        picks.extend(CATEGORIES.iter().map(|(id, title)| (Id::Category(id.to_string()).into(), translate(title).to_string(), false, self.category == *id)));
         Some((title.to_string(), self.modifications.len(), picks))
     }
 
@@ -555,7 +556,7 @@ impl Model {
         };
         if let Some((description, action)) = extension {
             let row = Line::row(Id::Act(Act::InstallShellExtension), t("GNOME Shell Extension")).says(description);
-            page.card("Wayland", vec![if action.is_empty() { row } else { row.button(action) }]);
+            page.card(t("Wayland"), vec![if action.is_empty() { row } else { row.button(action) }]);
         }
         let hotkey = Line::row("", t("Heyo Hotkey"));
         page.card(
@@ -565,7 +566,7 @@ impl Model {
                 if self.hotkeys_supported() { hotkey.hotkey(&Bound::Own("toggle".into()).to_string(), self.hotkeys.get("toggle")) } else { hotkey.says(t("Bind a desktop keyboard shortcut to heyo.")) },
             ],
         );
-        let languages = [(i18n::SYSTEM, t("System")), (i18n::SOURCE, "English")].into_iter().chain(i18n::languages());
+        let languages = [(i18n::SYSTEM, t("System")), (i18n::SOURCE, t("English"))].into_iter().chain(i18n::languages());
         page.card(
             t("Appearance"),
             vec![
@@ -635,9 +636,9 @@ impl Model {
         let mut page = Page::default();
 
         let applications = self.applications_extension();
-        let apps: Vec<&Value> = list(&applications, "commands").iter().filter(|command| visible(command, "Applications", true)).collect();
+        let apps: Vec<&Value> = list(&applications, "commands").iter().filter(|command| visible(command, t("Applications"), true)).collect();
         if self.category != "extensions" && (!apps.is_empty() || !filtering) {
-            let mut rows = vec![group("applications", "Applications", "app-window-grid-3x3-16")];
+            let mut rows = vec![group("applications", t("Applications"), "app-window-grid-3x3-16")];
             if open("applications") {
                 rows.push(Line { kind: "columns", ..Line::default() });
                 rows.extend(apps.iter().map(|command| entry(&applications, command, false, true)));
@@ -647,7 +648,7 @@ impl Model {
 
         let groups: Vec<(&Value, Vec<&Value>)> = self.extensions.iter().map(|extension| (extension, list(extension, "commands").iter().filter(|command| visible(command, &text(extension, "title"), false)).collect::<Vec<_>>())).filter(|(_, commands)| !commands.is_empty()).collect();
         if self.category != "applications" && (!groups.is_empty() || !filtering) {
-            let mut rows = vec![group("extensions", "Extensions", "plug-16")];
+            let mut rows = vec![group("extensions", t("Extensions"), "plug-16")];
             if open("extensions") {
                 rows.push(Line { kind: "columns", ..Line::default() });
                 for (extension, commands) in &groups {
@@ -668,7 +669,7 @@ impl Model {
             page.card("", rows);
         }
         if filtering && apps.is_empty() && groups.is_empty() {
-            page.note("Nothing matches.");
+            page.note(t("Nothing matches."));
         }
         page.done()
     }
@@ -681,46 +682,46 @@ impl Model {
         let ways: Vec<&str> = list(&self.capabilities, "dictationWords").iter().filter_map(Value::as_str).collect();
         match ways.first() {
             None => String::new(),
-            Some(&"composed") => format!(
+            Some(&"composed") => tf(
                 "Your words go into the window as you speak, through the input method: the sentence you are speaking is shown there as text being composed, and becomes the window's text when it is finished. Your own input method (Pinyin, say) is set aside while you dictate and comes back when you finish. {} When this is off, nothing is shown before a sentence is finished.",
-                if ways.contains(&"rewritten") {
-                    "A window that takes no input method gets the words by pasting, corrected where they stand until you press a key or click."
+                &[&if ways.contains(&"rewritten") {
+                    t("A window that takes no input method gets the words by pasting, corrected where they stand until you press a key or click.")
                 } else {
-                    "A window that takes no input method gets each sentence pasted when it is finished."
-                }
+                    t("A window that takes no input method gets each sentence pasted when it is finished.")
+                }],
             ),
-            Some(&"rewritten") => "Your words go into the window as they are recognized, and are corrected there when a later word changes an earlier one. Heyo only ever erases what it wrote itself: once you press a key or click while dictating, it stops correcting and adds each finished sentence where the cursor is. In terminals, password managers and the applications excluded from snippet expansion, and when this is off, each sentence is pasted when it is finished.".into(),
-            Some(_) if self.capabilities["session"] == "wayland" => "Not available on Wayland, where Heyo cannot tell whether you typed in between, and so must not erase anything. Each sentence is pasted when it is finished.".into(),
-            Some(_) => "Not available in this desktop session. Each sentence is pasted when it is finished.".into(),
+            Some(&"rewritten") => t("Your words go into the window as they are recognized, and are corrected there when a later word changes an earlier one. Heyo only ever erases what it wrote itself: once you press a key or click while dictating, it stops correcting and adds each finished sentence where the cursor is. In terminals, password managers and the applications excluded from snippet expansion, and when this is off, each sentence is pasted when it is finished.").into(),
+            Some(_) if self.capabilities["session"] == "wayland" => t("Not available on Wayland, where Heyo cannot tell whether you typed in between, and so must not erase anything. Each sentence is pasted when it is finished.").into(),
+            Some(_) => t("Not available in this desktop session. Each sentence is pasted when it is finished.").into(),
         }
     }
 
     fn dictation_page(&self) -> Vec<Line> {
         let mut page = Page::default();
-        page.note("Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer.");
+        page.note(t("Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer."));
         let installed = flag(&self.dictation, "installed");
-        let engine = Line::row(Id::Act(Act::InstallDictation), "Speech Recognition").says(if installed { "SenseVoice is installed. Audio never leaves this computer." } else { "A one-time download of about 270 MB (SenseVoice speech model)." });
+        let engine = Line::row(Id::Act(Act::InstallDictation), t("Speech Recognition")).says(if installed { t("SenseVoice is installed. Audio never leaves this computer.") } else { t("A one-time download of about 270 MB (SenseVoice speech model).") });
         let engine = if installed {
-            engine.badge("Installed")
+            engine.badge(t("Installed"))
         } else if self.progress.is_some() || flag(&self.dictation, "installing") {
-            engine.text(self.progress.clone().unwrap_or_else(|| "Downloading…".into()))
+            engine.text(self.progress.clone().unwrap_or_else(|| t("Downloading…").into()))
         } else {
-            engine.button("Download")
+            engine.button(t("Download"))
         };
-        let hotkey = Line::row("", "Hotkey");
-        let hotkey = if self.hotkeys_supported() { hotkey.says("Tap to start and tap again to finish, or hold it while you speak").hotkey(&Bound::Own("dictation".into()).to_string(), self.hotkeys.get("dictation")) } else { hotkey.says("Bind a desktop keyboard shortcut to heyo --dictate.") };
+        let hotkey = Line::row("", t("Hotkey"));
+        let hotkey = if self.hotkeys_supported() { hotkey.says(t("Tap to start and tap again to finish, or hold it while you speak")).hotkey(&Bound::Own("dictation".into()).to_string(), self.hotkeys.get("dictation")) } else { hotkey.says(t("Bind a desktop keyboard shortcut to heyo --dictate.")) };
         let known = !self.capabilities.is_null();
-        let hold = Line::row(Id::Set("dictationHoldKey".into()), "Hold-to-Talk Key");
+        let hold = Line::row(Id::Set("dictationHoldKey".into()), t("Hold-to-Talk Key"));
         let hold = if self.capabilities["holdKey"] == "none" {
-            hold.says("A single key cannot be watched in this desktop session; use the hotkey instead.")
+            hold.says(t("A single key cannot be watched in this desktop session; use the hotkey instead."))
         } else {
-            let hold = hold.says(if self.chosen("dictationHoldKey").is_empty() { "A single key to hold while you speak. It keeps working as usual in shortcuts." } else { "Hold it and speak; let go to finish. A quick tap, or using it in a shortcut, does nothing." });
-            if known { hold.select(&self.chosen("dictationHoldKey"), std::iter::once(("", "None")).chain(list(&self.capabilities, "holdKeys").iter().filter_map(|key| Some((key["value"].as_str()?, key["title"].as_str()?))))) } else { hold }
+            let hold = hold.says(if self.chosen("dictationHoldKey").is_empty() { t("A single key to hold while you speak. It keeps working as usual in shortcuts.") } else { t("Hold it and speak; let go to finish. A quick tap, or using it in a shortcut, does nothing.") });
+            if known { hold.select(&self.chosen("dictationHoldKey"), std::iter::once(("", t("None"))).chain(list(&self.capabilities, "holdKeys").iter().filter_map(|key| Some((key["value"].as_str()?, key["title"].as_str()?))))) } else { hold }
         };
         let mut rows = vec![engine, hotkey, hold];
         let live = self.live_description();
         if !live.is_empty() {
-            let row = Line::row(Id::Set("dictationLive".into()), "Type as You Speak").says(live);
+            let row = Line::row(Id::Set("dictationLive".into()), t("Type as You Speak")).says(live);
             rows.push(if list(&self.capabilities, "dictationWords").first().is_some_and(|way| way != "pasted") { row.switch(self.set("dictationLive")) } else { row });
         }
         page.card("", rows);
@@ -728,26 +729,26 @@ impl Model {
         let microphones = list(&self.dictation, "microphones");
         let none = !self.dictation.is_null() && microphones.is_empty();
         page.card(
-            "Input",
+            t("Input"),
             vec![
-                Line::row(Id::Set("dictationSource".into()), "Microphone").says(if none { "No microphone found. Connect one to use dictation." } else { "" }).warns(none).select(&self.chosen("dictationSource"), std::iter::once(("", "System Default")).chain(microphones.iter().filter_map(|m| Some((m["name"].as_str()?, m["description"].as_str()?))))),
-                Line::row(Id::Set("dictationLanguage".into()), "Language").says("Automatic detection handles mixed Chinese and English").select(&self.chosen("dictationLanguage"), DICTATION_LANGUAGES.iter().copied()),
+                Line::row(Id::Set("dictationSource".into()), t("Microphone")).says(if none { t("No microphone found. Connect one to use dictation.") } else { "" }).warns(none).select(&self.chosen("dictationSource"), std::iter::once(("", t("System Default"))).chain(microphones.iter().filter_map(|m| Some((m["name"].as_str()?, m["description"].as_str()?))))),
+                Line::row(Id::Set("dictationLanguage".into()), t("Language")).says(t("Automatic detection handles mixed Chinese and English")).select(&self.chosen("dictationLanguage"), DICTATION_LANGUAGES.iter().map(|(value, title)| (*value, translate(title)))),
             ],
         );
         page.card(
-            "Vocabulary",
+            t("Vocabulary"),
             vec![
-                Line::row("", "Your Words").says("Names, jargon and product names, one to a line, written the way you want them: “type script” then comes out as TypeScript. For a word that is heard as something else, write heard as -> written as. The recognizer cannot be taught new words, so these are put right in its text; a Chinese name heard as other characters of the same sound is only fixed if you list those characters as “heard as”. Polishing with AI is given the list too."),
-                Line { kind: "area", id: Id::Words.into(), label: "Your Words".into(), value: self.names("dictationVocabulary").join("\n"), placeholder: "TypeScript\nKubernetes\njason -> JSON\n杰森 -> JSON".into(), ..Line::default() },
+                Line::row("", t("Your Words")).says(t("Names, jargon and product names, one to a line, written the way you want them: “type script” then comes out as TypeScript. For a word that is heard as something else, write heard as -> written as. The recognizer cannot be taught new words, so these are put right in its text; a Chinese name heard as other characters of the same sound is only fixed if you list those characters as “heard as”. Polishing with AI is given the list too.")),
+                Line { kind: "area", id: Id::Words.into(), label: t("Your Words").into(), value: self.names("dictationVocabulary").join("\n"), placeholder: "TypeScript\nKubernetes\njason -> JSON\n杰森 -> JSON".into(), ..Line::default() },
             ],
         );
         let polish = self.chosen("dictationPolish");
         let mode = POLISH_MODES.iter().find(|(value, ..)| *value == polish).unwrap_or(&POLISH_MODES[0]);
-        let mut rows = vec![Line::row(Id::Set("dictationPolish".into()), "Mode").says(mode.2).select(mode.0, POLISH_MODES.iter().map(|(value, title, _)| (*value, *title)))];
+        let mut rows = vec![Line::row(Id::Set("dictationPolish".into()), t("Mode")).says(translate(mode.2)).select(mode.0, POLISH_MODES.iter().map(|(value, title, _)| (*value, translate(title))))];
         if mode.0 != "off" && self.chosen("aiProvider") != "local" && !self.set("anthropicApiKeySet") {
-            rows.push(Line::row("", "Claude API Key").says("Polishing needs a Claude API key or a local model. Set either in Advanced."));
+            rows.push(Line::row("", t("Claude API Key")).says(t("Polishing needs a Claude API key or a local model. Set either in Advanced.")));
         }
-        page.card("Polish with AI", rows);
+        page.card(t("Polish with AI"), rows);
         page.done()
     }
 
@@ -755,15 +756,15 @@ impl Model {
 
     fn screenshots(&self) -> Vec<Line> {
         let mut page = Page::default();
-        page.note("Drag to select part of the screen, or click a window to select exactly that. Mark it up with rectangles, arrows or the pen, then copy it, save it to Pictures/Screenshots, pin it on top of other windows, or copy the text in it.");
+        page.note(t("Drag to select part of the screen, or click a window to select exactly that. Mark it up with rectangles, arrows or the pen, then copy it, save it to Pictures/Screenshots, pin it on top of other windows, or copy the text in it."));
         let hotkey = |id: &str, title: &str, description: &str| {
             let row = Line::row("", title).says(description);
             if self.hotkeys_supported() { row.hotkey(id, self.item_hotkeys.get(id)) } else { row }
         };
-        page.card("Hotkeys", vec![hotkey("heyo:screenshot", "Capture Screenshot", "Enter copies, Ctrl+S saves, Esc cancels"), hotkey("heyo:screenshot-text", "Capture Text from Screen", "Drag over text and it is copied")]);
+        page.card(t("Hotkeys"), vec![hotkey("heyo:screenshot", t("Capture Screenshot"), t("Enter copies, Ctrl+S saves, Esc cancels")), hotkey("heyo:screenshot-text", t("Capture Text from Screen"), t("Drag over text and it is copied"))]);
         let installed = flag(&self.ocr, "installed");
-        let engine = Line::row(Id::Act(Act::InstallOcr), "Recognition Engine").says(if installed { "PaddleOCR is installed. Chinese and English; images never leave this computer." } else { "A one-time download of about 340 MB (PaddleOCR, Chinese and English)." });
-        page.card("Text Recognition", vec![if installed { engine.badge("Installed") } else if self.ocr_installing || flag(&self.ocr, "installing") { engine.text("Downloading…") } else { engine.button("Download") }]);
+        let engine = Line::row(Id::Act(Act::InstallOcr), t("Recognition Engine")).says(if installed { t("PaddleOCR is installed. Chinese and English; images never leave this computer.") } else { t("A one-time download of about 340 MB (PaddleOCR, Chinese and English).") });
+        page.card(t("Text Recognition"), vec![if installed { engine.badge(t("Installed")) } else if self.ocr_installing || flag(&self.ocr, "installing") { engine.text("Downloading…") } else { engine.button(t("Download")) }]);
         page.done()
     }
 
@@ -774,16 +775,16 @@ impl Model {
     fn server_description(&self) -> (String, bool) {
         let url = self.chosen("localModelUrl");
         let status = match &self.models {
-            Some((asked, Ok(models))) if *asked == url && models.is_empty() => "Connected, but the server lists no models.".to_string(),
-            Some((asked, Ok(models))) if *asked == url => format!("Connected: {}", models.join(", ")),
-            Some((asked, Err(e))) if *asked == url => format!("Not reachable: {e}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."),
-            _ => "Checking…".to_string(),
+            Some((asked, Ok(models))) if *asked == url && models.is_empty() => t("Connected, but the server lists no models.").to_string(),
+            Some((asked, Ok(models))) if *asked == url => tf("Connected: {}", &[&models.join(", ")]),
+            Some((asked, Err(e))) if *asked == url => tf("Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama).", &[e]),
+            _ => t("Checking…").to_string(),
         };
         match address(&url) {
-            Address::ThisComputer => (format!("{status} Text stays on this computer."), false),
-            Address::Unknown => (format!("{status} This is not an http or https address."), true),
-            Address::Elsewhere { host, encrypted: true } => (format!("{status} This address is not this computer: the text you select, ask about and dictate is sent to {host}."), true),
-            Address::Elsewhere { host, encrypted: false } => (format!("{status} This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {host} over plain http, readable by anyone on the network in between. Use https, or a server on this computer."), true),
+            Address::ThisComputer => (format!("{status} {}", t("Text stays on this computer.")), false),
+            Address::Unknown => (format!("{status} {}", t("This is not an http or https address.")), true),
+            Address::Elsewhere { host, encrypted: true } => (format!("{status} {}", tf("This address is not this computer: the text you select, ask about and dictate is sent to {0}.", &[&host])), true),
+            Address::Elsewhere { host, encrypted: false } => (format!("{status} {}", tf("This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer.", &[&host])), true),
         }
     }
 
@@ -792,34 +793,34 @@ impl Model {
         let node = self.setting("nodeVersion");
         let found = node.get("Ok").and_then(Value::as_str);
         let version = match found {
-            Some(version) => format!("Using {version}."),
+            Some(version) => tf("Using {0}.", &[&version]),
             None => text(node, "Err"),
         };
         page.card(
-            "Extensions",
+            t("Extensions"),
             vec![
-                Line::row(Id::Set("nodePath".into()), "Node.js").says(format!("{version}{} Extensions need Node.js 22 or newer.", if self.set("nodeOverridden") { " HEYO_NODE overrides this setting." } else { "" })).warns(found.is_none()).field(self.chosen("nodePath"), "node (from PATH)"),
-                Line::row(Id::Act(Act::OpenExtensions), "Extensions Folder").says(self.chosen("extensionsDir")).button("Open"),
+                Line::row(Id::Set("nodePath".into()), t("Node.js")).says(format!("{version}{} {}", if self.set("nodeOverridden") { format!(" {}", t("HEYO_NODE overrides this setting.")) } else { String::new() }, t("Extensions need Node.js 22 or newer."))).warns(found.is_none()).field(self.chosen("nodePath"), "node (from PATH)"),
+                Line::row(Id::Act(Act::OpenExtensions), t("Extensions Folder")).says(self.chosen("extensionsDir")).button(t("Open")),
             ],
         );
         page.card(
-            "Rendering",
-            vec![Line::row(Id::Set("renderer".into()), "Renderer").says("How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started.").select(&self.chosen("renderer"), RENDERERS.iter().copied())],
+            t("Rendering"),
+            vec![Line::row(Id::Set("renderer".into()), t("Renderer")).says(t("How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started.")).select(&self.chosen("renderer"), RENDERERS.iter().map(|(value, title)| (*value, translate(title))))],
         );
         let local = self.chosen("aiProvider") == "local";
-        let mut rows = vec![Line::row(Id::Set("aiProvider".into()), "Model").says("Answers Selected Text Actions and polishes dictation.").select(if local { "local" } else { "claude" }, [("claude", "Claude"), ("local", "Local Model")])];
+        let mut rows = vec![Line::row(Id::Set("aiProvider".into()), t("Model")).says(t("Answers Selected Text Actions and polishes dictation.")).select(if local { "local" } else { "claude" }, [("claude", t("Claude")), ("local", t("Local Model"))])];
         if local {
             let (description, warning) = self.server_description();
-            rows.push(Line::row(Id::Set("localModelUrl".into()), "Server").says(description).warns(warning).field(self.chosen("localModelUrl"), "http://127.0.0.1:8000/v1"));
-            rows.push(Line::row(Id::Set("localModelName".into()), "Model Name").says("Leave empty to use the first model the server offers.").field(self.chosen("localModelName"), "automatic"));
+            rows.push(Line::row(Id::Set("localModelUrl".into()), t("Server")).says(description).warns(warning).field(self.chosen("localModelUrl"), "http://127.0.0.1:8000/v1"));
+            rows.push(Line::row(Id::Set("localModelName".into()), t("Model Name")).says(t("Leave empty to use the first model the server offers.")).field(self.chosen("localModelName"), "automatic"));
         } else {
             let saved = self.set("anthropicApiKeySet");
-            let key = Line::row(Id::ApiKey, "API Key").says("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.").secret(if saved { "Saved — type a new key to replace it" } else { "sk-ant-…" });
-            rows.push(if saved { key.more("Remove", Id::ForgetApiKey) } else { key });
+            let key = Line::row(Id::ApiKey, t("API Key")).says(t("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.")).secret(if saved { t("Saved — type a new key to replace it") } else { "sk-ant-…" });
+            rows.push(if saved { key.more(t("Remove"), Id::ForgetApiKey) } else { key });
         }
         page.card("AI", rows);
-        page.card("Pasting", vec![Line::row(Id::Set("confirmTerminalPaste".into()), "Ask Before Pasting Several Lines into a Terminal").says("A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces.").switch(self.set("confirmTerminalPaste"))]);
-        page.card("Data", vec![Line::row("", "Settings File").says(self.chosen("settingsPath"))]);
+        page.card(t("Pasting"), vec![Line::row(Id::Set("confirmTerminalPaste".into()), t("Ask Before Pasting Several Lines into a Terminal")).says(t("A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces.")).switch(self.set("confirmTerminalPaste"))]);
+        page.card(t("Data"), vec![Line::row("", t("Settings File")).says(self.chosen("settingsPath"))]);
         page.done()
     }
 
@@ -828,11 +829,11 @@ impl Model {
     fn about(&self) -> Vec<Line> {
         let update = match &self.update {
             _ if !self.set("canUpdate") => String::new(),
-            Update::Unknown => "Check for Updates".into(),
-            Update::Checking => "Checking…".into(),
-            Update::Newest => "Heyo Is Up to Date".into(),
-            Update::Newer(version) => format!("Install Heyo {version} and Restart"),
-            Update::Installing(_) => "Installing…".into(),
+            Update::Unknown => t("Check for Updates").into(),
+            Update::Checking => t("Checking…").into(),
+            Update::Newest => t("Heyo Is Up to Date").into(),
+            Update::Newer(version) => tf("Install Heyo {0} and Restart", &[version]),
+            Update::Installing(_) => t("Installing…").into(),
         };
         vec![Line {
             kind: "about",
@@ -840,8 +841,8 @@ impl Model {
             id: Id::Act(Act::CopyDiagnostics).into(),
             more_id: Id::Act(Act::Update).into(),
             value: self.chosen("version"),
-            description: "A command palette launcher for Linux that runs Raycast extensions.".into(),
-            placeholder: "For a bug report: versions, the desktop session and the end of Heyo's log, with keys and tokens removed. Read it before you share it.".into(),
+            description: t("A command palette launcher for Linux that runs Raycast extensions.").into(),
+            placeholder: t("For a bug report: versions, the desktop session and the end of Heyo's log, with keys and tokens removed. Read it before you share it.").into(),
             more: update,
             busy: matches!(self.update, Update::Checking | Update::Installing(_)),
             on: self.copied,
@@ -890,7 +891,7 @@ impl Model {
         Line::row(remove(id.to_string()), source.map_or(id.to_string(), |source| text(source, "name")))
             .says(if source.is_some() { "" } else { missing })
             .pictured(Some(source.and_then(|source| source["icon"].as_str()).unwrap_or("app-window-16").to_string()))
-            .button("Remove")
+            .button(t("Remove"))
     }
 
     /// The cards about the clipboard history, on the page of Heyo's commands.
@@ -898,47 +899,47 @@ impl Model {
         let recording = self.set("clipboardHistory");
         let mut rows = Vec::new();
         if self.hotkeys_supported() {
-            rows.push(Line::row("", "Hotkey").says("Opens Clipboard History from anywhere").hotkey(&Bound::Own("clipboard".into()).to_string(), self.hotkeys.get("clipboard")));
+            rows.push(Line::row("", t("Hotkey")).says(t("Opens Clipboard History from anywhere")).hotkey(&Bound::Own("clipboard".into()).to_string(), self.hotkeys.get("clipboard")));
         }
-        rows.push(Line::row(Id::Set("clipboardHistory".into()), "Record Clipboard History").says("Copies marked as secret by password managers are never recorded").switch(recording));
+        rows.push(Line::row(Id::Set("clipboardHistory".into()), t("Record Clipboard History")).says(t("Copies marked as secret by password managers are never recorded")).switch(recording));
         if recording {
-            rows.push(Line::row(Id::Set("clipboardPaused".into()), "Pause Recording").says("Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey.").switch(self.set("clipboardPaused")));
+            rows.push(Line::row(Id::Set("clipboardPaused".into()), t("Pause Recording")).says(t("Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey.")).switch(self.set("clipboardPaused")));
         }
-        rows.push(Line::row(Id::Num("clipboardRetentionDays".into()), "Keep History For").says("Pinned entries are kept forever").select(&self.setting("clipboardRetentionDays").to_string(), RETENTION.iter().copied()));
-        rows.push(Line::row(Id::Act(Act::ClearClipboard), "Clear History").says("Pinned entries are not deleted").confirm("Clear…", "Click Again to Clear"));
+        rows.push(Line::row(Id::Num("clipboardRetentionDays".into()), t("Keep History For")).says(t("Pinned entries are kept forever")).select(&self.setting("clipboardRetentionDays").to_string(), RETENTION.iter().map(|(value, title)| (*value, translate(title)))));
+        rows.push(Line::row(Id::Act(Act::ClearClipboard), t("Clear History")).says(t("Pinned entries are not deleted")).confirm(t("Clear…"), t("Click Again to Clear")));
         if recording {
             // Finding entries by what they mean: the switch, the download
             // it needs, and how far reading the history has got.
             let (installed, on) = (flag(&self.meaning, "installed"), self.set("clipboardMeaning"));
             let (waiting, indexed) = (self.meaning["waiting"].as_u64().unwrap_or(0), self.meaning["indexed"].as_u64().unwrap_or(0));
             let state = if !installed {
-                "A one-time download of about 135 MB, or 250 MB if text recognition is not installed. It takes about 350 MB of memory while you search, and none a few minutes after.".to_string()
+                t("A one-time download of about 135 MB, or 250 MB if text recognition is not installed. It takes about 350 MB of memory while you search, and none a few minutes after.").to_string()
             } else if !on {
                 String::new()
             } else if let Some(problem) = self.meaning["problem"].as_str() {
-                format!("It is not working at present: {problem}")
+                tf("It is not working at present: {0}", &[&problem])
             } else if waiting > 0 {
-                format!("Reading the history: {} to go; until then some are found by their words only.", count(waiting, "entry", "entries"))
+                tn("Reading the history: {0} entry to go; until then some are found by their words only.", "Reading the history: {0} entries to go; until then some are found by their words only.", waiting, &[&digits(waiting)])
             } else {
-                format!("{} can be found this way.", count(indexed, "entry", "entries"))
+                tn("{0} entry can be found this way.", "{0} entries can be found this way.", indexed, &[&digits(indexed)])
             };
-            let row = Line::row(Id::Set("clipboardMeaning".into()), "Find by Meaning").says(format!("“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere. {state}"));
+            let row = Line::row(Id::Set("clipboardMeaning".into()), t("Find by Meaning")).says(format!("{} {state}", t("“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere.")));
             rows.push(if self.meaning.is_null() || installed {
                 row.switch(on)
             } else if self.meaning_installing || flag(&self.meaning, "installing") {
                 row.text("Downloading…")
             } else {
-                Line { id: Id::Act(Act::InstallMeaning).into(), ..row }.button("Download")
+                Line { id: Id::Act(Act::InstallMeaning).into(), ..row }.button(t("Download"))
             });
         }
-        page.card("Clipboard History", rows);
+        page.card(t("Clipboard History"), rows);
         if recording {
             let ignored = self.names("clipboardIgnoredApps");
-            let mut rows: Vec<Line> = ignored.iter().map(|id| self.left_out(id, Id::IgnoreRemove, "Not installed")).collect();
+            let mut rows: Vec<Line> = ignored.iter().map(|id| self.left_out(id, Id::IgnoreRemove, t("Not installed"))).collect();
             // Those copied from first, then the rest of the installed.
             let offered = |seen: bool| -> Vec<(&str, &str)> { self.sources.iter().filter(|source| flag(source, "seen") == seen && !ignored.contains(&source["id"].as_str().unwrap_or_default())).filter_map(|source| Some((source["id"].as_str()?, source["name"].as_str()?))).collect() };
-            rows.push(Line::row(Id::IgnoreAdd, "Never Record Copies From").says("What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out.").select("", std::iter::once(("", "Add Application…")).chain(offered(true)).chain(offered(false))));
-            page.card("Ignored Applications", rows);
+            rows.push(Line::row(Id::IgnoreAdd, t("Never Record Copies From")).says(t("What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out.")).select("", std::iter::once(("", t("Add Application…"))).chain(offered(true)).chain(offered(false))));
+            page.card(t("Ignored Applications"), rows);
         }
     }
 
@@ -950,20 +951,20 @@ impl Model {
         }
         let available = self.capabilities["snippetExpansion"] != "none";
         let on = self.set("snippetExpansion");
-        let row = Line::row(Id::Set("snippetExpansion".into()), "Expand Snippets as You Type");
+        let row = Line::row(Id::Set("snippetExpansion".into()), t("Expand Snippets as You Type"));
         let mut rows = vec![if available {
-            row.says("Typing a snippet's keyword in any application replaces it with the snippet's text. While this is on, Heyo watches what you type to find the keywords; none of it is stored. “Pause or Resume Snippet Expansion” in the root search switches it too.").switch(on)
+            row.says(t("Typing a snippet's keyword in any application replaces it with the snippet's text. While this is on, Heyo watches what you type to find the keywords; none of it is stored. “Pause or Resume Snippet Expansion” in the root search switches it too.")).switch(on)
         } else if self.capabilities["session"] == "wayland" {
-            row.says("Not available on Wayland, where an application cannot see what is typed in another. Snippets can still be pasted from the root search.")
+            row.says(t("Not available on Wayland, where an application cannot see what is typed in another. Snippets can still be pasted from the root search."))
         } else {
-            row.says("Not available in this desktop session. Snippets can still be pasted from the root search.")
+            row.says(t("Not available in this desktop session. Snippets can still be pasted from the root search."))
         }];
         if available && on {
             let excluded = self.names("snippetExpansionIgnoredApps");
             rows.extend(excluded.iter().map(|id| self.left_out(id, Id::ExpandRemove, "")));
-            rows.push(Line::row(Id::ExpandAdd, "Never Expand In").says("Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use.").select("", std::iter::once(("", "Add Application…")).chain(self.sources.iter().filter(|source| !excluded.contains(&source["id"].as_str().unwrap_or_default())).filter_map(|source| Some((source["id"].as_str()?, source["name"].as_str()?))))));
+            rows.push(Line::row(Id::ExpandAdd, t("Never Expand In")).says(t("Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use.")).select("", std::iter::once(("", t("Add Application…"))).chain(self.sources.iter().filter(|source| !excluded.contains(&source["id"].as_str().unwrap_or_default())).filter_map(|source| Some((source["id"].as_str()?, source["name"].as_str()?))))));
         }
-        page.card("Snippet Expansion", rows);
+        page.card(t("Snippet Expansion"), rows);
     }
 
     fn extension_page(&self, extension: &Value) -> Vec<Line> {
@@ -972,16 +973,16 @@ impl Model {
         let disabled = self.disabled();
         let mut page = Page::default();
         let about = match (extension["development"].as_str(), extension["author"].as_str()) {
-            (Some(directory), _) => format!("In development from {directory}"),
-            (None, Some(author)) => format!("by {author}"),
-            (None, None) if builtin && !applications => "Built into Heyo".into(),
+            (Some(directory), _) => tf("In development from {0}", &[&directory]),
+            (None, Some(author)) => tf("by {0}", &[&author]),
+            (None, None) if builtin && !applications => t("Built into Heyo").into(),
             _ => String::new(),
         };
         page.0.push(Line { kind: "head", label: Self::extension_title(extension), description: about, icon: Self::icon(extension, &extension["icon"]), ..Line::default() });
         if let Some(description) = extension["description"].as_str().filter(|description| !description.is_empty()) {
             page.note(description);
         }
-        page.card("Preferences", list(extension, "preferences").iter().map(|preference| Self::preference(extension, "", preference, &extension["values"]["extension"][text(preference, "name")])).collect());
+        page.card(t("Preferences"), list(extension, "preferences").iter().map(|preference| Self::preference(extension, "", preference, &extension["values"]["extension"][text(preference, "name")])).collect());
 
         let query = if applications { self.find.to_lowercase() } else { String::new() };
         let mut commands: Vec<Line> = list(extension, "commands")
@@ -995,9 +996,9 @@ impl Model {
             })
             .collect();
         if commands.is_empty() {
-            commands.push(Line::row("", "No matches"));
+            commands.push(Line::row("", t("No matches")));
         }
-        page.card(if applications { "" } else { "Commands" }, commands);
+        page.card(if applications { "" } else { t("Commands") }, commands);
 
         if id == BUILTIN {
             self.clipboard(&mut page);
@@ -1005,7 +1006,7 @@ impl Model {
         }
         for command in list(extension, "commands") {
             let name = text(command, "name");
-            page.card(&format!("{} Preferences", text(command, "title")), list(command, "preferences").iter().map(|preference| Self::preference(extension, &name, preference, &extension["values"]["commands"][&name][text(preference, "name")])).collect());
+            page.card(&tf("{} Preferences", &[&text(command, "title")]), list(command, "preferences").iter().map(|preference| Self::preference(extension, &name, preference, &extension["values"]["commands"][&name][text(preference, "name")])).collect());
         }
         if !builtin && self.permissions.0 == id && !self.permissions.1.is_empty() {
             // What it may ask Heyo for: what its manifest lists and what
@@ -1018,21 +1019,21 @@ impl Model {
                 let mut letters = allows.chars();
                 let label = letters.next().map(|first| first.to_uppercase().chain(letters).collect::<String>()).unwrap_or_default();
                 if permission == "activity" {
-                    return Line::row(Id::Activities(name.to_string()), label).says(if activities { "Declared; turn it off here" } else { "Live activities are off in General" }).switch(activities && !self.names("activitiesOff").contains(&name.as_str()));
+                    return Line::row(Id::Activities(name.to_string()), label).says(if activities { t("Declared; turn it off here") } else { t("Live activities are off in General") }).switch(activities && !self.names("activitiesOff").contains(&name.as_str()));
                 }
                 let line = Line::row(Id::Revoke { extension: name.to_string(), permission: permission.to_string() }, label).says(match row["state"].as_str() {
-                    Some("allowed") => "Allowed by you",
-                    Some("asks") => "Asks you the first time it is used",
-                    _ => "Needs no asking",
+                    Some("allowed") => t("Allowed by you"),
+                    Some("asks") => t("Asks you the first time it is used"),
+                    _ => t("Needs no asking"),
                 });
-                if row["state"] == "allowed" { line.button("Revoke") } else { line }
+                if row["state"] == "allowed" { line.button(t("Revoke")) } else { line }
             });
-            page.card("Permissions", rows.collect());
-            page.note("Permissions are about what Heyo hands over or does for an extension. They do not confine it: an extension is a program on this computer, and can read your files and start other programs by itself.");
+            page.card(t("Permissions"), rows.collect());
+            page.note(t("Permissions are about what Heyo hands over or does for an extension. They do not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."));
         }
         if !builtin {
             let developed = extension["development"].is_string();
-            page.card("", vec![Line::row(Id::Uninstall(id.to_string()), if developed { "Stop Developing" } else { "Uninstall Extension" }).says(if developed { "Takes it out of Heyo; its sources are not touched" } else { "Its preferences are kept" }).confirm(if developed { "Remove" } else { "Uninstall" }, if developed { "Click Again to Remove" } else { "Click Again to Uninstall" })]);
+            page.card("", vec![Line::row(Id::Uninstall(id.to_string()), if developed { t("Stop Developing") } else { t("Uninstall Extension") }).says(if developed { t("Takes it out of Heyo; its sources are not touched") } else { t("Its preferences are kept") }).confirm(if developed { t("Remove") } else { t("Uninstall") }, if developed { t("Click Again to Remove") } else { t("Click Again to Uninstall") })]);
         }
         page.done()
     }
@@ -1058,8 +1059,8 @@ impl Model {
     /// The title of the item `id`, which binding a hotkey to it names.
     fn item_title(&self, id: &str) -> Option<String> {
         match id {
-            "heyo:screenshot" => return Some("Capture Screenshot".into()),
-            "heyo:screenshot-text" => return Some("Capture Text from Screen".into()),
+            "heyo:screenshot" => return Some(t("Capture Screenshot").into()),
+            "heyo:screenshot-text" => return Some(t("Capture Text from Screen").into()),
             _ => {}
         }
         self.applications.iter().chain(self.extensions.iter().flat_map(|extension| list(extension, "commands"))).find(|item| item["id"] == id).map(|item| text(item, "title"))
@@ -1165,7 +1166,7 @@ impl Model {
             Id::ForgetApiKey => vec![ask(Command::SetAnthropicApiKey(String::new()), Then::Settings)],
             Id::Act(Act::InstallShellExtension) => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
             Id::Act(Act::InstallDictation) => {
-                self.progress = Some("Starting…".into());
+                self.progress = Some(t("Starting…").into());
                 vec![ask(Command::DictationInstall, Then::Started("dictation"))]
             }
             Id::Act(Act::InstallOcr) => {

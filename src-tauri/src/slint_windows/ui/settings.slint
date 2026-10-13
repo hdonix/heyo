@@ -213,7 +213,7 @@ component AboutPage inherits VerticalLayout {
     }
 
     TextSm {
-        text: "Version " + root.line.value;
+        text: @tr("Version {}", root.line.value);
         color: Tokens.text-muted;
         horizontal-alignment: center;
     }
@@ -247,7 +247,7 @@ component AboutPage inherits VerticalLayout {
         alignment: center;
         padding-top: Tokens.unit * 3;
         Button {
-            text: root.line.on ? "Copied" : "Copy Diagnostics";
+            text: root.line.on ? @tr("Copied") : @tr("Copy Diagnostics");
             clicked => {
                 Host.act(root.line.id, "");
             }
@@ -615,7 +615,7 @@ component LineView inherits VerticalLayout {
                 if root.line.checkable: VerticalLayout {
                     alignment: center;
                     Check {
-                        label: root.line.label + " enabled";
+                        label: @tr("{} enabled", root.line.label);
                         checked: root.line.on;
                         toggled(on) => {
                             Host.act(root.line.check-id, on ? "true" : "false");

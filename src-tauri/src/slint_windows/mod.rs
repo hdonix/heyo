@@ -142,7 +142,10 @@ fn follow() {
 /// (What the host hands them they ask for again when they hear the
 /// settings changed.)
 pub(crate) fn speak() {
-    life::ask(thread::speak);
+    life::ask(|| {
+        thread::speak();
+        screenshot::speak();
+    });
 }
 
 /// Sees to it that Slint's thread runs: starts it the first time, and

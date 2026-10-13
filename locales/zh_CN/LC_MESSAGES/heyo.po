@@ -17,6 +17,7 @@ msgid "Shortcuts"
 msgstr "快捷键"
 
 #: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/pill.slint
 msgid "Dictation"
 msgstr "听写"
 
@@ -33,8 +34,121 @@ msgid "About"
 msgstr "关于"
 
 #: src-tauri/src/slint_windows/model.rs
+msgid "Detect Automatically"
+msgstr "自动检测"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Chinese (Mandarin)"
+msgstr "中文（普通话）"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Cantonese"
+msgstr "粤语"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "English"
+msgstr "英语"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Japanese"
+msgstr "日语"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Korean"
+msgstr "韩语"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Off"
+msgstr "关闭"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "The text is left as it was recognized."
+msgstr "文字保持识别出来的样子。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Clean Up"
+msgstr "整理"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
+msgstr "说完后，Claude 会去掉口头语、按你的更正修改并修正标点，然后粘贴结果。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Translate to English"
+msgstr "翻译成英语"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "When you finish, Claude cleans up what you said and pastes it in English."
+msgstr "说完后，Claude 会整理你说的话，并以英语粘贴。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "1 Day"
+msgstr "1 天"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "7 Days"
+msgstr "7 天"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "1 Month"
+msgstr "1 个月"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "3 Months"
+msgstr "3 个月"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "6 Months"
+msgstr "6 个月"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "1 Year"
+msgstr "1 年"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Automatic"
+msgstr "自动"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "GPU, shared memory"
+msgstr "GPU，共享内存"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "GPU, DMA-BUF (WebKit's default)"
+msgstr "GPU，DMA-BUF（WebKit 默认）"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hotkey Set"
+msgstr "已设快捷键"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Alias Set"
+msgstr "已设别名"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Enabled"
+msgstr "启用"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Disabled"
+msgstr "已停用"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "All categories"
+msgstr "所有类别"
+
+#: src-tauri/src/slint_windows/model.rs
 msgid "Applications"
 msgstr "应用程序"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Extensions"
+msgstr "扩展"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Give an application a hotkey to launch it from anywhere."
+msgstr "为应用程序设置快捷键，随时随地启动它。"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Heyo Commands"
@@ -43,6 +157,23 @@ msgstr "Heyo 命令"
 #: src-tauri/src/slint_windows/model.rs
 msgid "Settings"
 msgstr "设置"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src/raycast/CommandView.tsx
+msgid "Search…"
+msgstr "搜索…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Search applications…"
+msgstr "搜索应用程序…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Modifications"
+msgstr "改动"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Categories"
+msgstr "类别"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use."
@@ -67,6 +198,10 @@ msgstr "已就绪。请注销并重新登录以完成：GNOME 只在会话开始
 #: src-tauri/src/slint_windows/model.rs
 msgid "GNOME Shell Extension"
 msgstr "GNOME Shell 扩展"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Wayland"
+msgstr "Wayland"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Heyo Hotkey"
@@ -152,9 +287,701 @@ msgstr "显示进行中的事项"
 msgid "Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you"
 msgstr "计时器、下载以及扩展报告的进行中事项会显示在主搜索顶部，结束或需要你处理时会发出通知"
 
+#: src-tauri/src/slint_windows/model.rs
+msgid "Nothing matches."
+msgstr "没有匹配项。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Your words go into the window as you speak, through the input method: the sentence you are speaking is shown there as text being composed, and becomes the window's text when it is finished. Your own input method (Pinyin, say) is set aside while you dictate and comes back when you finish. {} When this is off, nothing is shown before a sentence is finished."
+msgstr "你说的话会通过输入法边说边进入窗口：正在说的句子以待确认文字的形式显示，说完后成为窗口中的文字。听写期间你自己的输入法（例如拼音）会暂时让位，结束后恢复。{} 关闭此项后，句子说完之前不会显示任何内容。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A window that takes no input method gets the words by pasting, corrected where they stand until you press a key or click."
+msgstr "不接受输入法的窗口通过粘贴获得文字，在你按键或点击之前会就地更正。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A window that takes no input method gets each sentence pasted when it is finished."
+msgstr "不接受输入法的窗口会在每句话说完后粘贴该句。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Your words go into the window as they are recognized, and are corrected there when a later word changes an earlier one. Heyo only ever erases what it wrote itself: once you press a key or click while dictating, it stops correcting and adds each finished sentence where the cursor is. In terminals, password managers and the applications excluded from snippet expansion, and when this is off, each sentence is pasted when it is finished."
+msgstr "你说的话一经识别就进入窗口，后面的词改变了前面的内容时会就地更正。Heyo 只会擦除自己写下的内容：听写期间一旦你按键或点击，它就不再更正，而是把每句说完的话加到光标处。在终端、密码管理器和已排除文本片段展开的应用程序中，以及关闭此项时，每句话会在说完后粘贴。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not available on Wayland, where Heyo cannot tell whether you typed in between, and so must not erase anything. Each sentence is pasted when it is finished."
+msgstr "在 Wayland 上不可用：Heyo 无法得知你中途是否输入过内容，因此不能擦除任何文字。每句话会在说完后粘贴。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not available in this desktop session. Each sentence is pasted when it is finished."
+msgstr "在此桌面会话中不可用。每句话会在说完后粘贴。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer."
+msgstr "按住快捷键说话，说完松开；或者按一下开始，再按一下结束：你说的话会输入到当前使用的窗口中。语音在这台电脑上识别。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Speech Recognition"
+msgstr "语音识别"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "SenseVoice is installed. Audio never leaves this computer."
+msgstr "SenseVoice 已安装。音频不会离开这台电脑。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A one-time download of about 270 MB (SenseVoice speech model)."
+msgstr "需要一次性下载约 270 MB（SenseVoice 语音模型）。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Installed"
+msgstr "已安装"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Downloading…"
+msgstr "正在下载…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Download"
+msgstr "下载"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Hotkey"
+msgstr "快捷键"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Tap to start and tap again to finish, or hold it while you speak"
+msgstr "按一下开始，再按一下结束；或者按住说话"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Bind a desktop keyboard shortcut to heyo --dictate."
+msgstr "请在桌面的键盘快捷键设置中为 heyo --dictate 绑定一个快捷键。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hold-to-Talk Key"
+msgstr "按住说话键"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A single key cannot be watched in this desktop session; use the hotkey instead."
+msgstr "此桌面会话中无法监听单个按键，请改用快捷键。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A single key to hold while you speak. It keeps working as usual in shortcuts."
+msgstr "说话时按住的单个按键。它在快捷键组合中照常可用。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hold it and speak; let go to finish. A quick tap, or using it in a shortcut, does nothing."
+msgstr "按住它说话，松开即结束。轻按一下或在快捷键组合中使用它，都不会触发听写。"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "None"
+msgstr "无"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Type as You Speak"
+msgstr "边说边输入"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Input"
+msgstr "输入"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Microphone"
+msgstr "麦克风"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "No microphone found. Connect one to use dictation."
+msgstr "未找到麦克风。请连接麦克风后使用听写。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "System Default"
+msgstr "系统默认"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Automatic detection handles mixed Chinese and English"
+msgstr "自动检测可处理中英文混说"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Vocabulary"
+msgstr "词汇表"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Your Words"
+msgstr "你的词汇"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Names, jargon and product names, one to a line, written the way you want them: “type script” then comes out as TypeScript. For a word that is heard as something else, write heard as -> written as. The recognizer cannot be taught new words, so these are put right in its text; a Chinese name heard as other characters of the same sound is only fixed if you list those characters as “heard as”. Polishing with AI is given the list too."
+msgstr "人名、术语和产品名，每行一个，按你希望的写法填写：这样“type script”就会写成 TypeScript。如果某个词总被听成别的，请写成“听成的 -> 应写的”。识别器无法学习新词，所以这些词是在识别结果中改正的；中文名字被听成同音的其他字时，只有把那些字列为“听成的”才会改正。AI 润色时也会参考这份列表。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Mode"
+msgstr "模式"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Claude API Key"
+msgstr "Claude API 密钥"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Polishing needs a Claude API key or a local model. Set either in Advanced."
+msgstr "润色需要 Claude API 密钥或本地模型。请在“高级”中设置其一。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Polish with AI"
+msgstr "AI 润色"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Drag to select part of the screen, or click a window to select exactly that. Mark it up with rectangles, arrows or the pen, then copy it, save it to Pictures/Screenshots, pin it on top of other windows, or copy the text in it."
+msgstr "拖动选择屏幕的一部分，或点击某个窗口来选中它。可以用矩形、箭头或画笔标注，然后复制、保存到 Pictures/Screenshots、钉在其他窗口之上，或复制其中的文字。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Hotkeys"
+msgstr "快捷键"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Capture Screenshot"
+msgstr "截取屏幕"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Enter copies, Ctrl+S saves, Esc cancels"
+msgstr "Enter 复制，Ctrl+S 保存，Esc 取消"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Capture Text from Screen"
+msgstr "识别屏幕文字"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Drag over text and it is copied"
+msgstr "拖过文字即可复制"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Recognition Engine"
+msgstr "识别引擎"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "PaddleOCR is installed. Chinese and English; images never leave this computer."
+msgstr "PaddleOCR 已安装。支持中文和英文；图像不会离开这台电脑。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A one-time download of about 340 MB (PaddleOCR, Chinese and English)."
+msgstr "需要一次性下载约 340 MB（PaddleOCR，中文和英文）。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text Recognition"
+msgstr "文字识别"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected, but the server lists no models."
+msgstr "已连接，但服务器没有列出任何模型。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected: {}"
+msgstr "已连接：{}"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr "无法连接：{0}。任何兼容 OpenAI 的服务器都可以使用（vLLM、LM Studio、Ollama）。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Checking…"
+msgstr "正在检查…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text stays on this computer."
+msgstr "文字不会离开这台电脑。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This is not an http or https address."
+msgstr "这不是 http 或 https 地址。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This address is not this computer: the text you select, ask about and dictate is sent to {0}."
+msgstr "此地址不是这台电脑：你选中、提问和听写的文字会发送到 {0}。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer."
+msgstr "此地址不是这台电脑，而且连接未加密：你选中、提问和听写的文字会通过明文 http 发送到 {0}，途经网络上的任何人都能读到。请使用 https，或使用这台电脑上的服务器。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Using {0}."
+msgstr "正在使用 {0}。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Node.js"
+msgstr "Node.js"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "HEYO_NODE overrides this setting."
+msgstr "HEYO_NODE 会覆盖此设置。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Extensions need Node.js 22 or newer."
+msgstr "扩展需要 Node.js 22 或更高版本。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Extensions Folder"
+msgstr "扩展文件夹"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Open"
+msgstr "打开"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Rendering"
+msgstr "渲染"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Renderer"
+msgstr "渲染器"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started."
+msgstr "命令面板以及网页视图绘制的其他内容的绘制方式。“自动”在未启用 modesetting 的 NVIDIA 驱动上使用 CPU（那里 GPU 无法共享帧），其他情况由 WebKit 选择；“GPU，共享内存”在 GPU 上绘制并复制每一帧，在 200% 缩放下更快，并保留所有 CSS 效果。下次启动 Heyo 时生效。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Model"
+msgstr "模型"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Answers Selected Text Actions and polishes dictation."
+msgstr "用于回答“选中文本操作”并润色听写。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Claude"
+msgstr "Claude"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Local Model"
+msgstr "本地模型"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Server"
+msgstr "服务器"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Model Name"
+msgstr "模型名称"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Leave empty to use the first model the server offers."
+msgstr "留空则使用服务器提供的第一个模型。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "API Key"
+msgstr "API 密钥"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
+msgstr "留空则使用 ANTHROPIC_API_KEY 或 `ant auth login` 的配置。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Saved — type a new key to replace it"
+msgstr "已保存 — 输入新密钥即可替换"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Remove"
+msgstr "移除"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Pasting"
+msgstr "粘贴"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Ask Before Pasting Several Lines into a Terminal"
+msgstr "向终端粘贴多行内容前先询问"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces."
+msgstr "终端会把粘贴的每一行当作命令执行。听写不会询问：在终端中换行会变成空格。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Data"
+msgstr "数据"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Settings File"
+msgstr "设置文件"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Check for Updates"
+msgstr "检查更新"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Heyo Is Up to Date"
+msgstr "Heyo 已是最新版本"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Install Heyo {0} and Restart"
+msgstr "安装 Heyo {0} 并重新启动"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Installing…"
+msgstr "正在安装…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A command palette launcher for Linux that runs Raycast extensions."
+msgstr "一款可运行 Raycast 扩展的 Linux 命令面板启动器。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "For a bug report: versions, the desktop session and the end of Heyo's log, with keys and tokens removed. Read it before you share it."
+msgstr "用于报告问题：包含版本、桌面会话和 Heyo 日志的末尾，密钥和令牌已去除。分享前请先自己读一遍。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Opens Clipboard History from anywhere"
+msgstr "随时随地打开剪贴板历史"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Record Clipboard History"
+msgstr "记录剪贴板历史"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Copies marked as secret by password managers are never recorded"
+msgstr "密码管理器标记为机密的复制内容绝不会被记录"
+
+#: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pause Recording"
+msgstr "暂停记录"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey."
+msgstr "开启后不会记录你复制的任何内容。主搜索中的“Pause or Resume Clipboard History”作用相同，并且可以设置快捷键。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Keep History For"
+msgstr "历史保留时间"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Pinned entries are kept forever"
+msgstr "已固定的条目永久保留"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Clear History"
+msgstr "清除历史"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Pinned entries are not deleted"
+msgstr "已固定的条目不会被删除"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Clear…"
+msgstr "清除…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Clear"
+msgstr "再次点击以清除"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "A one-time download of about 135 MB, or 250 MB if text recognition is not installed. It takes about 350 MB of memory while you search, and none a few minutes after."
+msgstr "需要一次性下载约 135 MB；如果尚未安装文字识别，则约 250 MB。搜索时占用约 350 MB 内存，几分钟后即释放。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "It is not working at present: {0}"
+msgstr "目前无法工作：{0}"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Reading the history: {0} entry to go; until then some are found by their words only."
+msgid_plural "Reading the history: {0} entries to go; until then some are found by their words only."
+msgstr[0] "正在读取历史：还剩 {0} 个条目；在此之前，部分条目只能按字词找到。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} entry can be found this way."
+msgid_plural "{0} entries can be found this way."
+msgstr[0] "有 {0} 个条目可以这样找到。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Find by Meaning"
+msgstr "按含义查找"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere."
+msgstr "搜索“服务器登录命令”或“server login command”都能找到一行 ssh 命令：条目既可以按字词查找，也可以按内容含义查找，中英文皆可。这台电脑上的语言模型会读取你复制的内容；不会向任何地方发送任何东西。"
+
+#: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard History"
+msgstr "剪贴板历史"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not installed"
+msgstr "未安装"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Never Record Copies From"
+msgstr "不记录来自以下应用的复制"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out."
+msgstr "这些应用程序的窗口位于最前时，你复制的内容不会进入历史。密码管理器始终被排除。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Add Application…"
+msgstr "添加应用程序…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Ignored Applications"
+msgstr "已忽略的应用程序"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Expand Snippets as You Type"
+msgstr "输入时展开文本片段"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Typing a snippet's keyword in any application replaces it with the snippet's text. While this is on, Heyo watches what you type to find the keywords; none of it is stored. “Pause or Resume Snippet Expansion” in the root search switches it too."
+msgstr "在任何应用程序中输入文本片段的关键词，就会替换成该片段的文字。开启后，Heyo 会留意你的输入以找出关键词；输入内容不会被保存。主搜索中的“Pause or Resume Snippet Expansion”也可以切换此项。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not available on Wayland, where an application cannot see what is typed in another. Snippets can still be pasted from the root search."
+msgstr "在 Wayland 上不可用：应用程序无法看到在其他应用中输入的内容。仍然可以从主搜索粘贴文本片段。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not available in this desktop session. Snippets can still be pasted from the root search."
+msgstr "在此桌面会话中不可用。仍然可以从主搜索粘贴文本片段。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Never Expand In"
+msgstr "不在以下应用中展开"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use."
+msgstr "密码管理器始终被排除。其他应用程序中的密码框无法与普通输入框区分。使用输入法（中文、日文等）时不会展开。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Snippet Expansion"
+msgstr "文本片段展开"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "In development from {0}"
+msgstr "开发中，来自 {0}"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "by {0}"
+msgstr "作者：{0}"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Built into Heyo"
+msgstr "Heyo 内置"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Preferences"
+msgstr "偏好设置"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "No matches"
+msgstr "没有匹配项"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Commands"
+msgstr "命令"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{} Preferences"
+msgstr "{} 偏好设置"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Declared; turn it off here"
+msgstr "扩展已声明；可在此关闭"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Live activities are off in General"
+msgstr "实时活动已在“通用”中关闭"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Allowed by you"
+msgstr "你已允许"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Asks you the first time it is used"
+msgstr "首次使用时会询问你"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Needs no asking"
+msgstr "无需询问"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Revoke"
+msgstr "撤销"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Permissions"
+msgstr "权限"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Permissions are about what Heyo hands over or does for an extension. They do not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."
+msgstr "权限决定的是 Heyo 向扩展提供什么、替扩展做什么，并不能限制扩展本身：扩展是这台电脑上的程序，可以自行读取你的文件并启动其他程序。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Stop Developing"
+msgstr "停止开发"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Uninstall Extension"
+msgstr "卸载扩展"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Takes it out of Heyo; its sources are not touched"
+msgstr "从 Heyo 中移除；不会改动它的源代码"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Its preferences are kept"
+msgstr "它的偏好设置会保留"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Uninstall"
+msgstr "卸载"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Remove"
+msgstr "再次点击以移除"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Uninstall"
+msgstr "再次点击以卸载"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Starting…"
+msgstr "正在启动…"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Not polished: {0}"
+msgstr "未润色：{0}"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Cancelled. What was written is still there."
+msgstr "已取消。已写入的内容仍然保留。"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Cancelled"
+msgstr "已取消"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Didn't catch anything"
+msgstr "没有听到内容"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Listening"
+msgstr "正在聆听"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Polishing…"
+msgstr "正在润色…"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Done"
+msgstr "完成"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Rectangle"
+msgstr "矩形"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Arrow"
+msgstr "箭头"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Pen"
+msgstr "画笔"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Text"
+msgstr "文字"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Blur"
+msgstr "模糊"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Copy Text"
+msgstr "复制文字"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Copy text in the selection"
+msgstr "复制选区中的文字"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Pin"
+msgstr "钉住"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Pin to screen"
+msgstr "钉在屏幕上"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Save"
+msgstr "保存"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Save (Ctrl+S)"
+msgstr "保存 (Ctrl+S)"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Copy"
+msgstr "复制"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Copy (Enter)"
+msgstr "复制 (Enter)"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Cancel"
+msgstr "取消"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Cancel (Esc)"
+msgstr "取消 (Esc)"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Red"
+msgstr "红色"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Yellow"
+msgstr "黄色"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Green"
+msgstr "绿色"
+
+#: src-tauri/src/slint_windows/screenshot/mod.rs
+msgid "Blue"
+msgstr "蓝色"
+
+#: src-tauri/src/slint_windows/ui/screenshot.slint
+msgid "Selection"
+msgstr "选区"
+
+#: src-tauri/src/slint_windows/ui/screenshot.slint
+msgid "Tools"
+msgstr "工具"
+
+#: src-tauri/src/slint_windows/ui/screenshot.slint
+msgid "Color"
+msgstr "颜色"
+
+#: src-tauri/src/slint_windows/ui/screenshot.slint
+msgid "Undo"
+msgstr "撤销"
+
+#: src-tauri/src/slint_windows/ui/screenshot.slint
+msgid "Undo (Ctrl+Z)"
+msgstr "撤销 (Ctrl+Z)"
+
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Hotkey for {}"
 msgstr "{} 的快捷键"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Version {}"
+msgstr "版本 {}"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Copied"
+msgstr "已复制"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Copy Diagnostics"
+msgstr "复制诊断信息"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Name"
@@ -165,20 +992,16 @@ msgid "Alias"
 msgstr "别名"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
-msgid "Hotkey"
-msgstr "快捷键"
-
-#: src-tauri/src/slint_windows/ui/settings.slint
-msgid "Enabled"
-msgstr "启用"
-
-#: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Alias for {}"
 msgstr "{} 的别名"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Add Alias"
 msgstr "添加别名"
+
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "{} enabled"
+msgstr "启用 {}"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Heyo Settings"
@@ -200,6 +1023,26 @@ msgstr "页面"
 msgid "Close"
 msgstr "关闭"
 
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "Press a shortcut"
+msgstr "请按下快捷键"
+
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "Set"
+msgstr "已设置"
+
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "Press a shortcut…"
+msgstr "请按下快捷键…"
+
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "Record Hotkey"
+msgstr "录制快捷键"
+
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "Remove hotkey"
+msgstr "移除快捷键"
+
 #: src/RootSearch.tsx
 msgid "Search apps, commands, or calculate…"
 msgstr "搜索应用、命令，或进行计算…"
@@ -213,10 +1056,6 @@ msgstr "没有结果"
 msgid "Actions"
 msgstr "操作"
 
-#: src/raycast/CommandView.tsx
-msgid "Search…"
-msgstr "搜索…"
-
 #: src/raycast/actions.tsx
 msgid "No actions"
 msgstr "没有操作"
@@ -228,10 +1067,6 @@ msgstr "搜索操作…"
 #: runtime/src/builtins/clipboard.tsx
 msgid "Resume Recording"
 msgstr "继续记录"
-
-#: runtime/src/builtins/clipboard.tsx
-msgid "Pause Recording"
-msgstr "暂停记录"
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Recording is turned off"
@@ -285,10 +1120,6 @@ msgstr "已固定的条目会保留。"
 #: runtime/src/builtins/clipboard.tsx
 msgid "Delete All"
 msgstr "全部删除"
-
-#: runtime/src/builtins/clipboard.tsx
-msgid "Clipboard History"
-msgstr "剪贴板历史"
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"

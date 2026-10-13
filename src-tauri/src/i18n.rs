@@ -103,21 +103,19 @@ pub(crate) fn t(text: &'static str) -> &'static str {
 
 /// That text in the language spoken, where the English alone does not say
 /// which of its meanings it is.
-// Not called yet, nor are the two below: what is translated so far has no
-// such text. The tests hold them to what they say.
+// Not called yet: what is translated so far has no such text. The tests
+// hold it to what it says.
 #[allow(dead_code)]
 pub(crate) fn tc(context: &str, text: &'static str) -> &'static str {
     said(chosen(), context, text)
 }
 
 /// That text with its placeholders filled.
-#[allow(dead_code)]
 pub(crate) fn tf(text: &'static str, with: &[&dyn Display]) -> String {
     fill(said(chosen(), "", text), with, None)
 }
 
 /// The text for `n` things, `{n}` being the number.
-#[allow(dead_code)]
 pub(crate) fn tn(one: &'static str, many: &'static str, n: u64, with: &[&dyn Display]) -> String {
     fill(counted(chosen(), one, many, n), with, Some(n))
 }

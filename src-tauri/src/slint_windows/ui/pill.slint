@@ -125,7 +125,7 @@ export component PillWindow inherits Window {
         height: 30px;
         // A press on it finishes the recording.
         accessible-role: button;
-        accessible-label: "Dictation";
+        accessible-label: @tr("Dictation");
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2 + (root.shown ? 0px : 5px);
         opacity: root.shown ? 1 : root.leaving ? 0 : 0.6;
@@ -260,7 +260,7 @@ export component PillWindow inherits Window {
             height: 17px;
             mouse-cursor: pointer;
             accessible-role: button;
-            accessible-label: "Cancel";
+            accessible-label: @tr("Cancel");
             pointer-event(event) => {
                 if (event.kind == PointerEventKind.down) {
                     root.pressed();

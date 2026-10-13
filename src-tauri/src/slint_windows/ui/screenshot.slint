@@ -336,7 +336,7 @@ export component ScreenshotWindow inherits Window {
         height: root.part.height + 2 * self.out;
         // The selection, by its outline.
         accessible-role: groupbox;
-        accessible-label: "Selection";
+        accessible-label: @tr("Selection");
         border-width: 1.5px;
         border-color: Tokens.accent;
     }
@@ -501,7 +501,7 @@ export component ScreenshotWindow inherits Window {
         drop-shadow-offset-y: 8px;
         drop-shadow-color: Tokens.shadow-far;
         accessible-role: groupbox;
-        accessible-label: "Tools";
+        accessible-label: @tr("Tools");
         HorizontalLayout {
             padding: 5px;
             spacing: 2px;
@@ -522,7 +522,7 @@ export component ScreenshotWindow inherits Window {
                 dot: dot;
                 name: root.colour-names[index];
                 chosen-of-several: true;
-                tip: "Color";
+                tip: @tr("Color");
                 tip-above: root.tips-above;
                 active: root.colour == index;
                 clicked => {
@@ -531,8 +531,8 @@ export component ScreenshotWindow inherits Window {
             }
             ToolButton {
                 icon: root.undo-icon;
-                name: "Undo";
-                tip: "Undo (Ctrl+Z)";
+                name: @tr("Undo");
+                tip: @tr("Undo (Ctrl+Z)");
                 tip-above: root.tips-above;
                 enabled: root.can-undo;
                 clicked => {
