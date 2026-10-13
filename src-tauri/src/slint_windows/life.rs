@@ -43,6 +43,7 @@ use slint::winit_030::WinitWindowAccessor;
 use slint::ComponentHandle;
 use tauri::AppHandle;
 
+use crate::platform::desktop::OwnPlace;
 use crate::platform::place::{self, Display, Monitor, Rect};
 use super::guard::{self, State};
 use super::standing::{self, Standing, Told};
@@ -164,6 +165,7 @@ type Arrive<C> = Rc<dyn Fn(&C, &Window, bool)>;
 /// One window of Slint's, through its life.
 pub(super) struct Life<C: ComponentHandle + 'static> {
     window: C,
+    standing: Standing,
     /// What the desktop is told of it (`standing`), which also says
     /// whether winit keeps it.
     told: Told,
@@ -183,7 +185,14 @@ impl<C: ComponentHandle + 'static> Life<C> {
     pub(super) fn new(standing: Standing, make: impl FnOnce() -> Result<C, slint::PlatformError>, arrive: impl Fn(&C, &Window, bool) + 'static) -> Result<Self, String> {
         let window = thread::making(standing, make).map_err(|e| format!("Slint could not make it: {e}"))?;
         let told = standing::here(standing);
-        Ok(Self { window, told, stage: Rc::new(Cell::new(Stage::new(told.kept))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default() })
+        Ok(Self { window, standing, told, stage: Rc::new(Cell::new(Stage::new(told.kept))), arrive: Rc::new(arrive), known: Rc::default(), waiting: Rc::default() })
+    }
+
+    /// Where a window cannot say its standing of itself, asks the desktop
+    /// for it (`standing::ask_desktop`): the window is known there by its
+    /// title, and `at` is where it goes. To be said before it is shown.
+    pub(super) fn ask_desktop(&self, title: &'static str, at: Option<OwnPlace>) {
+        standing::ask_desktop(self.standing, self.told, title, at);
     }
 
     /// What the desktop is told of it here, and what it cannot be told.
@@ -443,6 +452,16 @@ impl<T: Slotted> Slot<T> {
     /// Why there is no window, when it could not be made.
     pub(super) fn why_not(slot: &'static LocalKey<Self>) -> Option<String> {
         slot.with(|slot| slot.failed.borrow().clone())
+    }
+
+    /// Has the window made ahead of when it is wanted, where a window of
+    /// that standing can exist unseen (one winit keeps). Elsewhere a
+    /// window that exists is on the screen, and the desktop lists it:
+    /// nothing is made until it is wanted.
+    pub(super) fn ahead(slot: &'static LocalKey<Self>, standing: Standing, work: impl FnOnce(&mut T)) {
+        if standing::here(standing).kept {
+            Self::with(slot, work);
+        }
     }
 
     /// Does `work` with the window if it has been made, and never makes

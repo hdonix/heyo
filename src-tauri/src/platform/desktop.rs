@@ -63,6 +63,30 @@ impl Supported {
     };
 }
 
+/// The standing the desktop itself is asked to give one of Heyo's windows
+/// (`Desktop::stand_own`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OwnStanding {
+    /// Above the other windows.
+    pub above: bool,
+    /// On every workspace.
+    pub everywhere: bool,
+    /// Whether it may have the keyboard: false, and the keyboard stays
+    /// with the window that had it, or goes back to it at once.
+    pub keyboard: bool,
+    /// Where it is put, if the desktop is to put it somewhere.
+    pub at: Option<OwnPlace>,
+}
+
+/// Where the desktop is asked to put a window: the rule is
+/// `platform::place`'s, and the desktop's adapter knows its units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OwnPlace {
+    /// At the bottom centre of the primary monitor, a tenth of its height
+    /// up: a window of that size in logical pixels.
+    BottomCentre { size: (f64, f64) },
+}
+
 pub trait Desktop: Send + Sync {
     fn supported(&self) -> Supported;
 
@@ -193,6 +217,15 @@ pub trait Desktop: Send + Sync {
     /// better than the toolkit. `None`: believe the toolkit.
     fn own_focused(&self) -> Option<bool> {
         None
+    }
+
+    /// Has the desktop itself give one of Heyo's windows, known by its
+    /// title, the standing a window cannot say of itself there: from now
+    /// on, for the window of that title that is there and each that comes.
+    /// False where the desktop does no such thing, which is everywhere a
+    /// window can say it of itself.
+    fn stand_own(&self, _title: &str, _standing: &OwnStanding) -> bool {
+        false
     }
 
     /// Where the monitor the pointer is on starts, in physical pixels as the

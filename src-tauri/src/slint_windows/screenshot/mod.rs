@@ -717,7 +717,7 @@ fn watch() {
 /// Has the overlay's window made ahead of the first screenshot. On
 /// Slint's thread.
 pub(super) fn prepare() {
-    with(|overlay| overlay.life.ahead(|| {}));
+    Slot::ahead(&OVERLAY, STANDING, |overlay| overlay.life.ahead(|| {}));
 }
 
 /// Shows `shot`, the monitor `area` as it was read, over that monitor, for

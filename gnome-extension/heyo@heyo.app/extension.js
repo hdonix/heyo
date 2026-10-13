@@ -28,8 +28,12 @@ const HEYO_NAME = 'dev.heyo.app.SingleInstance';
 // 2: Monitors says how its numbers relate to pixels and where the pointer
 //    is; the Ready signal; Heyo's passing windows are kept out of the Dash,
 //    the switchers and the overview.
+// 3: Monitors says which monitor is the primary one; Stand, by which Heyo
+//    says of one of its own windows what a Wayland window cannot say of
+//    itself: that it is above the others, on every workspace, never has
+//    the keyboard, and where it is.
 // (Heyo reads this line from the installed file: keep its form.)
-const API = 2;
+const API = 3;
 
 const INTERFACE = `
 <node>
@@ -47,6 +51,7 @@ const INTERFACE = `
     </method>
     <method name="OwnFocused"><arg type="b" direction="out"/></method>
     <method name="ActivateOwn"><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
+    <method name="Stand"><arg type="s" direction="in"/><arg type="s" direction="in"/></method>
     <method name="WatchKey"><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
     <method name="Paste"><arg type="b" direction="in"/></method>
     <method name="Selection"><arg type="s" direction="out"/></method>
@@ -102,7 +107,7 @@ export default class HeyoExtension extends Extension {
         // which is where the caller can be checked. Every method goes
         // through `_guard`.
         const methods = {};
-        for (const name of ['Version', 'Windows', 'Monitors', 'Activate', 'Close', 'Maximize', 'MoveResize', 'OwnFocused', 'ActivateOwn', 'WatchKey', 'Paste',
+        for (const name of ['Version', 'Windows', 'Monitors', 'Activate', 'Close', 'Maximize', 'MoveResize', 'OwnFocused', 'ActivateOwn', 'Stand', 'WatchKey', 'Paste',
             'Selection', 'ClipboardText', 'SetClipboardText', 'ClipboardImage', 'Screenshot'])
             methods[`${name}Async`] = (params, invocation) => this._guard(name, params, invocation);
         this._dbus = Gio.DBusExportedObject.wrapJSObject(INTERFACE, methods);
@@ -125,6 +130,11 @@ export default class HeyoExtension extends Extension {
         });
 
         this._keepOutOfLists();
+        this._standings = new Map();
+        // The window that last had the keyboard, other than one of Heyo's
+        // that is never to have it: it gets it back from such a one.
+        this._hadFocus = null;
+        this._focused = global.display.connect('notify::focus-window', () => this._keepFocus());
         // The Shell switches extensions off while the screen is locked, and
         // what Heyo had asked for (the held key) is forgotten: say when to
         // ask again.
@@ -132,6 +142,11 @@ export default class HeyoExtension extends Extension {
     }
 
     disable() {
+        if (this._focused)
+            global.display.disconnect(this._focused);
+        this._focused = null;
+        this._hadFocus = null;
+        this._standings = null;
         this._showInLists();
         if (this._ownerChanged)
             this._selection.disconnect(this._ownerChanged);
@@ -156,7 +171,10 @@ export default class HeyoExtension extends Extension {
         // Since GNOME 49 a window can be told to stay out of window lists.
         this._native = typeof Meta.Window.prototype.hide_from_window_list === 'function';
         // A window's title and application are known once it is on screen.
-        this._mapped = global.window_manager.connect('map', (_wm, actor) => this._keepOut(actor.meta_window));
+        this._mapped = global.window_manager.connect('map', (_wm, actor) => {
+            this._keepOut(actor.meta_window);
+            this._stand(actor.meta_window);
+        });
         for (const actor of global.get_window_actors())
             this._keepOut(actor.meta_window);
         if (this._native)
@@ -293,6 +311,7 @@ export default class HeyoExtension extends Extension {
         // monitors' scales; otherwise as finely as the finest monitor.
         const scaled = global.stage.get_resource_scale() > 1;
         const [pointerX, pointerY] = global.get_pointer();
+        const primary = global.display.get_primary_monitor();
         const monitors = [];
         for (let i = 0; i < global.display.get_n_monitors(); i++) {
             const area = global.display.get_monitor_geometry(i);
@@ -303,6 +322,7 @@ export default class HeyoExtension extends Extension {
                 work: {x: work.x, y: work.y, width: work.width, height: work.height},
                 scale,
                 density: scaled ? scale : 1,
+                primary: i === primary,
                 // The one the pointer is on, which an application is not told.
                 pointer: pointerX >= area.x && pointerX < area.x + area.width && pointerY >= area.y && pointerY < area.y + area.height,
             });
@@ -366,6 +386,56 @@ export default class HeyoExtension extends Extension {
         if (window)
             Main.activateWindow(window);
         return new GLib.Variant('(b)', [!!window]);
+    }
+
+    /// What Heyo says of one of its own windows, by its title, that a
+    /// Wayland window cannot say of itself: `above` the others, on every
+    /// workspace (`everywhere`), never with the keyboard (`keyboard`
+    /// false), and where (`at`: x and y in the Shell's coordinates, as
+    /// Monitors gives them). It holds for the window of that title that is
+    /// there and for every one that comes, until said again; an empty
+    /// standing takes it back.
+    _Stand(title, standing) {
+        if (standing === '')
+            this._standings.delete(title);
+        else
+            this._standings.set(title, JSON.parse(standing));
+        for (const actor of global.get_window_actors())
+            this._stand(actor.meta_window);
+        return new GLib.Variant('()', []);
+    }
+
+    _standing(window) {
+        return window && isOwn(window) ? this._standings?.get(window.get_title() ?? '') : undefined;
+    }
+
+    _stand(window) {
+        const standing = this._standing(window);
+        if (!standing)
+            return;
+        if (standing.above)
+            window.make_above();
+        if (standing.everywhere)
+            window.stick();
+        if (standing.at)
+            window.move_frame(true, standing.at[0], standing.at[1]);
+        if (standing.keyboard === false && global.display.focus_window === window)
+            this._keepFocus();
+    }
+
+    /// The keyboard stays with, or goes back at once to, the window that
+    /// had it, when it comes to a window of Heyo's that is never to have
+    /// it: by appearing, or by being clicked.
+    _keepFocus() {
+        const focused = global.display.focus_window;
+        if (this._standing(focused)?.keyboard !== false) {
+            this._hadFocus = focused;
+            return;
+        }
+        const had = this._hadFocus;
+        // It may have been closed meanwhile.
+        if (had && had.get_compositor_private())
+            had.focus(global.get_current_time());
     }
 
     _unwatchKey() {

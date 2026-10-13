@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use slint::winit_030::winit::window::{Window, WindowAttributes, WindowLevel};
 
+use crate::platform::desktop::{OwnPlace, OwnStanding};
 use crate::platform::place::Rect;
 
 /// Where a window is among the others.
@@ -120,10 +121,16 @@ pub(super) struct Told {
     /// hiding a window, may make it anew when it shows it again, without
     /// what is said here. Where this is false, Slint shows and hides it.
     pub kept: bool,
-    /// The desktop cannot be told where the window goes, nor that it is
-    /// over everything or without the keyboard: all of that is the
-    /// compositor's to decide. (Wayland; and winit cannot take a window
-    /// off the screen there, which is why none is kept.)
+    /// The window cannot say where it goes, nor that it is over everything
+    /// or without the keyboard: on Wayland all of that is the compositor's
+    /// to decide. So the desktop itself is asked (`ask_desktop`): under
+    /// GNOME, Heyo's Shell extension gives the window of that title its
+    /// standing (above the others, on every workspace, the keyboard left
+    /// with or returned to the window that had it) and its place. Under
+    /// another compositor nobody answers, and the window is an ordinary
+    /// one where the compositor puts it. (And winit cannot take a window
+    /// off the screen there, which is why none is kept, and none is made
+    /// before it is wanted: a window that exists is on the screen.)
     pub unplaced: bool,
 }
 
@@ -137,6 +144,21 @@ pub(super) fn told(standing: Standing, desktop: Desktop) -> Told {
         Desktop::Windows => Told { unlisted: !standing.listed, made_inactive: over, never_active: standing.keyboard == Keyboard::Never, keys: if all { Keys::Focused } else { Keys::Left }, kept: over, ..nothing },
         Desktop::Other => Told { keys: if all { Keys::Focused } else { Keys::Left }, kept: over, ..nothing },
     }
+}
+
+/// Asks the desktop itself for the standing of a window that cannot say
+/// it there (`Told::unplaced`), before the window is shown: the window is
+/// known to the desktop by its title, and `at` says where it goes. It
+/// does not wait: the desktop gives the standing to the window when it
+/// comes, or to the one that is there.
+pub(super) fn ask_desktop(standing: Standing, told: Told, title: &'static str, at: Option<OwnPlace>) {
+    if !told.unplaced {
+        return;
+    }
+    let own = OwnStanding { above: true, everywhere: true, keyboard: standing.keyboard != Keyboard::Never, at };
+    let _ = std::thread::Builder::new().name("heyo-slint-standing".into()).spawn(move || {
+        crate::platform::desktop::desktop().stand_own(title, &own);
+    });
 }
 
 /// The desktop Heyo's windows are on.

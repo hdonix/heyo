@@ -24,8 +24,10 @@ const INTERFACE: &str = "dev.heyo.Shell";
 /// inside Heyo), and the oldest it still works with. The interface only
 /// grows, so a newer extension is as good as this one; with an older one,
 /// what it lacks is done without (see where optional fields are read).
-pub(crate) const API: u32 = 2;
+pub(crate) const API: u32 = 3;
 const OLDEST: u32 = 1;
+
+use crate::platform::desktop::{OwnPlace, OwnStanding};
 
 fn connection() -> Result<&'static Connection, String> {
     static CONNECTION: OnceLock<Option<Connection>> = OnceLock::new();
@@ -87,6 +89,13 @@ fn yes() -> bool {
 struct Monitor {
     x: i32,
     y: i32,
+    #[serde(default)]
+    width: i32,
+    #[serde(default)]
+    height: i32,
+    /// The primary one. (Said since version 3.)
+    #[serde(default)]
+    primary: bool,
     work: WorkArea,
     #[serde(default = "one")]
     scale: f64,
@@ -270,6 +279,30 @@ pub fn own_focused() -> Option<bool> {
 /// Brings one of Heyo's own windows to the front.
 pub fn activate_own(title: &str) -> bool {
     call::<_, bool>("ActivateOwn", &(title,)).unwrap_or(false)
+}
+
+/// Where a place is in the Shell's own units, among these monitors. The
+/// rule is `place`'s; what is known here is how many of the Shell's units
+/// a logical pixel is on a monitor: one where monitors are laid out
+/// scaled, the monitor's scale where they are laid out in pixels.
+fn own_place(place: OwnPlace, monitors: &[Monitor]) -> Option<(i32, i32)> {
+    let monitor = monitors.iter().find(|monitor| monitor.primary).or(monitors.first())?;
+    let per = monitor.scale / monitor.density.unwrap_or(monitor.scale);
+    let on = crate::platform::place::Monitor::new((monitor.x, monitor.y, monitor.width.max(0) as u32, monitor.height.max(0) as u32), per, true, None);
+    match place {
+        OwnPlace::BottomCentre { size } => Some(on.bottom_centre(((size.0 * per).round() as u32, (size.1 * per).round() as u32))),
+    }
+}
+
+/// Has the Shell give one of Heyo's own windows a standing it cannot say
+/// of itself on Wayland. False with an extension from before it could.
+pub fn stand_own(title: &str, standing: &OwnStanding) -> bool {
+    if running().is_none_or(|version| version < 3) {
+        return false;
+    }
+    let at = standing.at.and_then(|place| own_place(place, &monitors().ok()?));
+    let said = serde_json::json!({ "above": standing.above, "everywhere": standing.everywhere, "keyboard": standing.keyboard, "at": at.map(|(x, y)| [x, y]) });
+    call::<_, ()>("Stand", &(title, said.to_string())).is_ok()
 }
 
 /// Presses the paste shortcut in the focused application.
@@ -540,6 +573,10 @@ impl crate::platform::desktop::Desktop for Gnome {
         own_focused()
     }
 
+    fn stand_own(&self, title: &str, standing: &OwnStanding) -> bool {
+        stand_own(title, standing)
+    }
+
     fn pointer_monitor(&self) -> Option<(i32, i32)> {
         pointer_monitor()
     }
@@ -555,7 +592,22 @@ mod tests {
     use super::*;
 
     fn monitor(x: i32, y: i32, scale: f64, density: Option<f64>) -> Monitor {
-        Monitor { x, y, work: WorkArea { x, y, width: 100, height: 100 }, scale, density, pointer: false }
+        Monitor { x, y, width: 0, height: 0, primary: false, work: WorkArea { x, y, width: 100, height: 100 }, scale, density, pointer: false }
+    }
+
+    #[test]
+    fn the_pill_s_place_is_said_in_the_shell_s_units() {
+        let pill = OwnPlace::BottomCentre { size: (360.0, 44.0) };
+        // Two monitors laid out scaled, the second the primary one, at 200 %:
+        // a unit is a logical pixel, and the monitor is 960 by 600 of them.
+        let scaled = [Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }, Monitor { width: 960, height: 600, primary: true, ..monitor(1920, 0, 2.0, Some(2.0)) }];
+        assert_eq!(own_place(pill, &scaled), Some((1920 + 300, 600 - 44 - 60)));
+        // The same monitor laid out in pixels: the window is twice as many units.
+        let pixels = [Monitor { width: 1920, height: 1200, primary: true, ..monitor(0, 0, 2.0, Some(1.0)) }];
+        assert_eq!(own_place(pill, &pixels), Some((600, 1200 - 88 - 120)));
+        // None is said to be primary: the first.
+        assert_eq!(own_place(pill, &[Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }]), Some((780, 1080 - 44 - 108)));
+        assert_eq!(own_place(pill, &[]), None);
     }
 
     fn area(x: i32, y: i32, width: u32, height: u32, scale: f64) -> Area {

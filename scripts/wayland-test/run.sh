@@ -17,7 +17,8 @@
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
-NAME=heyo-wayland
+# The container: another name lets two checkouts each have a session.
+NAME=${HEYO_WAYLAND_NAME:-heyo-wayland}
 IMAGE=heyo-wayland-test
 # The last commit whose extension answers version 1.
 FIRST_EXTENSION=149baf9

@@ -26,6 +26,7 @@ use slint::{ComponentHandle, Model as _, ModelRc, VecModel};
 use tauri::AppHandle;
 
 use super::life::{self, Life, Lives, Slot, Slotted};
+use crate::platform::desktop::OwnPlace;
 use crate::platform::place::{Rect, Which};
 use super::standing::{self, Keyboard, Layer, Standing};
 use super::thread::{self, Job};
@@ -39,6 +40,10 @@ use model::{Model, Phase};
 /// keyboard: not by appearing, not by being clicked. What is dictated
 /// goes to the window that has it.
 const STANDING: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::Never, listed: false, clear: true };
+
+/// What the window is called, as the markup has it: the desktop knows it
+/// by that where it is asked to place it.
+const TITLE: &str = "Heyo Dictation";
 
 /// The window, and how high the pill is in it, in logical pixels: as the
 /// markup has them. The window is wider than the pill, which grows with
@@ -179,6 +184,9 @@ impl Pill {
         self.leaving.stop();
         self.life.window().set_leaving(false);
         self.life.window().set_shown(true);
+        // Where the window cannot place itself, the desktop is asked to:
+        // by the same rule (`place`).
+        self.life.ask_desktop(TITLE, Some(OwnPlace::BottomCentre { size: (f64::from(WINDOW.0), f64::from(WINDOW.1)) }));
         self.life.on(|came| {
             if let Err(e) = came {
                 eprintln!("heyo: the dictation pill could not be shown: {e}");
@@ -217,7 +225,7 @@ fn place(made: &slint::winit_030::winit::window::Window) {
 /// Has the pill's window made ahead of the first recording. On Slint's
 /// thread.
 pub(super) fn prepare() {
-    with(|pill| pill.life.ahead(|| {}));
+    Slot::ahead(&PILL, STANDING, |pill| pill.life.ahead(|| {}));
 }
 
 /// Shows the pill. From any thread; it waits only for Slint to start, if
