@@ -4115,6 +4115,22 @@ msgstr "请说明时长"
 msgid "For example 25m, 1h 10m or 90s"
 msgstr "例如 25m、1h 10m 或 90s"
 
+#: runtime/src/compat.ts
+msgid "Downloading Speedtest for Linux…"
+msgstr "正在下载 Linux 版 Speedtest…"
+
+#: runtime/src/compat.ts
+msgid "Speedtest has no Linux build for this processor ({0})."
+msgstr "Speedtest 没有适用于此处理器（{0}）的 Linux 版本。"
+
+#: runtime/src/compat.ts
+msgid "Could not download Speedtest ({0})."
+msgstr "无法下载 Speedtest（{0}）。"
+
+#: runtime/src/compat.ts
+msgid "The Speedtest download does not match the expected file; not using it."
+msgstr "下载的 Speedtest 与预期的文件不符，不会使用它。"
+
 #: runtime/src/llm.ts
 msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
 msgstr "无法连接位于 {0} 的本地模型。它在运行吗？（Heyo 设置 → 高级）"

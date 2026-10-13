@@ -4118,6 +4118,22 @@ msgstr ""
 msgid "For example 25m, 1h 10m or 90s"
 msgstr ""
 
+#: runtime/src/compat.ts
+msgid "Downloading Speedtest for Linux…"
+msgstr ""
+
+#: runtime/src/compat.ts
+msgid "Speedtest has no Linux build for this processor ({0})."
+msgstr ""
+
+#: runtime/src/compat.ts
+msgid "Could not download Speedtest ({0})."
+msgstr ""
+
+#: runtime/src/compat.ts
+msgid "The Speedtest download does not match the expected file; not using it."
+msgstr ""
+
 #: runtime/src/llm.ts
 msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
 msgstr ""

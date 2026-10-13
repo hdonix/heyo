@@ -20,6 +20,26 @@ for it. A translation uses these and no synonym; change a term here and in
 | Ranking (of a result) | 排序 | Where a result stands in the list, which is what resetting it changes. |
 | Activity (a live activity's row) | 活动 | Follows from Live Activity. |
 | Ask AI | 问 AI | The verb people use; “询问” is stiff on a key hint. |
+| Conversation, Chat (with the AI model) | 对话 | One word for both: New Chat is 新对话, AI Chat's list is of 对话. “聊天” is for people. |
+| Answer (the model's) | 回答 | What was said back; 答案 is kept for the calculator's result. |
+| Answer (the calculator's) | 答案 | A result, not a reply. |
+| Action (in the action panel, on selected text) | 操作 | As the panel's own title says. |
+| Instruction (a custom action's prompt) | 指令 | What the model is told to do; “提示词” is jargon. |
+| Store (Raycast's) | 商店 | Standard. |
+| Details | 详情 | Standard. |
+| Configure (an extension) | 配置 | Opens its 偏好设置. |
+| In Development (an extension) | 开发中 | Built by `heyo dev`. |
+| Trash | 回收站 | What Chinese Linux desktops and Windows call it; “废纸篓” is the Mac's. |
+| Folder / Enclosing folder | 文件夹 / 上层文件夹 | Standard. |
+| Show in Files | 在文件管理器中显示 | No file manager is named; it is whichever the desktop has. |
+| Quick Look | 快速查看 | Apple's Chinese for the same thing. |
+| Quit / Force Kill (a process) | 退出 / 强制结束 | As system monitors say it; “杀死” is not said to users. |
+| Log Out | 退出登录 | Standard. |
+| Keyword (of a snippet) | 关键词 | Standard. |
+| Placeholder | 占位符 | Standard. |
+| Emoji | 表情 | Short, and what input methods call them; the section titles are Unicode's groups. |
+| Timer | 计时器 | Standard. |
+| Could not … | 无法… | One wording for every failure. |
 | Quicklink | 快速链接 | Raycast's own Chinese usage; says what it is. |
 | Snippet | 文本片段 | “片段” alone is unclear outside code. |
 | Snippet expansion | 文本片段展开 | Follows from Snippet. |
@@ -81,3 +101,11 @@ repeated; and never pinyin.
 A phrase that begins with a small letter and a verb (“read your clipboard
 history”) is what a permission allows: it is put after “允许“…”” and its
 like, so it begins with the verb and has no full stop.
+A command's title quoted in a sentence is put in as the root search shows
+it (`translate` of the host's title), not written into the sentence.
+
+What a user types stays as it is typed, in every language: the
+calculator's syntax (`5 km in mi`), a timer's length (`25m`), the
+placeholders of a link or a snippet (`{query}`), a snippet's keyword.
+Units written as symbols (km, MB, °C) stay; units written as words (days,
+cups) and the places a time is asked for are translated.

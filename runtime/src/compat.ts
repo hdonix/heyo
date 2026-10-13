@@ -16,6 +16,7 @@ import { promisify } from "node:util";
 
 import { supportPath, type Extension } from "./context";
 import { isMacProgram } from "./macos";
+import { t } from "../../shared/i18n";
 
 const run = promisify(execFile);
 
@@ -37,17 +38,19 @@ const speedtest: Fixup = (() => {
   };
   const target = (extension: Extension) => path.join(supportPath(extension.manifest.name), "cli", "speedtest");
   return {
-    title: "Downloading Speedtest for Linux…",
+    get title() {
+      return t("Downloading Speedtest for Linux…");
+    },
     // Missing (first run) or the macOS build the extension fetched earlier.
     needed: (extension) => !fs.existsSync(target(extension)) || isMacProgram(target(extension)),
     async apply(extension) {
       const build = builds[process.arch];
-      if (!build) throw new Error(`Speedtest has no Linux build for this processor (${process.arch}).`);
+      if (!build) throw new Error(t("Speedtest has no Linux build for this processor ({0}).", process.arch));
       const response = await fetch(`https://install.speedtest.net/app/cli/ookla-speedtest-${version}-${build.name}.tgz`);
-      if (!response.ok) throw new Error(`Could not download Speedtest (${response.status}).`);
+      if (!response.ok) throw new Error(t("Could not download Speedtest ({0}).", response.status));
       const archive = Buffer.from(await response.arrayBuffer());
       if (createHash("sha256").update(archive).digest("hex") !== build.sha256) {
-        throw new Error("The Speedtest download does not match the expected file; not using it.");
+        throw new Error(t("The Speedtest download does not match the expected file; not using it."));
       }
       const directory = path.dirname(target(extension));
       fs.mkdirSync(directory, { recursive: true });
