@@ -8,6 +8,536 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+#: src-tauri/src/extensions.rs
+msgctxt "command group"
+msgid "System"
+msgstr "系统"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Raycast Store"
+msgstr "搜索 Raycast 商店"
+
+#: src-tauri/src/extensions.rs
+msgid "Browse the Raycast Store and install extensions."
+msgstr "浏览 Raycast 商店并安装扩展。"
+
+#: src-tauri/src/extensions.rs
+msgid "extensions, install, plugins"
+msgstr "扩展, 安装, 插件, 商店"
+
+#: src-tauri/src/extensions.rs
+msgid "Manage Extensions"
+msgstr "管理扩展"
+
+#: src-tauri/src/extensions.rs
+msgid "Configure and uninstall installed extensions."
+msgstr "配置和卸载已安装的扩展。"
+
+#: src-tauri/src/extensions.rs
+msgid "uninstall, preferences, plugins"
+msgstr "卸载, 偏好设置, 插件"
+
+#: src-tauri/src/extensions.rs
+#: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard History"
+msgstr "剪贴板历史"
+
+#: src-tauri/src/extensions.rs
+msgid "Search, preview and paste everything you have copied."
+msgstr "搜索、预览并粘贴你复制过的所有内容。"
+
+#: src-tauri/src/extensions.rs
+msgid "paste, copy, pasteboard"
+msgstr "粘贴, 复制, 剪切板, 粘贴板"
+
+#: src-tauri/src/extensions.rs
+msgid "Selected Text Actions"
+msgstr "选中文本操作"
+
+#: src-tauri/src/extensions.rs
+msgid "Translate, improve, explain or search the text selected in any application. Give it a hotkey."
+msgstr "翻译、润色、解释或搜索在任意应用程序中选中的文本。请为它设置快捷键。"
+
+#: src-tauri/src/extensions.rs
+msgid "translate, improve, explain, ai"
+msgstr "翻译, 润色, 解释, 划词"
+
+#: src-tauri/src/extensions.rs
+msgid "Ask AI"
+msgstr "询问 AI"
+
+#: src-tauri/src/extensions.rs
+msgid "Ask the AI model a question. From the root search, type the question and press Tab."
+msgstr "向 AI 模型提问。在主搜索中输入问题，然后按 Tab。"
+
+#: src-tauri/src/extensions.rs
+msgid "chat, question, assistant, llm, claude"
+msgstr "聊天, 提问, 问答, 助手, 大模型"
+
+#: src-tauri/src/extensions.rs
+msgid "AI Chat"
+msgstr "AI 对话"
+
+#: src-tauri/src/extensions.rs
+msgid "Go back to a conversation with the AI model and continue it. Conversations are kept on this computer."
+msgstr "回到与 AI 模型的某次对话并继续。对话保存在这台电脑上。"
+
+#: src-tauri/src/extensions.rs
+msgid "conversations, history, assistant, llm, claude, ask"
+msgstr "对话, 聊天, 历史, 助手, 大模型"
+
+#: src-tauri/src/extensions.rs
+msgid "Create Quicklink"
+msgstr "创建快速链接"
+
+#: src-tauri/src/extensions.rs
+msgid "Save a link, optionally with a {0} placeholder."
+msgstr "保存一个链接，可以带 {0} 占位符。"
+
+#: src-tauri/src/extensions.rs
+msgid "bookmark, url, add"
+msgstr "书签, 网址, 链接, 添加, 新建"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Quicklinks"
+msgstr "搜索快速链接"
+
+#: src-tauri/src/extensions.rs
+msgid "Open, edit and delete quicklinks."
+msgstr "打开、编辑和删除快速链接。"
+
+#: src-tauri/src/extensions.rs
+msgid "bookmarks, urls"
+msgstr "书签, 网址, 链接"
+
+#: src-tauri/src/extensions.rs
+msgid "Create Snippet"
+msgstr "创建文本片段"
+
+#: src-tauri/src/extensions.rs
+msgid "Save text to paste anywhere, with dynamic placeholders."
+msgstr "保存可在任何地方粘贴的文本，支持动态占位符。"
+
+#: src-tauri/src/extensions.rs
+msgid "text, template, add"
+msgstr "文本, 模板, 短语, 添加, 新建"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Snippets"
+msgstr "搜索文本片段"
+
+#: src-tauri/src/extensions.rs
+msgid "Paste, edit and delete snippets."
+msgstr "粘贴、编辑和删除文本片段。"
+
+#: src-tauri/src/extensions.rs
+msgid "text, templates"
+msgstr "文本, 模板, 短语"
+
+#: src-tauri/src/extensions.rs
+msgid "Switch Windows"
+msgstr "切换窗口"
+
+#: src-tauri/src/extensions.rs
+msgid "Search the open windows and jump to one."
+msgstr "搜索打开的窗口并跳转过去。"
+
+#: src-tauri/src/extensions.rs
+msgid "window, alt tab, focus, open"
+msgstr "窗口, 切换, 跳转"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Emoji & Symbols"
+msgstr "搜索表情与符号"
+
+#: src-tauri/src/extensions.rs
+msgid "Find an emoji or symbol in English or Chinese and paste it."
+msgstr "用英文或中文查找表情或符号并粘贴。"
+
+#: src-tauri/src/extensions.rs
+msgid "emoticon, smiley, symbol, character, 表情"
+msgstr "表情, 符号, 颜文字, 字符"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Files"
+msgstr "搜索文件"
+
+#: src-tauri/src/extensions.rs
+msgid "Find files and folders under your home folder by name."
+msgstr "按名称查找主文件夹下的文件和文件夹。"
+
+#: src-tauri/src/extensions.rs
+msgid "find, documents, folder, locate"
+msgstr "查找, 文档, 文件夹, 定位"
+
+#: src-tauri/src/extensions.rs
+msgid "Kill Process"
+msgstr "结束进程"
+
+#: src-tauri/src/extensions.rs
+msgid "Stop a running process; search by name, command or listening port."
+msgstr "结束正在运行的进程；可按名称、命令或监听端口搜索。"
+
+#: src-tauri/src/extensions.rs
+msgid "quit, port, task, pid, terminate"
+msgstr "退出, 端口, 任务, 终止, 杀进程, 杀死"
+
+#: src-tauri/src/extensions.rs
+msgid "Switch Audio Device"
+msgstr "切换音频设备"
+
+#: src-tauri/src/extensions.rs
+msgid "Choose the default speaker and microphone."
+msgstr "选择默认的扬声器和麦克风。"
+
+#: src-tauri/src/extensions.rs
+msgid "sound, output, input, microphone, speaker, headphones"
+msgstr "声音, 输出, 输入, 麦克风, 扬声器, 耳机, 音箱"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Browser Bookmarks"
+msgstr "搜索浏览器书签"
+
+#: src-tauri/src/extensions.rs
+msgid "Search bookmarks from Firefox, Chrome, Chromium, Brave and Edge."
+msgstr "搜索 Firefox、Chrome、Chromium、Brave 和 Edge 的书签。"
+
+#: src-tauri/src/extensions.rs
+msgid "firefox, chrome, chromium, favorites"
+msgstr "书签, 收藏夹, 浏览器"
+
+#: src-tauri/src/extensions.rs
+msgid "Search Browser History"
+msgstr "搜索浏览器历史"
+
+#: src-tauri/src/extensions.rs
+msgid "Search pages you visited in Firefox, Chrome, Chromium, Brave and Edge."
+msgstr "搜索你在 Firefox、Chrome、Chromium、Brave 和 Edge 中访问过的网页。"
+
+#: src-tauri/src/extensions.rs
+msgid "firefox, chrome, chromium, visited"
+msgstr "历史记录, 浏览记录, 浏览器, 网页"
+
+#: src-tauri/src/extensions.rs
+msgid "Lock Screen"
+msgstr "锁定屏幕"
+
+#: src-tauri/src/extensions.rs
+msgid "Lock the session."
+msgstr "锁定当前会话。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, lock"
+msgstr "系统, 锁屏, 锁定"
+
+#: src-tauri/src/extensions.rs
+msgid "Sleep"
+msgstr "睡眠"
+
+#: src-tauri/src/extensions.rs
+msgid "Suspend the computer."
+msgstr "让电脑进入睡眠。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, suspend"
+msgstr "系统, 休眠, 挂起, 待机"
+
+#: src-tauri/src/extensions.rs
+msgid "Restart"
+msgstr "重启"
+
+#: src-tauri/src/extensions.rs
+msgid "Restart the computer, after confirming."
+msgstr "确认后重启电脑。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, reboot"
+msgstr "系统, 重启, 重新启动"
+
+#: src-tauri/src/extensions.rs
+msgid "Shut Down"
+msgstr "关机"
+
+#: src-tauri/src/extensions.rs
+msgid "Shut the computer down, after confirming."
+msgstr "确认后关闭电脑。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, poweroff, power off"
+msgstr "系统, 关机, 关闭电脑"
+
+#: src-tauri/src/extensions.rs
+msgid "Log Out"
+msgstr "注销"
+
+#: src-tauri/src/extensions.rs
+msgid "End the desktop session, after confirming."
+msgstr "确认后结束桌面会话。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, sign out"
+msgstr "系统, 注销, 退出登录, 登出"
+
+#: src-tauri/src/extensions.rs
+msgid "Empty Trash"
+msgstr "清空回收站"
+
+#: src-tauri/src/extensions.rs
+msgid "Permanently delete everything in the trash, after confirming."
+msgstr "确认后永久删除回收站中的所有内容。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, bin, delete"
+msgstr "系统, 回收站, 废纸篓, 垃圾桶, 删除"
+
+#: src-tauri/src/extensions.rs
+msgid "Toggle Dark Mode"
+msgstr "切换深色模式"
+
+#: src-tauri/src/extensions.rs
+msgid "Switch the desktop between light and dark appearance."
+msgstr "在浅色和深色外观之间切换桌面。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, appearance, light, theme"
+msgstr "系统, 外观, 浅色, 深色, 暗色, 夜间, 主题"
+
+#: src-tauri/src/extensions.rs
+msgid "Volume Up"
+msgstr "调高音量"
+
+#: src-tauri/src/extensions.rs
+msgid "Raise the volume by 5%."
+msgstr "音量调高 5%。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, sound, louder"
+msgstr "系统, 声音, 音量, 大声"
+
+#: src-tauri/src/extensions.rs
+msgid "Volume Down"
+msgstr "调低音量"
+
+#: src-tauri/src/extensions.rs
+msgid "Lower the volume by 5%."
+msgstr "音量调低 5%。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, sound, quieter"
+msgstr "系统, 声音, 音量, 小声"
+
+#: src-tauri/src/extensions.rs
+msgid "Toggle Mute"
+msgstr "切换静音"
+
+#: src-tauri/src/extensions.rs
+msgid "Mute or unmute the speakers."
+msgstr "将扬声器静音或取消静音。"
+
+#: src-tauri/src/extensions.rs
+msgid "system, sound, silence"
+msgstr "系统, 声音, 静音"
+
+#: src-tauri/src/extensions.rs
+msgid "Timer"
+msgstr "计时器"
+
+#: src-tauri/src/extensions.rs
+msgid "Count down from a length of time typed in the search bar (25m, 1h 10m, 90s): shown in the In Progress section with Pause and +1 min, with a notification at the end."
+msgstr "按搜索栏中输入的时长（25m、1h 10m、90s）倒计时：显示在“进行中”部分，可暂停或加 1 分钟，结束时发出通知。"
+
+#: src-tauri/src/extensions.rs
+msgid "countdown, pomodoro, alarm, minutes"
+msgstr "倒计时, 番茄钟, 闹钟, 定时, 分钟"
+
+#: src-tauri/src/extensions.rs
+msgid "Development"
+msgstr "开发中"
+
+#: src-tauri/src/extensions.rs
+msgid "Commands built into Heyo."
+msgstr "Heyo 内置的命令。"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Left Half"
+msgstr "左半屏"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Right Half"
+msgstr "右半屏"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Top Half"
+msgstr "上半屏"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Bottom Half"
+msgstr "下半屏"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Top Left Quarter"
+msgstr "左上四分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Top Right Quarter"
+msgstr "右上四分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Bottom Left Quarter"
+msgstr "左下四分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Bottom Right Quarter"
+msgstr "右下四分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "First Third"
+msgstr "左侧三分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Center Third"
+msgstr "中间三分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Last Third"
+msgstr "右侧三分之一"
+
+#: src-tauri/src/platform/windows.rs
+msgid "First Two Thirds"
+msgstr "左侧三分之二"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Last Two Thirds"
+msgstr "右侧三分之二"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Almost Maximize"
+msgstr "接近最大化"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Maximize"
+msgstr "最大化"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Center"
+msgstr "居中"
+
+#: src-tauri/src/platform/windows.rs
+msgid "Move to Next Display"
+msgstr "移到下一个显示器"
+
+#: src-tauri/src/root.rs
+msgid "Window Management"
+msgstr "窗口管理"
+
+#: src-tauri/src/root.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Heyo Settings"
+msgstr "Heyo 设置"
+
+#: src-tauri/src/root.rs
+msgid "Open Heyo's settings window."
+msgstr "打开 Heyo 的设置窗口。"
+
+#: src-tauri/src/root.rs
+msgid "preferences, configuration, node"
+msgstr "设置, 偏好设置, 配置, 选项"
+
+#: src-tauri/src/root.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Capture Screenshot"
+msgstr "截取屏幕"
+
+#: src-tauri/src/root.rs
+msgid "Select part of the screen, annotate it, then copy, save or pin it."
+msgstr "选取屏幕的一部分并标注，然后复制、保存或钉在屏幕上。"
+
+#: src-tauri/src/root.rs
+msgid "screen, snip, capture, pin, annotate"
+msgstr "截图, 截屏, 屏幕, 标注, 贴图"
+
+#: src-tauri/src/root.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Capture Text from Screen"
+msgstr "识别屏幕文字"
+
+#: src-tauri/src/root.rs
+msgid "Select part of the screen and copy the text in it."
+msgstr "选取屏幕的一部分并复制其中的文字。"
+
+#: src-tauri/src/root.rs
+msgid "ocr, extract, recognize, screen"
+msgstr "文字识别, 截图, 提取, 取字, 屏幕"
+
+#: src-tauri/src/root.rs
+msgid "Toggle Keep Awake"
+msgstr "切换保持唤醒"
+
+#: src-tauri/src/root.rs
+msgid "Stop the computer from sleeping or dimming the screen until you turn it off again."
+msgstr "阻止电脑睡眠或调暗屏幕，直到你再次关闭。"
+
+#: src-tauri/src/root.rs
+msgid "caffeine, sleep, idle, inhibit, amphetamine"
+msgstr "防休眠, 不睡眠, 睡眠, 常亮, 咖啡因"
+
+#: src-tauri/src/root.rs
+msgid "Restart Heyo"
+msgstr "重启 Heyo"
+
+#: src-tauri/src/root.rs
+msgid "Quit Heyo and start it again, as it was started."
+msgstr "退出 Heyo，并按原来的方式重新启动。"
+
+#: src-tauri/src/root.rs
+msgid "relaunch, reload, quit, reset, reopen"
+msgstr "重启, 重新启动, 重新加载, 退出"
+
+#: src-tauri/src/root.rs
+msgid "Paste as Plain Text"
+msgstr "粘贴为纯文本"
+
+#: src-tauri/src/root.rs
+msgid "Paste what you copied without its formatting (fonts, colors, links). Give it a hotkey."
+msgstr "粘贴你复制的内容，但不带格式（字体、颜色、链接）。请为它设置快捷键。"
+
+#: src-tauri/src/root.rs
+msgid "unformatted, strip, format, clipboard, text only"
+msgstr "纯文本, 无格式, 去除格式, 剪贴板"
+
+#: src-tauri/src/root.rs
+msgid "Pause or Resume Clipboard History"
+msgstr "暂停或恢复剪贴板历史"
+
+#: src-tauri/src/root.rs
+msgid "Stop recording what you copy until you run this again."
+msgstr "停止记录你复制的内容，直到再次运行此命令。"
+
+#: src-tauri/src/root.rs
+msgid "private, incognito, stop, record, ignore"
+msgstr "剪贴板, 隐私, 无痕, 停止, 记录, 忽略"
+
+#: src-tauri/src/root.rs
+msgid "Pause or Resume Snippet Expansion"
+msgstr "暂停或恢复文本片段展开"
+
+#: src-tauri/src/root.rs
+msgid "Stop replacing the keywords of snippets as you type them, and stop following what is typed, until you run this again."
+msgstr "停止在输入时替换文本片段的关键词，也不再跟踪输入的内容，直到再次运行此命令。"
+
+#: src-tauri/src/root.rs
+msgid "keyword, typing, text expander, stop, private"
+msgstr "关键词, 输入, 文本展开, 停止, 隐私"
+
+#: src-tauri/src/root.rs
+msgid "Move and resize the focused window."
+msgstr "移动当前窗口并调整其大小。"
+
+#: src-tauri/src/root.rs
+msgid "window, resize, tile, snap, layout"
+msgstr "窗口, 调整大小, 平铺, 分屏, 布局"
+
 #: src-tauri/src/slint_windows/model.rs
 msgid "General"
 msgstr "通用"
@@ -438,16 +968,8 @@ msgid "Hotkeys"
 msgstr "快捷键"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Capture Screenshot"
-msgstr "截取屏幕"
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Enter copies, Ctrl+S saves, Esc cancels"
 msgstr "Enter 复制，Ctrl+S 保存，Esc 取消"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Capture Text from Screen"
-msgstr "识别屏幕文字"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Drag over text and it is copied"
@@ -644,7 +1166,7 @@ msgstr "暂停记录"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey."
-msgstr "开启后不会记录你复制的任何内容。主搜索中的“Pause or Resume Clipboard History”作用相同，并且可以设置快捷键。"
+msgstr "开启后不会记录你复制的任何内容。主搜索中的“暂停或恢复剪贴板历史”作用相同，并且可以设置快捷键。"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Keep History For"
@@ -695,11 +1217,6 @@ msgstr "按含义查找"
 #: src-tauri/src/slint_windows/model.rs
 msgid "“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere."
 msgstr "搜索“服务器登录命令”或“server login command”都能找到一行 ssh 命令：条目既可以按字词查找，也可以按内容含义查找，中英文皆可。这台电脑上的语言模型会读取你复制的内容；不会向任何地方发送任何东西。"
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/clipboard.tsx
-msgid "Clipboard History"
-msgstr "剪贴板历史"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Not installed"
@@ -1002,10 +1519,6 @@ msgstr "添加别名"
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "{} enabled"
 msgstr "启用 {}"
-
-#: src-tauri/src/slint_windows/ui/settings.slint
-msgid "Heyo Settings"
-msgstr "Heyo 设置"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Search settings"

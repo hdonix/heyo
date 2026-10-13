@@ -103,9 +103,6 @@ pub(crate) fn t(text: &'static str) -> &'static str {
 
 /// That text in the language spoken, where the English alone does not say
 /// which of its meanings it is.
-// Not called yet: what is translated so far has no such text. The tests
-// hold it to what it says.
-#[allow(dead_code)]
 pub(crate) fn tc(context: &str, text: &'static str) -> &'static str {
     said(chosen(), context, text)
 }

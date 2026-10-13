@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::i18n::{marked, t, tc, translate};
+
 /// Extension name the runtime uses for Heyo's own commands.
 pub const BUILTIN: &str = "@heyo";
 
@@ -193,7 +195,10 @@ pub struct Builtin {
     pub view: bool,
     /// For the settings.
     pub description: &'static str,
-    pub keywords: &'static [&'static str],
+    /// What else it is found by, apart by commas. Its translation is the
+    /// words someone typing that language would look for it by; the
+    /// English ones find it whatever the language.
+    pub keywords: &'static str,
     /// One text argument typed in the search bar: its name and placeholder.
     pub argument: Option<(&'static str, &'static str)>,
     /// Run for the events of Heyo's own live activities (`activities.rs`).
@@ -204,6 +209,26 @@ impl Builtin {
     fn mode(&self) -> &'static str {
         if self.view { "view" } else { "no-view" }
     }
+
+    /// Its description in the language spoken. `{0}` in one is the
+    /// placeholder a quicklink is written with, which no message may spell
+    /// out: braces are a message's own placeholders.
+    fn description(&self) -> String {
+        translate(self.description).replace("{0}", "{query}")
+    }
+}
+
+/// A command's keywords, as a table has them (`Builtin::keywords`): the
+/// English ones, and after them the ones of the language spoken.
+pub(crate) fn keywords(marked: &'static str) -> Vec<String> {
+    let english = marked.split(", ");
+    let spoken = Some(translate(marked)).filter(|spoken| *spoken != marked).into_iter().flat_map(|spoken| spoken.split(", "));
+    english.chain(spoken).map(str::to_owned).collect()
+}
+
+/// The subtitle of the commands that act on the system.
+pub(crate) fn system_group() -> &'static str {
+    tc("command group", "System")
 }
 
 /// Heyo's built-in commands. This is the one list of them: the runtime's
@@ -211,171 +236,171 @@ impl Builtin {
 /// and the runtime will not build without an implementation for each.
 pub const BUILTINS: &[Builtin] = &[
     Builtin {
-        name: "store", title: "Search Raycast Store", icon: "store-16", view: true,
-        description: "Browse the Raycast Store and install extensions.",
-        keywords: &["extensions", "install", "plugins"],
+        name: "store", title: marked("Search Raycast Store"), icon: "store-16", view: true,
+        description: marked("Browse the Raycast Store and install extensions."),
+        keywords: marked("extensions, install, plugins"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "extensions", title: "Manage Extensions", icon: "box-16", view: true,
-        description: "Configure and uninstall installed extensions.",
-        keywords: &["uninstall", "preferences", "plugins"],
+        name: "extensions", title: marked("Manage Extensions"), icon: "box-16", view: true,
+        description: marked("Configure and uninstall installed extensions."),
+        keywords: marked("uninstall, preferences, plugins"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "clipboard-history", title: "Clipboard History", icon: "clipboard-16", view: true,
-        description: "Search, preview and paste everything you have copied.",
-        keywords: &["paste", "copy", "pasteboard"],
+        name: "clipboard-history", title: marked("Clipboard History"), icon: "clipboard-16", view: true,
+        description: marked("Search, preview and paste everything you have copied."),
+        keywords: marked("paste, copy, pasteboard"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "selection", title: "Selected Text Actions", icon: "text-selection-16", view: true,
-        description: "Translate, improve, explain or search the text selected in any application. Give it a hotkey.",
-        keywords: &["translate", "improve", "explain", "ai"],
+        name: "selection", title: marked("Selected Text Actions"), icon: "text-selection-16", view: true,
+        description: marked("Translate, improve, explain or search the text selected in any application. Give it a hotkey."),
+        keywords: marked("translate, improve, explain, ai"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "ask-ai", title: "Ask AI", icon: "stars-16", view: true,
-        description: "Ask the AI model a question. From the root search, type the question and press Tab.",
-        keywords: &["chat", "question", "assistant", "llm", "claude"],
+        name: "ask-ai", title: marked("Ask AI"), icon: "stars-16", view: true,
+        description: marked("Ask the AI model a question. From the root search, type the question and press Tab."),
+        keywords: marked("chat, question, assistant, llm, claude"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "ai-chat", title: "AI Chat", icon: "speech-bubble-16", view: true,
-        description: "Go back to a conversation with the AI model and continue it. Conversations are kept on this computer.",
-        keywords: &["conversations", "history", "assistant", "llm", "claude", "ask"],
+        name: "ai-chat", title: marked("AI Chat"), icon: "speech-bubble-16", view: true,
+        description: marked("Go back to a conversation with the AI model and continue it. Conversations are kept on this computer."),
+        keywords: marked("conversations, history, assistant, llm, claude, ask"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "create-quicklink", title: "Create Quicklink", icon: "link-16", view: true,
-        description: "Save a link, optionally with a {query} placeholder.",
-        keywords: &["bookmark", "url", "add"],
+        name: "create-quicklink", title: marked("Create Quicklink"), icon: "link-16", view: true,
+        description: marked("Save a link, optionally with a {0} placeholder."),
+        keywords: marked("bookmark, url, add"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "search-quicklinks", title: "Search Quicklinks", icon: "link-16", view: true,
-        description: "Open, edit and delete quicklinks.",
-        keywords: &["bookmarks", "urls"],
+        name: "search-quicklinks", title: marked("Search Quicklinks"), icon: "link-16", view: true,
+        description: marked("Open, edit and delete quicklinks."),
+        keywords: marked("bookmarks, urls"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "create-snippet", title: "Create Snippet", icon: "snippets-16", view: true,
-        description: "Save text to paste anywhere, with dynamic placeholders.",
-        keywords: &["text", "template", "add"],
+        name: "create-snippet", title: marked("Create Snippet"), icon: "snippets-16", view: true,
+        description: marked("Save text to paste anywhere, with dynamic placeholders."),
+        keywords: marked("text, template, add"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "search-snippets", title: "Search Snippets", icon: "snippets-16", view: true,
-        description: "Paste, edit and delete snippets.",
-        keywords: &["text", "templates"],
+        name: "search-snippets", title: marked("Search Snippets"), icon: "snippets-16", view: true,
+        description: marked("Paste, edit and delete snippets."),
+        keywords: marked("text, templates"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "switch-windows", title: "Switch Windows", icon: "app-window-list-16", view: true,
-        description: "Search the open windows and jump to one.",
-        keywords: &["window", "alt tab", "focus", "open"],
+        name: "switch-windows", title: marked("Switch Windows"), icon: "app-window-list-16", view: true,
+        description: marked("Search the open windows and jump to one."),
+        keywords: marked("window, alt tab, focus, open"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "emoji", title: "Search Emoji & Symbols", icon: "emoji-16", view: true,
-        description: "Find an emoji or symbol in English or Chinese and paste it.",
-        keywords: &["emoticon", "smiley", "symbol", "character", "表情"],
+        name: "emoji", title: marked("Search Emoji & Symbols"), icon: "emoji-16", view: true,
+        description: marked("Find an emoji or symbol in English or Chinese and paste it."),
+        keywords: marked("emoticon, smiley, symbol, character, 表情"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "search-files", title: "Search Files", icon: "magnifying-glass-16", view: true,
-        description: "Find files and folders under your home folder by name.",
-        keywords: &["find", "documents", "folder", "locate"],
+        name: "search-files", title: marked("Search Files"), icon: "magnifying-glass-16", view: true,
+        description: marked("Find files and folders under your home folder by name."),
+        keywords: marked("find, documents, folder, locate"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "kill-process", title: "Kill Process", icon: "bolt-16", view: true,
-        description: "Stop a running process; search by name, command or listening port.",
-        keywords: &["quit", "port", "task", "pid", "terminate"],
+        name: "kill-process", title: marked("Kill Process"), icon: "bolt-16", view: true,
+        description: marked("Stop a running process; search by name, command or listening port."),
+        keywords: marked("quit, port, task, pid, terminate"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "audio-devices", title: "Switch Audio Device", icon: "speaker-on-16", view: true,
-        description: "Choose the default speaker and microphone.",
-        keywords: &["sound", "output", "input", "microphone", "speaker", "headphones"],
+        name: "audio-devices", title: marked("Switch Audio Device"), icon: "speaker-on-16", view: true,
+        description: marked("Choose the default speaker and microphone."),
+        keywords: marked("sound, output, input, microphone, speaker, headphones"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "search-bookmarks", title: "Search Browser Bookmarks", icon: "bookmark-16", view: true,
-        description: "Search bookmarks from Firefox, Chrome, Chromium, Brave and Edge.",
-        keywords: &["firefox", "chrome", "chromium", "favorites"],
+        name: "search-bookmarks", title: marked("Search Browser Bookmarks"), icon: "bookmark-16", view: true,
+        description: marked("Search bookmarks from Firefox, Chrome, Chromium, Brave and Edge."),
+        keywords: marked("firefox, chrome, chromium, favorites"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "search-history", title: "Search Browser History", icon: "clock-16", view: true,
-        description: "Search pages you visited in Firefox, Chrome, Chromium, Brave and Edge.",
-        keywords: &["firefox", "chrome", "chromium", "visited"],
+        name: "search-history", title: marked("Search Browser History"), icon: "clock-16", view: true,
+        description: marked("Search pages you visited in Firefox, Chrome, Chromium, Brave and Edge."),
+        keywords: marked("firefox, chrome, chromium, visited"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "lock-screen", title: "Lock Screen", icon: "lock-16", view: false,
-        description: "Lock the session.",
-        keywords: &["system", "lock"],
+        name: "lock-screen", title: marked("Lock Screen"), icon: "lock-16", view: false,
+        description: marked("Lock the session."),
+        keywords: marked("system, lock"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "sleep", title: "Sleep", icon: "moon-16", view: false,
-        description: "Suspend the computer.",
-        keywords: &["system", "suspend"],
+        name: "sleep", title: marked("Sleep"), icon: "moon-16", view: false,
+        description: marked("Suspend the computer."),
+        keywords: marked("system, suspend"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "restart", title: "Restart", icon: "arrow-clockwise-16", view: false,
-        description: "Restart the computer, after confirming.",
-        keywords: &["system", "reboot"],
+        name: "restart", title: marked("Restart"), icon: "arrow-clockwise-16", view: false,
+        description: marked("Restart the computer, after confirming."),
+        keywords: marked("system, reboot"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "shut-down", title: "Shut Down", icon: "power-16", view: false,
-        description: "Shut the computer down, after confirming.",
-        keywords: &["system", "poweroff", "power off"],
+        name: "shut-down", title: marked("Shut Down"), icon: "power-16", view: false,
+        description: marked("Shut the computer down, after confirming."),
+        keywords: marked("system, poweroff, power off"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "log-out", title: "Log Out", icon: "logout-16", view: false,
-        description: "End the desktop session, after confirming.",
-        keywords: &["system", "sign out"],
+        name: "log-out", title: marked("Log Out"), icon: "logout-16", view: false,
+        description: marked("End the desktop session, after confirming."),
+        keywords: marked("system, sign out"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "empty-trash", title: "Empty Trash", icon: "trash-16", view: false,
-        description: "Permanently delete everything in the trash, after confirming.",
-        keywords: &["system", "bin", "delete"],
+        name: "empty-trash", title: marked("Empty Trash"), icon: "trash-16", view: false,
+        description: marked("Permanently delete everything in the trash, after confirming."),
+        keywords: marked("system, bin, delete"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "toggle-dark-mode", title: "Toggle Dark Mode", icon: "moon-16", view: false,
-        description: "Switch the desktop between light and dark appearance.",
-        keywords: &["system", "appearance", "light", "theme"],
+        name: "toggle-dark-mode", title: marked("Toggle Dark Mode"), icon: "moon-16", view: false,
+        description: marked("Switch the desktop between light and dark appearance."),
+        keywords: marked("system, appearance, light, theme"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "volume-up", title: "Volume Up", icon: "speaker-up-16", view: false,
-        description: "Raise the volume by 5%.",
-        keywords: &["system", "sound", "louder"],
+        name: "volume-up", title: marked("Volume Up"), icon: "speaker-up-16", view: false,
+        description: marked("Raise the volume by 5%."),
+        keywords: marked("system, sound, louder"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "volume-down", title: "Volume Down", icon: "speaker-down-16", view: false,
-        description: "Lower the volume by 5%.",
-        keywords: &["system", "sound", "quieter"],
+        name: "volume-down", title: marked("Volume Down"), icon: "speaker-down-16", view: false,
+        description: marked("Lower the volume by 5%."),
+        keywords: marked("system, sound, quieter"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "toggle-mute", title: "Toggle Mute", icon: "speaker-off-16", view: false,
-        description: "Mute or unmute the speakers.",
-        keywords: &["system", "sound", "silence"],
+        name: "toggle-mute", title: marked("Toggle Mute"), icon: "speaker-off-16", view: false,
+        description: marked("Mute or unmute the speakers."),
+        keywords: marked("system, sound, silence"),
         argument: None, handles_activities: false,
     },
     Builtin {
-        name: "timer", title: "Timer", icon: "clock-16", view: false,
-        description: "Count down from a length of time typed in the search bar (25m, 1h 10m, 90s): shown in the In Progress section with Pause and +1 min, with a notification at the end.",
-        keywords: &["countdown", "pomodoro", "alarm", "minutes"],
+        name: "timer", title: marked("Timer"), icon: "clock-16", view: false,
+        description: marked("Count down from a length of time typed in the search bar (25m, 1h 10m, 90s): shown in the In Progress section with Pause and +1 min, with a notification at the end."),
+        keywords: marked("countdown, pomodoro, alarm, minutes"),
         argument: Some(("duration", "25m, 1h 10m, 90s")), handles_activities: true,
     },
 ];
@@ -386,7 +411,7 @@ fn builtins() -> Vec<Command> {
         .map(|b| Command {
             extension: BUILTIN.into(),
             name: b.name.into(),
-            title: b.title.into(),
+            title: translate(b.title).into(),
             mode: b.mode().into(),
             interval: None,
             arguments: b
@@ -395,8 +420,8 @@ fn builtins() -> Vec<Command> {
                 .into_iter()
                 .collect(),
             handles_activities: b.handles_activities,
-            subtitle: Some(if b.view || b.handles_activities { "Heyo" } else { "System" }.into()),
-            keywords: b.keywords.iter().map(|k| k.to_string()).collect(),
+            subtitle: Some(if b.view || b.handles_activities { "Heyo" } else { system_group() }.into()),
+            keywords: keywords(b.keywords),
             icon: Some(b.icon.into()),
         })
         .collect()
@@ -492,7 +517,7 @@ struct Registry {
 }
 
 /// What is said of a development extension's commands wherever they are listed.
-const IN_DEVELOPMENT: &str = "Development";
+const IN_DEVELOPMENT: &str = marked("Development");
 
 /// The registry's entries. An entry that is not one is passed over, so a
 /// file written by a newer `heyo dev` still gives what can be read of it.
@@ -512,11 +537,15 @@ pub fn development() -> Vec<Development> {
 fn load_development(entry: &Development) -> Vec<Command> {
     let mut commands = load(Path::new(&entry.dir)).unwrap_or_default();
     for command in &mut commands {
+        let said = translate(IN_DEVELOPMENT);
         command.subtitle = Some(match command.subtitle.take() {
-            Some(subtitle) => format!("{subtitle} · {IN_DEVELOPMENT}"),
-            None => IN_DEVELOPMENT.to_owned(),
+            Some(subtitle) => format!("{subtitle} · {said}"),
+            None => said.to_owned(),
         });
         command.keywords.push(IN_DEVELOPMENT.to_lowercase());
+        if said != IN_DEVELOPMENT {
+            command.keywords.push(said.to_owned());
+        }
     }
     commands
 }
@@ -643,7 +672,7 @@ pub fn list() -> Vec<ExtensionInfo> {
         id: BUILTIN.into(),
         name: BUILTIN.into(),
         title: "Heyo".into(),
-        description: Some("Commands built into Heyo.".into()),
+        description: Some(t("Commands built into Heyo.").into()),
         author: None,
         icon: Some("store-16".into()),
         builtin: true,
@@ -652,7 +681,7 @@ pub fn list() -> Vec<ExtensionInfo> {
             .into_iter()
             .map(|c| CommandInfo {
                 id: c.id(),
-                description: BUILTINS.iter().find(|b| b.name == c.name).map(|b| b.description.to_owned()),
+                description: BUILTINS.iter().find(|b| b.name == c.name).map(Builtin::description),
                 mode: c.mode.clone(),
                 name: c.name,
                 title: c.title,
@@ -668,8 +697,8 @@ pub fn list() -> Vec<ExtensionInfo> {
     builtin.commands.extend(crate::root::NATIVE.iter().filter(|n| n.id != crate::root::SETTINGS_ID).map(|n| CommandInfo {
         id: n.id.clone(),
         name: n.id.clone(),
-        title: n.title.clone(),
-        description: Some(n.description.clone()),
+        title: n.title().into(),
+        description: Some(n.description().into()),
         mode: "native".into(),
         icon: Some(n.icon.into()),
         preferences: Vec::new(),
@@ -756,6 +785,13 @@ mod catalogue {
         names.dedup();
         assert_eq!(names.len(), BUILTINS.len());
         assert!(BUILTINS.iter().all(|b| !b.description.is_empty() && !b.title.is_empty()));
+    }
+
+    #[test]
+    fn keywords_are_a_list_apart_by_commas() {
+        // In English, as the tests run: the list and nothing else.
+        assert_eq!(keywords("window, alt tab, focus"), ["window", "alt tab", "focus"]);
+        assert!(BUILTINS.iter().all(|b| !b.keywords.is_empty() && b.keywords.split(", ").all(|keyword| !keyword.is_empty() && keyword.trim() == keyword && !keyword.contains(','))));
     }
 
     #[test]

@@ -62,6 +62,8 @@ fn carry_out(app: &AppHandle, next: &Settings, consequence: settings::Consequenc
         }
         TellLanguage => {
             if crate::i18n::choose(&next.language) {
+                // The root search says its commands in the language spoken.
+                reload_commands(app);
                 tell_language(app);
             }
         }

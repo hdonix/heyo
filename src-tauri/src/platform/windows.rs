@@ -9,6 +9,7 @@ use std::sync::Mutex;
 use serde::Serialize;
 
 use super::desktop::desktop;
+use crate::i18n::marked;
 
 /// A window of another application, as the session identifies it.
 pub type Window = u32;
@@ -84,25 +85,26 @@ pub enum Layout {
     Exact(Rect),
 }
 
-/// The layouts offered as commands: id suffix, title, layout.
+/// The layouts offered as commands: id suffix, title (shown through
+/// `i18n::translate`), layout.
 pub const LAYOUTS: &[(&str, &str, Layout)] = &[
-    ("left-half", "Left Half", Layout::Fraction(0, 0, 6, 12)),
-    ("right-half", "Right Half", Layout::Fraction(6, 0, 6, 12)),
-    ("top-half", "Top Half", Layout::Fraction(0, 0, 12, 6)),
-    ("bottom-half", "Bottom Half", Layout::Fraction(0, 6, 12, 6)),
-    ("top-left", "Top Left Quarter", Layout::Fraction(0, 0, 6, 6)),
-    ("top-right", "Top Right Quarter", Layout::Fraction(6, 0, 6, 6)),
-    ("bottom-left", "Bottom Left Quarter", Layout::Fraction(0, 6, 6, 6)),
-    ("bottom-right", "Bottom Right Quarter", Layout::Fraction(6, 6, 6, 6)),
-    ("first-third", "First Third", Layout::Fraction(0, 0, 4, 12)),
-    ("center-third", "Center Third", Layout::Fraction(4, 0, 4, 12)),
-    ("last-third", "Last Third", Layout::Fraction(8, 0, 4, 12)),
-    ("first-two-thirds", "First Two Thirds", Layout::Fraction(0, 0, 8, 12)),
-    ("last-two-thirds", "Last Two Thirds", Layout::Fraction(4, 0, 8, 12)),
-    ("almost-maximize", "Almost Maximize", Layout::Fraction(1, 1, 10, 10)),
-    ("maximize", "Maximize", Layout::Maximize),
-    ("center", "Center", Layout::Center),
-    ("next-display", "Move to Next Display", Layout::NextDisplay),
+    ("left-half", marked("Left Half"), Layout::Fraction(0, 0, 6, 12)),
+    ("right-half", marked("Right Half"), Layout::Fraction(6, 0, 6, 12)),
+    ("top-half", marked("Top Half"), Layout::Fraction(0, 0, 12, 6)),
+    ("bottom-half", marked("Bottom Half"), Layout::Fraction(0, 6, 12, 6)),
+    ("top-left", marked("Top Left Quarter"), Layout::Fraction(0, 0, 6, 6)),
+    ("top-right", marked("Top Right Quarter"), Layout::Fraction(6, 0, 6, 6)),
+    ("bottom-left", marked("Bottom Left Quarter"), Layout::Fraction(0, 6, 6, 6)),
+    ("bottom-right", marked("Bottom Right Quarter"), Layout::Fraction(6, 6, 6, 6)),
+    ("first-third", marked("First Third"), Layout::Fraction(0, 0, 4, 12)),
+    ("center-third", marked("Center Third"), Layout::Fraction(4, 0, 4, 12)),
+    ("last-third", marked("Last Third"), Layout::Fraction(8, 0, 4, 12)),
+    ("first-two-thirds", marked("First Two Thirds"), Layout::Fraction(0, 0, 8, 12)),
+    ("last-two-thirds", marked("Last Two Thirds"), Layout::Fraction(4, 0, 8, 12)),
+    ("almost-maximize", marked("Almost Maximize"), Layout::Fraction(1, 1, 10, 10)),
+    ("maximize", marked("Maximize"), Layout::Maximize),
+    ("center", marked("Center"), Layout::Center),
+    ("next-display", marked("Move to Next Display"), Layout::NextDisplay),
 ];
 
 /// Where a layout puts a window, given the usable area of its monitor.

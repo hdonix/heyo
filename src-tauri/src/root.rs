@@ -7,7 +7,8 @@ use std::sync::LazyLock;
 use serde::Serialize;
 
 use crate::apps::App;
-use crate::extensions::{Argument, Command};
+use crate::extensions::{self, Argument, Command};
+use crate::i18n::{marked, t, translate};
 use crate::library::{Quicklink, Snippet};
 use crate::search;
 use crate::settings::Settings;
@@ -29,93 +30,114 @@ pub const SNIPPET_EXPANSION_ID: &str = "heyo:snippet-expansion";
 /// Prefix of the window layout commands; the rest is a `windows::LAYOUTS` id.
 pub const WINDOW_PREFIX: &str = "heyo:window-";
 
-/// Something Heyo does itself, outside the extension runtime.
+/// Something Heyo does itself, outside the extension runtime. What it says
+/// is kept in English and shown in the language spoken.
 pub struct Native {
     pub id: String,
-    pub title: String,
+    title: &'static str,
     pub icon: &'static str,
-    pub description: String,
+    description: &'static str,
+    group: Group,
+    /// As `extensions::Builtin::keywords`.
+    keywords: &'static str,
+}
+
+/// What a native command is listed under: its subtitle.
+#[derive(Clone, Copy)]
+enum Group {
+    Heyo,
+    System,
+    Windows,
+}
+
+impl Native {
+    pub fn title(&self) -> &'static str {
+        translate(self.title)
+    }
+
+    pub fn description(&self) -> &'static str {
+        translate(self.description)
+    }
+
     /// Shown as the subtitle, e.g. "Window Management".
-    pub group: &'static str,
-    keywords: Vec<String>,
+    pub fn group(&self) -> &'static str {
+        match self.group {
+            Group::Heyo => "Heyo",
+            Group::System => extensions::system_group(),
+            Group::Windows => t("Window Management"),
+        }
+    }
 }
 
 pub static NATIVE: LazyLock<Vec<Native>> = LazyLock::new(|| {
-    let native = |id: &str, title: &str, icon, group, description: &str, keywords: &[&str]| Native {
-        id: id.into(),
-        title: title.into(),
-        icon,
-        group,
-        description: description.into(),
-        keywords: keywords.iter().map(|k| k.to_string()).collect(),
-    };
+    let native = |id: &str, title, icon, group, description, keywords| Native { id: id.into(), title, icon, group, description, keywords };
     let mut all = vec![
-        native(SETTINGS_ID, "Heyo Settings", "cog-16", "Heyo", "Open Heyo's settings window.", &["preferences", "configuration", "node"]),
+        native(SETTINGS_ID, marked("Heyo Settings"), "cog-16", Group::Heyo, marked("Open Heyo's settings window."), marked("preferences, configuration, node")),
         native(
             SCREENSHOT_ID,
-            "Capture Screenshot",
+            marked("Capture Screenshot"),
             "camera-16",
-            "Heyo",
-            "Select part of the screen, annotate it, then copy, save or pin it.",
-            &["screen", "snip", "capture", "pin", "annotate"],
+            Group::Heyo,
+            marked("Select part of the screen, annotate it, then copy, save or pin it."),
+            marked("screen, snip, capture, pin, annotate"),
         ),
         native(
             SCREENSHOT_TEXT_ID,
-            "Capture Text from Screen",
+            marked("Capture Text from Screen"),
             "text-selection-16",
-            "Heyo",
-            "Select part of the screen and copy the text in it.",
-            &["ocr", "extract", "recognize", "screen"],
+            Group::Heyo,
+            marked("Select part of the screen and copy the text in it."),
+            marked("ocr, extract, recognize, screen"),
         ),
         native(
             KEEP_AWAKE_ID,
-            "Toggle Keep Awake",
+            marked("Toggle Keep Awake"),
             "mug-steam-16",
-            "System",
-            "Stop the computer from sleeping or dimming the screen until you turn it off again.",
-            &["caffeine", "sleep", "idle", "inhibit", "amphetamine"],
+            Group::System,
+            marked("Stop the computer from sleeping or dimming the screen until you turn it off again."),
+            marked("caffeine, sleep, idle, inhibit, amphetamine"),
         ),
     ];
     all.push(native(
         RESTART_ID,
-        "Restart Heyo",
+        marked("Restart Heyo"),
         "arrow-clockwise-16",
-        "Heyo",
-        "Quit Heyo and start it again, as it was started.",
-        &["relaunch", "reload", "quit", "reset", "reopen"],
+        Group::Heyo,
+        marked("Quit Heyo and start it again, as it was started."),
+        marked("relaunch, reload, quit, reset, reopen"),
     ));
     all.push(native(
         PASTE_PLAIN_ID,
-        "Paste as Plain Text",
+        marked("Paste as Plain Text"),
         "clipboard-16",
-        "Heyo",
-        "Paste what you copied without its formatting (fonts, colors, links). Give it a hotkey.",
-        &["unformatted", "strip", "format", "clipboard", "text only"],
+        Group::Heyo,
+        marked("Paste what you copied without its formatting (fonts, colors, links). Give it a hotkey."),
+        marked("unformatted, strip, format, clipboard, text only"),
     ));
     all.push(native(
         CLIPBOARD_PAUSE_ID,
-        "Pause or Resume Clipboard History",
+        marked("Pause or Resume Clipboard History"),
         "clipboard-16",
-        "Heyo",
-        "Stop recording what you copy until you run this again.",
-        &["private", "incognito", "stop", "record", "ignore"],
+        Group::Heyo,
+        marked("Stop recording what you copy until you run this again."),
+        marked("private, incognito, stop, record, ignore"),
     ));
     all.push(native(
         SNIPPET_EXPANSION_ID,
-        "Pause or Resume Snippet Expansion",
+        marked("Pause or Resume Snippet Expansion"),
         "snippets-16",
-        "Heyo",
-        "Stop replacing the keywords of snippets as you type them, and stop following what is typed, until you run this again.",
-        &["keyword", "typing", "text expander", "stop", "private"],
+        Group::Heyo,
+        marked("Stop replacing the keywords of snippets as you type them, and stop following what is typed, until you run this again."),
+        marked("keyword, typing, text expander, stop, private"),
     ));
     all.extend(crate::windows::LAYOUTS.iter().map(|(id, title, _)| {
         native(
             &format!("{WINDOW_PREFIX}{id}"),
             title,
             "app-window-sidebar-left-16",
-            "Window Management",
-            "Move and resize the focused window.",
-            &["window", "resize", "tile", "snap", "layout"],
+            Group::Windows,
+            marked("Move and resize the focused window."),
+            marked("window, resize, tile, snap, layout"),
         )
     }));
     all
@@ -168,7 +190,8 @@ pub struct Item {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     hotkey: Option<String>,
-    /// Heading for the empty-query view ("Favorites", "Suggestions").
+    /// Heading for the empty-query view ("Favorites", "Suggestions"): the
+    /// palette tells the sections apart by it, and says it in its language.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional, type = "string")]
     section: Option<&'static str>,
@@ -188,14 +211,18 @@ pub struct Item {
 
 impl Index {
     pub fn new(apps: Vec<App>, commands: Vec<Command>, quicklinks: Vec<Quicklink>, snippets: Vec<Snippet>) -> Self {
-        let entry = |title: &str, keywords: Vec<String>| search::Entry { title: title.to_owned(), keywords };
+        let entry = |title: &str, keywords: Vec<String>| search::Entry { title: title.to_owned(), english: None, keywords };
+        // One of Heyo's own is found by its English title too, whatever
+        // the language it is shown in.
+        let own = |title: &str, english: &str, keywords: Vec<String>| search::Entry { english: (title != english).then(|| english.to_owned()), ..entry(title, keywords) };
         let mut items: Vec<(search::Entry, Target)> = Vec::new();
         for (i, app) in apps.iter().enumerate() {
             let keywords = app.generic_name.iter().chain(&app.keywords).cloned().collect();
             items.push((entry(&app.name, keywords), Target::App(i)));
         }
         for (i, cmd) in commands.iter().enumerate() {
-            items.push((entry(&cmd.title, cmd.keywords.clone()), Target::Command(i)));
+            let builtin = extensions::BUILTINS.iter().find(|builtin| cmd.extension == extensions::BUILTIN && builtin.name == cmd.name);
+            items.push((own(&cmd.title, builtin.map_or(&cmd.title, |builtin| builtin.title), cmd.keywords.clone()), Target::Command(i)));
         }
         for (i, link) in quicklinks.iter().enumerate() {
             items.push((entry(&link.name, vec!["quicklink".into()]), Target::Quicklink(i)));
@@ -206,7 +233,7 @@ impl Index {
         }
         // Only what can work in this session.
         for (i, native) in NATIVE.iter().enumerate().filter(|(_, n)| crate::platform::item_available(&n.id)) {
-            items.push((entry(&native.title, native.keywords.clone()), Target::Native(i)));
+            items.push((own(native.title(), native.title, extensions::keywords(native.keywords)), Target::Native(i)));
         }
         items.sort_by_cached_key(|(entry, _)| entry.title.to_lowercase());
         let (entries, targets) = items.into_iter().unzip();
@@ -283,7 +310,7 @@ impl Index {
                     ..base(&snippet.name, Some(preview), Some("snippets-16".into()), "Snippet")
                 }
             }
-            Target::Native(i) => base(&NATIVE[i].title, Some(NATIVE[i].group.into()), Some(NATIVE[i].icon.into()), "Command"),
+            Target::Native(i) => base(NATIVE[i].title(), Some(NATIVE[i].group().into()), Some(NATIVE[i].icon.into()), "Command"),
         }
     }
 

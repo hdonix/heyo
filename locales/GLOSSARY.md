@@ -44,8 +44,33 @@ for it. A translation uses these and no synonym; change a term here and in
 | System (follow the system) | 跟随系统 | “系统” alone does not say that it follows. |
 | Input method | 输入法 | Standard. |
 | Uninstall / Remove | 卸载 / 移除 | Uninstall for an extension, Remove for an item of a list. |
+| Copy | 复制 | The word Linux and Windows desktops use; no “拷贝”. |
+| Click | 点击 | As above; no “点按”. |
+| In Progress (the section) | 进行中 | What is under way; quoted as “进行中” in a sentence. |
+| Keep Awake | 保持唤醒 | Says the state that is kept; “防休眠” is among the command's keywords. |
+| Sleep (the computer) | 睡眠 | The system's word; “休眠” is hibernation. |
+| Log Out | 注销 | As Windows and GNOME say it. |
+| Trash, Recycle Bin | 回收站 | What every Chinese desktop but macOS calls it. |
+| Display (a monitor) | 显示器 | Standard. |
+| Kill Process | 结束进程 | As task managers label it; “杀进程” is among its keywords. |
+| Emoji | 表情 | What input methods call them. |
+| Half, Third, Quarter (of the screen) | 半屏, 三分之一, 四分之一 | As tiling tools say it. |
+| First, Last (Third, Two Thirds) | 左侧, 右侧 | The layouts go from the left; “第一个” says nothing of where. |
+| System (a command's group) | 系统 | The commands that act on the computer; a message of its own (`command group`), since “System” alone is 跟随系统. |
+| Heyo Settings → Dictation (a path through the settings) | “Heyo 设置”→“听写” | Each step quoted, no spaces round the arrow. |
 
 Names stay as they are: Heyo, Claude, Raycast, Wayland, GNOME Shell,
 Node.js, SenseVoice, PaddleOCR, and the names of keys (Enter, Esc, Ctrl).
-A command's title quoted in a sentence stays English for as long as the
-root search shows it in English.
+A command's title quoted in a sentence is the title the root search shows,
+in “ ”: the two are one message, or say the same.
+
+A message that is a list apart by commas (“paste, copy, pasteboard”) is a
+command's search keywords. Its translation is not a translation word for
+word: it is the words someone would type in Chinese to find that command
+(“截图”, “截屏” for Capture Screenshot), apart by “, ” as the English is.
+The English ones find the command whatever the language, so they are not
+repeated; and never pinyin.
+
+A phrase that begins with a small letter and a verb (“read your clipboard
+history”) is what a permission allows: it is put after “允许“…”” and its
+like, so it begins with the verb and has no full stop.

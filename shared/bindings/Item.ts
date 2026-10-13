@@ -11,7 +11,8 @@ icon: string | null, kind: "Application" | "Command" | "Quicklink" | "Snippet", 
  */
 hotkey?: string, 
 /**
- * Heading for the empty-query view ("Favorites", "Suggestions").
+ * Heading for the empty-query view ("Favorites", "Suggestions"): the
+ * palette tells the sections apart by it, and says it in its language.
  */
 section?: string, 
 /**

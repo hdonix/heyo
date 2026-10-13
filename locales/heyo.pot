@@ -5,6 +5,536 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: src-tauri/src/extensions.rs
+msgctxt "command group"
+msgid "System"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Raycast Store"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Browse the Raycast Store and install extensions."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "extensions, install, plugins"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Manage Extensions"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Configure and uninstall installed extensions."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "uninstall, preferences, plugins"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+#: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/clipboard.tsx
+msgid "Clipboard History"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search, preview and paste everything you have copied."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "paste, copy, pasteboard"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Selected Text Actions"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Translate, improve, explain or search the text selected in any application. Give it a hotkey."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "translate, improve, explain, ai"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Ask AI"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Ask the AI model a question. From the root search, type the question and press Tab."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "chat, question, assistant, llm, claude"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "AI Chat"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Go back to a conversation with the AI model and continue it. Conversations are kept on this computer."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "conversations, history, assistant, llm, claude, ask"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Create Quicklink"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Save a link, optionally with a {0} placeholder."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "bookmark, url, add"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Quicklinks"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Open, edit and delete quicklinks."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "bookmarks, urls"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Create Snippet"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Save text to paste anywhere, with dynamic placeholders."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "text, template, add"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Snippets"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Paste, edit and delete snippets."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "text, templates"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Switch Windows"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search the open windows and jump to one."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "window, alt tab, focus, open"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Emoji & Symbols"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Find an emoji or symbol in English or Chinese and paste it."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "emoticon, smiley, symbol, character, 表情"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Files"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Find files and folders under your home folder by name."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "find, documents, folder, locate"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Kill Process"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Stop a running process; search by name, command or listening port."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "quit, port, task, pid, terminate"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Switch Audio Device"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Choose the default speaker and microphone."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "sound, output, input, microphone, speaker, headphones"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Browser Bookmarks"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search bookmarks from Firefox, Chrome, Chromium, Brave and Edge."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "firefox, chrome, chromium, favorites"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search Browser History"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Search pages you visited in Firefox, Chrome, Chromium, Brave and Edge."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "firefox, chrome, chromium, visited"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Lock Screen"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Lock the session."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, lock"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Sleep"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Suspend the computer."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, suspend"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Restart"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Restart the computer, after confirming."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, reboot"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Shut Down"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Shut the computer down, after confirming."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, poweroff, power off"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Log Out"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "End the desktop session, after confirming."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, sign out"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Empty Trash"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Permanently delete everything in the trash, after confirming."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, bin, delete"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Toggle Dark Mode"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Switch the desktop between light and dark appearance."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, appearance, light, theme"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Volume Up"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Raise the volume by 5%."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, sound, louder"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Volume Down"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Lower the volume by 5%."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, sound, quieter"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Toggle Mute"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Mute or unmute the speakers."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "system, sound, silence"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Timer"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Count down from a length of time typed in the search bar (25m, 1h 10m, 90s): shown in the In Progress section with Pause and +1 min, with a notification at the end."
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "countdown, pomodoro, alarm, minutes"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Development"
+msgstr ""
+
+#: src-tauri/src/extensions.rs
+msgid "Commands built into Heyo."
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Left Half"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Right Half"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Top Half"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Bottom Half"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Top Left Quarter"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Top Right Quarter"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Bottom Left Quarter"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Bottom Right Quarter"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "First Third"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Center Third"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Last Third"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "First Two Thirds"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Last Two Thirds"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Almost Maximize"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Maximize"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Center"
+msgstr ""
+
+#: src-tauri/src/platform/windows.rs
+msgid "Move to Next Display"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Window Management"
+msgstr ""
+
+#: src-tauri/src/root.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Heyo Settings"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Open Heyo's settings window."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "preferences, configuration, node"
+msgstr ""
+
+#: src-tauri/src/root.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Capture Screenshot"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Select part of the screen, annotate it, then copy, save or pin it."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "screen, snip, capture, pin, annotate"
+msgstr ""
+
+#: src-tauri/src/root.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Capture Text from Screen"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Select part of the screen and copy the text in it."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "ocr, extract, recognize, screen"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Toggle Keep Awake"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Stop the computer from sleeping or dimming the screen until you turn it off again."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "caffeine, sleep, idle, inhibit, amphetamine"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Restart Heyo"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Quit Heyo and start it again, as it was started."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "relaunch, reload, quit, reset, reopen"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Paste as Plain Text"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Paste what you copied without its formatting (fonts, colors, links). Give it a hotkey."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "unformatted, strip, format, clipboard, text only"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Pause or Resume Clipboard History"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Stop recording what you copy until you run this again."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "private, incognito, stop, record, ignore"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Pause or Resume Snippet Expansion"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Stop replacing the keywords of snippets as you type them, and stop following what is typed, until you run this again."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "keyword, typing, text expander, stop, private"
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "Move and resize the focused window."
+msgstr ""
+
+#: src-tauri/src/root.rs
+msgid "window, resize, tile, snap, layout"
+msgstr ""
+
 #: src-tauri/src/slint_windows/model.rs
 msgid "General"
 msgstr ""
@@ -435,15 +965,7 @@ msgid "Hotkeys"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Capture Screenshot"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Enter copies, Ctrl+S saves, Esc cancels"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Capture Text from Screen"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -693,11 +1215,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/clipboard.tsx
-msgid "Clipboard History"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1000,10 +1517,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "{} enabled"
-msgstr ""
-
-#: src-tauri/src/slint_windows/ui/settings.slint
-msgid "Heyo Settings"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint
