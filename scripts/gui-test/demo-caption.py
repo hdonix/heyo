@@ -26,7 +26,7 @@ style = Gtk.CssProvider()
 style.load_from_data(b"""
 window { background: transparent; }
 label { background: rgba(12, 12, 14, 0.9); color: white; border-radius: 12px;
-        padding: 9px 20px; font: 600 15px "Inter", "Cantarell", sans-serif; }
+        padding: 9px 20px; font: 600 15px "Inter", "Noto Sans CJK SC", "Cantarell", sans-serif; }
 """)
 Gtk.StyleContext.add_provider_for_screen(window.get_screen(), style, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 shown = None
