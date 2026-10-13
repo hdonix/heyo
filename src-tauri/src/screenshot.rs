@@ -124,6 +124,21 @@ pub(crate) fn current_monitor(app: &AppHandle) -> Result<Area, String> {
     Ok(Area { x, y, width, height, scale: monitor.scale })
 }
 
+/// For trying a pinned capture where the screen cannot be read yet (a
+/// Wayland compositor Heyo has no way of capturing): with
+/// `HEYO_TEST_PIN=X,Y,WIDTH,HEIGHT`, a picture of that size, its left half
+/// one colour and its right another, is pinned at that place when Heyo
+/// starts; several, separated by semicolons.
+pub(crate) fn test_pin(app: &AppHandle) {
+    let Ok(wanted) = std::env::var("HEYO_TEST_PIN") else { return };
+    for one in wanted.split(';') {
+        let numbers: Vec<i64> = one.split(',').filter_map(|number| number.trim().parse().ok()).collect();
+        let [x, y, width, height] = numbers[..] else { continue };
+        let picture = image::RgbaImage::from_fn(width.max(1) as u32, height.max(1) as u32, |across, _| if i64::from(across) * 2 < width { image::Rgba([216, 27, 96, 255]) } else { image::Rgba([30, 136, 229, 255]) });
+        crate::slint_windows::screenshot::pin::show(app, picture, (x as i32, y as i32));
+    }
+}
+
 /// A window with less than this showing, either way, is not worth offering.
 const MIN_WINDOW: i32 = 16;
 

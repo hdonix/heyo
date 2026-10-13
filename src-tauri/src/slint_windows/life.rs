@@ -195,6 +195,25 @@ impl<C: ComponentHandle + 'static> Life<C> {
         standing::ask_desktop(self.standing, self.told, self.window.window(), title, at);
     }
 
+    /// Has `hear` told what the pointer does in a window that is not
+    /// winit's (`standing::pointed_of`).
+    pub(super) fn pointed(&self, hear: impl Fn(standing::Pointed) + 'static) {
+        standing::pointed_of(self.told, self.window.window(), hear);
+    }
+
+    /// Begins moving the window by the pointer pressed in it: true where
+    /// the desktop does from here on, false where the window is to be
+    /// moved as the pointer goes (`move_by`).
+    pub(super) fn drag(&self) -> bool {
+        standing::drag(self.told, self.window.window())
+    }
+
+    /// Moves the window by so many of its device pixels, and says by how
+    /// many it went.
+    pub(super) fn move_by(&self, by: (f64, f64)) -> (f64, f64) {
+        standing::move_by(self.told, self.window.window(), by)
+    }
+
     /// What the desktop is told of it here, and what it cannot be told.
     pub(super) fn told(&self) -> Told {
         self.told

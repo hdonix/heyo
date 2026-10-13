@@ -141,8 +141,10 @@ pub(super) struct Told {
     /// compositor offers that: on the overlay layer, so over everything on
     /// every workspace; anchored where its window says; never with the
     /// keyboard; taking the pointer where it is told. It is not one of
-    /// winit's windows, and nothing else need be asked of anybody. (Only a
-    /// window that never has the keyboard, for now: the pill.)
+    /// winit's windows, and nothing else need be asked of anybody. (A
+    /// window that never has the keyboard, the pill, and one that is above
+    /// the others, a pinned capture, which there has the pointer only:
+    /// the overlay, which needs every key, is not one yet.)
     pub layered: bool,
 }
 
@@ -150,10 +152,11 @@ pub(super) struct Told {
 pub(super) fn told(standing: Standing, desktop: Desktop) -> Told {
     let (over, all) = (standing.layer == Layer::Over, standing.keyboard == Keyboard::All);
     let nothing = Told { unmanaged: false, utility: false, unlisted: false, made_inactive: false, never_active: false, above: standing.layer == Layer::Above, raised: false, keys: Keys::Left, opaque: !standing.clear, kept: false, unplaced: false, layered: false };
-    let layered = over && standing.keyboard == Keyboard::Never;
+    let above = standing.layer == Layer::Above;
+    let layered = (over && standing.keyboard == Keyboard::Never) || above;
     match desktop {
         Desktop::X11 => Told { unmanaged: over, utility: !over && !standing.listed, raised: over && all, keys: if all { Keys::Grabbed } else { Keys::Left }, kept: over, ..nothing },
-        Desktop::Wayland => Told { keys: if all { Keys::Focused } else { Keys::Left }, unplaced: over, ..nothing },
+        Desktop::Wayland => Told { keys: if all { Keys::Focused } else { Keys::Left }, unplaced: over || above, ..nothing },
         Desktop::Layers => Told { keys: if all { Keys::Focused } else { Keys::Left }, unplaced: over && !layered, layered, ..nothing },
         Desktop::Windows => Told { unlisted: !standing.listed, made_inactive: over, never_active: standing.keyboard == Keyboard::Never, keys: if all { Keys::Focused } else { Keys::Left }, kept: over, ..nothing },
         Desktop::Other => Told { keys: if all { Keys::Focused } else { Keys::Left }, kept: over, ..nothing },
@@ -175,7 +178,7 @@ pub(super) fn ask_desktop(standing: Standing, told: Told, window: &slint::Window
     if !told.unplaced {
         return;
     }
-    let own = OwnStanding { above: true, everywhere: true, keyboard: standing.keyboard != Keyboard::Never, at };
+    let own = OwnStanding { above: true, everywhere: standing.layer == Layer::Over, keyboard: standing.keyboard != Keyboard::Never, at };
     let _ = std::thread::Builder::new().name("heyo-slint-standing".into()).spawn(move || {
         crate::platform::desktop::desktop().stand_own(title, &own);
     });
@@ -429,6 +432,79 @@ pub(super) fn reach(window: &Window, within: Option<Rect>) {
     let _ = (window, within);
 }
 
+/// What the pointer did in a window, for a window that hears of it
+/// itself (a pinned capture, which is moved by it): places are in the
+/// window's device pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Pointed {
+    Moved((f64, f64)),
+    Pressed(Button),
+    Released(Button),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Button {
+    Left,
+    Right,
+}
+
+/// Has a window that is not winit's hear what the pointer does in it
+/// (winit's hear of it from winit). `hear` takes all of it: Slint is not
+/// told.
+pub(super) fn pointed_of(told: Told, window: &slint::Window, hear: impl Fn(Pointed) + 'static) {
+    #[cfg(target_os = "linux")]
+    if told.layered {
+        return super::layer::hear(window, hear);
+    }
+    let _ = (told, window, hear);
+}
+
+/// Begins moving a window by the pointer that is pressed in it. True
+/// where the desktop moves it from here on and has the pointer until the
+/// button is let go; false where nobody does, and the window is to be
+/// moved by as much as the pointer goes (`move_by`).
+pub(super) fn drag(told: Told, window: &slint::Window) -> bool {
+    if told.layered {
+        return false;
+    }
+    use slint::winit_030::WinitWindowAccessor;
+    window.with_winit_window(|made| {
+        let _ = made.drag_window();
+    });
+    true
+}
+
+/// Moves a window that nobody else moves, by so many of its device
+/// pixels, and says by how many it went.
+pub(super) fn move_by(told: Told, window: &slint::Window, by: (f64, f64)) -> (f64, f64) {
+    #[cfg(target_os = "linux")]
+    if told.layered {
+        return super::layer::move_by(window, by);
+    }
+    let _ = (told, window, by);
+    (0.0, 0.0)
+}
+
+/// How far a window that moves itself under a pressed pointer has still
+/// to go, when the pointer is `gone` from where it was pressed (as the
+/// window is told, in its own pixels) and the window has `moved` so far.
+///
+/// A compositor says where the pointer is in the window, and compositors
+/// differ on a window that moves while the button is down: by the window
+/// as it is now (then `gone` is what is left to go), or by the window as
+/// it was when the button went down (Sway: then `gone` is all the pointer
+/// went, of which `moved` is done). Whichever leaves less to go is the
+/// one this compositor means: a pointer goes a little between two
+/// tellings, and a window that follows it has gone nearly all the way.
+pub(super) fn left_to_go(gone: (f64, f64), moved: (f64, f64)) -> (f64, f64) {
+    let since = (gone.0 - moved.0, gone.1 - moved.1);
+    if since.0.hypot(since.1) < gone.0.hypot(gone.1) {
+        since
+    } else {
+        gone
+    }
+}
+
 /// Whether what is behind a window shows where it draws nothing, for a
 /// window that is not winit's and so not drawn by the renderer the others
 /// are: a layer surface always is seen through. None for winit's windows,
@@ -508,11 +584,25 @@ mod tests {
         assert_eq!(told(PILL, Desktop::Layers), Told { layered: true, ..NOTHING });
         // The overlay is not one yet: it is still the compositor's to place.
         assert_eq!(told(OVERLAY, Desktop::Layers), Told { unplaced: true, keys: Keys::Focused, opaque: true, ..NOTHING });
-        assert_eq!(told(PINNED, Desktop::Layers), Told { above: true, opaque: true, ..NOTHING });
+        // A pinned capture is one too, with the pointer only.
+        assert_eq!(told(PINNED, Desktop::Layers), Told { above: true, opaque: true, layered: true, ..NOTHING });
         // And where it has not (GNOME), the desktop itself is asked.
         assert!(!told(PILL, Desktop::Wayland).layered && told(PILL, Desktop::Wayland).unplaced);
         // A layer surface is never one of those winit keeps.
         assert!(![SETTINGS, PINNED, PILL, OVERLAY].iter().any(|standing| told(*standing, Desktop::Layers).kept));
+    }
+
+    #[test]
+    fn a_window_that_moves_itself_follows_the_pointer_whichever_way_it_is_told() {
+        // Told by the window as it was when the button went down: the
+        // pointer has gone 100,50 in all, of which 90,45 is done.
+        assert_eq!(left_to_go((100.0, 50.0), (90.0, 45.0)), (10.0, 5.0));
+        // Told by the window as it is now: 10,5 is what is left.
+        assert_eq!(left_to_go((10.0, 5.0), (90.0, 45.0)), (10.0, 5.0));
+        // At the start the two are one.
+        assert_eq!(left_to_go((6.0, 0.0), (0.0, 0.0)), (6.0, 0.0));
+        // And back the way it came, past where it was pressed.
+        assert_eq!(left_to_go((-20.0, 0.0), (-16.0, 0.0)), (-4.0, 0.0));
     }
 
     #[test]
@@ -545,6 +635,8 @@ mod tests {
     #[test]
     fn on_wayland_nothing_of_it_can_be_said_and_no_window_is_kept() {
         assert_eq!(told(PILL, Desktop::Wayland), Told { unplaced: true, ..NOTHING });
+        // A pinned capture cannot say where it was read either.
+        assert_eq!(told(PINNED, Desktop::Wayland), Told { unplaced: true, above: true, opaque: true, ..NOTHING });
         assert_eq!(told(OVERLAY, Desktop::Wayland), Told { unplaced: true, keys: Keys::Focused, opaque: true, ..NOTHING });
         assert!(![SETTINGS, PINNED, PILL, OVERLAY].iter().any(|standing| told(*standing, Desktop::Wayland).kept));
     }

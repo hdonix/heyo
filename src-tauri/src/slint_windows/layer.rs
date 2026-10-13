@@ -41,6 +41,7 @@ use wayland_client::globals::registry_queue_init;
 use wayland_client::protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface};
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
 
+use super::standing::{Button, Pointed};
 use crate::platform::desktop::OwnPlace;
 use crate::platform::place::{Monitor, Rect};
 
@@ -149,6 +150,11 @@ pub(super) struct Layered {
     /// Its size in logical pixels, and how many device pixels one is.
     size: Cell<(u32, u32)>,
     scale: Cell<i32>,
+    /// Where its top left corner is on its output, in logical pixels, for
+    /// one that is put at a place and can be moved.
+    at: Cell<(i32, i32)>,
+    /// Who hears what the pointer does in it, in Slint's stead.
+    hears: RefCell<Option<Rc<dyn Fn(Pointed)>>>,
     /// Something in it changed since it was drawn.
     dirty: Cell<bool>,
     /// A frame was handed over and the compositor has not shown it yet.
@@ -174,6 +180,8 @@ impl Layered {
             configured: Cell::new(false),
             size: Cell::new((1, 1)),
             scale: Cell::new(1),
+            at: Cell::new((0, 0)),
+            hears: RefCell::new(None),
             dirty: Cell::new(false),
             waiting: Cell::new(false),
         });
@@ -203,30 +211,49 @@ impl Layered {
             return Ok(());
         }
         with(|wayland| {
-            let Some(OwnPlace::BottomCentre { size }) = self.place.get() else { return Err("it was not said where it goes".to_string()) };
-            // The first output: Wayland knows no primary one.
+            // The first output: Wayland knows no primary one, and a place
+            // of the screen is taken to be on it (one output, for now).
             let output = wayland.state.outputs.outputs().next();
             let info = output.as_ref().and_then(|output| wayland.state.outputs.info(output));
             let scale = info.as_ref().map_or(1, |info| info.scale_factor.max(1));
-            // The same rule as everywhere (`place`): what it gives as a
-            // place is said here as a margin from the bottom.
-            let lifted = info.as_ref().and_then(|info| info.logical_size).map_or(0, |(width, height)| {
-                let whole = Monitor::new((0, 0, width.max(0) as u32, height.max(0) as u32), 1.0, true, None);
-                let (_, y) = whole.bottom_centre((size.0.round() as u32, size.1.round() as u32));
-                height - y - size.1.round() as i32
-            });
             let queue = wayland.queue.handle();
             let surface = wayland.state.compositor.create_surface(&queue);
-            let layer = wayland.state.layers.create_layer_surface(&queue, surface, Layer::Overlay, Some("heyo"), output.as_ref());
-            layer.set_anchor(Anchor::BOTTOM);
-            layer.set_margin(0, 0, lifted.max(0), 0);
-            layer.set_size(size.0.round() as u32, size.1.round() as u32);
+            let (layer, size) = match self.place.get() {
+                Some(OwnPlace::BottomCentre { size }) => {
+                    let size = (size.0.round() as u32, size.1.round() as u32);
+                    // The same rule as everywhere (`place`): what it gives
+                    // as a place is said here as a margin from the bottom.
+                    let lifted = info.as_ref().and_then(|info| info.logical_size).map_or(0, |(width, height)| {
+                        let whole = Monitor::new((0, 0, width.max(0) as u32, height.max(0) as u32), 1.0, true, None);
+                        let (_, y) = whole.bottom_centre(size);
+                        height - y - size.1 as i32
+                    });
+                    // Over everything, a window that fills the screen too.
+                    let layer = wayland.state.layers.create_layer_surface(&queue, surface, Layer::Overlay, Some("heyo"), output.as_ref());
+                    layer.set_anchor(Anchor::BOTTOM);
+                    layer.set_margin(0, 0, lifted.max(0), 0);
+                    (layer, size)
+                }
+                Some(OwnPlace::At { at, size }) => {
+                    // A place and a size in the screen's pixels, which are
+                    // the output's logical ones times its scale.
+                    let size = ((size.0 as i32 + scale - 1) / scale, (size.1 as i32 + scale - 1) / scale);
+                    self.at.set((at.0 / scale, at.1 / scale));
+                    // Above the windows, as a window kept above them is.
+                    let layer = wayland.state.layers.create_layer_surface(&queue, surface, Layer::Top, Some("heyo"), output.as_ref());
+                    layer.set_anchor(Anchor::TOP | Anchor::LEFT);
+                    layer.set_margin(self.at.get().1, 0, 0, self.at.get().0);
+                    (layer, (size.0.max(1) as u32, size.1.max(1) as u32))
+                }
+                _ => return Err("it was not said where it goes".to_string()),
+            };
+            layer.set_size(size.0, size.1);
             layer.set_keyboard_interactivity(KeyboardInteractivity::None);
             // It is over the others without taking room from them.
             layer.set_exclusive_zone(-1);
             layer.wl_surface().set_buffer_scale(scale);
             layer.commit();
-            self.size.set((size.0.round() as u32, size.1.round() as u32));
+            self.size.set(size);
             self.scale.set(scale);
             *self.surface.borrow_mut() = Some(layer);
             let _ = wayland.connection.flush();
@@ -460,6 +487,22 @@ fn turn() {
             }
             Said::Pointer(surface, kind, at) => {
                 let Some(window) = of(&surface) else { continue };
+                // A window that hears of the pointer itself, in its device pixels.
+                let hears = window.hears.borrow().clone();
+                if let Some(hears) = hears {
+                    let scale = f64::from(window.scale.get().max(1));
+                    let pointed = match kind {
+                        PointerEventKind::Enter { .. } | PointerEventKind::Motion { .. } => Pointed::Moved((at.0 * scale, at.1 * scale)),
+                        PointerEventKind::Press { button: 0x110, .. } => Pointed::Pressed(Button::Left),
+                        PointerEventKind::Release { button: 0x110, .. } => Pointed::Released(Button::Left),
+                        // The right one (BTN_RIGHT).
+                        PointerEventKind::Press { button: 0x111, .. } => Pointed::Pressed(Button::Right),
+                        PointerEventKind::Release { button: 0x111, .. } => Pointed::Released(Button::Right),
+                        _ => continue,
+                    };
+                    hears(pointed);
+                    continue;
+                }
                 let position = LogicalPosition::new(at.0 as f32, at.1 as f32);
                 let event = match kind {
                     PointerEventKind::Enter { .. } | PointerEventKind::Motion { .. } => WindowEvent::PointerMoved { position },
@@ -492,6 +535,36 @@ fn of(window: &slint::Window) -> Option<Rc<Layered>> {
 /// Whether the window is a layer surface.
 pub(super) fn is(window: &slint::Window) -> bool {
     of(window).is_some()
+}
+
+/// Has `hear` told what the pointer does in the window, in Slint's stead.
+pub(super) fn hear(window: &slint::Window, hear: impl Fn(Pointed) + 'static) {
+    if let Some(layered) = of(window) {
+        *layered.hears.borrow_mut() = Some(Rc::new(hear));
+    }
+}
+
+/// Moves a window that was put at a place, by so many of its device
+/// pixels: nobody moves a layer surface but itself, by its margins. Says
+/// by how many it went, which is whole logical pixels.
+pub(super) fn move_by(window: &slint::Window, by: (f64, f64)) -> (f64, f64) {
+    let Some(layered) = of(window) else { return (0.0, 0.0) };
+    let scale = f64::from(layered.scale.get().max(1));
+    let (x, y) = layered.at.get();
+    let to = (x + (by.0 / scale).round() as i32, y + (by.1 / scale).round() as i32);
+    let went = (f64::from(to.0 - x) * scale, f64::from(to.1 - y) * scale);
+    if to == (x, y) {
+        return went;
+    }
+    layered.at.set(to);
+    if let Some(layer) = layered.surface.borrow().as_ref() {
+        layer.set_margin(to.1, 0, 0, to.0);
+        layer.commit();
+    }
+    with(|wayland| {
+        let _ = wayland.connection.flush();
+    });
+    went
 }
 
 /// Where the window goes, to be said before it is shown.

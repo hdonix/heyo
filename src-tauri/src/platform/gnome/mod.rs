@@ -24,7 +24,7 @@ const INTERFACE: &str = "dev.heyo.Shell";
 /// inside Heyo), and the oldest it still works with. The interface only
 /// grows, so a newer extension is as good as this one; with an older one,
 /// what it lacks is done without (see where optional fields are read).
-pub(crate) const API: u32 = 3;
+pub(crate) const API: u32 = 4;
 const OLDEST: u32 = 1;
 
 use crate::platform::desktop::{OwnPlace, OwnStanding};
@@ -298,13 +298,28 @@ fn own_place(place: OwnPlace, monitors: &[Monitor]) -> Option<serde_json::Value>
             let (x, y, width, height) = stage_area(area, monitors);
             Some(serde_json::json!({ "cover": [x, y, width, height] }))
         }
+        OwnPlace::At { at, .. } => {
+            // The monitor the place is on, as the toolkit lays monitors
+            // out; and the place on it, in the Shell's units.
+            let on = |monitor: &&Monitor| {
+                let ((x, y), per) = (monitor.toolkit_origin(), monitor.toolkit());
+                at.0 >= x && at.0 < x + monitor.width * per && at.1 >= y && at.1 < y + monitor.height * per
+            };
+            let monitor = monitors.iter().find(on).or(monitors.first())?;
+            let ((x, y), per) = (monitor.toolkit_origin(), monitor.toolkit() as f64);
+            // Each place is for one window: there may be several of the title.
+            Some(serde_json::json!({ "each": true, "at": [monitor.x + ((at.0 - x) as f64 / per).round() as i32, monitor.y + ((at.1 - y) as f64 / per).round() as i32] }))
+        }
     }
 }
 
 /// Has the Shell give one of Heyo's own windows a standing it cannot say
 /// of itself on Wayland. False with an extension from before it could.
 pub fn stand_own(title: &str, standing: &OwnStanding) -> bool {
-    if running().is_none_or(|version| version < 3) {
+    // One window among several of a title is placed since version 4:
+    // before, the others would have gone with it.
+    let needed = if matches!(standing.at, Some(OwnPlace::At { .. })) { 4 } else { 3 };
+    if running().is_none_or(|version| version < needed) {
         return false;
     }
     let mut said = serde_json::json!({ "above": standing.above, "everywhere": standing.everywhere, "keyboard": standing.keyboard });
@@ -617,6 +632,11 @@ mod tests {
         // None is said to be primary: the first.
         assert_eq!(own_place(pill, &[Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }]), Some(serde_json::json!({ "at": [780, 1080 - 44 - 108] })));
         assert_eq!(own_place(pill, &[]), None);
+        // A pinned capture, read at 400,300 of the second monitor's own
+        // pixels, which the toolkit has from 3840 on.
+        let pinned = OwnPlace::At { at: (3840 + 400, 300), size: (300, 200) };
+        let two = [Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }, Monitor { width: 960, height: 600, ..monitor(1920, 0, 2.0, Some(2.0)) }];
+        assert_eq!(own_place(pinned, &two), Some(serde_json::json!({ "each": true, "at": [1920 + 200, 150] })));
         // The overlay covers the monitor that was captured: the second,
         // at 200 % beside one at 100 %, which the toolkit has at 1920,0
         // with twice as many pixels as the Shell has units.

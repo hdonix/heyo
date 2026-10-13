@@ -92,6 +92,9 @@ pub enum OwnPlace {
     /// Over all of a monitor, given as a capture of it is: its area as the
     /// toolkit has it.
     Cover { area: Area },
+    /// With its top left corner at a place of the screen, as a capture
+    /// gives places (the toolkit's pixels): a window of that many pixels.
+    At { at: (i32, i32), size: (u32, u32) },
 }
 
 pub trait Desktop: Send + Sync {

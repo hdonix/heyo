@@ -3,5 +3,5 @@
   "name": "Heyo",
   "description": "Lets the Heyo launcher work on Wayland: it lists, switches and arranges windows, pastes into the focused application, follows the clipboard and captures the screen on Heyo's behalf, keeps Heyo's palette out of the Dash and the window switcher, and keeps its dictation pill above other windows without the keyboard. Only Heyo can use it; without Heyo it does nothing.",
   "shell-version": ["45", "46", "47", "48", "49", "50"],
-  "version": 3
+  "version": 4
 }

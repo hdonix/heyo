@@ -32,8 +32,12 @@ const HEYO_NAME = 'dev.heyo.app.SingleInstance';
 //    says of one of its own windows what a Wayland window cannot say of
 //    itself: that it is above the others, on every workspace, never has
 //    the keyboard, and where it is.
+// 4: Stand puts a window where it says once, when the window comes (or is
+//    there unplaced): of several windows of one title, each stays where it
+//    was put, and where the user has moved it since. With `each`, every
+//    place said is for one window, in the order they come.
 // (Heyo reads this line from the installed file: keep its form.)
-const API = 3;
+const API = 4;
 
 const INTERFACE = `
 <node>
@@ -173,7 +177,7 @@ export default class HeyoExtension extends Extension {
         // A window's title and application are known once it is on screen.
         this._mapped = global.window_manager.connect('map', (_wm, actor) => {
             this._keepOut(actor.meta_window);
-            this._stand(actor.meta_window);
+            this._stand(actor.meta_window, true);
         });
         for (const actor of global.get_window_actors())
             this._keepOut(actor.meta_window);
@@ -395,14 +399,21 @@ export default class HeyoExtension extends Extension {
     /// Monitors gives them; or `cover`: x, y, width and height of a monitor
     /// it is to fill). It holds for the window of that title that is
     /// there and for every one that comes, until said again; an empty
-    /// standing takes it back.
+    /// standing takes it back. A window is put where it goes once: when
+    /// it comes on the screen, or now if it is there and was not put
+    /// anywhere yet. With `each`, a place is for one window only, the
+    /// next that comes: so several windows of one title each have theirs.
     _Stand(title, standing) {
-        if (standing === '')
+        if (standing === '') {
             this._standings.delete(title);
-        else
-            this._standings.set(title, JSON.parse(standing));
+        } else {
+            const said = JSON.parse(standing);
+            if (said.each)
+                said.places = [...(this._standings.get(title)?.places ?? []), said.at];
+            this._standings.set(title, said);
+        }
         for (const actor of global.get_window_actors())
-            this._stand(actor.meta_window);
+            this._stand(actor.meta_window, actor.mapped);
         return new GLib.Variant('()', []);
     }
 
@@ -410,7 +421,7 @@ export default class HeyoExtension extends Extension {
         return window && isOwn(window) ? this._standings?.get(window.get_title() ?? '') : undefined;
     }
 
-    _stand(window) {
+    _stand(window, shown) {
         const standing = this._standing(window);
         if (!standing)
             return;
@@ -418,8 +429,16 @@ export default class HeyoExtension extends Extension {
             window.make_above();
         if (standing.everywhere)
             window.stick();
-        if (standing.at)
-            window.move_frame(true, standing.at[0], standing.at[1]);
+        if (standing.keyboard === false && global.display.focus_window === window)
+            this._keepFocus();
+        // Where it goes is said once, of a window that is on the screen:
+        // before, the Shell has yet to put it somewhere itself.
+        if (!shown || window._heyoPlaced)
+            return;
+        window._heyoPlaced = true;
+        const at = standing.each ? standing.places.shift() : standing.at;
+        if (at)
+            window.move_frame(true, at[0], at[1]);
         if (standing.cover) {
             // On that monitor, and then all of it: a window fills the
             // monitor it is on.
@@ -429,8 +448,6 @@ export default class HeyoExtension extends Extension {
             window.move_resize_frame(true, x, y, width, height);
             window.make_fullscreen();
         }
-        if (standing.keyboard === false && global.display.focus_window === window)
-            this._keepFocus();
     }
 
     /// The keyboard stays with, or goes back at once to, the window that

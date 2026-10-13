@@ -257,6 +257,7 @@ pub fn run() {
             slint_windows::warm(app.handle());
             // And its windows follow the display when it changes.
             platform::place::watch();
+            screenshot::test_pin(app.handle());
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let index = Index::new(

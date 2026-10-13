@@ -17,7 +17,8 @@ use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
 use tauri::AppHandle;
 
 use super::super::life::{self, Life, Lives, Slot, Slotted};
-use super::super::standing::{Keyboard, Layer, Standing};
+use super::super::standing::{left_to_go, Button, Keyboard, Layer, Pointed, Standing};
+use crate::platform::desktop::OwnPlace;
 use super::super::ui;
 
 /// Above the other windows, and still one the desktop arranges; in no
@@ -40,7 +41,15 @@ struct Pinned {
     pointer: (f64, f64),
     pressed: Option<(f64, f64)>,
     last: Option<(Instant, (f64, f64))>,
+    /// It is being moved by the pointer, by this window itself: nobody
+    /// else moves a window where it is a layer surface.
+    moving: bool,
+    /// How far it has moved itself since the button went down.
+    moved: (f64, f64),
 }
+
+/// What the window is called, as the markup has it.
+const TITLE: &str = "Heyo Pinned Screenshot";
 
 /// The captures that are pinned, and what the next one is known by.
 struct Pins {
@@ -103,6 +112,10 @@ impl Pins {
         let id = self.next;
         self.next += 1;
         window.window().on_winit_window_event(move |_, event| told(id, event));
+        // Where the window is not winit's, it hears of the pointer itself;
+        // and where it cannot place itself, the desktop is asked to.
+        life.pointed(move |pointed| heard(id, pointed));
+        life.ask_desktop(TITLE, Some(OwnPlace::At { at, size: (width.max(least), height.max(least)) }));
         window.window().on_close_requested(move || {
             close(id);
             slint::CloseRequestResponse::KeepWindowShown
@@ -112,7 +125,7 @@ impl Pins {
                 eprintln!("heyo: the capture could not be pinned: {e}");
             }
         });
-        self.pinned.push(Pinned { id, life, pointer: (0.0, 0.0), pressed: None, last: None });
+        self.pinned.push(Pinned { id, life, pointer: (0.0, 0.0), pressed: None, last: None, moving: false, moved: (0.0, 0.0) });
     }
 }
 
@@ -124,32 +137,56 @@ fn close(id: u64) {
     });
 }
 
-fn told(id: u64, event: &WindowEvent) -> EventResult {
+/// What the pointer did in a pinned capture, whoever said so: dragged, it
+/// moves; pressed twice, or with the other button, it closes.
+fn heard(id: u64, pointed: Pointed) {
     Slot::there(&PINS, |pins| {
-        let Some(pin) = pins.pinned.iter_mut().find(|pin| pin.id == id) else { return EventResult::Propagate };
+        let Some(pin) = pins.pinned.iter_mut().find(|pin| pin.id == id) else { return };
         let scale = f64::from(pin.life.window().window().scale_factor()).max(0.1);
         let apart = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1) / scale;
-        match event {
-            WindowEvent::CursorMoved { position, .. } => {
-                pin.pointer = (position.x, position.y);
-                if pin.pressed.is_some_and(|from| apart(from, pin.pointer) >= SLACK) {
-                    // The window manager moves it from here, and has the pointer until the button is let go.
-                    (pin.pressed, pin.last) = (None, None);
-                    pin.life.window().window().with_winit_window(|made| {
-                        let _ = made.drag_window();
-                    });
+        match pointed {
+            Pointed::Moved(to) => {
+                pin.pointer = to;
+                match pin.pressed {
+                    // It goes after the pointer, by what is left to go.
+                    Some(from) if pin.moving => {
+                        let went = pin.life.move_by(left_to_go((to.0 - from.0, to.1 - from.1), pin.moved));
+                        pin.moved = (pin.moved.0 + went.0, pin.moved.1 + went.1);
+                    }
+                    Some(from) if apart(from, to) >= SLACK => {
+                        pin.last = None;
+                        if pin.life.drag() {
+                            // The desktop moves it from here, and has the pointer until the button is let go.
+                            pin.pressed = None;
+                        } else {
+                            pin.moving = true;
+                        }
+                    }
+                    _ => {}
                 }
             }
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+            Pointed::Pressed(Button::Left) => {
                 let now = Instant::now();
                 if pin.last.is_some_and(|(when, at)| now.duration_since(when) < TWICE && apart(at, pin.pointer) < SLACK) {
                     close(id);
                 } else {
-                    (pin.pressed, pin.last) = (Some(pin.pointer), Some((now, pin.pointer)));
+                    (pin.pressed, pin.last, pin.moved) = (Some(pin.pointer), Some((now, pin.pointer)), (0.0, 0.0));
                 }
             }
-            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => pin.pressed = None,
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => close(id),
+            Pointed::Released(Button::Left) => (pin.pressed, pin.moving) = (None, false),
+            Pointed::Pressed(Button::Right) => close(id),
+            Pointed::Released(Button::Right) => {}
+        }
+    });
+}
+
+fn told(id: u64, event: &WindowEvent) -> EventResult {
+    {
+        match event {
+            WindowEvent::CursorMoved { position, .. } => heard(id, Pointed::Moved((position.x, position.y))),
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => heard(id, Pointed::Pressed(Button::Left)),
+            WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => heard(id, Pointed::Released(Button::Left)),
+            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Right, .. } => heard(id, Pointed::Pressed(Button::Right)),
             // Not a key that was down already when the window was given the
             // keyboard, which winit says as a press too: Escape that closed
             // another window must not close this one as the focus comes to it.
@@ -157,6 +194,5 @@ fn told(id: u64, event: &WindowEvent) -> EventResult {
             _ => return EventResult::Propagate,
         }
         EventResult::PreventDefault
-    })
-    .unwrap_or(EventResult::Propagate)
+    }
 }
