@@ -209,13 +209,15 @@ msgid "Text recognition is not set up yet. Download it in Heyo Settings → Scre
 msgstr "文字识别尚未设置。请在“Heyo 设置”→“截图”中下载。"
 
 #: src-tauri/src/ext/answer.rs
+#: runtime/src/builtins/system.tsx
 msgid "Restart the computer?"
-msgstr "重启电脑？"
+msgstr "重新启动电脑？"
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Restart"
-msgstr "重启"
+msgstr "重新启动"
 
 #: src-tauri/src/ext/answer.rs
 msgid "Shut the computer down?"
@@ -223,17 +225,20 @@ msgstr "关闭电脑？"
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Shut Down"
 msgstr "关机"
 
 #: src-tauri/src/ext/answer.rs
+#: runtime/src/builtins/system.tsx
 msgid "Log out?"
-msgstr "注销？"
+msgstr "退出登录？"
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Log Out"
-msgstr "注销"
+msgstr "退出登录"
 
 #: src-tauri/src/ext.rs
 msgid "No area was selected."
@@ -523,6 +528,7 @@ msgid "system, sign out"
 msgstr "系统, 注销, 退出登录, 登出"
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Empty Trash"
 msgstr "清空回收站"
 
@@ -596,6 +602,7 @@ msgid "countdown, pomodoro, alarm, minutes"
 msgstr "倒计时, 番茄钟, 闹钟, 定时, 分钟"
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/store.tsx
 msgid "Development"
 msgstr "开发中"
 
@@ -630,6 +637,7 @@ msgid "The command failed"
 msgstr "命令执行失败"
 
 #: src-tauri/src/menubar.rs
+#: runtime/src/builtins/system.tsx
 msgid "Refresh"
 msgstr "刷新"
 
@@ -1372,6 +1380,7 @@ msgid "This version of Heyo comes with a newer extension than the one installed.
 msgstr "此版本的 Heyo 附带的扩展比已安装的更新。请更新，然后注销并重新登录。在此之前，正在运行的扩展仍可继续使用，只是没有新版增加的功能。"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Update"
 msgstr "更新"
 
@@ -1516,6 +1525,7 @@ msgid "A one-time download of about 270 MB (SenseVoice speech model)."
 msgstr "需要一次性下载约 270 MB（SenseVoice 语音模型）。"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Installed"
 msgstr "已安装"
 
@@ -1566,6 +1576,7 @@ msgid "Type as You Speak"
 msgstr "边说边输入"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/system.tsx
 msgid "Input"
 msgstr "输入"
 
@@ -1757,6 +1768,7 @@ msgstr "已保存 — 输入新密钥即可替换"
 
 #: src-tauri/src/slint_windows/model.rs
 #: src/raycast/FormView.tsx
+#: runtime/src/builtins/store.tsx
 msgid "Remove"
 msgstr "移除"
 
@@ -1778,6 +1790,7 @@ msgid "Settings File"
 msgstr "设置文件"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Check for Updates"
 msgstr "检查更新"
 
@@ -1937,6 +1950,7 @@ msgid "Preferences"
 msgstr "偏好设置"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/system.tsx
 msgid "No matches"
 msgstr "没有匹配项"
 
@@ -1981,6 +1995,7 @@ msgid "Permissions are about what Heyo hands over or does for an extension. They
 msgstr "权限决定的是 Heyo 向扩展提供什么、替扩展做什么，并不能限制扩展本身：扩展是这台电脑上的程序，可以自行读取你的文件并启动其他程序。"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Stop Developing"
 msgstr "停止开发"
 
@@ -1997,6 +2012,7 @@ msgid "Its preferences are kept"
 msgstr "它的偏好设置会保留"
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Uninstall"
 msgstr "卸载"
 
@@ -2791,6 +2807,7 @@ msgstr "复制文本片段"
 
 #: src/rows.ts
 #: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/system.tsx
 msgid "Copy Link"
 msgstr "复制链接"
 
@@ -2921,6 +2938,7 @@ msgid "Copied to Clipboard"
 msgstr "已复制到剪贴板"
 
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/system.tsx
 msgid "Open in Browser"
 msgstr "在浏览器中打开"
 
@@ -2933,6 +2951,7 @@ msgid "Show in Files"
 msgstr "在文件管理器中显示"
 
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/system.tsx
 msgid "Move to Trash"
 msgstr "移到回收站"
 
@@ -3009,6 +3028,7 @@ msgid "Enclosing folder"
 msgstr "上层文件夹"
 
 #: runtime/src/api/files.tsx
+#: runtime/src/builtins/store.tsx
 msgid "Open Folder"
 msgstr "打开文件夹"
 
@@ -3086,6 +3106,7 @@ msgid "Close Quick Look"
 msgstr "关闭快速查看"
 
 #: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/system.tsx
 msgid "Copy Path"
 msgstr "复制路径"
 
@@ -3732,6 +3753,327 @@ msgstr "缺少必填的参数"
 #: runtime/src/builtins/setup.tsx
 msgid "Run {0}"
 msgstr "运行 {0}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Download failed: {0} {1}"
+msgstr "下载失败：{0} {1}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Updating {0}…"
+msgstr "正在更新 {0}…"
+
+#: runtime/src/builtins/store.tsx
+msgid "Installing {0}…"
+msgstr "正在安装 {0}…"
+
+#: runtime/src/builtins/store.tsx
+msgid "Invalid extension name: {0}"
+msgstr "扩展名称无效：{0}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Updated {0}"
+msgstr "已更新 {0}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Installed {0}"
+msgstr "已安装 {0}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Its commands are now in the root search."
+msgstr "它的命令已出现在主搜索中。"
+
+#: runtime/src/builtins/store.tsx
+msgid "Failed to update {0}"
+msgstr "更新 {0} 失败"
+
+#: runtime/src/builtins/store.tsx
+msgid "Failed to install {0}"
+msgstr "安装 {0} 失败"
+
+#: runtime/src/builtins/store.tsx
+msgid "Update Extension"
+msgstr "更新扩展"
+
+#: runtime/src/builtins/store.tsx
+msgid "Reinstall Extension"
+msgstr "重新安装扩展"
+
+#: runtime/src/builtins/store.tsx
+msgid "Install Extension"
+msgstr "安装扩展"
+
+#: runtime/src/builtins/store.tsx
+msgid "Show Details"
+msgstr "显示详情"
+
+#: runtime/src/builtins/store.tsx
+msgid "Author"
+msgstr "作者"
+
+#: runtime/src/builtins/store.tsx
+msgid "Downloads"
+msgstr "下载量"
+
+#: runtime/src/builtins/store.tsx
+msgid "Platforms"
+msgstr "平台"
+
+#: runtime/src/builtins/store.tsx
+msgid "Could not reach the Raycast Store"
+msgstr "无法连接 Raycast 商店"
+
+#: runtime/src/builtins/store.tsx
+msgid "Search the Raycast Store…"
+msgstr "搜索 Raycast 商店…"
+
+#: runtime/src/builtins/store.tsx
+msgid "May rely on macOS"
+msgstr "可能依赖 macOS"
+
+#: runtime/src/builtins/store.tsx
+msgid "{n} command"
+msgid_plural "{n} commands"
+msgstr[0] "{n} 个命令"
+
+#: runtime/src/builtins/store.tsx
+msgid "Uninstall {0}?"
+msgstr "卸载 {0}？"
+
+#: runtime/src/builtins/store.tsx
+msgid "Its preferences are kept."
+msgstr "它的偏好设置会保留。"
+
+#: runtime/src/builtins/store.tsx
+msgid "Uninstalled {0}"
+msgstr "已卸载 {0}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Take {0} out of Heyo?"
+msgstr "将 {0} 从 Heyo 中移除？"
+
+#: runtime/src/builtins/store.tsx
+msgid "Its sources in {0} are not touched; heyo dev puts it back."
+msgstr "{0} 中的源代码不受影响；运行 heyo dev 可重新加入。"
+
+#: runtime/src/builtins/store.tsx
+msgid "Removed {0}"
+msgstr "已移除 {0}"
+
+#: runtime/src/builtins/store.tsx
+msgid "Built by heyo dev; not updated from the store"
+msgstr "由 heyo dev 构建；不会从商店更新"
+
+#: runtime/src/builtins/store.tsx
+msgid "Configure"
+msgstr "配置"
+
+#: runtime/src/builtins/store.tsx
+msgid "Open Source Folder"
+msgstr "打开源代码文件夹"
+
+#: runtime/src/builtins/store.tsx
+msgid "Update available"
+msgstr "有可用更新"
+
+#: runtime/src/builtins/store.tsx
+msgid "Update All Extensions ({0})"
+msgstr "更新所有扩展（{0}）"
+
+#: runtime/src/builtins/store.tsx
+msgid "Search installed extensions…"
+msgstr "搜索已安装的扩展…"
+
+#: runtime/src/builtins/store.tsx
+msgid "No extensions installed"
+msgstr "尚未安装扩展"
+
+#: runtime/src/builtins/store.tsx
+msgid "Run “{0}” to install one."
+msgstr "运行“{0}”来安装一个。"
+
+#: runtime/src/builtins/store.tsx
+msgid "In Development"
+msgstr "开发中"
+
+#: runtime/src/builtins/store.tsx
+msgid "Updates Available"
+msgstr "有可用更新"
+
+#: runtime/src/builtins/store.tsx
+msgid "Up to Date"
+msgstr "已是最新"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not list windows"
+msgstr "无法列出窗口"
+
+#: runtime/src/builtins/system.tsx
+msgid "Search open windows…"
+msgstr "搜索打开的窗口…"
+
+#: runtime/src/builtins/system.tsx
+msgid "No open windows"
+msgstr "没有打开的窗口"
+
+#: runtime/src/builtins/system.tsx
+msgid "Current"
+msgstr "当前"
+
+#: runtime/src/builtins/system.tsx
+msgid "Switch to Window"
+msgstr "切换到窗口"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not switch"
+msgstr "无法切换"
+
+#: runtime/src/builtins/system.tsx
+msgid "Close Window"
+msgstr "关闭窗口"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not close the window"
+msgstr "无法关闭窗口"
+
+#: runtime/src/builtins/system.tsx
+msgid "Unsaved work in open applications may be lost."
+msgstr "打开的应用程序中未保存的内容可能会丢失。"
+
+#: runtime/src/builtins/system.tsx
+msgid "Shut down the computer?"
+msgstr "关闭电脑？"
+
+#: runtime/src/builtins/system.tsx
+msgid "All your applications will be closed."
+msgstr "你的所有应用程序都将关闭。"
+
+#: runtime/src/builtins/system.tsx
+msgid "Empty the trash?"
+msgstr "清空回收站？"
+
+#: runtime/src/builtins/system.tsx
+msgid "The files in it are deleted permanently."
+msgstr "其中的文件将被永久删除。"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not list audio devices"
+msgstr "无法列出音频设备"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not switch device"
+msgstr "无法切换设备"
+
+#: runtime/src/builtins/system.tsx
+msgid "Output: {0}"
+msgstr "输出：{0}"
+
+#: runtime/src/builtins/system.tsx
+msgid "Input: {0}"
+msgstr "输入：{0}"
+
+#: runtime/src/builtins/system.tsx
+msgid "Search audio devices…"
+msgstr "搜索音频设备…"
+
+#: runtime/src/builtins/system.tsx
+msgid "No audio devices found"
+msgstr "没有找到音频设备"
+
+#: runtime/src/builtins/system.tsx
+msgid "Output"
+msgstr "输出"
+
+#: runtime/src/builtins/system.tsx
+msgid "Use as Output"
+msgstr "用作输出"
+
+#: runtime/src/builtins/system.tsx
+msgid "Use as Input"
+msgstr "用作输入"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not list processes"
+msgstr "无法列出进程"
+
+#: runtime/src/builtins/system.tsx
+msgid "Killed {0}"
+msgstr "已强制结束 {0}"
+
+#: runtime/src/builtins/system.tsx
+msgid "Quit {0}"
+msgstr "已退出 {0}"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not stop {0}"
+msgstr "无法停止 {0}"
+
+#: runtime/src/builtins/system.tsx
+msgid "Search by name, command or port (e.g. 3000)…"
+msgstr "按名称、命令或端口搜索（例如 3000）…"
+
+#: runtime/src/builtins/system.tsx
+msgid "Quit Process"
+msgstr "退出进程"
+
+#: runtime/src/builtins/system.tsx
+msgid "Force Kill"
+msgstr "强制结束"
+
+#: runtime/src/builtins/system.tsx
+msgid "Copy PID"
+msgstr "复制 PID"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not read your files"
+msgstr "无法读取你的文件"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not search files"
+msgstr "无法搜索文件"
+
+#: runtime/src/builtins/system.tsx
+msgid "Type to search your files"
+msgstr "输入以搜索你的文件"
+
+#: runtime/src/builtins/system.tsx
+msgid "{0} files and folders under your home folder. Hidden folders and node_modules are skipped."
+msgstr "主文件夹下共有 {0} 个文件和文件夹。隐藏文件夹和 node_modules 已跳过。"
+
+#: runtime/src/builtins/system.tsx
+msgid "Reading file names…"
+msgstr "正在读取文件名…"
+
+#: runtime/src/builtins/system.tsx
+msgid "No files found"
+msgstr "没有找到文件"
+
+#: runtime/src/builtins/system.tsx
+msgid "Search files by name…"
+msgstr "按名称搜索文件…"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not move to trash"
+msgstr "无法移到回收站"
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not read browser data"
+msgstr "无法读取浏览器数据"
+
+#: runtime/src/builtins/system.tsx
+msgid "Search browser bookmarks…"
+msgstr "搜索浏览器书签…"
+
+#: runtime/src/builtins/system.tsx
+msgid "No bookmarks found"
+msgstr "没有找到书签"
+
+#: runtime/src/builtins/system.tsx
+msgid "Search browser history…"
+msgstr "搜索浏览器历史…"
+
+#: runtime/src/builtins/system.tsx
+msgid "No browsing history found"
+msgstr "没有找到浏览历史"
 
 #: runtime/src/builtins/timer.tsx
 msgid "Resume"

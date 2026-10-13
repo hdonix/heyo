@@ -22,6 +22,7 @@ import type { Application, FoundFiles } from "../../../shared/wire";
 import { cacheRoot } from "../context";
 import { Files, System, Windows } from "../heyo/plain";
 import { request } from "../protocol";
+import { locale, t } from "../../../shared/i18n";
 
 function fail(title: string) {
   return (e: unknown) => showToast({ style: Toast.Style.Failure, title, message: e instanceof Error ? e.message : String(e) });
@@ -50,7 +51,7 @@ export function SwitchWindows() {
       .then((all) => setWindows([...all.filter((w) => !w.active), ...all.filter((w) => w.active)]))
       .catch((e) => {
         setWindows([]);
-        fail("Could not list windows")(e);
+        fail(t("Could not list windows"))(e);
       });
   useEffect(() => {
     reload();
@@ -58,8 +59,8 @@ export function SwitchWindows() {
   }, []);
 
   return (
-    <List isLoading={windows === undefined} searchBarPlaceholder="Search open windows…">
-      {windows && <List.EmptyView icon={Icon.Window} title="No open windows" />}
+    <List isLoading={windows === undefined} searchBarPlaceholder={t("Search open windows…")}>
+      {windows && <List.EmptyView icon={Icon.Window} title={t("No open windows")} />}
       {(windows ?? []).map((w) => (
         <List.Item
           key={w.id}
@@ -67,17 +68,17 @@ export function SwitchWindows() {
           subtitle={w.class}
           icon={iconFor(w.class, apps)}
           keywords={[w.class]}
-          accessories={w.active ? [{ tag: "Current" }] : undefined}
+          accessories={w.active ? [{ tag: t("Current") }] : undefined}
           actions={
             <ActionPanel>
-              <Action title="Switch to Window" icon={Icon.Window} onAction={() => Windows.activate(w.id).catch(fail("Could not switch"))} />
+              <Action title={t("Switch to Window")} icon={Icon.Window} onAction={() => Windows.activate(w.id).catch(fail(t("Could not switch")))} />
               <Action
-                title="Close Window"
+                title={t("Close Window")}
                 icon={Icon.XMarkCircle}
                 style="destructive"
                 shortcut={{ modifiers: ["ctrl"], key: "x" }}
                 onAction={async () => {
-                  await Windows.close(w.id).catch(fail("Could not close the window"));
+                  await Windows.close(w.id).catch(fail(t("Could not close the window")));
                   setTimeout(reload, 300);
                 }}
               />
@@ -113,16 +114,16 @@ export const systemCommands: Record<SystemAction, () => Promise<void>> = {
     await system("sleep");
   },
   restart: async () => {
-    if (await confirmed("Restart the computer?", "Unsaved work in open applications may be lost.", "Restart")) await system("restart");
+    if (await confirmed(t("Restart the computer?"), t("Unsaved work in open applications may be lost."), t("Restart"))) await system("restart");
   },
   "shut-down": async () => {
-    if (await confirmed("Shut down the computer?", "Unsaved work in open applications may be lost.", "Shut Down")) await system("shut-down");
+    if (await confirmed(t("Shut down the computer?"), t("Unsaved work in open applications may be lost."), t("Shut Down"))) await system("shut-down");
   },
   "log-out": async () => {
-    if (await confirmed("Log out?", "All your applications will be closed.", "Log Out")) await system("log-out");
+    if (await confirmed(t("Log out?"), t("All your applications will be closed."), t("Log Out"))) await system("log-out");
   },
   "empty-trash": async () => {
-    if (await confirmed("Empty the trash?", "The files in it are deleted permanently.", "Empty Trash")) await system("empty-trash");
+    if (await confirmed(t("Empty the trash?"), t("The files in it are deleted permanently."), t("Empty Trash"))) await system("empty-trash");
   },
   "toggle-dark-mode": () => system("toggle-dark-mode"),
   "volume-up": () => system("volume-up"),
@@ -140,7 +141,7 @@ export function AudioDevices() {
       .then(setDevices)
       .catch((e) => {
         setDevices([]);
-        fail("Could not list audio devices")(e);
+        fail(t("Could not list audio devices"))(e);
       });
   useEffect(() => {
     reload();
@@ -150,13 +151,13 @@ export function AudioDevices() {
     try {
       await System.useAudioDevice(device.kind, device.name);
     } catch (e) {
-      return fail("Could not switch device")(e);
+      return fail(t("Could not switch device"))(e);
     }
     await reload();
-    await showToast({ title: `${device.kind === "output" ? "Output" : "Input"}: ${device.description}` });
+    await showToast({ title: device.kind === "output" ? t("Output: {0}", device.description) : t("Input: {0}", device.description) });
   };
 
-  const section = (kind: AudioDevice["kind"], title: string, icon: string) => (
+  const section = (kind: AudioDevice["kind"], title: string, useTitle: string, icon: string) => (
     <List.Section title={title}>
       {(devices ?? [])
         .filter((d) => d.kind === kind)
@@ -166,10 +167,10 @@ export function AudioDevices() {
             title={d.description}
             icon={icon}
             keywords={[d.name]}
-            accessories={d.current ? [{ tag: { value: "Current", color: Color.Green } }] : undefined}
+            accessories={d.current ? [{ tag: { value: t("Current"), color: Color.Green } }] : undefined}
             actions={
               <ActionPanel>
-                <Action title={`Use as ${title}`} icon={icon} onAction={() => use(d)} />
+                <Action title={useTitle} icon={icon} onAction={() => use(d)} />
               </ActionPanel>
             }
           />
@@ -178,10 +179,10 @@ export function AudioDevices() {
   );
 
   return (
-    <List isLoading={devices === undefined} searchBarPlaceholder="Search audio devices…">
-      <List.EmptyView icon={Icon.SpeakerOn} title="No audio devices found" />
-      {section("output", "Output", Icon.SpeakerOn)}
-      {section("input", "Input", Icon.Microphone)}
+    <List isLoading={devices === undefined} searchBarPlaceholder={t("Search audio devices…")}>
+      <List.EmptyView icon={Icon.SpeakerOn} title={t("No audio devices found")} />
+      {section("output", t("Output"), t("Use as Output"), Icon.SpeakerOn)}
+      {section("input", t("Input"), t("Use as Input"), Icon.Microphone)}
     </List>
   );
 }
@@ -196,7 +197,7 @@ export function KillProcess() {
     request<ProcessInfo[]>("host.processes.list")
       // Ending the runtime would end this command with it.
       .then((all) => setList(all.filter((p) => p.pid !== process.pid)))
-      .catch((e) => (setList([]), fail("Could not list processes")(e)));
+      .catch((e) => (setList([]), fail(t("Could not list processes"))(e)));
   useEffect(() => {
     reload();
   }, []);
@@ -204,15 +205,15 @@ export function KillProcess() {
   const end = async (p: ProcessInfo, force: boolean) => {
     try {
       await request("host.processes.end", { pid: p.pid, force });
-      await showToast({ title: `${force ? "Killed" : "Quit"} ${p.name}`, message: `PID ${p.pid}` });
+      await showToast({ title: force ? t("Killed {0}", p.name) : t("Quit {0}", p.name), message: `PID ${p.pid}` });
       setTimeout(reload, 400);
     } catch (e) {
-      fail(`Could not stop ${p.name}`)(e);
+      fail(t("Could not stop {0}", p.name))(e);
     }
   };
 
   return (
-    <List isLoading={list === undefined} searchBarPlaceholder="Search by name, command or port (e.g. 3000)…">
+    <List isLoading={list === undefined} searchBarPlaceholder={t("Search by name, command or port (e.g. 3000)…")}>
       {(list ?? []).map((p) => (
         <List.Item
           key={p.pid}
@@ -227,10 +228,10 @@ export function KillProcess() {
           ]}
           actions={
             <ActionPanel>
-              <Action title="Quit Process" icon={Icon.XMarkCircle} onAction={() => end(p, false)} />
-              <Action title="Force Kill" icon={Icon.Bolt} style="destructive" onAction={() => end(p, true)} />
-              <Action.CopyToClipboard title="Copy PID" content={String(p.pid)} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
-              <Action title="Refresh" icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={reload} />
+              <Action title={t("Quit Process")} icon={Icon.XMarkCircle} onAction={() => end(p, false)} />
+              <Action title={t("Force Kill")} icon={Icon.Bolt} style="destructive" onAction={() => end(p, true)} />
+              <Action.CopyToClipboard title={t("Copy PID")} content={String(p.pid)} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
+              <Action title={t("Refresh")} icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={reload} />
             </ActionPanel>
           }
         />
@@ -249,7 +250,7 @@ export function SearchFiles() {
   // The host keeps the file names in memory; opening the command re-reads
   // them. When that happens is Heyo's to say, not an extension's.
   useEffect(() => {
-    request("host.files.refresh").catch(fail("Could not read your files"));
+    request("host.files.refresh").catch(fail(t("Could not read your files")));
   }, []);
 
   useEffect(() => {
@@ -263,19 +264,24 @@ export function SearchFiles() {
           // Ask again until the scan in progress has finished.
           if (r.scanning) timer = setTimeout(search, 300);
         })
-        .catch(fail("Could not search files"));
+        .catch(fail(t("Could not search files")));
     search();
     return () => clearTimeout(timer);
   }, [query]);
 
   const home = os.homedir();
   const empty = !query.trim()
-    ? { title: "Type to search your files", description: results.total ? `${results.total.toLocaleString()} files and folders under your home folder. Hidden folders and node_modules are skipped.` : "Reading file names…" }
+    ? {
+        title: t("Type to search your files"),
+        description: results.total
+          ? t("{0} files and folders under your home folder. Hidden folders and node_modules are skipped.", results.total.toLocaleString(locale()))
+          : t("Reading file names…"),
+      }
     : results.scanning && !results.total
-      ? { title: "Reading file names…", description: undefined }
-      : { title: "No files found", description: undefined };
+      ? { title: t("Reading file names…"), description: undefined }
+      : { title: t("No files found"), description: undefined };
   return (
-    <List isLoading={results.scanning} filtering={false} onSearchTextChange={setQuery} searchBarPlaceholder="Search files by name…">
+    <List isLoading={results.scanning} filtering={false} onSearchTextChange={setQuery} searchBarPlaceholder={t("Search files by name…")}>
       <List.EmptyView icon={Icon.MagnifyingGlass} title={empty.title} description={empty.description} />
       {results.files.map(({ path: file, isDirectory }) => (
         <List.Item
@@ -285,16 +291,16 @@ export function SearchFiles() {
           icon={isDirectory ? Icon.Folder : Icon.Document}
           actions={
             <ActionPanel>
-              <Action.Open title="Open" target={file} />
+              <Action.Open target={file} />
               <Action.ShowInFinder path={file} shortcut={{ modifiers: ["cmd"], key: "return" }} />
-              <Action.CopyToClipboard title="Copy Path" content={file} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
+              <Action.CopyToClipboard title={t("Copy Path")} content={file} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
               <Action
-                title="Move to Trash"
+                title={t("Move to Trash")}
                 icon={Icon.Trash}
                 style="destructive"
                 shortcut={{ modifiers: ["ctrl"], key: "x" }}
                 onAction={async () => {
-                  await trash(file).catch(fail("Could not move to trash"));
+                  await trash(file).catch(fail(t("Could not move to trash")));
                   setResults((r) => ({ ...r, files: r.files.filter((f) => f.path !== file) }));
                 }}
               />
@@ -459,7 +465,7 @@ function PageList(props: { load(): Page[]; placeholder: string; empty: string })
         setPages(props.load().filter((p) => !seen.has(key(p)) && seen.add(key(p))));
       } catch (e) {
         setPages([]);
-        fail("Could not read browser data")(e);
+        fail(t("Could not read browser data"))(e);
       }
     });
   }, []);
@@ -474,7 +480,7 @@ function PageList(props: { load(): Page[]; placeholder: string; empty: string })
 
   return (
     <List isLoading={pages === undefined} filtering={false} onSearchTextChange={setQuery} searchBarPlaceholder={props.placeholder}>
-      <List.EmptyView icon={Icon.Globe} title={pages?.length ? "No matches" : props.empty} />
+      <List.EmptyView icon={Icon.Globe} title={pages?.length ? t("No matches") : props.empty} />
       {visible.map((p, i) => (
         <List.Item
           key={`${p.url}-${i}`}
@@ -485,14 +491,14 @@ function PageList(props: { load(): Page[]; placeholder: string; empty: string })
           actions={
             <ActionPanel>
               <Action
-                title="Open in Browser"
+                title={t("Open in Browser")}
                 icon={Icon.Globe}
                 onAction={async () => {
                   await open(p.url);
                   await closeMainWindow();
                 }}
               />
-              <Action.CopyToClipboard title="Copy Link" content={p.url} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
+              <Action.CopyToClipboard title={t("Copy Link")} content={p.url} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
             </ActionPanel>
           }
         />
@@ -502,11 +508,11 @@ function PageList(props: { load(): Page[]; placeholder: string; empty: string })
 }
 
 export function SearchBookmarks() {
-  return <PageList load={bookmarks} placeholder="Search browser bookmarks…" empty="No bookmarks found" />;
+  return <PageList load={bookmarks} placeholder={t("Search browser bookmarks…")} empty={t("No bookmarks found")} />;
 }
 
 export function SearchHistory() {
-  return <PageList load={history} placeholder="Search browser history…" empty="No browsing history found" />;
+  return <PageList load={history} placeholder={t("Search browser history…")} empty={t("No browsing history found")} />;
 }
 
 export { showInFinder };

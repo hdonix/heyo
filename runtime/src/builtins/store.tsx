@@ -14,6 +14,7 @@ import { registered, unregister } from "../dev/registry";
 import { request } from "../protocol";
 import { extract } from "../unzip";
 import { PreferencesForm } from "./setup";
+import { locale, t, tn, translate } from "../../../shared/i18n";
 
 const API = "https://www.raycast.com/api/v1";
 
@@ -48,13 +49,12 @@ async function download(listing: Listing) {
     const fresh = await getJson<Listing>(`${API}/extensions/${listing.owner.handle}/${listing.name}`);
     res = await fetch(fresh.download_url);
   }
-  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(t("Download failed: {0} {1}", res.status, res.statusText));
   return Buffer.from(await res.arrayBuffer());
 }
 
 async function install(listing: Listing, update = false) {
-  const [doing, done] = update ? ["Updating", "Updated"] : ["Installing", "Installed"];
-  const toast = await showToast({ style: Toast.Style.Animated, title: `${doing} ${listing.title}…` });
+  const toast = await showToast({ style: Toast.Style.Animated, title: update ? t("Updating {0}…", listing.title) : t("Installing {0}…", listing.title) });
   fs.mkdirSync(extensionsDir, { recursive: true });
   const staging = fs.mkdtempSync(path.join(extensionsDir, ".install-"));
   try {
@@ -62,7 +62,7 @@ async function install(listing: Listing, update = false) {
     const manifest = readManifest(staging);
     // The name becomes a directory that is replaced on install: it must be a
     // plain name ("." and ".." would point at Heyo's own data).
-    if (!/^[A-Za-z0-9][\w-]*$/.test(manifest.name)) throw new Error(`Invalid extension name: ${manifest.name}`);
+    if (!/^[A-Za-z0-9][\w-]*$/.test(manifest.name)) throw new Error(t("Invalid extension name: {0}", manifest.name));
     writeJson(path.join(staging, ".heyo-store.json"), {
       owner: listing.owner.handle,
       name: listing.name,
@@ -70,18 +70,18 @@ async function install(listing: Listing, update = false) {
       installedAt: new Date().toISOString(),
     });
     const dest = path.join(extensionsDir, manifest.name);
-    if (path.dirname(dest) !== path.resolve(extensionsDir)) throw new Error(`Invalid extension name: ${manifest.name}`);
+    if (path.dirname(dest) !== path.resolve(extensionsDir)) throw new Error(t("Invalid extension name: {0}", manifest.name));
     fs.rmSync(dest, { recursive: true, force: true });
     fs.renameSync(staging, dest);
     await request("host.reload");
     toast.style = Toast.Style.Success;
-    toast.title = `${done} ${listing.title}`;
-    toast.message = update ? undefined : "Its commands are now in the root search.";
+    toast.title = update ? t("Updated {0}", listing.title) : t("Installed {0}", listing.title);
+    toast.message = update ? undefined : t("Its commands are now in the root search.");
     return true;
   } catch (e) {
     fs.rmSync(staging, { recursive: true, force: true });
     toast.style = Toast.Style.Failure;
-    toast.title = `Failed to ${update ? "update" : "install"} ${listing.title}`;
+    toast.title = update ? t("Failed to update {0}", listing.title) : t("Failed to install {0}", listing.title);
     toast.message = e instanceof Error ? e.message : String(e);
     return false;
   }
@@ -127,7 +127,7 @@ async function checkUpdates(extensions: Extension[]): Promise<Map<string, Listin
   await Promise.all(Array.from({ length: 6 }, worker));
   return updates;
 }
-const formatCount = (n: number) => Intl.NumberFormat("en", { notation: "compact" }).format(n);
+const formatCount = (n: number) => Intl.NumberFormat(locale(), { notation: "compact" }).format(n);
 const runnable = (listing: Listing) => listing.commands.filter((c) => c.mode !== "menu-bar");
 
 function ListingActions(props: {
@@ -141,7 +141,7 @@ function ListingActions(props: {
   return (
     <ActionPanel>
       <Action
-        title={props.update ? "Update Extension" : props.installed ? "Reinstall Extension" : "Install Extension"}
+        title={props.update ? t("Update Extension") : props.installed ? t("Reinstall Extension") : t("Install Extension")}
         icon={Icon.Download}
         onAction={async () => {
           await install(listing, props.update);
@@ -150,7 +150,7 @@ function ListingActions(props: {
       />
       {props.details && (
         <Action.Push
-          title="Show Details"
+          title={t("Show Details")}
           icon={Icon.Sidebar}
           shortcut={{ modifiers: ["cmd"], key: "d" }}
           target={<ListingDetail listing={listing} installed={props.installed} onInstalled={props.onInstalled} />}
@@ -185,9 +185,9 @@ function ListingDetail(props: { listing: Listing; installed: boolean; onInstalle
       markdown={`# ${listing.title}\n\n${listing.description}\n\n${readme ?? ""}`}
       metadata={
         <Detail.Metadata>
-          <Detail.Metadata.Label title="Author" text={listing.author.name} />
-          <Detail.Metadata.Label title="Downloads" text={formatCount(listing.download_count)} />
-          <Detail.Metadata.TagList title="Platforms">
+          <Detail.Metadata.Label title={t("Author")} text={listing.author.name} />
+          <Detail.Metadata.Label title={t("Downloads")} text={formatCount(listing.download_count)} />
+          <Detail.Metadata.TagList title={t("Platforms")}>
             {(listing.platforms ?? []).map((p) => (
               <Detail.Metadata.TagList.Item key={p} text={p} />
             ))}
@@ -224,7 +224,7 @@ export function Store() {
         } catch (e) {
           if (controller.signal.aborted) return;
           setLoading(false);
-          showToast({ style: Toast.Style.Failure, title: "Could not reach the Raycast Store", message: e instanceof Error ? e.message : String(e) });
+          showToast({ style: Toast.Style.Failure, title: t("Could not reach the Raycast Store"), message: e instanceof Error ? e.message : String(e) });
         }
       },
       query ? 250 : 0,
@@ -238,7 +238,7 @@ export function Store() {
   const refresh = () => setInstalled(installedCommits());
 
   return (
-    <List isLoading={loading} searchBarPlaceholder="Search the Raycast Store…" onSearchTextChange={setQuery}>
+    <List isLoading={loading} searchBarPlaceholder={t("Search the Raycast Store…")} onSearchTextChange={setQuery}>
       {listings.map((listing) => {
         const commands = runnable(listing).length;
         const macOnly = listing.platforms?.length === 1 && listing.platforms[0] === "macOS";
@@ -252,12 +252,12 @@ export function Store() {
             icon={listing.icons.dark || listing.icons.light || Icon.Box}
             accessories={[
               ...(update
-                ? [{ tag: { value: "Update", color: Color.Orange } }]
+                ? [{ tag: { value: t("Update"), color: Color.Orange } }]
                 : isInstalled
-                  ? [{ tag: { value: "Installed", color: Color.Green } }]
+                  ? [{ tag: { value: t("Installed"), color: Color.Green } }]
                   : []),
-              ...(macOnly ? [{ tag: { value: "macOS", color: Color.Orange }, tooltip: "May rely on macOS" }] : []),
-              { text: `${commands} command${commands === 1 ? "" : "s"}` },
+              ...(macOnly ? [{ tag: { value: "macOS", color: Color.Orange }, tooltip: t("May rely on macOS") }] : []),
+              { text: tn("{n} command", "{n} commands", commands) },
               { icon: Icon.Download, text: formatCount(listing.download_count) },
             ]}
             actions={
@@ -311,28 +311,28 @@ export function Extensions() {
 
   const uninstall = async (extension: Extension) => {
     const confirmed = await confirmAlert({
-      title: `Uninstall ${extension.manifest.title}?`,
-      message: "Its preferences are kept.",
-      primaryAction: { title: "Uninstall", style: "DESTRUCTIVE" },
+      title: t("Uninstall {0}?", extension.manifest.title),
+      message: t("Its preferences are kept."),
+      primaryAction: { title: t("Uninstall"), style: "DESTRUCTIVE" },
     });
     if (!confirmed) return;
     fs.rmSync(extension.dir, { recursive: true, force: true });
     await request("host.reload");
     reload();
-    showToast({ title: `Uninstalled ${extension.manifest.title}` });
+    showToast({ title: t("Uninstalled {0}", extension.manifest.title) });
   };
 
   const stopDeveloping = async (extension: Extension & { source: string }) => {
     const confirmed = await confirmAlert({
-      title: `Take ${extension.manifest.title} out of Heyo?`,
-      message: `Its sources in ${extension.source} are not touched; heyo dev puts it back.`,
-      primaryAction: { title: "Remove", style: "DESTRUCTIVE" },
+      title: t("Take {0} out of Heyo?", extension.manifest.title),
+      message: t("Its sources in {0} are not touched; heyo dev puts it back.", extension.source),
+      primaryAction: { title: t("Remove"), style: "DESTRUCTIVE" },
     });
     if (!confirmed) return;
     unregister(extension.dir);
     await request("host.reload");
     reload();
-    showToast({ title: `Removed ${extension.manifest.title}` });
+    showToast({ title: t("Removed {0}", extension.manifest.title) });
   };
 
   const developmentItem = (extension: Extension & { source: string }) => {
@@ -345,13 +345,13 @@ export function Extensions() {
         subtitle={extension.source}
         icon={manifest.icon ? path.join(extension.dir, "assets", manifest.icon) : Icon.Hammer}
         keywords={[manifest.name, "development"]}
-        accessories={[{ tag: { value: "Development", color: Color.Blue }, tooltip: "Built by heyo dev; not updated from the store" }]}
+        accessories={[{ tag: { value: t("Development"), color: Color.Blue }, tooltip: t("Built by heyo dev; not updated from the store") }]}
         actions={
           <ActionPanel>
-            {hasPreferences && <Action.Push title="Configure" icon={Icon.Gear} target={<ConfigureExtension extension={extension} />} />}
-            <Action.Open title="Open Source Folder" target={extension.source} />
+            {hasPreferences && <Action.Push title={t("Configure")} icon={Icon.Gear} target={<ConfigureExtension extension={extension} />} />}
+            <Action.Open title={t("Open Source Folder")} target={extension.source} />
             <Action
-              title="Stop Developing"
+              title={t("Stop Developing")}
               icon={Icon.Trash}
               style="destructive"
               shortcut={{ modifiers: ["ctrl"], key: "x" }}
@@ -377,29 +377,29 @@ export function Extensions() {
         icon={manifest.icon ? path.join(extension.dir, "assets", manifest.icon) : Icon.Box}
         keywords={[manifest.name]}
         accessories={[
-          ...(available ? [{ tag: { value: "Update available", color: Color.Orange } }] : []),
-          { text: `${commands} command${commands === 1 ? "" : "s"}` },
+          ...(available ? [{ tag: { value: t("Update available"), color: Color.Orange } }] : []),
+          { text: tn("{n} command", "{n} commands", commands) },
         ]}
         actions={
           <ActionPanel>
             <ActionPanel.Section>
-              {available && <Action title="Update Extension" icon={Icon.Download} onAction={() => update([available])} />}
+              {available && <Action title={t("Update Extension")} icon={Icon.Download} onAction={() => update([available])} />}
               {hasPreferences && (
-                <Action.Push title="Configure" icon={Icon.Gear} target={<ConfigureExtension extension={extension} />} />
+                <Action.Push title={t("Configure")} icon={Icon.Gear} target={<ConfigureExtension extension={extension} />} />
               )}
-              <Action.Open title="Open Folder" target={extension.dir} />
+              <Action.Open title={t("Open Folder")} target={extension.dir} />
             </ActionPanel.Section>
             <ActionPanel.Section>
               {pending.length > 0 && (
                 <Action
-                  title={`Update All Extensions (${pending.length})`}
+                  title={t("Update All Extensions ({0})", pending.length)}
                   icon={Icon.Download}
                   shortcut={{ modifiers: ["cmd", "shift"], key: "u" }}
                   onAction={() => update(pending)}
                 />
               )}
               <Action
-                title="Check for Updates"
+                title={t("Check for Updates")}
                 icon={Icon.ArrowClockwise}
                 shortcut={{ modifiers: ["cmd"], key: "r" }}
                 onAction={() => {
@@ -408,7 +408,7 @@ export function Extensions() {
                 }}
               />
               <Action
-                title="Uninstall"
+                title={t("Uninstall")}
                 icon={Icon.Trash}
                 style="destructive"
                 shortcut={{ modifiers: ["ctrl"], key: "x" }}
@@ -424,15 +424,15 @@ export function Extensions() {
   const outdated = extensions.filter((e) => updates?.has(e.dir));
   const current = extensions.filter((e) => !updates?.has(e.dir));
   return (
-    <List isLoading={updates === undefined} searchBarPlaceholder="Search installed extensions…">
+    <List isLoading={updates === undefined} searchBarPlaceholder={t("Search installed extensions…")}>
       <List.EmptyView
         icon={Icon.Box}
-        title="No extensions installed"
-        description="Run “Search Raycast Store” to install one."
+        title={t("No extensions installed")}
+        description={t("Run “{0}” to install one.", translate("Search Raycast Store"))}
       />
-      {developed.length > 0 && <List.Section title="In Development">{developed.map(developmentItem)}</List.Section>}
-      {outdated.length > 0 && <List.Section title="Updates Available">{outdated.map(item)}</List.Section>}
-      <List.Section title={outdated.length > 0 ? "Up to Date" : developed.length > 0 ? "Installed" : undefined}>{current.map(item)}</List.Section>
+      {developed.length > 0 && <List.Section title={t("In Development")}>{developed.map(developmentItem)}</List.Section>}
+      {outdated.length > 0 && <List.Section title={t("Updates Available")}>{outdated.map(item)}</List.Section>}
+      <List.Section title={outdated.length > 0 ? t("Up to Date") : developed.length > 0 ? t("Installed") : undefined}>{current.map(item)}</List.Section>
     </List>
   );
 }

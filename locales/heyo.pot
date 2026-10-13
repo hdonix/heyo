@@ -206,11 +206,13 @@ msgid "Text recognition is not set up yet. Download it in Heyo Settings → Scre
 msgstr ""
 
 #: src-tauri/src/ext/answer.rs
+#: runtime/src/builtins/system.tsx
 msgid "Restart the computer?"
 msgstr ""
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Restart"
 msgstr ""
 
@@ -220,15 +222,18 @@ msgstr ""
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Shut Down"
 msgstr ""
 
 #: src-tauri/src/ext/answer.rs
+#: runtime/src/builtins/system.tsx
 msgid "Log out?"
 msgstr ""
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Log Out"
 msgstr ""
 
@@ -520,6 +525,7 @@ msgid "system, sign out"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/system.tsx
 msgid "Empty Trash"
 msgstr ""
 
@@ -593,6 +599,7 @@ msgid "countdown, pomodoro, alarm, minutes"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
+#: runtime/src/builtins/store.tsx
 msgid "Development"
 msgstr ""
 
@@ -627,6 +634,7 @@ msgid "The command failed"
 msgstr ""
 
 #: src-tauri/src/menubar.rs
+#: runtime/src/builtins/system.tsx
 msgid "Refresh"
 msgstr ""
 
@@ -1370,6 +1378,7 @@ msgid "This version of Heyo comes with a newer extension than the one installed.
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Update"
 msgstr ""
 
@@ -1514,6 +1523,7 @@ msgid "A one-time download of about 270 MB (SenseVoice speech model)."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Installed"
 msgstr ""
 
@@ -1564,6 +1574,7 @@ msgid "Type as You Speak"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/system.tsx
 msgid "Input"
 msgstr ""
 
@@ -1755,6 +1766,7 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 #: src/raycast/FormView.tsx
+#: runtime/src/builtins/store.tsx
 msgid "Remove"
 msgstr ""
 
@@ -1776,6 +1788,7 @@ msgid "Settings File"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Check for Updates"
 msgstr ""
 
@@ -1937,6 +1950,7 @@ msgid "Preferences"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/system.tsx
 msgid "No matches"
 msgstr ""
 
@@ -1981,6 +1995,7 @@ msgid "Permissions are about what Heyo hands over or does for an extension. They
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Stop Developing"
 msgstr ""
 
@@ -1997,6 +2012,7 @@ msgid "Its preferences are kept"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: runtime/src/builtins/store.tsx
 msgid "Uninstall"
 msgstr ""
 
@@ -2791,6 +2807,7 @@ msgstr ""
 
 #: src/rows.ts
 #: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/system.tsx
 msgid "Copy Link"
 msgstr ""
 
@@ -2921,6 +2938,7 @@ msgid "Copied to Clipboard"
 msgstr ""
 
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/system.tsx
 msgid "Open in Browser"
 msgstr ""
 
@@ -2933,6 +2951,7 @@ msgid "Show in Files"
 msgstr ""
 
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/system.tsx
 msgid "Move to Trash"
 msgstr ""
 
@@ -3009,6 +3028,7 @@ msgid "Enclosing folder"
 msgstr ""
 
 #: runtime/src/api/files.tsx
+#: runtime/src/builtins/store.tsx
 msgid "Open Folder"
 msgstr ""
 
@@ -3086,6 +3106,7 @@ msgid "Close Quick Look"
 msgstr ""
 
 #: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/system.tsx
 msgid "Copy Path"
 msgstr ""
 
@@ -3733,6 +3754,328 @@ msgstr ""
 
 #: runtime/src/builtins/setup.tsx
 msgid "Run {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Download failed: {0} {1}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Updating {0}…"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Installing {0}…"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Invalid extension name: {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Updated {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Installed {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Its commands are now in the root search."
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Failed to update {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Failed to install {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Update Extension"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Reinstall Extension"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Install Extension"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Show Details"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Author"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Downloads"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Platforms"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Could not reach the Raycast Store"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Search the Raycast Store…"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "May rely on macOS"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "{n} command"
+msgid_plural "{n} commands"
+msgstr[0] ""
+msgstr[1] ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Uninstall {0}?"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Its preferences are kept."
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Uninstalled {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Take {0} out of Heyo?"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Its sources in {0} are not touched; heyo dev puts it back."
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Removed {0}"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Built by heyo dev; not updated from the store"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Configure"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Open Source Folder"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Update available"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Update All Extensions ({0})"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Search installed extensions…"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "No extensions installed"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Run “{0}” to install one."
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "In Development"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Updates Available"
+msgstr ""
+
+#: runtime/src/builtins/store.tsx
+msgid "Up to Date"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not list windows"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Search open windows…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "No open windows"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Current"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Switch to Window"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not switch"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Close Window"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not close the window"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Unsaved work in open applications may be lost."
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Shut down the computer?"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "All your applications will be closed."
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Empty the trash?"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "The files in it are deleted permanently."
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not list audio devices"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not switch device"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Output: {0}"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Input: {0}"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Search audio devices…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "No audio devices found"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Output"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Use as Output"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Use as Input"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not list processes"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Killed {0}"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Quit {0}"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not stop {0}"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Search by name, command or port (e.g. 3000)…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Quit Process"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Force Kill"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Copy PID"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not read your files"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not search files"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Type to search your files"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "{0} files and folders under your home folder. Hidden folders and node_modules are skipped."
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Reading file names…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "No files found"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Search files by name…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not move to trash"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Could not read browser data"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Search browser bookmarks…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "No bookmarks found"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "Search browser history…"
+msgstr ""
+
+#: runtime/src/builtins/system.tsx
+msgid "No browsing history found"
 msgstr ""
 
 #: runtime/src/builtins/timer.tsx
