@@ -285,12 +285,19 @@ pub fn activate_own(title: &str) -> bool {
 /// rule is `place`'s; what is known here is how many of the Shell's units
 /// a logical pixel is on a monitor: one where monitors are laid out
 /// scaled, the monitor's scale where they are laid out in pixels.
-fn own_place(place: OwnPlace, monitors: &[Monitor]) -> Option<(i32, i32)> {
-    let monitor = monitors.iter().find(|monitor| monitor.primary).or(monitors.first())?;
-    let per = monitor.scale / monitor.density.unwrap_or(monitor.scale);
-    let on = crate::platform::place::Monitor::new((monitor.x, monitor.y, monitor.width.max(0) as u32, monitor.height.max(0) as u32), per, true, None);
+fn own_place(place: OwnPlace, monitors: &[Monitor]) -> Option<serde_json::Value> {
     match place {
-        OwnPlace::BottomCentre { size } => Some(on.bottom_centre(((size.0 * per).round() as u32, (size.1 * per).round() as u32))),
+        OwnPlace::BottomCentre { size } => {
+            let monitor = monitors.iter().find(|monitor| monitor.primary).or(monitors.first())?;
+            let per = monitor.scale / monitor.density.unwrap_or(monitor.scale);
+            let on = crate::platform::place::Monitor::new((monitor.x, monitor.y, monitor.width.max(0) as u32, monitor.height.max(0) as u32), per, true, None);
+            let (x, y) = on.bottom_centre(((size.0 * per).round() as u32, (size.1 * per).round() as u32));
+            Some(serde_json::json!({ "at": [x, y] }))
+        }
+        OwnPlace::Cover { area } => {
+            let (x, y, width, height) = stage_area(area, monitors);
+            Some(serde_json::json!({ "cover": [x, y, width, height] }))
+        }
     }
 }
 
@@ -300,8 +307,10 @@ pub fn stand_own(title: &str, standing: &OwnStanding) -> bool {
     if running().is_none_or(|version| version < 3) {
         return false;
     }
-    let at = standing.at.and_then(|place| own_place(place, &monitors().ok()?));
-    let said = serde_json::json!({ "above": standing.above, "everywhere": standing.everywhere, "keyboard": standing.keyboard, "at": at.map(|(x, y)| [x, y]) });
+    let mut said = serde_json::json!({ "above": standing.above, "everywhere": standing.everywhere, "keyboard": standing.keyboard });
+    if let Some(serde_json::Value::Object(place)) = standing.at.and_then(|place| own_place(place, &monitors().ok()?)) {
+        said.as_object_mut().expect("an object").extend(place);
+    }
     call::<_, ()>("Stand", &(title, said.to_string())).is_ok()
 }
 
@@ -601,13 +610,18 @@ mod tests {
         // Two monitors laid out scaled, the second the primary one, at 200 %:
         // a unit is a logical pixel, and the monitor is 960 by 600 of them.
         let scaled = [Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }, Monitor { width: 960, height: 600, primary: true, ..monitor(1920, 0, 2.0, Some(2.0)) }];
-        assert_eq!(own_place(pill, &scaled), Some((1920 + 300, 600 - 44 - 60)));
+        assert_eq!(own_place(pill, &scaled), Some(serde_json::json!({ "at": [1920 + 300, 600 - 44 - 60] })));
         // The same monitor laid out in pixels: the window is twice as many units.
         let pixels = [Monitor { width: 1920, height: 1200, primary: true, ..monitor(0, 0, 2.0, Some(1.0)) }];
-        assert_eq!(own_place(pill, &pixels), Some((600, 1200 - 88 - 120)));
+        assert_eq!(own_place(pill, &pixels), Some(serde_json::json!({ "at": [600, 1200 - 88 - 120] })));
         // None is said to be primary: the first.
-        assert_eq!(own_place(pill, &[Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }]), Some((780, 1080 - 44 - 108)));
+        assert_eq!(own_place(pill, &[Monitor { width: 1920, height: 1080, ..monitor(0, 0, 1.0, Some(1.0)) }]), Some(serde_json::json!({ "at": [780, 1080 - 44 - 108] })));
         assert_eq!(own_place(pill, &[]), None);
+        // The overlay covers the monitor that was captured: the second,
+        // at 200 % beside one at 100 %, which the toolkit has at 1920,0
+        // with twice as many pixels as the Shell has units.
+        let cover = OwnPlace::Cover { area: area(1920 * 2, 0, 1920, 1200, 2.0) };
+        assert_eq!(own_place(cover, &[monitor(0, 0, 1.0, Some(1.0)), monitor(1920, 0, 2.0, Some(2.0))]), Some(serde_json::json!({ "cover": [1920, 0, 960, 600] })));
     }
 
     fn area(x: i32, y: i32, width: u32, height: u32, scale: f64) -> Area {

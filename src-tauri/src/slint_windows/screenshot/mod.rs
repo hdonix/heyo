@@ -46,6 +46,7 @@ use super::standing::{self, Keyboard, Layer, Standing};
 use super::thread::{self, Job};
 use super::ui;
 use crate::platform::capture::{Area, Shot};
+use crate::platform::desktop::OwnPlace;
 use crate::screenshot::selecting::{self, Action, Button, Cursor, Event, Key, Mode, Outcome, Selecting, Shape, Tool};
 
 /// How bright the capture is around the selection, out of 256.
@@ -70,6 +71,10 @@ const RESTING: Duration = Duration::from_secs(60);
 /// focus; and it hides all that is behind it.
 const STANDING: Standing = Standing { layer: Layer::Over, keyboard: Keyboard::All, listed: false, clear: false };
 
+/// What the window is called, as the markup has it: the desktop knows it
+/// by that where it is asked to place it.
+const TITLE: &str = "Heyo Screenshot";
+
 /// The overlay is on screen, or about to be.
 static UP: AtomicBool = AtomicBool::new(false);
 /// Counts answers from Slint's thread, for `watch`.
@@ -87,6 +92,9 @@ struct Capture {
 /// What is on screen.
 struct Up {
     selecting: Selecting,
+    mode: Mode,
+    /// The windows in the capture, as they were said.
+    windows: Vec<selecting::Area>,
     /// How many device pixels a logical one is, for this window.
     scale: f64,
     /// The size the window is to have before it is put on screen.
@@ -292,7 +300,10 @@ impl Overlay {
         let scale = f64::from(self.life.window().window().scale_factor()).max(0.1);
         self.life.window().set_dimmed(Image::from_rgba8_premultiplied(dimmed));
         let selecting = Selecting::new((area.width as f64 / scale, area.height as f64 / scale), (area.width, area.height), mode);
-        self.up = Some(Up { selecting, scale, size: (area.width, area.height), mapped: false, asked, clear: None });
+        self.up = Some(Up { selecting, mode, windows: Vec::new(), scale, size: (area.width, area.height), mapped: false, asked, clear: None });
+        // Where the window cannot place itself, the desktop is asked to
+        // have it cover the monitor that was read.
+        self.life.ask_desktop(TITLE, Some(OwnPlace::Cover { area }));
         (self.pressed, self.moved_pressed, self.ctrl, self.alt, self.cursor) = (false, 0, false, false, None);
         (self.on_toolbar, self.pressed_in_slint) = (false, false);
         self.push();
@@ -312,6 +323,17 @@ impl Overlay {
             // And if winit never says so, it is shown all the same.
             slint::Timer::single_shot(UNSIZED, || with(Overlay::map));
         }
+    }
+
+    /// The window is drawn at another scale than it was shown at: what is
+    /// selected in it is reckoned for that scale, from the beginning.
+    fn rescaled(&mut self) {
+        let scale = f64::from(self.life.window().window().scale_factor()).max(0.1);
+        let Some(up) = self.up.as_mut().filter(|up| (up.scale - scale).abs() > 1e-6) else { return };
+        up.scale = scale;
+        up.selecting = Selecting::new((up.size.0 as f64 / scale, up.size.1 as f64 / scale), up.size, up.mode);
+        up.selecting.windows(&up.windows);
+        self.push();
     }
 
     /// The monitor as it was read is here too. It is drawn at once, though
@@ -466,6 +488,13 @@ impl Overlay {
                     // Once Slint has heard of it too.
                     slint::Timer::single_shot(Duration::ZERO, || with(Overlay::map));
                 }
+                return EventResult::Propagate;
+            }
+            // Where a window learns its scale only once it is on a
+            // monitor (Wayland), it was shown at another: once Slint has
+            // heard of it too.
+            WindowEvent::ScaleFactorChanged { .. } => {
+                slint::Timer::single_shot(Duration::ZERO, || with(Overlay::rescaled));
                 return EventResult::Propagate;
             }
             WindowEvent::KeyboardInput { event, is_synthetic, .. } => {
@@ -751,6 +780,7 @@ pub(crate) fn windows(windows: Vec<selecting::Area>) {
         Slot::there(&OVERLAY, |overlay| {
             if let Some(up) = overlay.up.as_mut() {
                 up.selecting.windows(&windows);
+                up.windows = windows;
                 overlay.push();
             }
         });

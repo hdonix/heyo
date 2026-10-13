@@ -392,7 +392,8 @@ export default class HeyoExtension extends Extension {
     /// Wayland window cannot say of itself: `above` the others, on every
     /// workspace (`everywhere`), never with the keyboard (`keyboard`
     /// false), and where (`at`: x and y in the Shell's coordinates, as
-    /// Monitors gives them). It holds for the window of that title that is
+    /// Monitors gives them; or `cover`: x, y, width and height of a monitor
+    /// it is to fill). It holds for the window of that title that is
     /// there and for every one that comes, until said again; an empty
     /// standing takes it back.
     _Stand(title, standing) {
@@ -419,6 +420,15 @@ export default class HeyoExtension extends Extension {
             window.stick();
         if (standing.at)
             window.move_frame(true, standing.at[0], standing.at[1]);
+        if (standing.cover) {
+            // On that monitor, and then all of it: a window fills the
+            // monitor it is on.
+            const [x, y, width, height] = standing.cover;
+            if (window.is_fullscreen())
+                window.unmake_fullscreen();
+            window.move_resize_frame(true, x, y, width, height);
+            window.make_fullscreen();
+        }
         if (standing.keyboard === false && global.display.focus_window === window)
             this._keepFocus();
     }

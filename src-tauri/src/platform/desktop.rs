@@ -65,7 +65,7 @@ impl Supported {
 
 /// The standing the desktop itself is asked to give one of Heyo's windows
 /// (`Desktop::stand_own`).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy)]
 pub struct OwnStanding {
     /// Above the other windows.
     pub above: bool,
@@ -80,11 +80,14 @@ pub struct OwnStanding {
 
 /// Where the desktop is asked to put a window: the rule is
 /// `platform::place`'s, and the desktop's adapter knows its units.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy)]
 pub enum OwnPlace {
     /// At the bottom centre of the primary monitor, a tenth of its height
     /// up: a window of that size in logical pixels.
     BottomCentre { size: (f64, f64) },
+    /// Over all of a monitor, given as a capture of it is: its area as the
+    /// toolkit has it.
+    Cover { area: Area },
 }
 
 pub trait Desktop: Send + Sync {
