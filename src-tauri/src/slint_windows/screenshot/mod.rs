@@ -42,7 +42,7 @@ use tauri::AppHandle;
 
 use super::guard::{self, State};
 use super::life::{self, Life, Lives, Slot, Slotted};
-use super::standing::{self, Keyboard, Layer, Standing};
+use super::standing::{self, KeyOf, Keyboard, Keyed, Layer, Pointed, Standing};
 use super::thread::{self, Job};
 use super::ui;
 use crate::platform::capture::{Area, Shot};
@@ -202,6 +202,45 @@ impl Lives for Overlay {
         window.window().set_position(slint::PhysicalPosition::new(-(IDLE as i32) * 4, -(IDLE as i32) * 4));
         window.window().set_size(slint::PhysicalSize::new(IDLE, IDLE));
         window.window().on_winit_window_event(|_, event| Slot::there(&OVERLAY, |overlay| overlay.told(event)).unwrap_or(EventResult::Propagate));
+        // Where the window is not winit's, it hears of the pointer itself.
+        life.pointed(|pointed| {
+            let mut slint_too = false;
+            with(|overlay| {
+                let input = match pointed {
+                    Pointed::Moved(to) => Input::Moved(to),
+                    Pointed::Left => Input::Left,
+                    Pointed::Pressed(button) | Pointed::Released(button) => Input::Button { button: if button == standing::Button::Left { Mouse::Left } else { Mouse::Right }, down: matches!(pointed, Pointed::Pressed(_)) },
+                };
+                slint_too = matches!(overlay.input(input), EventResult::Propagate);
+            });
+            slint_too
+        });
+        life.keyed(|keyed| {
+            let mut slint_too = false;
+            with(|overlay| {
+                let input = match keyed {
+                    Keyed::Key { key, down, .. } => Input::Key {
+                        key: match key {
+                            KeyOf::Escape => Some(Key::Escape),
+                            KeyOf::Enter => Some(Key::Enter),
+                            KeyOf::F4 => Some(Key::F4),
+                            KeyOf::Character { made, placed } => Some(character(made, placed)),
+                            KeyOf::Control | KeyOf::Alt | KeyOf::Other => None,
+                        },
+                        down,
+                        held: match key {
+                            KeyOf::Control => Some(Held::Control),
+                            KeyOf::Alt => Some(Held::Alt),
+                            _ => None,
+                        },
+                        real: true,
+                    },
+                    Keyed::Held { ctrl, alt } => Input::Modifiers { ctrl, alt },
+                };
+                slint_too = matches!(overlay.input(input), EventResult::Propagate);
+            });
+            slint_too
+        });
         Ok(Overlay {
             life,
             handles,
@@ -253,7 +292,7 @@ fn rest() {
 /// For measuring how soon the overlay follows the pointer: with
 /// `HEYO_OVERLAY_TRACE` set, says what happened and when by the system's
 /// clock.
-fn trace(what: &str) {
+pub(in crate::slint_windows) fn trace(what: &str) {
     static WANTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     if *WANTED.get_or_init(|| std::env::var_os("HEYO_OVERLAY_TRACE").is_some()) {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_micros());
@@ -309,19 +348,25 @@ fn key_of(logical: &WinitKey, physical: PhysicalKey) -> Option<Key> {
         WinitKey::Named(NamedKey::Enter) => Some(Key::Enter),
         WinitKey::Named(NamedKey::F4) => Some(Key::F4),
         WinitKey::Character(text) => {
-            let made = text.chars().next()?.to_ascii_lowercase();
-            // On a layout whose letters are not these, a shortcut is the
-            // key where the letter is on the layout they are named after.
             let placed = match physical {
                 PhysicalKey::Code(KeyCode::KeyC) => Some('c'),
                 PhysicalKey::Code(KeyCode::KeyS) => Some('s'),
                 PhysicalKey::Code(KeyCode::KeyZ) => Some('z'),
                 _ => None,
             };
-            Some(Key::Character(if made.is_ascii() { made } else { placed.unwrap_or(made) }))
+            Some(character(text.chars().next()?, placed))
         }
         _ => None,
     }
+}
+
+/// A key that makes a character, as the overlay's rules know it. On a
+/// layout whose letters are not the ones shortcuts are named by, a
+/// shortcut is the key where the letter is on the layout they are named
+/// after (`placed`).
+fn character(made: char, placed: Option<char>) -> Key {
+    let made = made.to_ascii_lowercase();
+    Key::Character(if made.is_ascii() { made } else { placed.unwrap_or(made) })
 }
 
 fn icon(cursor: Cursor) -> CursorIcon {
@@ -361,7 +406,11 @@ impl Overlay {
         // It is put on screen when it has the monitor's size: at once if
         // it has it already, else when winit says it has (`told`).
         let sized = window.with_winit_window(|made| made.inner_size()).is_some_and(|size| (size.width, size.height) == (area.width, area.height));
-        if self.life.told().unplaced {
+        if self.life.told().layered {
+            // A surface of Heyo's own covers the output it was said to.
+            self.map();
+            self.rescaled();
+        } else if self.life.told().unplaced {
             // Where a window cannot place itself, it fills a monitor.
             window.set_fullscreen(true);
             self.map();

@@ -151,7 +151,13 @@ pub(super) fn run(host: Arc<dyn Host>, begun: mpsc::Sender<Result<(), String>>) 
             let winit = i_slint_backend_winit::Backend::builder().with_renderer_name(renderer.clone()).with_window_attributes_hook(told);
             let winit = if super::window::frames::wanted().is_some() { winit.with_custom_application_handler(Box::new(super::window::frames::Timing)) } else { winit };
             let winit = winit.build().map_err(|e| format!("Slint has no backend: {e}"))?;
-            let layered = || standing::here(MAKING.get()).layered;
+            let layered = || {
+                let told = standing::here(MAKING.get());
+                // One as large as a screen that hides all behind it is
+                // drawn by Skia; a small one that is seen through, by
+                // Slint's own renderer.
+                told.layered.then(|| if told.opaque && told.keys != standing::Keys::Left { super::layer::Drawn::Solid } else { super::layer::Drawn::Clear })
+            };
             slint::platform::set_platform(Box::new(super::layer::Platform::over(winit, layered))).map_err(|e| format!("Slint has no backend: {e}"))?;
         }
         #[cfg(not(target_os = "linux"))]

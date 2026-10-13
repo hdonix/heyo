@@ -2558,6 +2558,7 @@ dependencies = [
  "gtk",
  "i-slint-backend-winit",
  "i-slint-core",
+ "i-slint-renderer-skia",
  "ignore",
  "image",
  "libc",

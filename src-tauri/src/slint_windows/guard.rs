@@ -25,7 +25,10 @@
 //!   answer their messages, or programs that broadcast one wait on it. The
 //!   thread's windows are handed to the system's own procedure and
 //!   destroyed, and the thread then does nothing but answer messages.
-//! - Wayland: not handled. The surface stays as it was last drawn.
+//! - Wayland: a layer surface is on a connection of Heyo's own, whose
+//!   socket is shut down the same way (`layer::lost`), and the compositor
+//!   drops what was on it. A window of winit's is not handled: it stays as
+//!   it was last drawn.
 
 use std::sync::atomic::{AtomicI64, AtomicU8, Ordering};
 use std::sync::Once;
@@ -119,6 +122,7 @@ fn rest() -> ! {
         // Xlib still has it written down.
         unsafe { libc::shutdown(socket as i32, libc::SHUT_RDWR) };
     }
+    super::layer::lost();
     loop {
         std::thread::park();
     }

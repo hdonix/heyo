@@ -197,8 +197,13 @@ impl<C: ComponentHandle + 'static> Life<C> {
 
     /// Has `hear` told what the pointer does in a window that is not
     /// winit's (`standing::pointed_of`).
-    pub(super) fn pointed(&self, hear: impl Fn(standing::Pointed) + 'static) {
+    pub(super) fn pointed(&self, hear: impl Fn(standing::Pointed) -> bool + 'static) {
         standing::pointed_of(self.told, self.window.window(), hear);
+    }
+
+    /// The same for the keys (`standing::keyed_of`).
+    pub(super) fn keyed(&self, hear: impl Fn(standing::Keyed) -> bool + 'static) {
+        standing::keyed_of(self.told, self.window.window(), hear);
     }
 
     /// Begins moving the window by the pointer pressed in it: true where

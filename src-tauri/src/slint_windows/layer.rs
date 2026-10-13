@@ -22,7 +22,11 @@
 use std::cell::{Cell, RefCell};
 use std::os::fd::{AsFd, AsRawFd};
 use std::rc::{Rc, Weak};
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use slint::winit_030::winit::raw_window_handle;
 
 use slint::platform::software_renderer::{PremultipliedRgbaColor, RepaintBufferType, SoftwareRenderer};
 use slint::platform::{PointerEventButton, WindowAdapter, WindowEvent};
@@ -38,10 +42,10 @@ use smithay_client_toolkit::shm::slot::SlotPool;
 use smithay_client_toolkit::shm::{Shm, ShmHandler};
 use smithay_client_toolkit::{delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry, delegate_seat, delegate_shm, registry_handlers};
 use wayland_client::globals::registry_queue_init;
-use wayland_client::protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface};
-use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
+use wayland_client::protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface};
+use wayland_client::{Connection, EventQueue, Proxy, QueueHandle, WEnum};
 
-use super::standing::{Button, Pointed};
+use super::standing::{Button, Keyed, Pointed};
 use crate::platform::desktop::OwnPlace;
 use crate::platform::place::{Monitor, Rect};
 
@@ -71,21 +75,34 @@ impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry,
 pub(super) struct Platform {
     winit: i_slint_backend_winit::Backend,
     /// Whether the window being made is to be a layer surface.
-    layered: Box<dyn Fn() -> bool>,
+    layered: Box<dyn Fn() -> Option<Drawn>>,
+}
+
+/// What draws a layer surface.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Drawn {
+    /// Slint's own renderer on the CPU, into a buffer that can be seen
+    /// through: a small window with clear corners (the pill, a pinned
+    /// capture).
+    Clear,
+    /// Skia on the CPU, as winit's windows are drawn on X11, handed to the
+    /// compositor without the bits that say how much is seen through: a
+    /// window that hides all behind it and is as large as a screen (the
+    /// overlay), which the other is too slow for.
+    Solid,
 }
 
 impl Platform {
-    pub(super) fn over(winit: i_slint_backend_winit::Backend, layered: impl Fn() -> bool + 'static) -> Self {
+    pub(super) fn over(winit: i_slint_backend_winit::Backend, layered: impl Fn() -> Option<Drawn> + 'static) -> Self {
         Self { winit, layered: Box::new(layered) }
     }
 }
 
 impl slint::platform::Platform for Platform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
-        if (self.layered)() {
-            Ok(Layered::new())
-        } else {
-            self.winit.create_window_adapter()
+        match (self.layered)() {
+            Some(drawn) => Ok(Layered::new(drawn)),
+            None => self.winit.create_window_adapter(),
         }
     }
 
@@ -139,7 +156,7 @@ impl slint::platform::Platform for Platform {
 /// A window of Slint's that is a layer surface.
 pub(super) struct Layered {
     window: slint::Window,
-    renderer: SoftwareRenderer,
+    renderer: Renderer,
     /// Where it goes, as its window said (`place`).
     place: Cell<Option<OwnPlace>>,
     /// Where in it the pointer is its own, in its device pixels (`reach`).
@@ -153,8 +170,11 @@ pub(super) struct Layered {
     /// Where its top left corner is on its output, in logical pixels, for
     /// one that is put at a place and can be moved.
     at: Cell<(i32, i32)>,
-    /// Who hears what the pointer does in it, in Slint's stead.
-    hears: RefCell<Option<Rc<dyn Fn(Pointed)>>>,
+    /// Who hears what the pointer does in it, before Slint: and says
+    /// whether Slint is to have it too.
+    hears: RefCell<Option<Rc<dyn Fn(Pointed) -> bool>>>,
+    /// The same for the keys, for one that has the keyboard.
+    keyed: RefCell<Option<Rc<dyn Fn(Keyed) -> bool>>>,
     /// Something in it changed since it was drawn.
     dirty: Cell<bool>,
     /// A frame was handed over and the compositor has not shown it yet.
@@ -167,13 +187,58 @@ thread_local! {
     static WAYLAND: RefCell<Option<Wayland>> = const { RefCell::new(None) };
     /// A turn has been asked for and not taken yet.
     static ASKED: Cell<bool> = const { Cell::new(false) };
+    /// The key that is down and pressed again and again, the window it is
+    /// pressed in, and what presses it.
+    static REPEAT: RefCell<Option<(u32, Weak<Layered>, slint::Timer)>> = const { RefCell::new(None) };
+}
+
+/// The surface that has every key, and the connection it is on, as they
+/// are known outside Slint's thread (`take_down`).
+static HELD: Mutex<Option<(Connection, wl_surface::WlSurface)>> = Mutex::new(None);
+/// It was taken off the screen from outside: nothing is drawn into it.
+static DOWN: AtomicBool = AtomicBool::new(false);
+/// The socket of the connection, for `lost`. -1 while there is none.
+static SOCKET: AtomicI32 = AtomicI32::new(-1);
+
+/// Takes the surface that has every key off the screen, from any thread,
+/// when Slint's does not answer: the compositor gives the keyboard back
+/// to what had it when the surface is no longer shown. A surface is not
+/// its thread's, so this says it on the connection Slint's thread has;
+/// that thread, if it ever goes on, draws nothing into it and takes it
+/// away as it would have. False when no surface has the keys.
+pub(super) fn take_down() -> bool {
+    let Ok(held) = HELD.lock() else { return false };
+    let Some((connection, surface)) = held.as_ref() else { return false };
+    DOWN.store(true, Ordering::SeqCst);
+    // A surface without a picture is not shown.
+    surface.attach(None, 0, 0);
+    surface.commit();
+    if connection.flush().is_err() {
+        eprintln!("heyo: the surface that holds the keyboard could not be taken off the screen from outside");
+    }
+    true
+}
+
+/// Slint's thread is lost for good (it panicked): the compositor is to
+/// drop all that was on its connection, as an X server is made to
+/// (`guard`). Not closed: the number must not come to mean another file
+/// while the connection has it written down.
+pub(super) fn lost() {
+    let socket = SOCKET.load(Ordering::SeqCst);
+    if socket >= 0 {
+        // SAFETY: a socket of this process's, which stays open.
+        unsafe { libc::shutdown(socket, libc::SHUT_RDWR) };
+    }
 }
 
 impl Layered {
-    fn new() -> Rc<Self> {
+    fn new(drawn: Drawn) -> Rc<Self> {
         let made = Rc::new_cyclic(|own: &Weak<Self>| Self {
             window: slint::Window::new(own.clone() as Weak<dyn WindowAdapter>),
-            renderer: SoftwareRenderer::new_with_repaint_buffer_type(RepaintBufferType::NewBuffer),
+            renderer: match drawn {
+                Drawn::Clear => Renderer::Clear(SoftwareRenderer::new_with_repaint_buffer_type(RepaintBufferType::NewBuffer)),
+                Drawn::Solid => Renderer::Solid(i_slint_renderer_skia::SkiaRenderer::default_software(&i_slint_renderer_skia::SkiaSharedContext::default()), Cell::new(None)),
+            },
             place: Cell::new(None),
             reach: Cell::new(None),
             surface: RefCell::new(None),
@@ -182,6 +247,7 @@ impl Layered {
             scale: Cell::new(1),
             at: Cell::new((0, 0)),
             hears: RefCell::new(None),
+            keyed: RefCell::new(None),
             dirty: Cell::new(false),
             waiting: Cell::new(false),
         });
@@ -245,6 +311,29 @@ impl Layered {
                     layer.set_margin(self.at.get().1, 0, 0, self.at.get().0);
                     (layer, (size.0.max(1) as u32, size.1.max(1) as u32))
                 }
+                Some(OwnPlace::Cover { area }) => {
+                    // All of the output that was read, over everything on
+                    // it, with every key while it is there.
+                    let scale_of = |output: &wl_output::WlOutput| wayland.state.outputs.info(output).map_or(1, |info| info.scale_factor.max(1));
+                    let starts_there = |output: &wl_output::WlOutput| wayland.state.outputs.info(output).and_then(|info| info.logical_position).is_some_and(|(x, y)| (x * scale_of(output), y * scale_of(output)) == (area.x, area.y));
+                    let output = wayland.state.outputs.outputs().find(starts_there).or(output);
+                    let scale = output.as_ref().map_or(1, scale_of);
+                    let layer = wayland.state.layers.create_layer_surface(&queue, surface, Layer::Overlay, Some("heyo"), output.as_ref());
+                    layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
+                    layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+                    layer.set_exclusive_zone(-1);
+                    layer.wl_surface().set_buffer_scale(scale);
+                    layer.commit();
+                    self.size.set(((area.width as i32 / scale).max(1) as u32, (area.height as i32 / scale).max(1) as u32));
+                    self.scale.set(scale);
+                    DOWN.store(false, Ordering::SeqCst);
+                    if let Ok(mut held) = HELD.lock() {
+                        *held = Some((wayland.connection.clone(), layer.wl_surface().clone()));
+                    }
+                    *self.surface.borrow_mut() = Some(layer);
+                    let _ = wayland.connection.flush();
+                    return Ok(());
+                }
                 _ => return Err("it was not said where it goes".to_string()),
             };
             layer.set_size(size.0, size.1);
@@ -267,6 +356,16 @@ impl Layered {
     fn take_off(&self) {
         self.configured.set(false);
         self.waiting.set(false);
+        if let Renderer::Solid(skia, given) = &self.renderer {
+            // What it drew into goes with the surface.
+            let _ = skia.suspend();
+            given.set(None);
+        }
+        if let Ok(mut held) = HELD.lock() {
+            if held.as_ref().is_some_and(|(_, surface)| self.is(surface)) {
+                *held = None;
+            }
+        }
         if self.surface.borrow_mut().take().is_some() {
             with(|wayland| {
                 let _ = wayland.connection.flush();
@@ -289,14 +388,62 @@ impl Layered {
         }
     }
 
+    /// A key went down or up in it, or is pressed again because it stays
+    /// down: whoever hears of the keys first, then Slint if it is to.
+    fn key(&self, press: &keys::Press, down: bool, again: bool) {
+        if self.surface.borrow().is_none() {
+            return;
+        }
+        let hears = self.keyed.borrow().clone();
+        if hears.is_some_and(|hears| !hears(Keyed::Key { key: press.key, down, again })) {
+            return;
+        }
+        let Some(text) = press.text.clone() else { return };
+        let event = match (down, again) {
+            (true, false) => WindowEvent::KeyPressed { text },
+            (true, true) => WindowEvent::KeyPressRepeated { text },
+            (false, _) => WindowEvent::KeyReleased { text },
+        };
+        let _ = self.window.dispatch_event_with_result(event);
+    }
+
     /// Draws the window and hands the picture to the compositor.
     fn draw(&self, wayland: &mut Wayland) {
         let surface = self.surface.borrow();
         let Some(layer) = surface.as_ref() else { return };
         let (size, scale) = (self.size.get(), self.scale.get().max(1) as u32);
         let (width, height) = ((size.0 * scale) as usize, (size.1 * scale) as usize);
+        let software = match &self.renderer {
+            Renderer::Clear(software) => software,
+            Renderer::Solid(skia, given) => {
+                if DOWN.load(Ordering::SeqCst) {
+                    return;
+                }
+                // Skia is given the surface once it has its size, and
+                // hands each picture to the compositor itself.
+                let surface = layer.wl_surface();
+                if given.get() != Some((width, height)) {
+                    let handles = std::sync::Arc::new(Handles { surface: surface.id().as_ptr().cast(), display: wayland.connection.backend().display_ptr().cast() });
+                    if let Err(e) = skia.set_window_handle(handles.clone(), handles, PhysicalSize::new(width as u32, height as u32), None, false) {
+                        return eprintln!("heyo: Skia could not draw into the layer surface: {e}");
+                    }
+                    given.set(Some((width, height)));
+                }
+                self.reaches(wayland);
+                surface.frame(&wayland.queue.handle(), surface.clone());
+                match skia.render() {
+                    Ok(_) => {
+                        self.waiting.set(true);
+                        super::screenshot::trace("layer surface drawn");
+                    }
+                    Err(e) => eprintln!("heyo: the layer surface could not be drawn: {e}"),
+                }
+                self.dirty.set(false);
+                return;
+            }
+        };
         let mut drawn = vec![PremultipliedRgbaColor::default(); width * height];
-        self.renderer.render(&mut drawn, width);
+        software.render(&mut drawn, width);
         let Ok((buffer, canvas)) = wayland.state.pool.create_buffer(width as i32, height as i32, width as i32 * 4, wl_shm::Format::Argb8888) else { return };
         for (pixel, out) in drawn.iter().zip(canvas.chunks_exact_mut(4)) {
             out.copy_from_slice(&[pixel.blue, pixel.green, pixel.red, pixel.alpha]);
@@ -311,6 +458,7 @@ impl Layered {
         }
         layer.commit();
         self.dirty.set(false);
+        super::screenshot::trace("layer surface drawn");
     }
 }
 
@@ -325,7 +473,10 @@ impl WindowAdapter for Layered {
     }
 
     fn renderer(&self) -> &dyn slint::platform::Renderer {
-        &self.renderer
+        match &self.renderer {
+            Renderer::Clear(software) => software,
+            Renderer::Solid(skia, _) => skia,
+        }
     }
 
     fn set_visible(&self, visible: bool) -> Result<(), PlatformError> {
@@ -344,6 +495,43 @@ impl WindowAdapter for Layered {
     }
 }
 
+mod keys;
+
+/// What draws a window, and for Skia the size of the surface it was given.
+enum Renderer {
+    Clear(SoftwareRenderer),
+    Solid(i_slint_renderer_skia::SkiaRenderer, Cell<Option<(usize, usize)>>),
+}
+
+/// A surface of ours as Skia's way of drawing on the CPU wants to be
+/// handed one: by the compositor's own names for it and for the
+/// connection.
+struct Handles {
+    surface: *mut std::ffi::c_void,
+    display: *mut std::ffi::c_void,
+}
+
+// SAFETY: two names, which are only ever used on Slint's thread; the type
+// they are handed over as asks for this.
+unsafe impl Send for Handles {}
+unsafe impl Sync for Handles {}
+
+impl raw_window_handle::HasWindowHandle for Handles {
+    fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
+        let surface = std::ptr::NonNull::new(self.surface).ok_or(raw_window_handle::HandleError::Unavailable)?;
+        // SAFETY: the surface outlives what draws into it (`take_off` lets go of that first).
+        Ok(unsafe { raw_window_handle::WindowHandle::borrow_raw(raw_window_handle::RawWindowHandle::Wayland(raw_window_handle::WaylandWindowHandle::new(surface))) })
+    }
+}
+
+impl raw_window_handle::HasDisplayHandle for Handles {
+    fn display_handle(&self) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
+        let display = std::ptr::NonNull::new(self.display).ok_or(raw_window_handle::HandleError::Unavailable)?;
+        // SAFETY: the connection lives as long as Slint's thread.
+        Ok(unsafe { raw_window_handle::DisplayHandle::borrow_raw(raw_window_handle::RawDisplayHandle::Wayland(raw_window_handle::WaylandDisplayHandle::new(display))) })
+    }
+}
+
 // --- The connection ------------------------------------------------------------------
 
 /// What the compositor said, to be done with once it has been heard out:
@@ -354,6 +542,11 @@ enum Said {
     Shown(wl_surface::WlSurface),
     Closed(wl_surface::WlSurface),
     Pointer(wl_surface::WlSurface, PointerEventKind, (f64, f64)),
+    /// The surface has the keyboard, or has it no longer.
+    Keyboard(wl_surface::WlSurface, bool),
+    Key(wl_surface::WlSurface, keys::Press, bool),
+    /// Whether Control and Alt are held.
+    Held(wl_surface::WlSurface, bool, bool),
 }
 
 struct State {
@@ -365,6 +558,10 @@ struct State {
     shm: Shm,
     pool: SlotPool,
     pointer: Option<wl_pointer::WlPointer>,
+    keyboard: Option<wl_keyboard::WlKeyboard>,
+    keys: keys::Keyboard,
+    /// The surface that has the keyboard.
+    keyed: Option<wl_surface::WlSurface>,
     said: Vec<Said>,
 }
 
@@ -384,12 +581,13 @@ fn connect() -> Result<Wayland, String> {
     let layers = LayerShell::bind(&globals, &handle).map_err(|e| e.to_string())?;
     let shm = Shm::bind(&globals, &handle).map_err(|e| e.to_string())?;
     let pool = SlotPool::new(360 * 44 * 4 * 4, &shm).map_err(|e| e.to_string())?;
-    let state = State { registry: RegistryState::new(&globals), outputs: OutputState::new(&globals, &handle), seats: SeatState::new(&globals, &handle), compositor, layers, shm, pool, pointer: None, said: Vec::new() };
+    let state = State { registry: RegistryState::new(&globals), outputs: OutputState::new(&globals, &handle), seats: SeatState::new(&globals, &handle), compositor, layers, shm, pool, pointer: None, keyboard: None, keys: keys::Keyboard::new(), keyed: None, said: Vec::new() };
     let mut wayland = Wayland { connection, queue, state };
     // The outputs and the seat are known after this.
     for _ in 0..2 {
         wayland.queue.roundtrip(&mut wayland.state).map_err(|e| e.to_string())?;
     }
+    SOCKET.store(wayland.connection.as_fd().as_raw_fd(), Ordering::SeqCst);
     watch(wayland.connection.as_fd().as_raw_fd());
     Ok(wayland)
 }
@@ -453,6 +651,13 @@ fn turn() {
     .unwrap_or_default();
     let windows: Vec<Rc<Layered>> = WINDOWS.with_borrow(|windows| windows.iter().filter_map(Weak::upgrade).collect());
     let of = |surface: &wl_surface::WlSurface| windows.iter().find(|window| window.is(surface));
+    // A key is not pressed again in a window that has left the screen
+    // (of which the compositor says nothing).
+    REPEAT.with_borrow_mut(|repeat| {
+        if repeat.as_ref().is_some_and(|(_, window, _)| window.upgrade().is_none_or(|window| window.surface.borrow().is_none())) {
+            *repeat = None;
+        }
+    });
     for said in said {
         match said {
             Said::Sized(surface, size) => {
@@ -474,6 +679,7 @@ fn turn() {
             Said::Shown(surface) => {
                 if let Some(window) = of(&surface) {
                     window.waiting.set(false);
+                    super::screenshot::trace("layer surface shown");
                     // What moves is drawn again as often as the compositor shows it.
                     if window.window.has_active_animations() {
                         window.dirty.set(true);
@@ -483,6 +689,43 @@ fn turn() {
             Said::Closed(surface) => {
                 if let Some(window) = of(&surface) {
                     window.take_off();
+                }
+            }
+            Said::Keyboard(surface, has) => {
+                if !has {
+                    REPEAT.set(None);
+                }
+                if let Some(window) = of(&surface) {
+                    // What types in it takes keys only in a window that has them.
+                    let _ = window.window.dispatch_event_with_result(WindowEvent::WindowActiveChanged(has));
+                }
+            }
+            Said::Held(surface, ctrl, alt) => {
+                let hears = of(&surface).and_then(|window| window.keyed.borrow().clone());
+                if let Some(hears) = hears {
+                    hears(Keyed::Held { ctrl, alt });
+                }
+            }
+            Said::Key(surface, press, down) => {
+                // Another key down, or this one up, ends the pressing again.
+                REPEAT.with_borrow_mut(|repeat| {
+                    if down || repeat.as_ref().is_some_and(|(code, ..)| *code == press.code) {
+                        *repeat = None;
+                    }
+                });
+                let Some(window) = of(&surface) else { continue };
+                window.key(&press, down, false);
+                if let (true, Some((rate, delay))) = (down, press.repeats) {
+                    let (began, wait, timer) = (Instant::now(), Duration::from_millis(delay.into()), slint::Timer::default());
+                    let (pressed, again) = (Rc::downgrade(window), press.clone());
+                    timer.start(slint::TimerMode::Repeated, Duration::from_millis(u64::from(1000 / rate.max(1)).max(1)), move || {
+                        if began.elapsed() >= wait {
+                            if let Some(window) = pressed.upgrade() {
+                                window.key(&again, true, true);
+                            }
+                        }
+                    });
+                    REPEAT.set(Some((press.code, Rc::downgrade(window), timer)));
                 }
             }
             Said::Pointer(surface, kind, at) => {
@@ -498,10 +741,12 @@ fn turn() {
                         // The right one (BTN_RIGHT).
                         PointerEventKind::Press { button: 0x111, .. } => Pointed::Pressed(Button::Right),
                         PointerEventKind::Release { button: 0x111, .. } => Pointed::Released(Button::Right),
+                        PointerEventKind::Leave { .. } => Pointed::Left,
                         _ => continue,
                     };
-                    hears(pointed);
-                    continue;
+                    if !hears(pointed) {
+                        continue;
+                    }
                 }
                 let position = LogicalPosition::new(at.0 as f32, at.1 as f32);
                 let event = match kind {
@@ -537,10 +782,18 @@ pub(super) fn is(window: &slint::Window) -> bool {
     of(window).is_some()
 }
 
-/// Has `hear` told what the pointer does in the window, in Slint's stead.
-pub(super) fn hear(window: &slint::Window, hear: impl Fn(Pointed) + 'static) {
+/// Has `hear` told what the pointer does in the window, before Slint; it
+/// says whether Slint is to have it too.
+pub(super) fn hear(window: &slint::Window, hear: impl Fn(Pointed) -> bool + 'static) {
     if let Some(layered) = of(window) {
         *layered.hears.borrow_mut() = Some(Rc::new(hear));
+    }
+}
+
+/// The same for the keys of a window that has the keyboard.
+pub(super) fn hear_keys(window: &slint::Window, hear: impl Fn(Keyed) -> bool + 'static) {
+    if let Some(layered) = of(window) {
+        *layered.keyed.borrow_mut() = Some(Rc::new(hear));
     }
 }
 
@@ -635,6 +888,9 @@ impl SeatHandler for State {
         if capability == Capability::Pointer && self.pointer.is_none() {
             self.pointer = self.seats.get_pointer(queue, &seat).ok();
         }
+        if capability == Capability::Keyboard && self.keyboard.is_none() {
+            self.keyboard = Some(seat.get_keyboard(queue, ()));
+        }
     }
 
     fn remove_capability(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat, capability: Capability) {
@@ -642,6 +898,12 @@ impl SeatHandler for State {
             if let Some(pointer) = self.pointer.take() {
                 pointer.release();
             }
+        }
+        if capability == Capability::Keyboard {
+            if let Some(keyboard) = self.keyboard.take() {
+                keyboard.release();
+            }
+            self.keyed = None;
         }
     }
 
@@ -652,6 +914,41 @@ impl PointerHandler for State {
     fn pointer_frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_pointer::WlPointer, events: &[PointerEvent]) {
         for event in events {
             self.said.push(Said::Pointer(event.surface.clone(), event.kind.clone(), event.position));
+        }
+    }
+}
+
+/// The keyboard, heard here and not through the toolkit, whose own
+/// hearing of it would bring a second copy of xkbcommon into the build
+/// (`keys`).
+impl wayland_client::Dispatch<wl_keyboard::WlKeyboard, ()> for State {
+    fn event(state: &mut Self, _: &wl_keyboard::WlKeyboard, event: wl_keyboard::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
+        use wl_keyboard::Event;
+        match event {
+            Event::Keymap { format: WEnum::Value(wl_keyboard::KeymapFormat::XkbV1), fd, size } => state.keys.layout(fd, size),
+            Event::RepeatInfo { rate, delay } => (state.keys.rate, state.keys.delay) = (rate.max(0) as u32, delay.max(0) as u32),
+            Event::Enter { surface, .. } => {
+                // The keys that were down already are not presses in it.
+                state.keyed = Some(surface.clone());
+                state.said.push(Said::Keyboard(surface, true));
+            }
+            Event::Leave { surface, .. } => {
+                state.keyed = None;
+                state.said.push(Said::Keyboard(surface, false));
+            }
+            Event::Key { key, state: pressed, .. } => {
+                let down = pressed == WEnum::Value(wl_keyboard::KeyState::Pressed);
+                if let (Some(surface), Some(press)) = (state.keyed.clone(), state.keys.key(key, down)) {
+                    state.said.push(Said::Key(surface, press, down));
+                }
+            }
+            Event::Modifiers { mods_depressed, mods_latched, mods_locked, group, .. } => {
+                let (ctrl, alt) = state.keys.held(mods_depressed, mods_latched, mods_locked, group);
+                if let Some(surface) = state.keyed.clone() {
+                    state.said.push(Said::Held(surface, ctrl, alt));
+                }
+            }
+            _ => {}
         }
     }
 }

@@ -141,10 +141,10 @@ pub(super) struct Told {
     /// compositor offers that: on the overlay layer, so over everything on
     /// every workspace; anchored where its window says; never with the
     /// keyboard; taking the pointer where it is told. It is not one of
-    /// winit's windows, and nothing else need be asked of anybody. (A
-    /// window that never has the keyboard, the pill, and one that is above
-    /// the others, a pinned capture, which there has the pointer only:
-    /// the overlay, which needs every key, is not one yet.)
+    /// winit's windows, and nothing else need be asked of anybody. (The
+    /// pill, never with the keyboard; a pinned capture, which there has
+    /// the pointer only; and the overlay, over all of an output with every
+    /// key while it is there.)
     pub layered: bool,
 }
 
@@ -153,7 +153,7 @@ pub(super) fn told(standing: Standing, desktop: Desktop) -> Told {
     let (over, all) = (standing.layer == Layer::Over, standing.keyboard == Keyboard::All);
     let nothing = Told { unmanaged: false, utility: false, unlisted: false, made_inactive: false, never_active: false, above: standing.layer == Layer::Above, raised: false, keys: Keys::Left, opaque: !standing.clear, kept: false, unplaced: false, layered: false };
     let above = standing.layer == Layer::Above;
-    let layered = (over && standing.keyboard == Keyboard::Never) || above;
+    let layered = over || above;
     match desktop {
         Desktop::X11 => Told { unmanaged: over, utility: !over && !standing.listed, raised: over && all, keys: if all { Keys::Grabbed } else { Keys::Left }, kept: over, ..nothing },
         Desktop::Wayland => Told { keys: if all { Keys::Focused } else { Keys::Left }, unplaced: over || above, ..nothing },
@@ -354,13 +354,18 @@ pub(super) fn off(told: Told, window: &Window) {
 /// when Slint's does not answer: by a connection of its own, since
 /// winit's is that thread's. The server lets the keyboard go when the
 /// window that holds it is no longer on the screen. (X11, where a window
-/// can hold the keyboard against everything; elsewhere the desktop still
-/// has its own ways of taking the focus away.)
+/// can hold the keyboard against everything, and a layer surface, which
+/// the compositor gives every key; elsewhere the desktop still has its
+/// own ways of taking the focus away.)
 pub(super) fn take_down() {
     let id = HOLDER.swap(0, Ordering::SeqCst);
     #[cfg(target_os = "linux")]
     {
         use x11rb::protocol::xproto::ConnectionExt;
+        // A surface of Heyo's own is taken down on its own connection.
+        if super::layer::take_down() {
+            return;
+        }
         if id == 0 || desktop() != Desktop::X11 {
             return;
         }
@@ -440,6 +445,8 @@ pub(super) enum Pointed {
     Moved((f64, f64)),
     Pressed(Button),
     Released(Button),
+    /// It left the window.
+    Left,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -448,10 +455,47 @@ pub(super) enum Button {
     Right,
 }
 
+/// What the keys did in a window that is not winit's and has the
+/// keyboard, as whoever hears of it for the window is told.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Keyed {
+    /// A key went down or up; `again` when it is pressed once more
+    /// because it stays down.
+    Key { key: KeyOf, down: bool, again: bool },
+    /// Which of the keys held with others are down, as the desktop says.
+    Held { ctrl: bool, alt: bool },
+}
+
+/// Which key, as far as a window of Heyo's own has a rule about it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum KeyOf {
+    Escape,
+    Enter,
+    F4,
+    Control,
+    Alt,
+    /// One that makes a character: the one it makes without the keys held
+    /// with it, and the letter at its place on the layout the letters are
+    /// named after, if a letter is there.
+    Character { made: char, placed: Option<char> },
+    Other,
+}
+
+/// Has a window that is not winit's and has the keyboard hear of the keys
+/// (winit's hear of them from winit), before Slint does: `hear` says
+/// whether Slint is to have a key too.
+pub(super) fn keyed_of(told: Told, window: &slint::Window, hear: impl Fn(Keyed) -> bool + 'static) {
+    #[cfg(target_os = "linux")]
+    if told.layered {
+        return super::layer::hear_keys(window, hear);
+    }
+    let _ = (told, window, hear);
+}
+
 /// Has a window that is not winit's hear what the pointer does in it
-/// (winit's hear of it from winit). `hear` takes all of it: Slint is not
-/// told.
-pub(super) fn pointed_of(told: Told, window: &slint::Window, hear: impl Fn(Pointed) + 'static) {
+/// (winit's hear of it from winit), before Slint does: `hear` says
+/// whether Slint is to have it too.
+pub(super) fn pointed_of(told: Told, window: &slint::Window, hear: impl Fn(Pointed) -> bool + 'static) {
     #[cfg(target_os = "linux")]
     if told.layered {
         return super::layer::hear(window, hear);
@@ -582,8 +626,8 @@ mod tests {
     #[test]
     fn where_wayland_has_the_layer_shell_the_pill_is_a_layer_surface_and_nobody_is_asked() {
         assert_eq!(told(PILL, Desktop::Layers), Told { layered: true, ..NOTHING });
-        // The overlay is not one yet: it is still the compositor's to place.
-        assert_eq!(told(OVERLAY, Desktop::Layers), Told { unplaced: true, keys: Keys::Focused, opaque: true, ..NOTHING });
+        // The overlay is one that covers an output and has every key.
+        assert_eq!(told(OVERLAY, Desktop::Layers), Told { layered: true, keys: Keys::Focused, opaque: true, ..NOTHING });
         // A pinned capture is one too, with the pointer only.
         assert_eq!(told(PINNED, Desktop::Layers), Told { above: true, opaque: true, layered: true, ..NOTHING });
         // And where it has not (GNOME), the desktop itself is asked.

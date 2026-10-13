@@ -114,7 +114,11 @@ impl Pins {
         window.window().on_winit_window_event(move |_, event| told(id, event));
         // Where the window is not winit's, it hears of the pointer itself;
         // and where it cannot place itself, the desktop is asked to.
-        life.pointed(move |pointed| heard(id, pointed));
+        life.pointed(move |pointed| {
+            heard(id, pointed);
+            // All of it is the pin's: Slint has nothing to answer there.
+            false
+        });
         life.ask_desktop(TITLE, Some(OwnPlace::At { at, size: (width.max(least), height.max(least)) }));
         window.window().on_close_requested(move || {
             close(id);
@@ -175,7 +179,7 @@ fn heard(id: u64, pointed: Pointed) {
             }
             Pointed::Released(Button::Left) => (pin.pressed, pin.moving) = (None, false),
             Pointed::Pressed(Button::Right) => close(id),
-            Pointed::Released(Button::Right) => {}
+            Pointed::Released(Button::Right) | Pointed::Left => {}
         }
     });
 }
