@@ -2,16 +2,17 @@
 # A short film of Heyo at work, for the README and for showing it around:
 # demo-video.sh [light|dark] writes $HEYO_TEST_DIR/demo-<theme>.webm.
 #
-# What is filmed is the real Heyo in the sandbox's GNOME session: a note in
-# a text editor is dictated into (spoken by say.py in place of a
-# microphone, so the same film comes out every time, and it has no sound),
-# the words composed at the cursor as they are heard; then the palette is
-# called up and searched. The screen is filmed by GStreamer (ximagesrc,
-# VP8 in WebM: what Ubuntu has without anything installed), the middle of
-# it: 2560 by 1600.
+# What is filmed is the real Heyo in the sandbox's GNOME session, used as a
+# person would use it, one thing after another: a note dictated into
+# (spoken by say.py in place of a microphone, so the same film comes out
+# every time, and it has no sound), a search, the calculator, the clipboard
+# history, a screenshot annotated and copied, the settings, the store. A
+# line of words below says what is being shown (demo-caption.py). The
+# screen is filmed by GStreamer (ximagesrc, VP8 in WebM: what Ubuntu has
+# without anything installed), the middle of it: 2560 by 1800.
 #
 # It needs what readme-dictation.sh needs, and gst-launch-1.0. About a
-# minute a theme.
+# minute and a half a theme.
 . "$(dirname "$0")/readme-env.sh"
 [ -f "$HEYO_TEST_SPEECH/models/sense-voice/model.int8.onnx" ] || { echo "demo-video: no speech engine in $HEYO_TEST_SPEECH (Settings → Dictation downloads it)" >&2; exit 1; }
 command -v gedit > /dev/null || { echo "demo-video: gedit is not installed" >&2; exit 1; }
@@ -129,25 +130,75 @@ for THEME in ${*:-light dark}; do
   xdotool windowactivate "$id"; w 1
   xdotool key ctrl+End; w 0.5
 
-  # Filmed: the middle of the screen, where the palette comes up, down to
-  # below the editor and the pill.
-  X0=640; Y0=480; X1=3199; Y1=2079
+  # Filmed: the middle of the screen, where the palette, the settings and
+  # the editor all are, with a line of words below them saying what is seen.
+  X0=640; Y0=340; X1=3199; Y1=2139
   OUT="$T/demo-$THEME.webm"
-  start_as film gst-launch-1.0 -q -e ximagesrc display-name="$DISPLAY" use-damage=false show-pointer=false startx=$X0 starty=$Y0 endx=$X1 endy=$Y1 \
+  CAPTION="$T/caption.txt"; : > "$CAPTION"
+  start_as caption /usr/bin/python3 "$HERE/demo-caption.py" "$CAPTION" 1920 2076 > /dev/null 2>&1
+  says() { printf '%s\n' "$1" > "$CAPTION"; }
+  # Typed as a person types, into whatever has the keyboard.
+  types() { xdotool type --delay "${2:-110}" "$1"; }
+  again() { xdotool key ctrl+a; w 0.2; }
+  start_as film gst-launch-1.0 -q -e ximagesrc display-name="$DISPLAY" use-damage=false show-pointer=true startx=$X0 starty=$Y0 endx=$X1 endy=$Y1 \
     ! video/x-raw,framerate=30/1 ! videoconvert ! vp8enc deadline=1 cpu-used=6 threads=12 target-bitrate=9000000 keyframe-max-dist=60 \
     ! webmmux ! filesink location="$OUT" > "$T/film.log" 2>&1
   FILM=$STARTED
-  w 1.5
+  xdotool mousemove 3000 1500
+  says "Heyo: a launcher for Linux you drive from the keyboard"; w 3
+
+  says "Dictation: speak, and the words appear where you are typing. Recognized on your computer."
   heyo --dictate
-  w "$LENGTH"; w 4
+  w "$LENGTH"; w 3.5
   heyo --dictate; w 2.5
-  # The palette, searched as a person types.
+
+  says "Search applications and commands"
   heyo; w 1.5
-  xdotool type --delay 140 "fire"; w 1.8
-  xdotool key ctrl+a; xdotool type --delay 140 "capture"; w 2
-  xdotool key Escape; w 0.4; xdotool key Escape; w 1.2
+  types "fire"; w 1.8
+  again; types "term"; w 1.8
+
+  says "Calculate and convert as you type"
+  again; types "15% of 80"; w 2.2
+  again; types "5 km in mi"; w 2.2
+  again; types "3pm pst in beijing" 80; w 2.5
+
+  says "Clipboard History: everything you copied, searchable"
+  xdotool key Escape; w 0.3; xdotool key Escape; w 0.8
+  xdotool windowactivate "$id"; w 0.5
+  xdotool key ctrl+a ctrl+c; w 0.5; xdotool key ctrl+End; w 0.4
+  heyo --open "cmd:@heyo:clipboard-history"; w 3.5
+  xdotool key Escape; w 0.3; xdotool key Escape; w 1
+
+  says "Screenshots: select an area, annotate it, copy, save or pin it"
+  heyo --open heyo:screenshot; w 1.8
+  xdotool mousemove 1250 620 mousedown 1; w 0.2
+  for step in 1 2 3 4 5 6 7 8 9 10; do xdotool mousemove $((1250 + step * 110)) $((620 + step * 60)); w 0.05; done
+  xdotool mouseup 1; w 1.2
+  button() { set -- $(python3 "$HERE/layout.py" toolbar "$1" 2350 1220 2); xdotool mousemove "$1" "$2"; w 0.4; xdotool click 1; w 0.4; }
+  button rect
+  xdotool mousemove 1330 700 mousedown 1; w 0.1; xdotool mousemove 1500 800; w 0.1; xdotool mousemove 1760 900; w 0.1; xdotool mouseup 1; w 0.7
+  button arrow
+  xdotool mousemove 2200 720 mousedown 1; w 0.1; xdotool mousemove 2000 800; w 0.1; xdotool mousemove 1800 880; w 0.1; xdotool mouseup 1; w 0.7
+  button text
+  xdotool mousemove 1900 1050 click 1; w 0.5; types "Dictated, not typed"; w 0.4; xdotool key Return; w 1.2
+  button copy; w 1.5
+
+  says "Settings, drawn natively: on screen in a fifteenth of a second"
+  heyo --open heyo:settings; w 2
+  for page in Shortcuts Dictation Screenshots General; do
+    ask click "list item" "$page" "Heyo Settings" > /dev/null 2>&1; w 1.4
+  done
+  xdotool key Escape; w 1
+
+  says "And extensions written for Raycast, from its store"
+  heyo; w 1.2; types "store"; w 2.5
+  xdotool key Escape; w 0.3; xdotool key Escape; w 0.8
+
+  xdotool mousemove 3000 1500
+  says "Heyo  ·  github.com/hdonix/heyo"; w 3.5
   # Ended by its own signal for "that is all", so the file is closed whole.
   kill -INT "$FILM" 2> /dev/null; w 2.5
+  stop caption > /dev/null
   ls -la "$OUT" | awk '{ print "demo-video: " $NF ", " int($5 / 1024) " KB" }'
   grep "heyo: dictation\|input method" "$T/app.log" | tail -n 3 | cut -c1-200 >&2
 
