@@ -310,6 +310,7 @@ msgstr ""
 #: src-tauri/src/extensions.rs
 #: src/RootSearch.tsx
 #: src/rows.ts
+#: runtime/src/builtins/ask.tsx
 msgid "Ask AI"
 msgstr ""
 
@@ -2057,6 +2058,7 @@ msgstr ""
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src/arguments.ts
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Text"
 msgstr ""
 
@@ -2090,6 +2092,7 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: runtime/src/builtins/emoji.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Copy"
 msgstr ""
 
@@ -2169,6 +2172,7 @@ msgstr ""
 #: src-tauri/src/slint_windows/ui/settings.slint
 #: runtime/src/api/quicklook.tsx
 #: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Name"
 msgstr ""
 
@@ -2734,10 +2738,14 @@ msgid "Could not copy"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
 msgid "Copy Answer"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
 msgid "Paste Answer"
 msgstr ""
 
@@ -2754,6 +2762,7 @@ msgid "Could not open"
 msgstr ""
 
 #: src/rows.ts
+#: runtime/src/builtins/selection.tsx
 msgid "Search Google"
 msgstr ""
 
@@ -2903,8 +2912,11 @@ msgid "Copy to Clipboard"
 msgstr ""
 
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
 #: runtime/src/builtins/clipboard.tsx
 #: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Copied to Clipboard"
 msgstr ""
 
@@ -3093,6 +3105,171 @@ msgstr ""
 msgid "OK"
 msgstr ""
 
+#: runtime/src/builtins/ask.tsx
+msgid "Continue in AI Chat"
+msgstr ""
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+msgid "Stop Answering"
+msgstr ""
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Try Again"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Send Message"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Write a Longer Message"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Answer Again"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Copy Conversation as Markdown"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Rename Conversation"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/conversations.ts
+msgid "New Chat"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Delete Conversation"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Required"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Question"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Ask"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Ask anything…"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Nothing to send"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Type a message in the search bar, then press Enter."
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Still answering"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Wait for the answer, or stop it."
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Message"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Title"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Rename"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Delete “{0}”?"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Delete"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Reply…"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Ask anything"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Type a message and press Enter."
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "This cannot be undone."
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Delete the conversation?"
+msgid_plural "Delete all {n} conversations?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete All"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Conversations deleted"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Search conversations…"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "No conversation found"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "No conversations yet"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Nothing said matches these words."
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Press Enter to start one, or type a question in the root search and press Tab."
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Open Conversation"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Copy Last Answer"
+msgstr ""
+
+#: runtime/src/builtins/chat.tsx
+msgid "Delete All Conversations"
+msgstr ""
+
 #: runtime/src/builtins/clipboard.tsx
 #: runtime/src/builtins/library.tsx
 msgid "Link"
@@ -3243,10 +3420,6 @@ msgid "Pinned entries are kept."
 msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
-msgid "Delete All"
-msgstr ""
-
-#: runtime/src/builtins/clipboard.tsx
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
 msgstr ""
 
@@ -3272,6 +3445,22 @@ msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Copy something and it will show up here."
+msgstr ""
+
+#: runtime/src/builtins/conversations.ts
+msgid "The answer was cut short."
+msgstr ""
+
+#: runtime/src/builtins/conversations.ts
+msgid "No answer yet."
+msgstr ""
+
+#: runtime/src/builtins/conversations.ts
+msgid "Could not get an answer"
+msgstr ""
+
+#: runtime/src/builtins/conversations.ts
+msgid "You"
 msgstr ""
 
 #: runtime/src/builtins/emoji.tsx
@@ -3331,10 +3520,6 @@ msgid "Placeholders: {0} (text you type), {1}."
 msgstr ""
 
 #: runtime/src/builtins/library.tsx
-msgid "Required"
-msgstr ""
-
-#: runtime/src/builtins/library.tsx
 msgid "Quicklink saved"
 msgstr ""
 
@@ -3375,14 +3560,6 @@ msgid "Delete Quicklink"
 msgstr ""
 
 #: runtime/src/builtins/library.tsx
-msgid "Delete “{0}”?"
-msgstr ""
-
-#: runtime/src/builtins/library.tsx
-msgid "Delete"
-msgstr ""
-
-#: runtime/src/builtins/library.tsx
 msgid "Typing the keyword in the root search selects this snippet. With “Expand Snippets as You Type” on (Heyo Settings), typing it in any application replaces it with the snippet: at once if it begins or ends with a symbol (;sig), after the next space or punctuation mark if it is a plain word (sig). 2 to 32 characters, capitals matter."
 msgstr ""
 
@@ -3420,6 +3597,118 @@ msgstr ""
 
 #: runtime/src/builtins/library.tsx
 msgid "Delete Snippet"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Improve Writing"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Fix Spelling and Grammar"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Make Shorter"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Explain"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Summarize"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Edit Action"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "New Action"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Save Action"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Create Action"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate to Japanese"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Instruction"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate the text into natural Japanese, keeping its tone."
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Enter replaces the selection with the result"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "The instruction is what the model is told to do with the selected text."
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "{0} failed"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Replace Selection"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Copy Result"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Back"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "No text is selected"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Select text in any application, then run this command — best with a hotkey."
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "New Custom Action…"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Delete Action"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "What should happen to the selected text?"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Your Actions"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Open Link"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Search Baidu"
+msgstr ""
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate in Browser"
 msgstr ""
 
 #: runtime/src/builtins/setup.tsx

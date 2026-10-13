@@ -313,6 +313,7 @@ msgstr "翻译, 润色, 解释, 划词"
 #: src-tauri/src/extensions.rs
 #: src/RootSearch.tsx
 #: src/rows.ts
+#: runtime/src/builtins/ask.tsx
 msgid "Ask AI"
 msgstr "问 AI"
 
@@ -2057,6 +2058,7 @@ msgstr "画笔"
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src/arguments.ts
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Text"
 msgstr "文字"
 
@@ -2090,6 +2092,7 @@ msgstr "保存 (Ctrl+S)"
 
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: runtime/src/builtins/emoji.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Copy"
 msgstr "复制"
 
@@ -2169,6 +2172,7 @@ msgstr "复制诊断信息"
 #: src-tauri/src/slint_windows/ui/settings.slint
 #: runtime/src/api/quicklook.tsx
 #: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Name"
 msgstr "名称"
 
@@ -2734,10 +2738,14 @@ msgid "Could not copy"
 msgstr "无法复制"
 
 #: src/rows.ts
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
 msgid "Copy Answer"
 msgstr "复制答案"
 
 #: src/rows.ts
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
 msgid "Paste Answer"
 msgstr "粘贴答案"
 
@@ -2754,6 +2762,7 @@ msgid "Could not open"
 msgstr "无法打开"
 
 #: src/rows.ts
+#: runtime/src/builtins/selection.tsx
 msgid "Search Google"
 msgstr "用 Google 搜索"
 
@@ -2903,8 +2912,11 @@ msgid "Copy to Clipboard"
 msgstr "复制到剪贴板"
 
 #: runtime/src/api/components.ts
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
 #: runtime/src/builtins/clipboard.tsx
 #: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
 msgid "Copied to Clipboard"
 msgstr "已复制到剪贴板"
 
@@ -3093,6 +3105,170 @@ msgstr "无法预览文件"
 msgid "OK"
 msgstr "好"
 
+#: runtime/src/builtins/ask.tsx
+msgid "Continue in AI Chat"
+msgstr "在 AI 对话中继续"
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+msgid "Stop Answering"
+msgstr "停止回答"
+
+#: runtime/src/builtins/ask.tsx
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Try Again"
+msgstr "重试"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Send Message"
+msgstr "发送消息"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Write a Longer Message"
+msgstr "写一条长消息"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Answer Again"
+msgstr "重新回答"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Copy Conversation as Markdown"
+msgstr "以 Markdown 复制对话"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Rename Conversation"
+msgstr "重命名对话"
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/conversations.ts
+msgid "New Chat"
+msgstr "新对话"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Delete Conversation"
+msgstr "删除对话"
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Required"
+msgstr "必填"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Question"
+msgstr "问题"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Ask"
+msgstr "提问"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Ask anything…"
+msgstr "随便问…"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Nothing to send"
+msgstr "没有可发送的内容"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Type a message in the search bar, then press Enter."
+msgstr "在搜索栏中输入消息，然后按 Enter。"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Still answering"
+msgstr "仍在回答"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Wait for the answer, or stop it."
+msgstr "请等待回答完成，或停止回答。"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Message"
+msgstr "消息"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Title"
+msgstr "标题"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Rename"
+msgstr "重命名"
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Delete “{0}”?"
+msgstr "删除“{0}”？"
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Delete"
+msgstr "删除"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Reply…"
+msgstr "回复…"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Ask anything"
+msgstr "随便问"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Type a message and press Enter."
+msgstr "输入消息，然后按 Enter。"
+
+#: runtime/src/builtins/chat.tsx
+msgid "This cannot be undone."
+msgstr "此操作无法撤销。"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Delete the conversation?"
+msgid_plural "Delete all {n} conversations?"
+msgstr[0] "删除这 {n} 个对话？"
+
+#: runtime/src/builtins/chat.tsx
+#: runtime/src/builtins/clipboard.tsx
+msgid "Delete All"
+msgstr "全部删除"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Conversations deleted"
+msgstr "对话已删除"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Search conversations…"
+msgstr "搜索对话…"
+
+#: runtime/src/builtins/chat.tsx
+msgid "No conversation found"
+msgstr "没有找到对话"
+
+#: runtime/src/builtins/chat.tsx
+msgid "No conversations yet"
+msgstr "还没有对话"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Nothing said matches these words."
+msgstr "没有哪段对话包含这些词。"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Press Enter to start one, or type a question in the root search and press Tab."
+msgstr "按 Enter 开始一个，或在主搜索中输入问题后按 Tab。"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Open Conversation"
+msgstr "打开对话"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Copy Last Answer"
+msgstr "复制最后的回答"
+
+#: runtime/src/builtins/chat.tsx
+msgid "Delete All Conversations"
+msgstr "删除所有对话"
+
 #: runtime/src/builtins/clipboard.tsx
 #: runtime/src/builtins/library.tsx
 msgid "Link"
@@ -3242,10 +3418,6 @@ msgid "Pinned entries are kept."
 msgstr "已固定的条目会保留。"
 
 #: runtime/src/builtins/clipboard.tsx
-msgid "Delete All"
-msgstr "全部删除"
-
-#: runtime/src/builtins/clipboard.tsx
 msgid "Search, or say when and where: 昨天下午, last week, from firefox…"
 msgstr "搜索，或说出时间和来源：昨天下午、last week、from firefox…"
 
@@ -3272,6 +3444,22 @@ msgstr "记录已暂停。运行“{0}”可重新开始记录。"
 #: runtime/src/builtins/clipboard.tsx
 msgid "Copy something and it will show up here."
 msgstr "复制点什么，它就会出现在这里。"
+
+#: runtime/src/builtins/conversations.ts
+msgid "The answer was cut short."
+msgstr "回答被中断了。"
+
+#: runtime/src/builtins/conversations.ts
+msgid "No answer yet."
+msgstr "还没有回答。"
+
+#: runtime/src/builtins/conversations.ts
+msgid "Could not get an answer"
+msgstr "无法获得回答"
+
+#: runtime/src/builtins/conversations.ts
+msgid "You"
+msgstr "你"
 
 #: runtime/src/builtins/emoji.tsx
 msgid "Smileys & Emotion"
@@ -3330,10 +3518,6 @@ msgid "Placeholders: {0} (text you type), {1}."
 msgstr "占位符：{0}（你输入的文本）、{1}。"
 
 #: runtime/src/builtins/library.tsx
-msgid "Required"
-msgstr "必填"
-
-#: runtime/src/builtins/library.tsx
 msgid "Quicklink saved"
 msgstr "快速链接已保存"
 
@@ -3374,14 +3558,6 @@ msgid "Delete Quicklink"
 msgstr "删除快速链接"
 
 #: runtime/src/builtins/library.tsx
-msgid "Delete “{0}”?"
-msgstr "删除“{0}”？"
-
-#: runtime/src/builtins/library.tsx
-msgid "Delete"
-msgstr "删除"
-
-#: runtime/src/builtins/library.tsx
 msgid "Typing the keyword in the root search selects this snippet. With “Expand Snippets as You Type” on (Heyo Settings), typing it in any application replaces it with the snippet: at once if it begins or ends with a symbol (;sig), after the next space or punctuation mark if it is a plain word (sig). 2 to 32 characters, capitals matter."
 msgstr "在主搜索中输入关键词会选中这个文本片段。开启“输入时展开文本片段”（Heyo 设置）后，在任何应用程序中输入关键词都会把它替换为文本片段：以符号开头或结尾的（;sig）立即替换，普通单词（sig）在下一个空格或标点之后替换。长度为 2 到 32 个字符，区分大小写。"
 
@@ -3420,6 +3596,118 @@ msgstr "还没有文本片段"
 #: runtime/src/builtins/library.tsx
 msgid "Delete Snippet"
 msgstr "删除文本片段"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate"
+msgstr "翻译"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Improve Writing"
+msgstr "改进写作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Fix Spelling and Grammar"
+msgstr "修正拼写和语法"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Make Shorter"
+msgstr "缩短"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Explain"
+msgstr "解释"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Summarize"
+msgstr "总结"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Edit Action"
+msgstr "编辑操作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "New Action"
+msgstr "新建操作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Save Action"
+msgstr "保存操作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Create Action"
+msgstr "创建操作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate to Japanese"
+msgstr "翻译成日语"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Instruction"
+msgstr "指令"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate the text into natural Japanese, keeping its tone."
+msgstr "把文本翻译成自然的日语，并保留原有语气。"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Enter replaces the selection with the result"
+msgstr "按 Enter 用结果替换所选内容"
+
+#: runtime/src/builtins/selection.tsx
+msgid "The instruction is what the model is told to do with the selected text."
+msgstr "指令就是告诉模型要对所选文本做什么。"
+
+#: runtime/src/builtins/selection.tsx
+msgid "{0} failed"
+msgstr "“{0}”失败"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Replace Selection"
+msgstr "替换所选内容"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Copy Result"
+msgstr "复制结果"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Back"
+msgstr "返回"
+
+#: runtime/src/builtins/selection.tsx
+msgid "No text is selected"
+msgstr "没有选中文本"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Select text in any application, then run this command — best with a hotkey."
+msgstr "在任意应用程序中选中文本，然后运行此命令，最好用快捷键。"
+
+#: runtime/src/builtins/selection.tsx
+msgid "New Custom Action…"
+msgstr "新建自定义操作…"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Delete Action"
+msgstr "删除操作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "What should happen to the selected text?"
+msgstr "要对所选文本做什么？"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Your Actions"
+msgstr "你的操作"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Open Link"
+msgstr "打开链接"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Search Baidu"
+msgstr "用百度搜索"
+
+#: runtime/src/builtins/selection.tsx
+msgid "Translate in Browser"
+msgstr "在浏览器中翻译"
 
 #: runtime/src/builtins/setup.tsx
 msgid "Required preferences missing"

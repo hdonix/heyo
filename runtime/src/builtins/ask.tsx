@@ -11,6 +11,7 @@ import { useNavigation } from "../api/navigation";
 import { Clipboard, pasteable, showHUD } from "../api/system";
 import { begin, Question, useChat } from "./chat";
 import { exchangeMarkdown, exchanges, type Conversation } from "./conversations";
+import { t } from "../../../shared/i18n";
 
 function Answer(props: { conversation: Conversation }) {
   const chat = useChat(props.conversation);
@@ -20,7 +21,7 @@ function Answer(props: { conversation: Conversation }) {
 
   return (
     <Detail
-      navigationTitle="Ask AI"
+      navigationTitle={t("Ask AI")}
       isLoading={busy}
       markdown={exchange ? exchangeMarkdown(exchange, chat.writing, chat.error) : ""}
       // Model output: no raw HTML, no images fetched from wherever it points.
@@ -29,7 +30,7 @@ function Answer(props: { conversation: Conversation }) {
         <ActionPanel>
           {!busy && (
             <Action
-              title="Continue in AI Chat"
+              title={t("Continue in AI Chat")}
               icon={Icon.SpeechBubble}
               // AI Chat opens on this conversation, with a bar to reply in.
               onAction={() => launchCommand({ name: "ai-chat", context: { conversation: chat.conversation.id } })}
@@ -37,20 +38,20 @@ function Answer(props: { conversation: Conversation }) {
           )}
           {answer && (
             <Action
-              title="Copy Answer"
+              title={t("Copy Answer")}
               icon={Icon.CopyClipboard}
               shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
               onAction={async () => {
                 await Clipboard.copy(answer);
-                await showHUD("Copied to Clipboard");
+                await showHUD(t("Copied to Clipboard"));
               }}
             />
           )}
-          {answer && <Action title="Paste Answer" icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />}
+          {answer && <Action title={t("Paste Answer")} icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />}
           {busy ? (
-            <Action title="Stop Answering" icon={Icon.Stop} shortcut={{ modifiers: ["cmd", "shift"], key: "s" }} onAction={chat.stop} />
+            <Action title={t("Stop Answering")} icon={Icon.Stop} shortcut={{ modifiers: ["cmd", "shift"], key: "s" }} onAction={chat.stop} />
           ) : (
-            <Action title="Try Again" icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={chat.again} />
+            <Action title={t("Try Again")} icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={chat.again} />
           )}
         </ActionPanel>
       }
@@ -66,5 +67,5 @@ export function AskAi(props: { fallbackText?: string }) {
     return question ? begin(question) : undefined;
   });
   if (asked) return <Answer conversation={asked} />;
-  return <Question title="Ask AI" onSubmit={(question) => push(<Answer conversation={begin(question)} />)} />;
+  return <Question title={t("Ask AI")} onSubmit={(question) => push(<Answer conversation={begin(question)} />)} />;
 }

@@ -12,6 +12,7 @@ import path from "node:path";
 
 import { readJson, writeJson } from "../context";
 import type { Message as Turn } from "../heyo/ai";
+import { t } from "../../../shared/i18n";
 
 export interface Message {
   role: "user" | "assistant";
@@ -32,7 +33,9 @@ export interface Conversation {
   messages: Message[];
 }
 
-export const UNTITLED = "New Chat";
+/// What a conversation is called before a question names it, in the
+/// language spoken when it begins.
+export const untitled = () => t("New Chat");
 const TITLE_LENGTH = 60;
 
 /// A title for a conversation that starts with `question`: its first line,
@@ -43,7 +46,7 @@ export function titleOf(question: string): string {
     .map((l) => l.replace(/\s+/g, " ").trim())
     // Not a line of nothing but markup (a code fence, a rule).
     .find((l) => /[^\s`#>*_~=-]/.test(l));
-  if (!line) return UNTITLED;
+  if (!line) return untitled();
   // Counted in characters, not UTF-16 units: an emoji is not cut in half.
   const characters = Array.from(line);
   if (characters.length <= TITLE_LENGTH) return line;
@@ -56,7 +59,7 @@ export function titleOf(question: string): string {
 export function newConversation(now: number): Conversation {
   // Sorts by time of creation; the random part keeps two of one moment apart.
   const id = `${now.toString(36)}-${randomBytes(4).toString("hex")}`;
-  return { id, title: UNTITLED, createdAt: now, updatedAt: now, messages: [] };
+  return { id, title: untitled(), createdAt: now, updatedAt: now, messages: [] };
 }
 
 /// The conversation with a question added. The first question names it.
@@ -125,10 +128,10 @@ export function exchangeMarkdown(exchange: Exchange, writing: string | null = nu
   const parts = [question];
   if (exchange.answer) {
     parts.push(exchange.answer.content);
-    if (exchange.answer.partial) parts.push("*The answer was cut short.*");
+    if (exchange.answer.partial) parts.push(`*${t("The answer was cut short.")}*`);
   } else if (writing !== null) parts.push(writing || "…");
-  else if (!error) parts.push("*No answer yet.*");
-  if (error) parts.push(`**Could not get an answer**\n\n${error}`);
+  else if (!error) parts.push(`*${t("No answer yet.")}*`);
+  if (error) parts.push(`**${t("Could not get an answer")}**\n\n${error}`);
   return parts.join("\n\n");
 }
 
@@ -138,7 +141,7 @@ export function lastAnswer(conversation: Conversation): string | undefined {
 
 /// The whole conversation as a Markdown document.
 export function asMarkdown(conversation: Conversation): string {
-  const parts = conversation.messages.map((m) => `## ${m.role === "user" ? "You" : "AI"}\n\n${m.content.trim()}`);
+  const parts = conversation.messages.map((m) => `## ${m.role === "user" ? t("You") : "AI"}\n\n${m.content.trim()}`);
   return [`# ${conversation.title}`, ...parts].join("\n\n") + "\n";
 }
 
@@ -163,7 +166,7 @@ function read(file: string): Conversation | undefined {
   const createdAt = Number(stored.createdAt) || 0;
   return {
     id: stored.id,
-    title: typeof stored.title === "string" && stored.title ? stored.title : UNTITLED,
+    title: typeof stored.title === "string" && stored.title ? stored.title : untitled(),
     ...(stored.renamed ? { renamed: true } : {}),
     createdAt,
     updatedAt: Number(stored.updatedAt) || createdAt,

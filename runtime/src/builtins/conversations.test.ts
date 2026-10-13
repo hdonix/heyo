@@ -17,7 +17,7 @@ import {
   titleOf,
   turnsOf,
   unanswered,
-  UNTITLED,
+  untitled,
   type Conversation,
 } from "./conversations";
 
@@ -36,7 +36,7 @@ test("a conversation is named by its first question", () => {
   expect(titleOf("  how do I\t undo   a commit  \n\nI already pushed it")).toBe("how do I undo a commit");
   // A first line of nothing but markup is not a name.
   expect(titleOf("```\n\nexplain this code\n```")).toBe("explain this code");
-  expect(titleOf("   \n ")).toBe(UNTITLED);
+  expect(titleOf("   \n ")).toBe(untitled());
 });
 
 test("a long first question is cut at a word", () => {

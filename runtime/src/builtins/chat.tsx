@@ -32,6 +32,7 @@ import {
   type Conversations,
   type Exchange,
 } from "./conversations";
+import { t, tn } from "../../../shared/i18n";
 
 const SYSTEM = `You are the quick-answer assistant inside a desktop launcher. Answer the question directly and briefly: lead with the answer, then only the explanation that is needed. Use Markdown, with code blocks for code and commands. Answer in the language of the question. If you are not sure, say so rather than guess.`;
 
@@ -130,7 +131,7 @@ function useStable(commands: Commands): Commands {
 
 async function copy(text: string) {
   await Clipboard.copy(text);
-  await showHUD("Copied to Clipboard");
+  await showHUD(t("Copied to Clipboard"));
 }
 
 function ChatActions(props: { exchange?: Exchange; last: boolean; busy: boolean; commands: Commands }) {
@@ -139,29 +140,29 @@ function ChatActions(props: { exchange?: Exchange; last: boolean; busy: boolean;
   return (
     <ActionPanel>
       <ActionPanel.Section>
-        <Action title="Send Message" icon={Icon.SpeechBubble} onAction={commands.send} />
-        <Action title="Write a Longer Message" icon={Icon.Pencil} shortcut={{ modifiers: ["cmd", "shift"], key: "e" }} onAction={commands.compose} />
-        {busy && <Action title="Stop Answering" icon={Icon.Stop} shortcut={{ modifiers: ["cmd", "shift"], key: "s" }} onAction={commands.stop} />}
+        <Action title={t("Send Message")} icon={Icon.SpeechBubble} onAction={commands.send} />
+        <Action title={t("Write a Longer Message")} icon={Icon.Pencil} shortcut={{ modifiers: ["cmd", "shift"], key: "e" }} onAction={commands.compose} />
+        {busy && <Action title={t("Stop Answering")} icon={Icon.Stop} shortcut={{ modifiers: ["cmd", "shift"], key: "s" }} onAction={commands.stop} />}
       </ActionPanel.Section>
       {exchange && (
         <ActionPanel.Section>
-          {answer && <Action title="Copy Answer" icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} onAction={() => copy(answer)} />}
+          {answer && <Action title={t("Copy Answer")} icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} onAction={() => copy(answer)} />}
           {answer && (
-            <Action title="Paste Answer" icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />
+            <Action title={t("Paste Answer")} icon={Icon.Clipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "v" }} onAction={() => Clipboard.paste(pasteable(answer))} />
           )}
           {last && !busy && (
-            <Action title={answer ? "Answer Again" : "Try Again"} icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={commands.again} />
+            <Action title={answer ? t("Answer Again") : t("Try Again")} icon={Icon.ArrowClockwise} shortcut={{ modifiers: ["cmd"], key: "r" }} onAction={commands.again} />
           )}
         </ActionPanel.Section>
       )}
       <ActionPanel.Section>
         {exchange && (
-          <Action title="Copy Conversation as Markdown" icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "m" }} onAction={commands.copyAll} />
+          <Action title={t("Copy Conversation as Markdown")} icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "m" }} onAction={commands.copyAll} />
         )}
-        <Action title="Rename Conversation" icon={Icon.Pencil} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={commands.rename} />
-        <Action title="New Chat" icon={Icon.Plus} shortcut={{ modifiers: ["cmd", "shift"], key: "n" }} onAction={commands.startNew} />
+        <Action title={t("Rename Conversation")} icon={Icon.Pencil} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={commands.rename} />
+        <Action title={t("New Chat")} icon={Icon.Plus} shortcut={{ modifiers: ["cmd", "shift"], key: "n" }} onAction={commands.startNew} />
         {exchange && (
-          <Action title="Delete Conversation" icon={Icon.Trash} style="destructive" shortcut={{ modifiers: ["ctrl"], key: "x" }} onAction={commands.remove} />
+          <Action title={t("Delete Conversation")} icon={Icon.Trash} style="destructive" shortcut={{ modifiers: ["ctrl"], key: "x" }} onAction={commands.remove} />
         )}
       </ActionPanel.Section>
     </ActionPanel>
@@ -203,7 +204,7 @@ function TextForm(props: { navigationTitle: string; title: string; submit: strin
             title={props.submit}
             onSubmit={(values: { text: string }) => {
               const text = values.text.trim();
-              if (!text) return setError("Required");
+              if (!text) return setError(t("Required"));
               props.onSubmit(text);
             }}
           />
@@ -217,7 +218,7 @@ function TextForm(props: { navigationTitle: string; title: string; submit: strin
 
 /// The form a question is written in when there is no search bar for it.
 export function Question(props: { title: string; onSubmit(question: string): void }) {
-  return <TextForm navigationTitle={props.title} title="Question" submit="Ask" placeholder="Ask anything…" multiline onSubmit={props.onSubmit} />;
+  return <TextForm navigationTitle={props.title} title={t("Question")} submit={t("Ask")} placeholder={t("Ask anything…")} multiline onSubmit={props.onSubmit} />;
 }
 
 /// One conversation, to read and to continue.
@@ -236,10 +237,10 @@ export function Chat(props: { conversation: Conversation }) {
   const send = (text: string) => {
     const question = text.trim();
     if (!question) {
-      return void showToast({ style: Toast.Style.Failure, title: "Nothing to send", message: "Type a message in the search bar, then press Enter." });
+      return void showToast({ style: Toast.Style.Failure, title: t("Nothing to send"), message: t("Type a message in the search bar, then press Enter.") });
     }
     if (writing !== null) {
-      return void showToast({ style: Toast.Style.Failure, title: "Still answering", message: "Wait for the answer, or stop it." });
+      return void showToast({ style: Toast.Style.Failure, title: t("Still answering"), message: t("Wait for the answer, or stop it.") });
     }
     draft.current = "";
     clearSearchBar();
@@ -254,7 +255,7 @@ export function Chat(props: { conversation: Conversation }) {
     compose: () =>
       push(
         <Question
-          title="Message"
+          title={t("Message")}
           onSubmit={(question) => {
             pop();
             // The answer awaited when the form opened may have come since.
@@ -268,9 +269,9 @@ export function Chat(props: { conversation: Conversation }) {
     rename: () =>
       push(
         <TextForm
-          navigationTitle="Rename Conversation"
-          title="Title"
-          submit="Rename"
+          navigationTitle={t("Rename Conversation")}
+          title={t("Title")}
+          submit={t("Rename")}
           initial={conversation.title}
           onSubmit={(title) => {
             chat.rename(title);
@@ -280,7 +281,7 @@ export function Chat(props: { conversation: Conversation }) {
       ),
     startNew: () => push(<Chat conversation={newConversation(Date.now())} />),
     remove: async () => {
-      if (!(await confirmDelete(`Delete "${conversation.title}"?`, "Delete"))) return;
+      if (!(await confirmDelete(t("Delete “{0}”?", conversation.title), t("Delete")))) return;
       answers.drop(conversation.id);
       store.remove(conversation.id);
       pop();
@@ -290,7 +291,7 @@ export function Chat(props: { conversation: Conversation }) {
   return (
     <List
       navigationTitle={conversation.title}
-      searchBarPlaceholder={all.length ? "Reply…" : "Ask anything…"}
+      searchBarPlaceholder={all.length ? t("Reply…") : t("Ask anything…")}
       filtering={false}
       onSearchTextChange={(text: string) => (draft.current = text)}
       isLoading={writing !== null}
@@ -298,7 +299,7 @@ export function Chat(props: { conversation: Conversation }) {
       selectedItemId={wanted}
       actions={<ChatActions last={false} busy={false} commands={commands} />}
     >
-      <List.EmptyView icon={Icon.SpeechBubble} title="Ask anything" description="Type a message and press Enter." />
+      <List.EmptyView icon={Icon.SpeechBubble} title={t("Ask anything")} description={t("Type a message and press Enter.")} />
       {/* The latest first: it is the one being read and replied to, and
           the first row is where the selection is whenever something is typed. */}
       {all
@@ -312,7 +313,7 @@ export function Chat(props: { conversation: Conversation }) {
 }
 
 const confirmDelete = (title: string, action: string) =>
-  confirmAlert({ title, message: "This cannot be undone.", primaryAction: { title: action, style: Alert.ActionStyle.Destructive } });
+  confirmAlert({ title, message: t("This cannot be undone."), primaryAction: { title: action, style: Alert.ActionStyle.Destructive } });
 
 /// The first words of the last thing said, on one line.
 function preview(conversation: Conversation) {
@@ -341,9 +342,9 @@ export function AiChat(props: { launchContext?: { conversation?: string } }) {
   const rename = (conversation: Conversation) =>
     push(
       <TextForm
-        navigationTitle="Rename Conversation"
-        title="Title"
-        submit="Rename"
+        navigationTitle={t("Rename Conversation")}
+        title={t("Title")}
+        submit={t("Rename")}
         initial={conversation.title}
         onSubmit={(title) => {
           // As it is kept now: an answer may have arrived meanwhile.
@@ -355,7 +356,7 @@ export function AiChat(props: { launchContext?: { conversation?: string } }) {
     );
 
   const remove = async (conversation: Conversation) => {
-    if (!(await confirmDelete(`Delete "${conversation.title}"?`, "Delete"))) return;
+    if (!(await confirmDelete(t("Delete “{0}”?", conversation.title), t("Delete")))) return;
     answers.drop(conversation.id);
     store.remove(conversation.id);
     reload();
@@ -363,26 +364,26 @@ export function AiChat(props: { launchContext?: { conversation?: string } }) {
 
   const removeAll = async () => {
     const count = all.length;
-    if (!(await confirmDelete(count === 1 ? "Delete the conversation?" : `Delete all ${count} conversations?`, "Delete All"))) return;
+    if (!(await confirmDelete(tn("Delete the conversation?", "Delete all {n} conversations?", count), t("Delete All")))) return;
     answers.drop();
     store.removeAll();
     reload();
-    await showToast({ title: "Conversations deleted" });
+    await showToast({ title: t("Conversations deleted") });
   };
 
-  const newChat = <Action title="New Chat" icon={Icon.Plus} shortcut={{ modifiers: ["cmd", "shift"], key: "n" }} onAction={startNew} />;
+  const newChat = <Action title={t("New Chat")} icon={Icon.Plus} shortcut={{ modifiers: ["cmd", "shift"], key: "n" }} onAction={startNew} />;
 
   return (
     <List
-      searchBarPlaceholder="Search conversations…"
+      searchBarPlaceholder={t("Search conversations…")}
       filtering={false}
       onSearchTextChange={setQuery}
       actions={<ActionPanel>{newChat}</ActionPanel>}
     >
       <List.EmptyView
         icon={Icon.SpeechBubble}
-        title={all.length ? "No conversation found" : "No conversations yet"}
-        description={all.length ? "Nothing said matches these words." : "Press Enter to start one, or type a question in the root search and press Tab."}
+        title={all.length ? t("No conversation found") : t("No conversations yet")}
+        description={all.length ? t("Nothing said matches these words.") : t("Press Enter to start one, or type a question in the root search and press Tab.")}
       />
       {shown.map((conversation) => {
         const answer = lastAnswer(conversation);
@@ -397,23 +398,23 @@ export function AiChat(props: { launchContext?: { conversation?: string } }) {
             actions={
               <ActionPanel>
                 <ActionPanel.Section>
-                  <Action title="Open Conversation" icon={Icon.SpeechBubble} onAction={() => open(conversation)} />
+                  <Action title={t("Open Conversation")} icon={Icon.SpeechBubble} onAction={() => open(conversation)} />
                   {newChat}
                 </ActionPanel.Section>
                 <ActionPanel.Section>
-                  {answer && <Action title="Copy Last Answer" icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} onAction={() => copy(answer)} />}
+                  {answer && <Action title={t("Copy Last Answer")} icon={Icon.CopyClipboard} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} onAction={() => copy(answer)} />}
                   <Action
-                    title="Copy Conversation as Markdown"
+                    title={t("Copy Conversation as Markdown")}
                     icon={Icon.CopyClipboard}
                     shortcut={{ modifiers: ["cmd", "shift"], key: "m" }}
                     onAction={() => copy(asMarkdown(conversation))}
                   />
-                  <Action title="Rename Conversation" icon={Icon.Pencil} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={() => rename(conversation)} />
+                  <Action title={t("Rename Conversation")} icon={Icon.Pencil} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={() => rename(conversation)} />
                 </ActionPanel.Section>
                 <ActionPanel.Section>
-                  <Action title="Delete Conversation" icon={Icon.Trash} style="destructive" shortcut={{ modifiers: ["ctrl"], key: "x" }} onAction={() => remove(conversation)} />
+                  <Action title={t("Delete Conversation")} icon={Icon.Trash} style="destructive" shortcut={{ modifiers: ["ctrl"], key: "x" }} onAction={() => remove(conversation)} />
                   <Action
-                    title="Delete All Conversations"
+                    title={t("Delete All Conversations")}
                     icon={Icon.Trash}
                     style="destructive"
                     shortcut={{ modifiers: ["ctrl", "shift"], key: "x" }}
