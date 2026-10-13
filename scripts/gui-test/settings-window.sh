@@ -27,6 +27,11 @@ sleep 2
   echo "after its title bar was dragged by 100, 100: $(where)"
   "$GUI/settings-do.sh" drag 100 44 0 -56 wait 1
   echo "after the sidebar's top edge was dragged by -100, -100: $(where)"
+  # The desktop had the pointer for those moves, and the window never
+  # heard the button go up: a click in it must still be a click.
+  "$GUI/settings-do.sh" page Shortcuts wait 0.6
+  echo "a click on Shortcuts in the sidebar, after the moves: $(ask states "list item" Shortcuts "Heyo Settings")"
+  "$GUI/settings-do.sh" page General wait 0.6
   echo "Open at Login before: $(login)"
   # From the search field, Tab goes down the sidebar's entries (the six
   # pages, then the applications and Heyo's commands) and then to the first

@@ -42,6 +42,7 @@ use tauri::AppHandle;
 
 use super::guard;
 use super::life::{self, Life, Lives, Slot, Slotted};
+use super::press::{self, Pointer, Whose};
 use super::standing::{self, KeyOf, Keyboard, Keyed, Layer, Pointed, Standing};
 use super::thread::{self, Job};
 use super::ui;
@@ -109,20 +110,14 @@ struct Overlay {
     holding: slint::Timer,
     held_tries: u32,
     resting: slint::Timer,
-    /// The pointer, in device pixels, and whether its button is down.
-    pointer: (f64, f64),
-    pressed: bool,
-    moved_pressed: u32,
+    /// The pointer in it, and whose each press is (`press`).
+    pointer: Pointer,
     ctrl: bool,
     alt: bool,
     cursor: Option<Cursor>,
     /// What is drawn on the capture, as the markup has it, and of what.
     marks: Rc<VecModel<ui::Mark>>,
     drawn: Vec<Shape>,
-    /// The pointer is over the toolbar, which is Slint's; and its button
-    /// went down there, or in the line that is being typed.
-    on_toolbar: bool,
-    pressed_in_slint: bool,
     /// Where text is being typed, as the markup has it.
     typing: Option<selecting::Point>,
 }
@@ -200,12 +195,7 @@ impl Lives for Overlay {
         life.pointed(|pointed| {
             let mut slint_too = false;
             with(|overlay| {
-                let input = match pointed {
-                    Pointed::Moved(to) => Input::Moved(to),
-                    Pointed::Left => Input::Left,
-                    Pointed::Pressed(button) | Pointed::Released(button) => Input::Button { button: if button == standing::Button::Left { Mouse::Left } else { Mouse::Right }, down: matches!(pointed, Pointed::Pressed(_)) },
-                };
-                slint_too = matches!(overlay.input(input), EventResult::Propagate);
+                slint_too = matches!(overlay.input(Input::Pointed(pointed)), EventResult::Propagate);
             });
             slint_too
         });
@@ -244,16 +234,12 @@ impl Lives for Overlay {
             holding: slint::Timer::default(),
             held_tries: 0,
             resting: slint::Timer::default(),
-            pointer: (0.0, 0.0),
-            pressed: false,
-            moved_pressed: 0,
+            pointer: Pointer::default(),
             ctrl: false,
             alt: false,
             cursor: None,
             marks,
             drawn: Vec::new(),
-            on_toolbar: false,
-            pressed_in_slint: false,
             typing: None,
         })
     }
@@ -300,13 +286,8 @@ pub(in crate::slint_windows) fn trace(what: &str) {
 /// surface. Places are in the window's device pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Input {
-    Moved((f64, f64)),
-    /// The pointer left the window.
-    Left,
-    Button {
-        button: Mouse,
-        down: bool,
-    },
+    /// What the pointer did.
+    Pointed(Pointed),
     /// A key went down or up: what it is to the overlay's rules, if
     /// anything; whether it is one of the two that are held with others;
     /// and whether it was really pressed now.
@@ -321,13 +302,6 @@ pub(super) enum Input {
         ctrl: bool,
         alt: bool,
     },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Mouse {
-    Left,
-    Right,
-    Other,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -392,8 +366,8 @@ impl Overlay {
         // Where the window cannot place itself, the desktop is asked to
         // have it cover the monitor that was read.
         self.life.ask_desktop(TITLE, Some(OwnPlace::Cover { area }));
-        (self.pressed, self.moved_pressed, self.ctrl, self.alt, self.cursor) = (false, 0, false, false, None);
-        (self.on_toolbar, self.pressed_in_slint) = (false, false);
+        (self.ctrl, self.alt, self.cursor) = (false, false, None);
+        self.pointer.forget();
         self.push();
         let window = self.life.window().window();
         window.set_position(slint::PhysicalPosition::new(area.x, area.y));
@@ -599,16 +573,17 @@ impl Overlay {
                 real: !is_synthetic,
             },
             WindowEvent::ModifiersChanged(modifiers) => Input::Modifiers { ctrl: modifiers.state().control_key(), alt: modifiers.state().alt_key() },
-            WindowEvent::CursorMoved { position, .. } => Input::Moved((position.x, position.y)),
-            WindowEvent::CursorLeft { .. } => Input::Left,
-            WindowEvent::MouseInput { state, button, .. } => Input::Button {
-                button: match button {
-                    MouseButton::Left => Mouse::Left,
-                    MouseButton::Right => Mouse::Right,
-                    _ => Mouse::Other,
-                },
-                down: *state == ElementState::Pressed,
-            },
+            WindowEvent::CursorMoved { position, .. } => Input::Pointed(Pointed::Moved((position.x, position.y))),
+            WindowEvent::CursorLeft { .. } => Input::Pointed(Pointed::Left),
+            WindowEvent::MouseInput { state, button, .. } => {
+                let button = match button {
+                    MouseButton::Left => standing::Button::Left,
+                    MouseButton::Right => standing::Button::Right,
+                    // No other button does anything in it.
+                    _ => return EventResult::PreventDefault,
+                };
+                Input::Pointed(if *state == ElementState::Pressed { Pointed::Pressed(button) } else { Pointed::Released(button) })
+            }
             WindowEvent::MouseWheel { .. } | WindowEvent::Touch(_) | WindowEvent::CursorEntered { .. } => return EventResult::PreventDefault,
             _ => return EventResult::Propagate,
         };
@@ -621,9 +596,10 @@ impl Overlay {
     /// have it too, which is so only where something of Slint's is to
     /// answer it: over the toolbar, and for the line that is being typed.
     pub(super) fn input(&mut self, input: Input) -> EventResult {
+        if let Input::Pointed(pointed) = input {
+            return self.pointed(pointed);
+        }
         let Some(up) = self.up.as_mut() else { return EventResult::Propagate };
-        let scale = up.scale;
-        let at = |pointer: (f64, f64)| (pointer.0 / scale, pointer.1 / scale);
         let typing = up.selecting.typing();
         let event = match input {
             Input::Key { key, down, held, real } => {
@@ -650,69 +626,66 @@ impl Overlay {
                 (self.ctrl, self.alt) = (ctrl, alt);
                 return if typing.is_some() { EventResult::Propagate } else { EventResult::PreventDefault };
             }
-            Input::Moved(to) => {
-                trace("pointer moved");
-                self.pointer = to;
-                if self.pressed {
-                    self.moved_pressed += 1;
-                    guard::test_in_drag(self.moved_pressed);
-                }
-                if self.pressed_in_slint {
-                    return EventResult::Propagate;
-                }
-                let to = at(self.pointer);
-                up.selecting.handle(Event::Moved { to });
-                // Slint hears of the pointer while it is over the toolbar,
-                // and that it has left when it has.
-                let on_toolbar = up.selecting.toolbar().is_some_and(|toolbar| toolbar.contains(to));
-                if self.on_toolbar && !on_toolbar {
-                    let _ = self.life.window().window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
-                    // And had the pointer's shape meanwhile.
-                    self.cursor = None;
-                }
-                self.on_toolbar = on_toolbar;
-                self.push();
-                return if on_toolbar { EventResult::Propagate } else { EventResult::PreventDefault };
-            }
-            Input::Left => {
-                let was_on_toolbar = std::mem::take(&mut self.on_toolbar);
-                up.selecting.handle(Event::Left);
-                self.push();
-                return if was_on_toolbar { EventResult::Propagate } else { EventResult::PreventDefault };
-            }
-            Input::Button { button, down } => {
-                let place = at(self.pointer);
-                match button {
-                    // Gives the screenshot up, wherever it is pressed.
-                    Mouse::Right if down => Event::Pressed { at: place, button: Button::Secondary },
-                    Mouse::Left if !down && self.pressed_in_slint => {
-                        self.pressed_in_slint = false;
-                        return EventResult::Propagate;
-                    }
-                    Mouse::Left if !down => {
-                        (self.pressed, self.moved_pressed) = (false, 0);
-                        Event::Released { button: Button::Primary }
-                    }
-                    Mouse::Left => {
-                        // A press on the toolbar is the toolbar's, and one in
-                        // the line that is being typed is the line's.
-                        let line = typing.map(|line| selecting::Rect { x: line.0 - 4.0, y: line.1 - 3.0, width: (f64::from(self.life.window().get_typed_width()) + 2.0).max(120.0) + 8.0, height: selecting::TEXT_LINE + 6.0 });
-                        if up.selecting.toolbar().is_some_and(|toolbar| toolbar.contains(place)) || line.is_some_and(|line| line.contains(place)) {
-                            self.pressed_in_slint = true;
-                            return EventResult::Propagate;
-                        }
-                        // Anywhere else, what was being typed is done with.
-                        self.typed();
-                        (self.pressed, self.moved_pressed) = (true, 0);
-                        Event::Pressed { at: place, button: Button::Primary }
-                    }
-                    _ => return EventResult::PreventDefault,
-                }
-            }
+            Input::Pointed(_) => return EventResult::PreventDefault,
         };
         let outcome = self.up.as_mut().and_then(|up| up.selecting.handle(event));
         self.after(outcome);
         EventResult::PreventDefault
+    }
+
+    /// What the pointer did in the overlay. Whose it is, is one rule
+    /// (`press`): the toolbar and the line that is being typed are
+    /// Slint's for the left button, and everything else is the
+    /// selection's.
+    fn pointed(&mut self, pointed: Pointed) -> EventResult {
+        let Some(up) = self.up.as_ref() else { return EventResult::Propagate };
+        let scale = up.scale;
+        let at = move |pointer: (f64, f64)| (pointer.0 / scale, pointer.1 / scale);
+        let toolbar = up.selecting.toolbar();
+        let line = up.selecting.typing().map(|line| selecting::Rect { x: line.0 - 4.0, y: line.1 - 3.0, width: (f64::from(self.life.window().get_typed_width()) + 2.0).max(120.0) + 8.0, height: selecting::TEXT_LINE + 6.0 });
+        let given = self.pointer.heard(pointed, |pointer, button| {
+            let place = at(pointer);
+            let slints = toolbar.as_ref().is_some_and(|toolbar| toolbar.contains(place)) || line.as_ref().is_some_and(|line| line.contains(place));
+            if button == standing::Button::Left && slints { Whose::Slint } else { Whose::Window }
+        });
+        if matches!(pointed, Pointed::Moved(_)) {
+            trace("pointer moved");
+            if self.pointer.press_from().is_some() {
+                guard::test_in_drag(self.pointer.moves());
+            }
+        }
+        if given.left_slint {
+            press::left(self.life.window().window());
+            // And had the pointer's shape meanwhile.
+            self.cursor = None;
+        }
+        if given.window {
+            let place = at(self.pointer.at());
+            match pointed {
+                Pointed::Moved(_) | Pointed::Left => {
+                    if let Some(up) = self.up.as_mut() {
+                        up.selecting.handle(if pointed == Pointed::Left { Event::Left } else { Event::Moved { to: place } });
+                    }
+                    self.push();
+                }
+                Pointed::Pressed(button) => {
+                    if button == standing::Button::Left {
+                        // What was being typed is done with.
+                        self.typed();
+                    }
+                    // The other button gives the screenshot up, wherever it is pressed.
+                    let button = if button == standing::Button::Left { Button::Primary } else { Button::Secondary };
+                    let outcome = self.up.as_mut().and_then(|up| up.selecting.handle(Event::Pressed { at: place, button }));
+                    self.after(outcome);
+                }
+                Pointed::Released(standing::Button::Left) => {
+                    let outcome = self.up.as_mut().and_then(|up| up.selecting.handle(Event::Released { button: Button::Primary }));
+                    self.after(outcome);
+                }
+                Pointed::Released(standing::Button::Right) => {}
+            }
+        }
+        if given.slint { EventResult::Propagate } else { EventResult::PreventDefault }
     }
 
     /// Shows what the selection says is to be seen.

@@ -632,6 +632,28 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
   - What a caller must never do: keep beats or a watcher of its own,
     look at the guard's state to know whether it is still on the screen,
     or take another window down.
+- `press.rs` is who a press of the pointer belongs to in a window:
+  Slint, which has the controls; the window's own rule (the overlay's
+  selection, a pinned capture that is dragged); or the desktop, which
+  moves a window by a press it is handed. Its interface:
+  - What a window says: what it heard of the pointer, in `standing`'s
+    words (`Pointed`), to the `Pointer` it keeps; whose a place is for a
+    button, when it is asked (`Whose`: the overlay's toolbar and the
+    line being typed are Slint's for the left button, everything in a
+    pinned capture is the window's, everything in the settings is
+    Slint's); and that it has asked the desktop to move it by the press
+    (`handed_to_desktop`).
+  - What it is promised: a press belongs to whoever it went down on
+    until that button goes up, wherever the pointer goes. With no button
+    down the window's own rule hears of every move, and Slint too while
+    the pointer is over what is Slint's, and Slint is told when it
+    leaves that. A press handed to the desktop is over at once, and if
+    it was Slint's, Slint is told the button is up and the pointer away,
+    which it would never hear. What is to be done with each thing heard
+    comes back as a value (`Given`), which is what is tested.
+  - What a window must never do: keep a note of its own of who has a
+    press, or tell Slint itself that a button went up or the pointer
+    left.
 - `layer.rs` is a window that is not winit's: a layer surface, on a
   Wayland compositor that offers the layer shell (tried on Sway; the other
   wlroots ones and KWin offer it too), where the pill, a pinned capture and the overlay

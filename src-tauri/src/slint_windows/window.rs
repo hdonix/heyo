@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use slint::winit_030::winit::dpi::PhysicalPosition;
-use slint::winit_030::winit::event::{ElementState, WindowEvent};
+use slint::winit_030::winit::event::{ElementState, MouseButton, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, VecModel};
@@ -29,7 +29,8 @@ use super::host::Command;
 use super::model::{changes, Ask, Changes, Line, Model, Then};
 use super::thread::{self, Job};
 use super::life::{self, Life, Lives, Slot, Slotted};
-use super::standing::{self, Keyboard, Layer, Standing};
+use super::press::{self, Pointer, Whose};
+use super::standing::{self, Button, Keyboard, Layer, Pointed, Standing};
 use super::{icons, reach, ui};
 use crate::platform::place::Which;
 
@@ -212,8 +213,8 @@ struct Live {
     /// The hotkey field that is recording, and the modifiers held.
     recording: Option<String>,
     held: Held,
-    /// Where the pointer is in the window, in its device pixels.
-    pointer: (f64, f64),
+    /// The pointer in the window, and whose each press is (`press`).
+    pointer: Pointer,
     /// Asks again, while something is under way that the page counts down.
     /// Kept, so that it goes on asking.
     _poll: slint::Timer,
@@ -316,9 +317,13 @@ impl Live {
                 self.life.window().set_moved(self.life.window().get_moved().wrapping_add(1));
                 EventResult::Propagate
             }
-            WindowEvent::CursorMoved { position, .. } => {
-                self.pointer = (position.x, position.y);
-                EventResult::Propagate
+            // Everything in it is Slint's: what is kept is whether a
+            // press is, for when the desktop takes one (`drag`).
+            WindowEvent::CursorMoved { position, .. } => self.pointed(Pointed::Moved((position.x, position.y))),
+            WindowEvent::CursorLeft { .. } => self.pointed(Pointed::Left),
+            WindowEvent::MouseInput { state, button: MouseButton::Left, .. } => {
+                self.life.draw();
+                self.pointed(if *state == ElementState::Pressed { Pointed::Pressed(Button::Left) } else { Pointed::Released(Button::Left) })
             }
             // Its panel is elsewhere in it, or of another size: once Slint
             // has laid it out for what it was just told.
@@ -361,6 +366,32 @@ impl Live {
                 EventResult::Propagate
             }
             _ => EventResult::Propagate,
+        }
+    }
+
+    /// What the pointer did, for `press`'s rule to keep whose a press is.
+    fn pointed(&mut self, pointed: Pointed) -> EventResult {
+        self.pointer.heard(pointed, |_, _| Whose::Slint);
+        EventResult::Propagate
+    }
+
+    /// The desktop is asked to move the window by the press that is
+    /// down, and has the pointer from then until the button is let go:
+    /// the window is never told that it was.
+    fn drag(&mut self) {
+        self.life.window().window().with_winit_window(|window| {
+            let _ = window.drag_window();
+        });
+        if self.pointer.handed_to_desktop() {
+            // Once Slint is done with the press that asked for this, and
+            // not while the window is being done something with here:
+            // what Slint is told may come back as something a control did.
+            let (window, at) = (self.life.window().as_weak(), self.pointer.at());
+            slint::Timer::single_shot(Duration::ZERO, move || {
+                if let Some(window) = window.upgrade() {
+                    press::let_go(window.window(), at);
+                }
+            });
         }
     }
 
@@ -451,37 +482,13 @@ fn wire(window: &ui::SettingsWindow) {
         with(Live::hide);
     });
     host.on_drag(|| {
-        with(|live| {
-            live.life.window().window().with_winit_window(|window| {
-                let _ = window.drag_window();
-            });
-        });
-        // Once Slint is done with the press that asked for this.
-        slint::Timer::single_shot(Duration::ZERO, let_go);
+        with(Live::drag);
     });
     window.window().on_close_requested(|| {
         with(Live::hide);
         slint::CloseRequestResponse::HideWindow
     });
     window.window().on_winit_window_event(|_, event| with(|live| live.told(event)).unwrap_or(EventResult::Propagate));
-}
-
-/// The window is being moved by the desktop, which has the pointer from
-/// the press that began the move until the button is let go: the window
-/// is never told that it was. Slint would go on taking what was pressed
-/// for pressed, and hand it every press after: each would begin another
-/// move, and nothing in the window could be clicked again. So Slint is
-/// told now what it will not hear: the button is up, and the pointer is
-/// away until it is next heard of.
-fn let_go() {
-    let Some((window, at)) = with(|live| (live.life.window().as_weak(), live.pointer)) else { return };
-    // Not while the window is being done something with here: what Slint
-    // is told may come back as something a control did.
-    let Some(window) = window.upgrade() else { return };
-    let scale = f64::from(window.window().scale_factor()).max(0.1);
-    let position = slint::LogicalPosition::new((at.0 / scale) as f32, (at.1 / scale) as f32);
-    let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerReleased { position, button: slint::platform::PointerEventButton::Left });
-    let _ = window.window().dispatch_event_with_result(slint::platform::WindowEvent::PointerExited);
 }
 
 /// What the window is given when it is made: where its lines come from,
@@ -582,7 +589,7 @@ fn make() -> Result<Live, String> {
     poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
         with(|live| live.ask(live.model.poll()));
     });
-    let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: (0.0, 0.0), _poll: poll };
+    let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: Pointer::default(), _poll: poll };
     live.push();
 
     // Whichever window there is hears them: it may be made again.

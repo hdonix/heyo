@@ -43,6 +43,7 @@ mod life;
 mod model;
 pub(crate) mod pill;
 mod pointer;
+mod press;
 mod reach;
 pub(crate) mod screenshot;
 mod standing;

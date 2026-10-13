@@ -17,6 +17,7 @@ use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
 use tauri::AppHandle;
 
 use super::super::life::{self, Life, Lives, Slot, Slotted};
+use super::super::press::{Pointer, Whose};
 use super::super::standing::{left_to_go, Button, Keyboard, Layer, Pointed, Standing};
 use crate::platform::desktop::OwnPlace;
 use super::super::ui;
@@ -36,10 +37,9 @@ const TWICE: Duration = Duration::from_millis(400);
 struct Pinned {
     id: u64,
     life: Life<ui::PinWindow>,
-    /// The pointer, in the window's pixels; where its button went down,
-    /// while it is down; and when and where it last went down.
-    pointer: (f64, f64),
-    pressed: Option<(f64, f64)>,
+    /// The pointer in the window, and whose each press is (`press`); and
+    /// when and where its button last went down.
+    pointer: Pointer,
     last: Option<(Instant, (f64, f64))>,
     /// It is being moved by the pointer, by this window itself: nobody
     /// else moves a window where it is a layer surface.
@@ -132,7 +132,7 @@ impl Pins {
                 eprintln!("heyo: the capture could not be pinned: {e}");
             }
         });
-        self.pinned.push(Pinned { id, life, pointer: (0.0, 0.0), pressed: None, last: None, moving: false, moved: (0.0, 0.0) });
+        self.pinned.push(Pinned { id, life, pointer: Pointer::default(), last: None, moving: false, moved: (0.0, 0.0) });
     }
 }
 
@@ -151,10 +151,11 @@ fn heard(id: u64, pointed: Pointed) {
         let Some(pin) = pins.pinned.iter_mut().find(|pin| pin.id == id) else { return };
         let scale = f64::from(pin.life.window().window().scale_factor()).max(0.1);
         let apart = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1) / scale;
+        // All of it is the pin's own: nothing of Slint's answers in it.
+        pin.pointer.heard(pointed, |_, _| Whose::Window);
         match pointed {
             Pointed::Moved(to) => {
-                pin.pointer = to;
-                match pin.pressed {
+                match pin.pointer.press_from() {
                     // It goes after the pointer, by what is left to go.
                     Some(from) if pin.moving => {
                         let went = pin.life.move_by(left_to_go((to.0 - from.0, to.1 - from.1), pin.moved));
@@ -164,7 +165,7 @@ fn heard(id: u64, pointed: Pointed) {
                         pin.last = None;
                         if pin.life.drag() {
                             // The desktop moves it from here, and has the pointer until the button is let go.
-                            pin.pressed = None;
+                            pin.pointer.handed_to_desktop();
                         } else {
                             pin.moving = true;
                         }
@@ -174,13 +175,13 @@ fn heard(id: u64, pointed: Pointed) {
             }
             Pointed::Pressed(Button::Left) => {
                 let now = Instant::now();
-                if pin.last.is_some_and(|(when, at)| now.duration_since(when) < TWICE && apart(at, pin.pointer) < SLACK) {
+                if pin.last.is_some_and(|(when, at)| now.duration_since(when) < TWICE && apart(at, pin.pointer.at()) < SLACK) {
                     close(id);
                 } else {
-                    (pin.pressed, pin.last, pin.moved) = (Some(pin.pointer), Some((now, pin.pointer)), (0.0, 0.0));
+                    (pin.last, pin.moved) = (Some((now, pin.pointer.at())), (0.0, 0.0));
                 }
             }
-            Pointed::Released(Button::Left) => (pin.pressed, pin.moving) = (None, false),
+            Pointed::Released(Button::Left) => pin.moving = false,
             Pointed::Pressed(Button::Right) => close(id),
             Pointed::Released(Button::Right) | Pointed::Left => {}
         }
