@@ -20,10 +20,16 @@ clipboard history, arranges windows, takes screenshots and dictation, and
 runs extensions written for [Raycast](https://www.raycast.com): the same
 builds the Raycast Store hands out, installed from inside Heyo.
 
-It is early: there has been no release yet. Heyo is developed and used
-every day on Ubuntu 24.04 (GNOME on X11); [where else it
-runs](#where-it-runs), and how far along, is below. Heyo is not affiliated
-with Raycast.
+It is early: the first release, [0.0.1](https://github.com/hdonix/heyo/releases),
+is a pre-release. Heyo is developed and used every day on Ubuntu 24.04
+(GNOME on X11); [where else it runs](#where-it-runs), and how far along,
+is below. Heyo is not affiliated with Raycast.
+
+<p align="center">
+  <a href="https://youtu.be/Hu0lVY2hJjg"><img src="docs/images/demo-video.jpg" width="830" alt="Heyo in a minute and a quarter, on YouTube: dictation in English and in Chinese with English in it, window layouts, a screenshot marked up and pinned, the clipboard history, the calculator, and a Raycast extension installed from the store"></a>
+  <br>
+  <sub>A minute and a quarter of Heyo at work, <a href="https://youtu.be/Hu0lVY2hJjg">on YouTube</a></sub>
+</p>
 
 ## What it does
 
