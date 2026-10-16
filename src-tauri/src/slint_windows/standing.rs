@@ -210,6 +210,15 @@ pub(super) fn here(standing: Standing) -> Told {
 /// What winit is told of a window before it makes it.
 pub(super) fn attributes(told: Told, attributes: WindowAttributes) -> WindowAttributes {
     let attributes = if told.opaque { attributes.with_transparent(false) } else { attributes };
+    #[cfg(target_os = "macos")]
+    let attributes = {
+        use slint::winit_030::winit::platform::macos::WindowAttributesExtMacOS;
+
+        // Every Slint window draws its own shadow into the transparent
+        // margin. AppKit's additional NSWindow shadow otherwise sits outside
+        // that margin and makes the window look like a dark rectangular box.
+        attributes.with_has_shadow(false)
+    };
     #[cfg(target_os = "linux")]
     let attributes = {
         use slint::winit_030::winit::platform::x11::{WindowAttributesExtX11, WindowType};

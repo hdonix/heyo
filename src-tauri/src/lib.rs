@@ -148,6 +148,12 @@ fn give_large_memory_back() {
     }
 }
 
+/// A macOS helper process gives Slint the process main thread that AppKit
+/// requires, while the primary process keeps Tauri's event loop.
+pub fn run_slint_child_if_requested() -> bool {
+    slint_windows::run_child_if_requested()
+}
+
 pub fn run() {
     // Heyo keeps its things where the XDG directories say. Windows has no
     // such variables: there they are set, for Heyo and the helper programs
@@ -243,8 +249,14 @@ pub fn run() {
         .setup(move |app| {
             // Extension icons and assets.
             let _ = app.asset_protocol_scope().allow_directory(paths::data(), true);
+            #[cfg(target_os = "macos")]
+            let _ = app.asset_protocol_scope().allow_directory(paths::cache().join("app-icons"), true);
             #[cfg(windows)]
             let _ = app.asset_protocol_scope().allow_directory(apps::icon_dir(), true);
+            #[cfg(target_os = "macos")]
+            for directory in [paths::home().join("Applications"), "/Applications".into(), "/System/Applications".into()] {
+                let _ = app.asset_protocol_scope().allow_directory(directory, true);
+            }
             platform::clipboard_watch::attach(app.handle());
             clipboard::watch(app.handle().clone());
             links::register();

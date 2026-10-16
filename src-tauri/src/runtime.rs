@@ -141,6 +141,7 @@ fn session_name() -> &'static str {
     use crate::platform::Session;
     match crate::platform::session() {
         _ if cfg!(windows) => "windows",
+        _ if cfg!(target_os = "macos") => "macos",
         Session::X11 => "x11",
         Session::Wayland => "wayland",
         Session::Unknown => "unknown",

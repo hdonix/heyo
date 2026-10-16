@@ -28,7 +28,10 @@ slint-build = "=1.18.1"
 rspolib = "0.1"
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
+# 2.12 moved to muda 0.20 while Slint 1.18 uses muda 0.19. Linking both
+# menu implementations into one macOS process defines the same Objective-C
+# classes twice, so stay on the newest Tauri release that shares muda 0.19.
+tauri = { version = "=2.11.0", features = ["macos-private-api", "protocol-asset", "tray-icon"] }
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -86,6 +89,9 @@ i-slint-core = "=1.18.1"
 # Skia drawing into a surface of Heyo's own (the overlay as a layer
 # surface): Slint's renderer by its own name. In the build already.
 i-slint-renderer-skia = "=1.18.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+plist = "1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

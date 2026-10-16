@@ -4,7 +4,8 @@
 use std::path::PathBuf;
 
 #[cfg_attr(windows, path = "apps/windows.rs")]
-#[cfg_attr(not(windows), path = "apps/desktop_entries.rs")]
+#[cfg_attr(target_os = "macos", path = "apps/macos.rs")]
+#[cfg_attr(all(not(windows), not(target_os = "macos")), path = "apps/desktop_entries.rs")]
 mod system;
 #[cfg(any(windows, test))]
 mod shortcut;

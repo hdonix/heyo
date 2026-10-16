@@ -211,6 +211,7 @@ pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<Setti
 #[tauri::command]
 pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
     if crate::slint_windows::open(&app) {
+        #[cfg(not(target_os = "macos"))]
         palette::hide(&app);
         return Ok(());
     }
@@ -254,7 +255,7 @@ pub(crate) async fn get_hotkeys() -> Hotkeys {
 }
 
 /// The hotkeys that open Heyo itself, named as in `Hotkeys`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, ts_rs::TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) enum HotkeyName {

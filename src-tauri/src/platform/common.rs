@@ -26,6 +26,8 @@ pub(crate) fn open(target: impl AsRef<std::ffi::OsStr>) -> Result<(), String> {
         // The empty string is the window title `start` takes its first quoted argument for.
         command.args(["/C", "start", ""]);
         command
+    } else if cfg!(target_os = "macos") {
+        quiet("open")
     } else {
         quiet("xdg-open")
     };

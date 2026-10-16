@@ -108,7 +108,7 @@ pub enum Words {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct Capabilities {
-    #[ts(type = "\"x11\" | \"wayland\" | \"windows\" | \"unknown\"")]
+    #[ts(type = "\"x11\" | \"wayland\" | \"macos\" | \"windows\" | \"unknown\"")]
     pub session: &'static str,
     /// Listing, switching and moving other applications' windows.
     pub windows: Support,
@@ -157,6 +157,7 @@ pub fn capabilities() -> Capabilities {
     Capabilities {
         session: match session() {
             _ if cfg!(windows) => "windows",
+            _ if cfg!(target_os = "macos") => "macos",
             Session::X11 => "x11",
             Session::Wayland => "wayland",
             Session::Unknown => "unknown",

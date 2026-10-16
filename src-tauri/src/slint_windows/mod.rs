@@ -44,6 +44,8 @@ mod model;
 pub(crate) mod pill;
 mod pointer;
 mod press;
+#[cfg(target_os = "macos")]
+mod process;
 mod reach;
 pub(crate) mod screenshot;
 mod standing;
@@ -74,6 +76,11 @@ pub(crate) fn failure() -> String {
 /// show it, now or for the rest of this run (`failure` says why): the
 /// caller tells the user.
 pub(crate) fn open(app: &AppHandle) -> bool {
+    #[cfg(target_os = "macos")]
+    return process::open(app);
+
+    #[cfg(not(target_os = "macos"))]
+    {
     let asked = Instant::now();
     if !ensure(app) {
         return false;
@@ -99,11 +106,19 @@ pub(crate) fn open(app: &AppHandle) -> bool {
             false
         }
     }
+    }
 }
 
 /// Starts Slint's thread ahead of the first window, so that the first one
 /// asked for is as quick as the ones after. It does not wait.
 pub(crate) fn warm(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        return;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
     let app = app.clone();
     let _ = std::thread::Builder::new().name("heyo-slint-warm".into()).spawn(move || {
         // The pill is the window that cannot wait to be made, and the
@@ -118,6 +133,7 @@ pub(crate) fn warm(app: &AppHandle) {
     crate::platform::place::when_changed(|| {
         life::ask(follow);
     });
+    }
 }
 
 /// Makes Slint's windows again, for the display as it is now. On Slint's
@@ -151,6 +167,14 @@ pub(crate) fn speak() {
 /// Sees to it that Slint's thread runs: starts it the first time, and
 /// waits for it while another is starting it. False when it does not run,
 /// and will not in this run.
+#[cfg(target_os = "macos")]
+fn ensure(_app: &AppHandle) -> bool {
+    // macOS Slint windows live in the helper process, not this process's
+    // Tauri-owned main thread. The settings entry uses `process::open`.
+    false
+}
+
+#[cfg(not(target_os = "macos"))]
 fn ensure(app: &AppHandle) -> bool {
     let asked = Instant::now();
     if guard::moved(State::Idle, State::Starting) {
@@ -203,4 +227,15 @@ fn start(app: &AppHandle, asked: Instant) -> bool {
             false
         }
     }
+}
+
+/// Runs the macOS Slint UI helper when this process was spawned for it.
+/// Slint owns this process's main thread, as AppKit requires.
+pub(crate) fn run_child_if_requested() -> bool {
+    #[cfg(target_os = "macos")]
+    if std::env::args().any(|argument| argument == process::ARGUMENT) {
+        process::run_child();
+        return true;
+    }
+    false
 }

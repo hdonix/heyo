@@ -43,7 +43,9 @@ pub fn run(action: Action) -> Result<Option<String>, String> {
 pub fn dark() -> Result<bool, String> {
     #[cfg(windows)]
     return Ok(!tool("reg", &["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "/v", "AppsUseLightTheme"])?.contains("0x1"));
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    return Ok(tool("defaults", &["read", "-g", "AppleInterfaceStyle"]).is_ok_and(|appearance| appearance.trim() == "Dark"));
+    #[cfg(all(not(windows), not(target_os = "macos")))]
     Ok(tool("gsettings", &["get", "org.gnome.desktop.interface", "color-scheme"])?.contains("prefer-dark"))
 }
 

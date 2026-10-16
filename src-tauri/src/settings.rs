@@ -316,7 +316,7 @@ impl Settings {
     pub fn node(&self) -> String {
         node_given().unwrap_or_else(|| match self.node_path.trim() {
             // The one that came with Heyo, if one did; else whichever is installed.
-            "" => bundled_node().unwrap_or_else(|| "node".into()),
+            "" => bundled_node().or_else(installed_node).unwrap_or_else(|| "node".into()),
             path => path.into(),
         })
     }
@@ -376,6 +376,18 @@ fn set_autostart_entry(enabled: bool) -> Result<(), String> {
 fn bundled_node() -> Option<String> {
     let beside = env::current_exe().ok()?.parent()?.join(if cfg!(windows) { "node.exe" } else { "node" });
     beside.is_file().then(|| beside.to_string_lossy().into_owned())
+}
+
+/// GUI applications on macOS do not inherit the shell's PATH. Homebrew's
+/// two standard prefixes cover its Apple Silicon and Intel installations.
+fn installed_node() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    for path in ["/opt/homebrew/bin/node", "/usr/local/bin/node"] {
+        if Path::new(path).is_file() {
+            return Some(path.into());
+        }
+    }
+    None
 }
 
 pub fn node_version(node: &str) -> Result<String, String> {

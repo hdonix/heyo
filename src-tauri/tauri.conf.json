@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -18,6 +19,7 @@
         "height": 534,
         "decorations": false,
         "transparent": true,
+        "shadow": false,
         "resizable": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
@@ -69,7 +71,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "appimage", "nsis"],
+    "targets": ["deb", "rpm", "appimage", "nsis", "dmg", "app"],
     "category": "Utility",
     "license": "GPL-3.0-only",
     "licenseFile": "../LICENSE",

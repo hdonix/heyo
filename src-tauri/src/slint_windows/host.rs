@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tauri::async_runtime::block_on;
 use tauri::{AppHandle, Listener, Manager};
@@ -42,7 +42,8 @@ pub(crate) trait Host: Send + Sync + 'static {
 /// asking. This is the one place a command is written: the model makes
 /// these, and `Running::call` answers every one of them, or does not
 /// compile.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data")]
 pub(crate) enum Command {
     GetSettings,
     /// The settings to change, by their names, and what each is to be.

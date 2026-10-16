@@ -115,7 +115,7 @@ pub struct Heyo {
     /// What it may come to ask for (`permissions::Permission`, by name).
     #[serde(default)]
     pub permissions: Vec<String>,
-    /// Where it runs (`linux`, `windows`); everywhere when left out.
+    /// Where it runs (`linux`, `macos`, `windows`); everywhere when left out.
     #[serde(default)]
     pub platforms: Option<Vec<String>>,
 }
@@ -132,7 +132,7 @@ impl Heyo {
 }
 
 /// This platform, as manifests name it.
-pub const PLATFORM: &str = if cfg!(windows) { "windows" } else { "linux" };
+pub const PLATFORM: &str = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
 
 /// What the host needs to know of an extension that asks it for something.
 #[derive(Debug, Clone, PartialEq)]

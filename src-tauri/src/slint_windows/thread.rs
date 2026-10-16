@@ -122,7 +122,13 @@ pub(super) fn wayland() -> bool {
 
 /// Which of Slint's renderers draws the windows.
 fn renderer() -> String {
-    std::env::var("HEYO_SETTINGS_RENDERER").ok().filter(|name| !name.is_empty()).unwrap_or_else(|| if wayland() { RENDERER_ON_WAYLAND } else { RENDERER }.to_string())
+    std::env::var("HEYO_SETTINGS_RENDERER")
+        .ok()
+        .filter(|name| !name.is_empty())
+        // AppKit needs the renderer's alpha surface for a transparent Slint
+        // window. softbuffer's CPU surface is presented as an opaque black
+        // rectangle on macOS, just as it is on Wayland.
+        .unwrap_or_else(|| if wayland() || cfg!(target_os = "macos") { RENDERER_ON_WAYLAND } else { RENDERER }.to_string())
 }
 
 /// Runs Slint on this thread until Heyo ends, and says through `begun`
