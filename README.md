@@ -2,7 +2,7 @@
   <img src="src-tauri/icons/128x128@2x.png" width="96" alt="">
 </p>
 <h1 align="center">Heyo</h1>
-<p align="center">A command palette for Linux that runs Raycast extensions.</p>
+<p align="center">A command palette for Linux, macOS and Windows that runs Raycast extensions.</p>
 <p align="center">
   <a href="https://github.com/hdonix/heyo/actions/workflows/ci.yml"><img src="https://github.com/hdonix/heyo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
@@ -159,7 +159,8 @@ forms itself.
 </p>
 
 Not all of them work. Many extensions are written for macOS alone
-(AppleScript, macOS programs), and those parts cannot run here. Of the 100
+(AppleScript, macOS programs); those parts cannot run on Linux or Windows,
+and have not yet been surveyed on Heyo's early macOS host. Of the 100
 most-downloaded extensions, launched command by command on Linux, 15
 launch cleanly, 19 stop at something only their user can give (an API
 key, a sign-in), 49 launch but contain parts that cannot work here, 8 are
@@ -181,7 +182,7 @@ windows, the screen, dictation, the clipboard history, live activities.
 | **Linux, other X11 desktops** | The X11 code is not GNOME's alone, but hotkeys are only set up for you on GNOME (elsewhere, bind a shortcut to `heyo`), and no other desktop has had daily use. |
 | **KDE, Sway, Hyprland and other Wayland desktops** | Not supported. Heyo has no adapter for them, which leaves launching, extensions and what generic tools can do; [docs/wayland.md](docs/wayland.md) says what each would take. Where the compositor offers the layer shell, the dictation pill, pinned captures and the screenshot overlay are placed by it; that much has been tried, under Sway only, in a container. |
 | **Windows** | Behind. It compiles in CI, and a build ran in a Windows 11 virtual machine: the palette on `Alt+Space`, the Start menu's applications, a window layout, pasting, the clipboard history. Screen capture, the selected text, the hold-to-talk key, application icons and the installer are written and have only been compiled. Dictation does not work there yet. |
-| **macOS** | No. |
+| **macOS** | Early support, tested on Apple silicon. The native host discovers and launches `.app` bundles with their icons, opens files and links, follows the system appearance, and can keep the palette and Slint settings window open together. Desktop integration is not implemented yet: global hotkeys, window management, pasting and selected text, clipboard watching, screenshots, snippet expansion and dictation are unavailable. Build from source; `.app` and `.dmg` bundle targets are configured. |
 
 ## Install
 
@@ -190,6 +191,12 @@ Packages for Linux and Windows, on x86_64 and arm64, are on the
 [CHANGELOG.md](CHANGELOG.md) says what is in each version. Or build from
 source; [packaging/README.md](packaging/README.md) describes how the
 packages are made.
+
+On macOS, install the Xcode Command Line Tools, Rust, Node.js 22 or newer
+and pnpm; run `pnpm install`, then build a native application and disk
+image with `pnpm tauri build --bundles app,dmg`. Until macOS packages are
+published, open the resulting `Heyo.app` from
+`src-tauri/target/release/bundle/macos/`.
 
 From source, for the current user, under `~/.local` (what the build needs
 is in [docs/development.md](docs/development.md#what-you-need)):
