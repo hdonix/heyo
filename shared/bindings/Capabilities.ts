@@ -7,7 +7,7 @@ import type { Support } from "./Support";
  * What the running session can do, so features that cannot work are
  * hidden or explained instead of failing when used.
  */
-export type Capabilities = { session: "x11" | "wayland" | "windows" | "unknown", 
+export type Capabilities = { session: "x11" | "wayland" | "macos" | "windows" | "unknown", 
 /**
  * Listing, switching and moving other applications' windows.
  */
