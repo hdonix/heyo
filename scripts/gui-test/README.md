@@ -204,7 +204,7 @@ that the cutting can be changed without filming again:
 ```sh
 scripts/gui-test/demo-film.sh            # both: $HEYO_TEST_DIR/film/heyo.mp4 and heyo.webm
 scripts/gui-test/demo-film.sh capture    # films the sandbox: film/capture.mkv, film/moments.jsonl
-scripts/gui-test/demo-film.sh edit       # cuts what was filmed, again
+scripts/gui-test/demo-film.sh edit       # makes the film of what was filmed, again
 ```
 
 - **Capture.** The real Heyo in the sandbox's GNOME session at 3840x2160
@@ -213,21 +213,37 @@ scripts/gui-test/demo-film.sh edit       # cuts what was filmed, again
   writes the moments: when each thing happened and where on the screen it
   is, asked of the windows (`mark`). Nothing in the edit carries a place as
   a number that the capture could have told it.
-- **Edit.** `demo-film.py` is the cutting: a list of shots (`storyboard`),
-  each so many beats of the music long, saying which stretch of the capture
-  it shows, how fast, and where the camera is. Cuts are on beats; what must
-  happen on a beat is found in the capture by the picture in which the
-  screen changes. Captions and the two cards are drawn there. It writes
-  `film/cuts.txt`: how far each cut is from a beat.
+- **Music.** `film/music.py` writes the music: drums, bass, chords, an
+  arpeggio and a hook, each sound computed (oscillators, filtered noise,
+  envelopes), mixed with a kick-keyed duck, reverb, delay and a limiter to
+  -14 LUFS. Nothing is fetched or sampled, so no licence comes with it. At
+  120 beats a minute a beat is 15 pictures; its sections are the film's
+  (`SECTIONS`, `WIPES`): a build under the opening and the title, the drop
+  where dictation begins, a lift for the windows, a breakdown, the last
+  drop, the hit on the end card. Run alone it prints its loudness, peaks,
+  spectrum and how far the notes an onset detector finds are from the grid.
+- **Edit.** `film/edit.py` is the cutting: a list of shots (`storyboard`),
+  each so many beats long, saying which stretch of the capture it shows,
+  how fast, and where the camera is. What must happen on a beat is found in
+  the capture by the picture in which the screen changes. It writes the
+  plate (the capture retimed to the film, still 4K), the sound (the music
+  turned down under what is dictated), and `data.js` for the composition.
+- **Composition.** `film/composition` is a
+  [HyperFrames](https://github.com/heygen-com/hyperframes) project: HTML
+  with GSAP, rendered picture by picture in headless Chromium and encoded by
+  FFmpeg. It moves the camera over the plate, punches it on the beat,
+  flashes each window where it lands, and sets the type: the title, the
+  captions whose words arrive on the beat, the sweeps between scenes and
+  the end card. `film/cuts.txt` says how far each cut is from its beat.
 
-The music is not in the repository. `demo-film.py` fetches it by its
-address, checks its SHA-256 and keeps it (`$HEYO_FILM_CACHE/music`); its
-title, author and licence are at the head of that file, with how another
-track is given. A licence that asks for a credit gets it on the last card.
-
-The edit runs under a Python of its own with what it needs (numpy, Pillow,
-OpenCV, librosa, and an ffmpeg with H.264 from `imageio-ffmpeg`): a virtual
-environment that `demo-film.sh` makes with `uv` the first time, in
-`$HEYO_FILM_CACHE/venv`. `HEYO_FILM_DRAFT=1` makes a quick film at half
-the size; `HEYO_FILM_STILLS=1` also writes the first, middle and last
-picture of every shot to `film/stills/`, to look the film over.
+The edit runs under a Python of its own (numpy, scipy, librosa, and an
+ffmpeg with H.264 from `imageio-ffmpeg`), a virtual environment that
+`demo-film.sh` makes with `uv` the first time, in `$HEYO_FILM_CACHE/venv`,
+and under HyperFrames at a fixed version, which it puts there with npm
+(Node 22 or later). HyperFrames needs `ffprobe` and a headless Chromium;
+where its own download has none (Linux on ARM), name one:
+`HEYO_FILM_BROWSER` (Playwright's `chrome-headless-shell` serves) and
+`HEYO_FILM_FFPROBE`. `HEYO_FILM_DRAFT=1` makes a quick film;
+`HEYO_FILM_STILLS=1` also writes the first, middle and last picture of
+every shot and each caption at its fullest to `film/stills/`, to look the
+film over.

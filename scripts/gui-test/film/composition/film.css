@@ -1,0 +1,344 @@
+@font-face {
+  font-family: "Inter";
+  src: url("assets/Inter-Variable.ttf");
+  font-weight: 100 900;
+}
+
+:root {
+  --blue: #1a80f8;
+  --blue-deep: #0b5fd8;
+  --ink: #060b1a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: #000;
+}
+
+#root,
+#stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-family: "Inter", sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The camera over the plate: the plate at its own size, moved and scaled. */
+#punch {
+  position: absolute;
+  inset: 0;
+  transform-origin: 960px 540px;
+}
+
+#cam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3840px;
+  height: 2160px;
+  transform-origin: 0 0;
+}
+
+#plate {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3840px;
+  height: 2160px;
+}
+
+.snap {
+  position: absolute;
+  border: 16px solid var(--blue);
+  border-radius: 32px;
+  background: rgba(26, 128, 248, 0.26);
+  box-shadow: 0 0 80px 16px rgba(26, 128, 248, 0.6), inset 0 0 60px rgba(26, 128, 248, 0.4);
+  opacity: 0;
+}
+
+/* Captions: a kicker in the icon's blue, a headline whose words rise into
+   place, over a soft shade so they read on any picture. */
+.cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+}
+
+.cap.bottom {
+  bottom: 0;
+  justify-content: flex-end;
+  padding-bottom: 64px;
+}
+
+.cap.top {
+  top: 0;
+  justify-content: flex-start;
+  padding-top: 58px;
+}
+
+.cap .scrim {
+  position: absolute;
+  inset: 0;
+}
+
+.cap.bottom .scrim {
+  background: linear-gradient(to top, rgba(6, 11, 26, 0.78) 0%, rgba(6, 11, 26, 0.5) 45%, rgba(6, 11, 26, 0) 100%);
+}
+
+.cap.top .scrim {
+  background: linear-gradient(to bottom, rgba(6, 11, 26, 0.78) 0%, rgba(6, 11, 26, 0.5) 45%, rgba(6, 11, 26, 0) 100%);
+}
+
+.kicker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  color: #b5d8ff;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+}
+
+.kicker .bar {
+  width: 40px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--blue);
+  transform-origin: 0 50%;
+}
+
+.kicker .text {
+  padding-right: 0.1em;
+}
+
+.headline {
+  position: relative;
+  display: flex;
+  gap: 0 0.26em;
+  color: #fff;
+  font-size: 84px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  white-space: nowrap;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+}
+
+.headline .w {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0 0.04em 0.08em;
+  margin: 0 -0.04em -0.08em;
+}
+
+.headline .wi {
+  position: relative;
+  display: inline-block;
+}
+
+.headline .hl {
+  position: absolute;
+  left: -0.12em;
+  right: -0.12em;
+  top: 0.12em;
+  bottom: 0.02em;
+  border-radius: 0.14em;
+  background: linear-gradient(100deg, var(--blue) 0%, #3f9bff 100%);
+  transform-origin: 0 50%;
+  z-index: -1;
+}
+
+/* The two cards. */
+.card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(1400px 900px at 50% 42%, #10295a 0%, #0a1634 48%, var(--ink) 100%);
+  color: #fff;
+  visibility: hidden;
+  overflow: hidden;
+}
+
+.card .glow {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 1100px;
+  height: 700px;
+  margin: -350px 0 0 -550px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(26, 128, 248, 0.45), rgba(26, 128, 248, 0));
+  filter: blur(20px);
+}
+
+.lockup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 44px;
+}
+
+.lockup .icon {
+  width: 200px;
+  height: 200px;
+  filter: drop-shadow(0 18px 40px rgba(26, 128, 248, 0.5));
+}
+
+.lockup .name {
+  display: flex;
+  font-size: 220px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.lockup .name .w {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.04em 0.02em 0.12em;
+  margin: -0.04em -0.02em -0.12em;
+}
+
+.lockup .name .wi {
+  display: inline-block;
+}
+
+.card .sub {
+  position: relative;
+  display: flex;
+  gap: 0 0.28em;
+  margin-top: 30px;
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #dbe9ff;
+}
+
+.card .sub .w {
+  display: inline-block;
+  overflow: hidden;
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
+}
+
+.card .sub .wi {
+  display: inline-block;
+}
+
+.card .sub .accent {
+  color: #8cc4ff;
+}
+
+.card .list {
+  position: relative;
+  display: flex;
+  gap: 18px;
+  margin-top: 54px;
+}
+
+.card .list .item {
+  padding: 12px 26px;
+  border-radius: 999px;
+  border: 2px solid rgba(140, 196, 255, 0.35);
+  background: rgba(26, 128, 248, 0.14);
+  color: #dbe9ff;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card .url {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 46px;
+  padding: 22px 44px;
+  min-width: 720px;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--blue);
+  box-shadow: 0 20px 60px rgba(26, 128, 248, 0.45);
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.card .url .caret {
+  display: inline-block;
+  width: 4px;
+  height: 52px;
+  margin-left: 4px;
+  background: #fff;
+}
+
+/* The sweep between scenes, carrying the next one's name. */
+.wipe {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+
+.wipe .panel {
+  position: absolute;
+  inset: 0 -10%;
+  transform: skewX(-12deg);
+}
+
+.wipe .panel.back {
+  background: #0a1634;
+}
+
+.wipe .panel.front {
+  background: linear-gradient(110deg, var(--blue-deep) 0%, var(--blue) 55%, #3f9bff 100%);
+}
+
+.wipe .word {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 190px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  background: #d6e8ff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}

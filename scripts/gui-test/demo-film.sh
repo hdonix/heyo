@@ -10,17 +10,19 @@
 # dictated is spoken by kept takes of say-zh.cjs (English, then Chinese
 # with English in it, in one voice) in place of a microphone.
 #
-# edit: demo-film.py cuts that into the film: shots that begin on a beat of
-# the music, a camera that moves in on what matters, the waiting left out,
-# titles and captions drawn by itself, the music turned down under what is
-# said. It says what it does and what it needs.
+# edit: film/edit.py makes the film of that: music written for it by
+# film/music.py (made note by note, 120 beats a minute, so the beat grid is
+# exact), the capture retimed shot by shot onto that grid, and a HyperFrames
+# composition (film/composition: HTML and GSAP, rendered by headless
+# Chromium and FFmpeg) for the camera, the titles, the captions and the
+# cards. It says what it does and what it needs.
 #
 # What is made is in $HEYO_TEST_DIR/film ($FILM): capture.mkv and
 # moments.jsonl, then heyo.mp4 and heyo.webm.
 #
 #   HEYO_FILM_CACHE    where what is fetched is kept from one run to the next
-#                      (default: ~/.cache/heyo-build/film): the music, and
-#                      the Python the edit runs under
+#                      (default: ~/.cache/heyo-build/film): the Python and
+#                      the HyperFrames the edit runs under
 #   HEYO_FILM_PYTHON   that Python; when not given, a virtual environment is
 #                      made with uv in $HEYO_FILM_CACHE/venv, which also
 #                      brings the ffmpeg both stages use (imageio-ffmpeg)
@@ -32,24 +34,30 @@
 #                      without one say-zh.cjs speaks them anew, and the
 #                      recognizer may mishear that
 #   HEYO_FILM_SPEECH_ENGLISH  the same for the English sentence (demo-en.wav)
+#   HEYO_FILM_HYPERFRAMES  the HyperFrames command; when not given, npm puts
+#                      hyperframes@$HYPERFRAMES in $HEYO_FILM_CACHE/hyperframes
+#   HEYO_FILM_BROWSER  the headless Chromium it renders with (where its own
+#                      download has no build, as on Linux on ARM: Playwright's
+#                      chrome-headless-shell serves)
+#   HEYO_FILM_FFPROBE  the ffprobe it needs, when none is on the PATH
 #   KEEP=1             leaves the sandbox running after the capture
 #
-# It needs what readme-dictation.sh needs, uv (or HEYO_FILM_PYTHON), gedit,
-# Files and the terminal of GNOME, and the network: the Raycast Store, the
-# exchange rates, and the music (demo-film.py fetches it). The capture
-# takes about five minutes, the edit about as long.
+# It needs what readme-dictation.sh needs, uv (or HEYO_FILM_PYTHON), Node 22
+# or later with npm, ffprobe, gedit, Files and the terminal of GNOME, and the
+# network: the Raycast Store, the exchange rates, HyperFrames and GSAP. The
+# capture takes about five minutes, the edit about ten.
 STAGE=${1:-all}; THEME=${2:-light}
-case "$STAGE" in capture | edit | all) ;; *) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
+case "$STAGE" in capture | edit | all) ;; *) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
 case "$THEME" in light | dark) ;; *) echo "demo-film: the theme is light or dark" >&2; exit 2 ;; esac
 HERE=$(cd "$(dirname "$0")" && pwd)
 
 # The Python of the edit, with what it needs, and its ffmpeg.
-PACKAGES="numpy scipy pillow opencv-python-headless librosa imageio-ffmpeg fonttools brotli"
+PACKAGES="numpy scipy librosa imageio-ffmpeg"
 export HEYO_FILM_CACHE="${HEYO_FILM_CACHE:-$HOME/.cache/heyo-build/film}"
 if [ -z "$HEYO_FILM_PYTHON" ]; then
   VENV="$HEYO_FILM_CACHE/venv"
   HEYO_FILM_PYTHON="$VENV/bin/python"
-  if ! "$HEYO_FILM_PYTHON" -c 'import numpy, scipy, PIL, cv2, librosa, imageio_ffmpeg, fontTools, brotli' 2> /dev/null; then
+  if ! "$HEYO_FILM_PYTHON" -c 'import numpy, scipy, librosa, imageio_ffmpeg' 2> /dev/null; then
     command -v uv > /dev/null || { echo "demo-film: uv is not installed (or name a Python that has $PACKAGES: HEYO_FILM_PYTHON)" >&2; exit 1; }
     [ -x "$HEYO_FILM_PYTHON" ] || uv venv -q "$VENV" || exit 1
     uv pip install -q --python "$HEYO_FILM_PYTHON" $PACKAGES || exit 1
@@ -58,9 +66,23 @@ fi
 FFMPEG=$("$HEYO_FILM_PYTHON" -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())') || exit 1
 export HEYO_FILM_PYTHON
 
+# HyperFrames, at the version the composition was made with.
+HYPERFRAMES=0.8.172
+if [ -z "$HEYO_FILM_HYPERFRAMES" ]; then
+  HF="$HEYO_FILM_CACHE/hyperframes"
+  if ! grep -q "\"version\": \"$HYPERFRAMES\"" "$HF/node_modules/hyperframes/package.json" 2> /dev/null; then
+    command -v npm > /dev/null || { echo "demo-film: npm is not installed (or name a HyperFrames: HEYO_FILM_HYPERFRAMES)" >&2; exit 1; }
+    npm install --silent --no-audit --no-fund --prefix "$HF" "hyperframes@$HYPERFRAMES" || exit 1
+  fi
+  HEYO_FILM_HYPERFRAMES="$HF/node_modules/.bin/hyperframes"
+fi
+export HEYO_FILM_HYPERFRAMES HYPERFRAMES_NO_TELEMETRY=1
+[ -z "$HEYO_FILM_BROWSER" ] || export PRODUCER_HEADLESS_SHELL_PATH="$HEYO_FILM_BROWSER" HYPERFRAMES_BROWSER_PATH="$HEYO_FILM_BROWSER"
+[ -z "$HEYO_FILM_FFPROBE" ] || export HYPERFRAMES_FFPROBE_PATH="$HEYO_FILM_FFPROBE"
+
 if [ "$STAGE" = edit ]; then
   FILM="${HEYO_TEST_DIR:-${TMPDIR:-/tmp}/heyo-demo-film}/film"
-  exec "$HEYO_FILM_PYTHON" "$HERE/demo-film.py" "$FILM"
+  exec "$HEYO_FILM_PYTHON" "$HERE/film/edit.py" "$FILM"
 fi
 
 export HEYO_TEST_DIR="${HEYO_TEST_DIR:-${TMPDIR:-/tmp}/heyo-demo-film}"
@@ -545,7 +567,7 @@ start_as film "$FFMPEG" -loglevel warning -f x11grab -draw_mouse 1 -framerate 30
 CAMERA=$STARTED
 w 2
 # The film's clock against the moments': the pointer jumps, which is in
-# the very next picture, and is marked as it does (demo-film.py finds the
+# the very next picture, and is marked as it does (film/edit.py finds the
 # picture). Once more at the end, for a clock that drifted.
 sync() { xdotool mousemove 3700 2000; w 1; mark "$1-before"; xdotool mousemove 3700 1700; mark "$1-after"; w 0.5; }
 sync sync
@@ -564,4 +586,4 @@ grep "heyo: dictation\|input method\|panicked" "$T/app.log" | tail -n 6 | cut -c
 ls -la "$FILM/capture.mkv" | awk '{ print "demo-film: " $NF ", " int($5 / 1048576) " MB" }'
 [ -n "$KEEP" ] || "$HERE/sandbox.sh" down > /dev/null
 [ -z "$FAILED" ] || exit 1
-[ "$STAGE" = capture ] || exec "$HEYO_FILM_PYTHON" "$HERE/demo-film.py" "$FILM"
+[ "$STAGE" = capture ] || exec "$HEYO_FILM_PYTHON" "$HERE/film/edit.py" "$FILM"

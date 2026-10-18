@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  The film, as a HyperFrames composition. edit.py copies this beside the
+  plate (the capture retimed to the film) and the sound, writes data.js
+  (where the camera is, when each word comes) and renders it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="film.css" />
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="{{DURATION}}" data-width="1920" data-height="1080">
+      <div id="stage" class="clip" data-start="0" data-duration="{{DURATION}}">
+        <div id="punch">
+          <div id="cam">
+            <video id="plate" src="assets/plate.mp4" muted playsinline data-start="0" data-duration="{{DURATION}}"></video>
+          </div>
+        </div>
+        <div id="captions"></div>
+
+        <div id="title" class="card">
+          <div class="glow"></div>
+          <div class="lockup">
+            <img class="icon" src="assets/icon.png" alt="" />
+            <div class="name"></div>
+          </div>
+          <div class="sub"></div>
+          <div class="list"></div>
+        </div>
+
+        <div id="end" class="card">
+          <div class="glow"></div>
+          <div class="lockup">
+            <img class="icon" src="assets/icon.png" alt="" />
+            <div class="name"></div>
+          </div>
+          <div class="sub"></div>
+          <div class="url"><span class="typed"></span><span class="caret"></span></div>
+        </div>
+
+        <div id="wipes"></div>
+        <div id="flash"></div>
+        <div id="black"></div>
+      </div>
+      <audio id="sound" src="assets/sound.wav" data-start="0" data-duration="{{DURATION}}" data-volume="1"></audio>
+    </div>
+    <script src="data.js"></script>
+    <script src="film.js"></script>
+  </body>
+</html>
