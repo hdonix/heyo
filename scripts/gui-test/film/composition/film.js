@@ -6,6 +6,14 @@
   const F = window.FILM;
   const B = F.beat;
   const tl = gsap.timeline({ paused: true });
+  // A picture is 1/30 s. Something that comes in on a beat starts moving a
+  // picture before it, so that the picture on the beat already shows it
+  // arriving (the picture at a tween's start shows it not yet moved); a
+  // thing switched on a beat is switched half a picture before, so that the
+  // nearest picture shows it.
+  const PICTURE = 1 / F.rate;
+  const rev = (t) => t - PICTURE;
+  const on = (t) => t - PICTURE / 2;
   const $ = (selector, root = document) => root.querySelector(selector);
   const make = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -58,8 +66,8 @@
     cam.style.transform = `translate(${-x * s}px, ${-y * s}px) scale(${s})`;
     // A punch: the picture a little larger on the beat, settling at once.
     let p = 1;
-    for (const at of F.punches) {
-      if (t >= at && t < at + 0.6) p = 1 + 0.035 * Math.exp(-(t - at) / 0.11);
+    for (const [at, amount] of F.punches) {
+      if (t >= at && t < at + 0.6) p = 1 + amount * Math.exp(-(t - at) / 0.11);
     }
     punch.style.transform = `scale(${p})`;
   };
@@ -105,8 +113,9 @@
       tl.set(scrim, { opacity: 1 }, c.from);
     } else {
       tl.fromTo(scrim, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power1.out", immediateRender: false }, c.from);
-      tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: "power3.out", immediateRender: false }, c.from + 0.05);
-      tl.fromTo(label, { clipPath: "inset(0 100% 0 0)", x: -12 }, { clipPath: "inset(0 0% 0 0)", x: 0, duration: 0.45, ease: "power3.out", immediateRender: false }, c.from + 0.12);
+      // the kicker in, between the cut and the first word
+      tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.2, ease: "power3.out", immediateRender: false }, c.from + 0.12);
+      tl.fromTo(label, { clipPath: "inset(0 100% 0 0)", x: -12 }, { clipPath: "inset(0 0% 0 0)", x: 0, duration: 0.25, ease: "power3.out", immediateRender: false }, c.from + 0.15);
     }
     if (!passesKicker) {
       tl.to(scrim, { opacity: 0, duration: 0.3, ease: "power1.in" }, c.to - 0.3);
@@ -119,12 +128,13 @@
     });
     for (const { w, inner } of words) {
       // In from below the mask, on its beat.
-      tl.fromTo(inner, { yPercent: 118, rotation: 5 }, { yPercent: 0, rotation: 0, duration: 0.5, ease: "expo.out", immediateRender: false }, w.t);
+      tl.fromTo(inner, { yPercent: 118, rotation: 5 }, { yPercent: 0, rotation: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, rev(w.t));
       if (w.accent) {
+        // the blue behind the word, and the word punched, on its own hit
         const hl = $(".hl", inner);
         tl.set(hl, { scaleX: 0 }, 0);
-        tl.fromTo(hl, { scaleX: 0 }, { scaleX: 1, duration: 0.32, ease: "power3.out", immediateRender: false }, w.t + 0.12);
-        tl.fromTo(inner, { scale: 1.16 }, { scale: 1, duration: 0.45, ease: "back.out(3)", immediateRender: false }, w.t + 0.12);
+        tl.fromTo(hl, { scaleX: 0 }, { scaleX: 1, duration: 0.22, ease: "expo.out", immediateRender: false }, rev(w.t));
+        tl.fromTo(inner, { scale: 1.3 }, { scale: 1, duration: 0.4, ease: "back.out(3)", immediateRender: false }, rev(w.t));
       }
     }
     tl.set(words.map((x) => x.inner), { yPercent: 118 }, 0);
@@ -143,14 +153,14 @@
     const t = w.t;
     tl.set([back, front], { xPercent: 120 }, 0);
     tl.set(word, { opacity: 0 }, 0);
-    tl.set(box, { visibility: "visible" }, t - 0.5);
-    tl.set(box, { visibility: "hidden" }, t + 0.62);
-    tl.fromTo(back, { xPercent: 120 }, { xPercent: 0, duration: 0.3, ease: "power3.in", immediateRender: false }, t - 0.5);
-    tl.fromTo(front, { xPercent: 120 }, { xPercent: 0, duration: 0.3, ease: "power3.in", immediateRender: false }, t - 0.44);
-    tl.fromTo(word, { opacity: 0, scale: 1.25, letterSpacing: "0.04em" }, { opacity: 1, scale: 1, letterSpacing: "-0.045em", duration: 0.32, ease: "expo.out", immediateRender: false }, t - 0.16);
-    tl.to(word, { opacity: 0, x: -140, duration: 0.24, ease: "power2.in" }, t + 0.3);
-    tl.to(front, { xPercent: -120, duration: 0.3, ease: "power3.inOut" }, t + 0.3);
-    tl.to(back, { xPercent: -120, duration: 0.3, ease: "power3.inOut" }, t + 0.36);
+    tl.set(box, { visibility: "visible" }, t - 0.45);
+    tl.set(box, { visibility: "hidden" }, t + 0.34);
+    tl.fromTo(back, { xPercent: 120 }, { xPercent: 0, duration: 0.25, ease: "power3.in", immediateRender: false }, t - 0.45);
+    tl.fromTo(front, { xPercent: 120 }, { xPercent: 0, duration: 0.25, ease: "power3.in", immediateRender: false }, t - 0.4);
+    tl.fromTo(word, { opacity: 0, scale: 1.35 }, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, rev(t));
+    tl.to(word, { opacity: 0, x: -140, duration: 0.14, ease: "power2.in" }, t + 0.12);
+    tl.to(front, { xPercent: -120, duration: 0.18, ease: "power3.in" }, t + 0.12);
+    tl.to(back, { xPercent: -120, duration: 0.18, ease: "power3.in" }, t + 0.15);
   }
 
   // --- The title ------------------------------------------------------------
@@ -161,77 +171,83 @@
 
   {
     const c = card("title");
+    const T = F.title;
     const root = $("#title");
-    const t = c.from;
     const name = $(".name", root);
     const letters = [..."Heyo"].map((ch) => masked(name, ch));
     const sub = $(".sub", root);
-    const subWords = ["The", "keyboard", "launcher", "for", "Linux."].map((w) => masked(sub, w, w === "Linux." ? "accent" : ""));
+    const subWords = T.sub_words.map((w) => masked(sub, w, w === "Linux." ? "accent" : ""));
     const list = $(".list", root);
-    const items = ["Dictation", "Windows", "Screenshots", "Clipboard", "Calculator", "Extensions"].map((w) => {
+    const items = T.pills_words.map((w) => {
       const item = make("div", "item", w);
       list.appendChild(item);
       return item;
     });
-    tl.set(root, { visibility: "visible" }, t);
+    tl.set(root, { visibility: "visible" }, c.from);
     tl.set(root, { visibility: "hidden" }, c.to);
-    flashAt(t, 0.18, 0.2);
-    tl.fromTo($(".glow", root), { scale: 0.6, opacity: 0 }, { scale: 1.15, opacity: 1, duration: 4, ease: "power1.out", immediateRender: false }, t);
-    tl.fromTo($(".icon", root), { scale: 0.3, rotation: -14, opacity: 0 }, { scale: 1, rotation: 0, opacity: 1, duration: 0.7, ease: "back.out(2.2)", immediateRender: false }, t);
+    flashAt(c.from, 0.12, 0.15);
+    tl.fromTo($(".glow", root), { scale: 0.6, opacity: 0.2 }, { scale: 1.15, opacity: 1, duration: 4, ease: "power1.out", immediateRender: false }, c.from);
+    // Each thing here appears whole on its beat and settles after it.
+    tl.set($(".icon", root), { opacity: 0 }, 0);
+    tl.set($(".icon", root), { opacity: 1 }, on(T.icon));
+    tl.fromTo($(".icon", root), { scale: 0.55, rotation: -14 }, { scale: 1, rotation: 0, duration: 0.45, ease: "back.out(2.2)", immediateRender: false }, on(T.icon));
     tl.set(letters, { yPercent: 115 }, 0);
-    tl.fromTo(letters, { yPercent: 115 }, { yPercent: 0, duration: 0.55, ease: "expo.out", stagger: B / 4, immediateRender: false }, t + B);
+    letters.forEach((letter, k) => tl.fromTo(letter, { yPercent: 115 }, { yPercent: 0, duration: 0.25, ease: "expo.out", immediateRender: false }, rev(T.name[k])));
     tl.set(subWords, { yPercent: 120 }, 0);
-    tl.fromTo(subWords, { yPercent: 120 }, { yPercent: 0, duration: 0.5, ease: "expo.out", stagger: B / 2, immediateRender: false }, t + 3 * B);
+    subWords.forEach((word, k) => tl.fromTo(word, { yPercent: 120 }, { yPercent: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, rev(T.sub[k])));
     tl.set(items, { opacity: 0 }, 0);
-    tl.fromTo(items, { opacity: 0, y: 26, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: "back.out(2)", stagger: B / 2, immediateRender: false }, t + 4.5 * B);
-    // Into the drop: the card thrown towards the camera.
-    tl.to($(".lockup", root), { scale: 1.6, opacity: 0, duration: B / 2, ease: "power3.in" }, c.to - B / 2);
-    tl.to([sub, list], { scale: 1.3, opacity: 0, duration: B / 2, ease: "power3.in" }, c.to - B / 2);
-    tl.to(root, { opacity: 0, duration: 0.12, ease: "none" }, c.to - 0.12);
-    flashAt(c.to, 0.3, 0.25);
+    items.forEach((item, k) => {
+      tl.set(item, { opacity: 1 }, on(T.pills[k]));
+      tl.fromTo(item, { y: 26, scale: 0.75 }, { y: 0, scale: 1, duration: 0.3, ease: "back.out(2.5)", immediateRender: false }, on(T.pills[k]));
+    });
+    // Into the drop: the card struck on the beat, then thrown towards the
+    // camera.
+    tl.set(root, { scale: 1.08 }, on(T.throw));
+    tl.to($(".lockup", root), { scale: 1.7, opacity: 0, duration: c.to - T.throw, ease: "power3.in" }, T.throw);
+    tl.to([sub, list], { scale: 1.35, opacity: 0, duration: c.to - T.throw, ease: "power3.in" }, T.throw);
+    tl.to(root, { opacity: 0, duration: 0.1, ease: "none" }, c.to - 0.1);
+    flashAt(c.to, 0.2, 0.2);
   }
 
   // --- The end card ---------------------------------------------------------
   {
     const c = card("end");
+    const E = F.end;
     const root = $("#end");
-    const t = c.from;
     const name = $(".name", root);
-    const letters = [..."Heyo"].map((ch) => masked(name, ch));
+    [..."Heyo"].forEach((ch) => masked(name, ch));
     const sub = $(".sub", root);
     const subWords = ["Free", "and", "open", "source"].map((w) => masked(sub, w, w === "open" || w === "source" ? "accent" : ""));
     const url = $(".url", root);
     const typed = $(".typed", url);
     const caret = $(".caret", url);
-    const address = "github.com/hdonix/heyo";
-    tl.set(root, { visibility: "visible", opacity: 1 }, t);
-    flashAt(t, 0.25, 0.3);
-    tl.fromTo($(".glow", root), { scale: 1.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.2, ease: "power2.out", immediateRender: false }, t);
-    tl.fromTo($(".lockup", root), { scale: 1.35, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: "expo.out", immediateRender: false }, t);
-    tl.set(letters, { yPercent: 0 }, t);
+    tl.set(root, { visibility: "visible", opacity: 1 }, c.from);
+    flashAt(c.from, 0.2, 0.25);
+    tl.fromTo($(".glow", root), { scale: 1.8, opacity: 0.3 }, { scale: 1, opacity: 1, duration: 1.0, ease: "power2.out", immediateRender: false }, c.from);
+    // The name slammed in, on the big hit.
+    tl.set($(".lockup", root), { opacity: 0 }, 0);
+    tl.set($(".lockup", root), { opacity: 1 }, on(E.slam));
+    tl.fromTo($(".lockup", root), { scale: 1.45 }, { scale: 1, duration: 0.45, ease: "expo.out", immediateRender: false }, on(E.slam));
+    // The line, all of it on its own hit.
     tl.set(subWords, { yPercent: 120 }, 0);
-    tl.fromTo(subWords, { yPercent: 120 }, { yPercent: 0, duration: 0.5, ease: "expo.out", stagger: B / 2, immediateRender: false }, t + 2 * B);
+    tl.fromTo(subWords, { yPercent: 120 }, { yPercent: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, rev(E.line));
     tl.set(url, { opacity: 0 }, 0);
-    tl.fromTo(url, { opacity: 0, scaleX: 0.2, scaleY: 0.6 }, { opacity: 1, scaleX: 1, scaleY: 1, duration: 0.45, ease: "back.out(1.8)", immediateRender: false }, t + 4 * B);
-    // The address typed, a letter on each sixteenth.
-    const typing = { n: 0 };
-    tl.fromTo(typing, { n: 0 }, {
-      n: address.length, duration: (address.length * B) / 4, ease: "none", immediateRender: false,
-      onUpdate: () => { typed.textContent = address.slice(0, Math.round(typing.n)); },
-    }, t + 4.5 * B);
+    tl.set(url, { opacity: 1 }, on(E.url));
+    tl.fromTo(url, { scaleX: 0.3, scaleY: 0.7 }, { scaleX: 1, scaleY: 1, duration: 0.2, ease: "expo.out", immediateRender: false }, on(E.url));
+    // The address typed, a letter on each of its ticks.
     tl.set(typed, { textContent: "" }, 0);
-    // The caret blinks on the beat once the address is there.
-    const done = t + 4.5 * B + (address.length * B) / 4;
-    for (let k = 0; done + k * B < c.to; k++) {
-      tl.set(caret, { opacity: 0 }, done + k * B + B / 2);
-      tl.set(caret, { opacity: 1 }, done + (k + 1) * B);
-    }
-    tl.to("#black", { opacity: 1, duration: F.duration - c.to + 0.2, ease: "power1.in" }, c.to - 0.2);
+    E.letters.forEach((at, k) => tl.set(typed, { textContent: E.address.slice(0, k + 1) }, on(at)));
+    // The caret blinks on the hats: off on the off-beat, on on the beat.
+    E.blinks.forEach((at) => tl.set(caret, { opacity: Math.abs(((at / F.beat) % 1) - 0.5) < 0.25 ? 0 : 1 }, on(at)));
+    // The last chord: the name and the glow struck once more.
+    tl.fromTo($(".lockup", root), { scale: 1.06 }, { scale: 1, duration: 0.6, ease: "power2.out", immediateRender: false }, on(E.chord));
+    tl.fromTo($(".glow", root), { opacity: 1.0, scale: 1.25 }, { opacity: 0.8, scale: 1, duration: 1.2, ease: "power2.out", immediateRender: false }, on(E.chord));
+    // And out, with the chord's reverb.
+    tl.fromTo("#black", { opacity: 0 }, { opacity: 1, duration: E.fade[1] - E.fade[0], ease: "power1.in", immediateRender: false }, E.fade[0]);
   }
 
-  // Out of black at the start.
-  tl.fromTo("#black", { opacity: 1 }, { opacity: 0, duration: 0.15, ease: "none", immediateRender: false }, 0);
-  flashAt(0.0, 0.0, 0.01);
+  // Out of black, with the swell, to the palette's beat.
+  tl.fromTo("#black", { opacity: 1 }, { opacity: 0, duration: F.title.palette * 0.8, ease: "power2.in", immediateRender: false }, 0);
 
   window.__timelines = window.__timelines || {};
   window.__timelines["main"] = tl;

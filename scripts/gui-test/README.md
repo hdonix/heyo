@@ -213,28 +213,43 @@ scripts/gui-test/demo-film.sh edit       # makes the film of what was filmed, ag
   writes the moments: when each thing happened and where on the screen it
   is, asked of the windows (`mark`). Nothing in the edit carries a place as
   a number that the capture could have told it.
-- **Music.** `film/music.py` writes the music: drums, bass, chords, an
-  arpeggio and a hook, each sound computed (oscillators, filtered noise,
-  envelopes), mixed with a kick-keyed duck, reverb, delay and a limiter to
-  -14 LUFS. Nothing is fetched or sampled, so no licence comes with it. At
-  120 beats a minute a beat is 15 pictures; its sections are the film's
-  (`SECTIONS`, `WIPES`): a build under the opening and the title, the drop
-  where dictation begins, a lift for the windows, a breakdown, the last
-  drop, the hit on the end card. Run alone it prints its loudness, peaks,
-  spectrum and how far the notes an onset detector finds are from the grid.
+- **Plan.** `film/plan.py` lists, beat by beat, everything that is seen
+  to happen on one: the sections, the cuts, the sweeps between scenes, the
+  windows going to their places, each word of each caption, each letter
+  typed in the opening and on the last card. The edit puts the pictures
+  there and the music is written from the same list. At 120 beats a minute
+  and 24 pictures a second, every sixteenth of a beat is 3 pictures.
+- **Music.** `film/music.py` writes the music: a sound for each thing in
+  the plan (an impact on the palette, a tick for each letter typed, a clap
+  under each caption word, a crash on each cut, a hat for each blink of the
+  caret) over drums, bass, chords, an arpeggio and a hook, each sound
+  computed (oscillators, filtered noise, envelopes), mixed with a
+  kick-keyed duck, reverb, delay and a true-peak limiter to -14 LUFS.
+  Nothing is fetched or sampled, so no licence comes with it. Run alone it
+  prints its loudness, peaks, spectrum and how far the notes an onset
+  detector finds are from the grid.
 - **Edit.** `film/edit.py` is the cutting: a list of shots (`storyboard`),
   each so many beats long, saying which stretch of the capture it shows,
   how fast, and where the camera is. What must happen on a beat is found in
-  the capture by the picture in which the screen changes. It writes the
-  plate (the capture retimed to the film, still 4K), the sound (the music
-  turned down under what is dictated), and `data.js` for the composition.
+  the capture by the picture in which the screen changes, and the picture
+  is held or hurried so that it lands there (each letter of the opening's
+  search is held from the picture it appears in). It writes the plate (the
+  capture retimed to the film, still 4K), the sound (the music's chords
+  turned down under what is dictated, its hits less), and `data.js` for the
+  composition.
 - **Composition.** `film/composition` is a
   [HyperFrames](https://github.com/heygen-com/hyperframes) project: HTML
   with GSAP, rendered picture by picture in headless Chromium and encoded by
-  FFmpeg. It moves the camera over the plate, punches it on the beat,
+  FFmpeg. It moves the camera over the plate, punches it on the kicks,
   flashes each window where it lands, and sets the type: the title, the
   captions whose words arrive on the beat, the sweeps between scenes and
-  the end card. `film/cuts.txt` says how far each cut is from its beat.
+  the end card.
+- **Measured.** `film/sync.py` finds each thing of the plan in the rendered
+  film's pictures and the notes in its sound with an onset detector, and
+  writes `film/sync.txt`: for each, the note heard with it, how far it is
+  from the picture, and how strong against the median note. Nobody needs
+  to listen to know whether it is on the beat. `film/cuts.txt` says how far
+  each cut is from its beat.
 
 The edit runs under a Python of its own (numpy, scipy, librosa, and an
 ffmpeg with H.264 from `imageio-ffmpeg`), a virtual environment that

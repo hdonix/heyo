@@ -7,8 +7,9 @@ film's pictures carry, and where on the screen it is), and what was spoken.
 The film is put together in three parts:
 
 - The music (music.py, beside this): made here, note by note, at 120 beats
-  a minute, so that a beat is exactly 15 pictures. Its sections are the
-  film's: everything below is counted in its beats.
+  a minute, from the list of what happens when (plan.py), so that a
+  sixteenth is exactly 3 pictures (24 a second). Everything below is
+  counted in its beats.
 - The plate (FILM/composition/assets/plate.mp4): the capture retimed to the
   film, still 3840x2160. Each shot is so many beats long and says which
   stretch of the capture it shows and how fast (the waiting is left out,
@@ -22,9 +23,11 @@ The film is put together in three parts:
   the two cards, all on the beat. What it needs to know (where the camera
   is, when each word arrives) is written here into data.js.
 
-Out of it come FILM/heyo.mp4 (H.264 and AAC, 1920x1080, 30 a second),
+Out of it come FILM/heyo.mp4 (H.264 and AAC, 1920x1080, 24 a second),
 FILM/heyo.webm (VP9 and Opus), FILM/music.wav, FILM/sound.wav (the music
-with what is said, as mixed) and FILM/cuts.txt (each cut against the beat).
+with what is said, as mixed), FILM/cuts.txt (each cut against the beat)
+and FILM/sync.txt (what is seen against what is heard, measured in the
+film as made: sync.py).
 
     HEYO_FILM_DRAFT=1    a quick film, MP4 only, draft quality
     HEYO_FILM_STILLS=1   also FILM/stills/: the first, middle and last
@@ -53,6 +56,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
 sys.path.insert(0, str(HERE))
 import music  # noqa: E402
+import plan  # noqa: E402
+import sync  # noqa: E402
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 FILM = Path(sys.argv[1]) if len(sys.argv) > 1 else sys.exit(__doc__)
@@ -60,10 +65,11 @@ DRAFT = bool(os.environ.get("HEYO_FILM_DRAFT"))
 STILLS = bool(os.environ.get("HEYO_FILM_STILLS"))
 
 SCREEN = (3840, 2160)
-RATE = 30
+RATE = 24  # the film: a sixteenth of a beat is 3 pictures
+CAPTURED = 30  # the capture
 SOUND = music.RATE
 PERIOD = music.BEAT
-SECTION = {name: (a, b) for name, a, b in music.SECTIONS}
+SECTION = {name: (a, b) for name, a, b in plan.SECTIONS}
 
 
 # --- The capture ---------------------------------------------------------------
@@ -88,11 +94,11 @@ class Capture:
         self.late = self.clock()
 
     def number_at(self, seconds):
-        return max(0, round((seconds - self.first) * RATE))
+        return max(0, round((seconds - self.first) * CAPTURED))
 
     def open(self, number, *filters, length=None):
         # Half a picture early: the first one read is the one asked for.
-        arguments = ["-ss", f"{max(0, (number - 0.5) / RATE):.4f}", "-i", self.path]
+        arguments = ["-ss", f"{max(0, (number - 0.5) / CAPTURED):.4f}", "-i", self.path]
         if length:
             arguments += ["-frames:v", str(length)]
         if filters:
@@ -130,8 +136,8 @@ class Capture:
         across = min(w, 240) // 2 * 2
         down = max(2, round(h * across / w) // 2 * 2)
         number = self.number_at(start)
-        process = subprocess.Popen([FFMPEG, "-hide_banner", "-loglevel", "error", "-ss", f"{max(0, (number - 0.5) / RATE):.4f}", "-i", str(self.path),
-                                    "-frames:v", str(round(seconds * RATE)), "-vf", f"crop={w}:{h}:{x}:{y},scale={across}:{down},format=gray",
+        process = subprocess.Popen([FFMPEG, "-hide_banner", "-loglevel", "error", "-ss", f"{max(0, (number - 0.5) / CAPTURED):.4f}", "-i", str(self.path),
+                                    "-frames:v", str(round(seconds * CAPTURED)), "-vf", f"crop={w}:{h}:{x}:{y},scale={across}:{down},format=gray",
                                     "-f", "rawvideo", "-pix_fmt", "gray", "-"], stdout=subprocess.PIPE)
         raw = process.communicate()[0]
         return number, np.frombuffer(raw, np.uint8)[: len(raw) // (across * down) * across * down].reshape(-1, down, across).astype(np.int16)
@@ -141,7 +147,7 @@ class Capture:
         `start`: the time of the picture it does so in. None if it does not."""
         number, pictures = self.small(start, within, box)
         differs = np.abs(pictures - pictures[0]).mean(axis=(1, 2)) > by
-        return (number + int(np.argmax(differs))) / RATE + self.first if differs.any() else None
+        return (number + int(np.argmax(differs))) / CAPTURED + self.first if differs.any() else None
 
     def clock(self):
         """How far the moments' clock is ahead of the pictures', at the
@@ -249,6 +255,21 @@ class Shot:
             beat -= beats
 
 
+def typed(capture, start, end, region, count):
+    """Where `count` letters were typed into that part of the screen: for
+    each, the time of a picture that shows it settled (the last before the
+    next letter, or a little after the last). Letters are found as the dark
+    of the text grows."""
+    number, pictures = capture.small(start, end - start, region)
+    ink = (pictures < 140).sum(axis=(1, 2))
+    jumps = [i for i in range(1, len(ink)) if ink[i] > ink[i - 1] + 4]
+    if len(jumps) < count:
+        sys.exit(f"edit: {len(jumps)} letters typed in {region}, not {count}")
+    jumps = jumps[:count]
+    frames = [b - 1 for b in jumps[1:]] + [min(len(ink) - 1, jumps[-1] + 9)]
+    return [(number + frame) / CAPTURED + capture.first for frame in frames]
+
+
 def storyboard(capture):
     at, box = capture.at, capture.box
 
@@ -270,19 +291,27 @@ def storyboard(capture):
     PALETTE = low(2440)
     shots = []
 
-    # Cold open: the palette on the first beat, a word, the application on
-    # the next bar. Then the title.
+    # Cold open, retimed so that each thing lands on its beat (plan.OPEN):
+    # the desktop; the palette; "edit", a letter a sixteenth (each held from
+    # the picture in which it appears); Enter, the palette gone; the editor.
+    O = plan.OPEN
     appears = changed(at("open-desktop"), palette)
+    letters = typed(capture, at("open-typing", -0.2), at("open-typed", 0.6), (palette[0] + 20, palette[1] + 10, 700, 110), 4)
+    gone = changed(at("open-enter", -0.05), (palette[0] + 100, palette[1] + 100, 1300, 700))
     editor = box("open-editor")
+    opened = changed(gone + 0.02, (editor[0] + 40, editor[1] + 40, 900, editor[3] - 80))
+    steps = [b - a for a, b in zip(O["letters"], O["letters"][1:] + [O["enter"]])]
     shots.append(Shot("open", [
-        (1, appears - 0.02, "live"),
-        (2, at("open-typing", -0.1), at("open-typed", 0.3)),
-        (1, at("open-found", -0.1), None),
-        (4, at("open-editor", 1.2), None),
-    ], [(0, view(px, py, 1900)), (3.6, view(px, py, 2400), "power2.out"), (4, view(px, py, 2400)),
-        # with the editor, straight to it, then back from it
-        (4, view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 2900)),
-        (8, view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 3300), "power2.out")]))
+        (O["palette"], appears - 0.6, None),
+        (O["letters"][0] - O["palette"], appears, "live"),
+        *[(step, shown, None) for step, shown in zip(steps, letters)],
+        (O["editor"] - O["enter"], gone, opened - 1 / CAPTURED),
+        (O["title"] - O["editor"], opened, "live"),
+    ], [(0, view(px, py, 2100)), (O["editor"], view(px, py, 2100)),
+        # with the editor, straight to it; then, on its beat, in closer
+        (O["editor"], view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 3000)),
+        (O["move"] - 1 / (RATE * PERIOD), view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 3000)),
+        (O["title"], view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2 - 120, 2300), "power3.out")]))
     shots.append(Shot("title", [(8, at("open-editor", 1.2), None)], card="title"))
 
     # Dictation. The window that listens, close; then the words where the
@@ -295,14 +324,14 @@ def storyboard(capture):
     WORDS = view(nx, SCREEN[1], 2500)
     NEARER = view(nx, SCREEN[1], 2300)
     listening = speech_starts(capture, "english") + SPEECH["english"]["sentences"][0][0] - 2.5 * PERIOD
-    shots.append(Shot("dictation-listening", [(4, listening, "live")], [(0, WIDE), (0.5, WIDE), (2.2, PILL, "power3.inOut")]))
+    shots.append(Shot("dictation-listening", [(4, listening, "live")], [(0, WIDE), (1.5, PILL, "power3.out")]))
     shots.append(Shot("dictation-words", [(8, listening + 4 * PERIOD, "live")], [(0, PILL), (2.5, WORDS, "power2.inOut")]))
     heard = speech_starts(capture, "chinese")
     sentences = SPEECH["chinese"]["sentences"]
     # Chinese with English in it: every sentence, as it was said.
     shots.append(Shot("dictation-mixed", [(20, heard + sentences[0][0] - 0.3, "live")], [(0, WORDS), (20, NEARER, "power1.inOut")]))
 
-    # Windows: asked for by name once, then a layout on every beat.
+    # Window layouts: asked for by name once, then one on every beat.
     shots.append(Shot("windows-ask", [
         (1, at("windows-untidy"), None),
         (2, at("windows-palette", -0.3), at("windows-typed", -0.4)),
@@ -378,24 +407,8 @@ def storyboard(capture):
         (2, at("store-typing-2", -0.05), at("store-typing-2", 1.0)),
         (5, at("store-blue", -0.1), None),
     ], [(0, low(2440)), (3, low(2440)), (8, low(2400), "power2.inOut")]))
-    shots.append(Shot("end", [(music.LENGTH - SECTION["end"][0], at("open-editor", 1.2), None)], card="end"))
+    shots.append(Shot("end", [(plan.LENGTH - SECTION["end"][0], at("open-editor", 1.2), None)], card="end"))
     return shots
-
-
-# The words over the picture, by the beat they come on (from the film's
-# start) and go. Each headline is (word, beat it arrives on); the words in
-# `accent` are marked in the icon's blue.
-CAPTIONS = [
-    {"from": 16, "to": 28, "kicker": "", "place": "bottom", "words": [("Say", 16.5), ("it.", 17), ("It’s", 18.5), ("typed.", 19)], "accent": ["typed."]},
-    {"from": 28, "to": 47.5, "kicker": "", "place": "bottom", "words": [("Mix", 28.5), ("languages", 29), ("mid-sentence.", 30)], "accent": ["languages"]},
-    {"from": 48, "to": 59.5, "kicker": "Windows", "place": "bottom", "words": [("Every", 48.5), ("window,", 49), ("right", 50), ("where", 50.5), ("you", 51), ("want", 51.25), ("it.", 51.5)], "accent": ["right"]},
-    {"from": 60, "to": 70, "kicker": "Screenshots", "place": "bottom", "words": [("Capture", 60.5), ("it.", 61), ("Mark", 62), ("it", 62.5), ("up.", 63)], "accent": ["Mark"]},
-    {"from": 70, "to": 75.5, "kicker": "Screenshots", "place": "bottom", "words": [("Pin", 70), ("it", 70.5), ("over", 71), ("your", 71.5), ("work.", 72)], "accent": ["Pin"]},
-    {"from": 76, "to": 87.5, "kicker": "Clipboard", "place": "bottom", "words": [("Everything", 76.5), ("you", 77), ("copied,", 77.5), ("found", 78.5), ("again.", 79)], "accent": ["found"]},
-    {"from": 88, "to": 95.5, "kicker": "Calculator", "place": "top", "words": [("Answers", 88.5), ("as", 89), ("you", 89.5), ("type.", 90)], "accent": ["type."]},
-    {"from": 96, "to": 111.5, "kicker": "Extensions", "place": "bottom", "words": [("Raycast", 96.5), ("extensions,", 97), ("one", 98), ("Enter", 98.5), ("away.", 99)], "accent": ["Enter"]},
-]
-WIPE_WORDS = {48: "Windows", 60: "Screenshots", 76: "Clipboard", 88: "Calculator", 96: "Extensions"}
 
 
 # --- The plate -----------------------------------------------------------------
@@ -426,9 +439,10 @@ def plate(capture, shots, starts, total, path):
 # --- The sound -----------------------------------------------------------------
 
 
-def soundtrack(score, shots, starts, length):
-    """The music, turned down under what is said, and what is said where its
-    pictures are."""
+def soundtrack(hits, bed, shots, starts, length):
+    """The music, turned down under what is said (the bed by 12 dB, the hits
+    by 4: a cut or a word still lands), and what is said where its pictures
+    are."""
     said = np.zeros(length, np.float32)
     for shot, shot_start in zip(shots, starts):
         beat = 0
@@ -451,16 +465,21 @@ def soundtrack(score, shots, starts, length):
                     piece = piece[: max(0, length - out)]
                     said[out : out + len(piece)] += piece
             beat += part_beats
-    tune = np.zeros((length, 2))
-    tune[: min(length, len(score))] = score[:length]
+    # both parts at the level the music has alone
+    gain = 10 ** ((-14 - music.loudness(hits + bed)) / 20)
+    parts = []
+    for part in (hits, bed):
+        whole = np.zeros((length, 2))
+        whole[: min(length, len(part))] = part[:length] * gain
+        parts.append(whole)
     # Down under speech, and through the pauses between sentences: from
     # half a second before a word to a second after the last.
     speaking = (np.abs(said) > 0.02).astype(np.float32)
     window = SOUND // 4
     near = fftconvolve(speaking, np.ones(6 * window), mode="same") > 0.5
     duck = np.clip(fftconvolve(near.astype(np.float32), np.hanning(window) / np.hanning(window).sum(), mode="same"), 0, 1)
-    tune *= (1 - 0.75 * duck)[:, None]
-    return music.master(tune + said[:, None] * 1.25), duck
+    tune = parts[0] * (1 - 0.37 * duck)[:, None] + parts[1] * (1 - 0.75 * duck)[:, None]
+    return music.glue(tune + said[:, None] * 1.25), duck
 
 
 def write_wav(path, sound):
@@ -494,19 +513,24 @@ def composition(shots, start_beats, capture, total, project):
         x, y, w, h = capture.box(f"windows-{k}")
         # a little inside the window, so that all four sides are seen
         flashes.append({"t": round((beat0 + k - 1) * PERIOD, 4), "x": x + 28, "y": y + 28, "w": w - 56, "h": h - 56})
-    punches = [16, *music.SNAPS, 60, 96]
+    seconds = lambda beats: [round(b * PERIOD, 4) for b in beats]  # noqa: E731
     data = {
         "duration": total / RATE,
+        "rate": RATE,
         "beat": PERIOD,
         "cards": [{"kind": s.card, "from": round(b * PERIOD, 4), "to": round((b + s.beats) * PERIOD, 4)} for s, b in zip(shots, start_beats) if s.card],
         "cameras": cameras,
         "flashes": flashes,
-        "punches": [round(b * PERIOD, 4) for b in punches],
-        "wipes": [{"t": round(b * PERIOD, 4), "word": WIPE_WORDS[b]} for b in music.WIPES],
+        "punches": [[round(b * PERIOD, 4), amount] for b, amount in plan.punches()],
+        "wipes": [{"t": round(b * PERIOD, 4), "word": word} for b, word in sorted(plan.WIPES.items())],
+        "title": {key: (seconds(value) if isinstance(value, list) else round(value * PERIOD, 4)) for key, value in plan.OPEN.items()}
+        | {"sub_words": plan.TITLE_SUB, "pills_words": plan.TITLE_PILLS},
+        "end": {key: (seconds(value) if isinstance(value, (list, tuple)) else round(value * PERIOD, 4)) for key, value in plan.END.items()}
+        | {"address": plan.ADDRESS},
         "captions": [
             {"from": c["from"] * PERIOD, "to": c["to"] * PERIOD, "kicker": c["kicker"], "place": c["place"],
              "words": [{"text": w, "t": t * PERIOD, "accent": w in c["accent"]} for w, t in c["words"]]}
-            for c in CAPTIONS
+            for c in plan.CAPTIONS
         ],
     }
     (project / "data.js").write_text("window.FILM = " + json.dumps(data, indent=1, ensure_ascii=False) + ";\n")
@@ -566,18 +590,18 @@ def main():
     speech_starts(capture, "english")
     shots = storyboard(capture)
     start_beats = np.concatenate([[0], np.cumsum([shot.beats for shot in shots])])
-    assert start_beats[-1] == music.LENGTH, f"the shots are {start_beats[-1]} beats, the music {music.LENGTH}"
-    for name, a, _ in music.SECTIONS:
-        assert a in start_beats, f"the music's {name} begins on beat {a}, where no shot does"
+    assert list(start_beats[:-1]) == plan.CUTS, f"the shots begin on {list(start_beats[:-1])}, the plan says {plan.CUTS}"
+    assert start_beats[-1] == plan.LENGTH, f"the shots are {start_beats[-1]} beats, the plan {plan.LENGTH}"
     starts = [round(b * PERIOD * RATE) for b in start_beats]
-    total = round((music.LENGTH * PERIOD + music.TAIL) * RATE)
+    total = round((plan.LENGTH * PERIOD + plan.TAIL) * RATE)
 
     project = FILM / "composition"
     (project / "assets").mkdir(parents=True, exist_ok=True)
     print("edit: the music")
-    score = music.render()
+    hits, bed = music.parts()
+    score = music.glue(hits + bed)
     write_wav(FILM / "music.wav", score)
-    sound, duck = soundtrack(score, shots, starts, round(total / RATE * SOUND))
+    sound, duck = soundtrack(hits, bed, shots, starts, round(total / RATE * SOUND))
     write_wav(project / "assets/sound.wav", sound)
     shutil.copy(project / "assets/sound.wav", FILM / "sound.wav")
     print("edit: the plate")
@@ -619,6 +643,10 @@ def main():
     lines.append(f"the music is turned down under speech for {duck.mean() * total / RATE:.1f} s of the film")
     (FILM / "cuts.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines[:2] + lines[-4:]))
+    # What is seen against what is heard, measured in the film as made.
+    report = sync.measure(out, [(b * PERIOD, what, where) for b, what, where in plan.seen()], RATE)
+    (FILM / "sync.txt").write_text("\n".join(report) + "\n")
+    print("\n".join(report[-4:]))
     print(f"edit: {out}, {total / RATE:.1f} s, {out.stat().st_size / 1048576:.1f} MB")
 
 

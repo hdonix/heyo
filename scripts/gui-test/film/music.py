@@ -3,13 +3,15 @@
 Nothing is fetched and nothing is sampled: every sound is computed below
 (oscillators, filtered noise, envelopes), so the music is the film's own and
 its beat grid is exact. 120 beats a minute: a beat is 0.5 s, 24000 samples
-at 48 kHz and 15 pictures at 30 a second, so every beat falls on a picture.
+at 48 kHz and 12 pictures at 24 a second: every sixteenth is 3 pictures.
 
-The film is cut to SECTIONS (in beats) and WIPES (the beats on which a
-scene gives way to the next, under a sweep of colour); the edit reads both
-from here. As a module: `render()` gives the stereo music, `loudness()` and
-`true_peak()` measure, `grid_report()` says how far the notes found by an
-onset detector are from the grid.
+It is written from the film's own list of what happens when (plan.py):
+a sound for each thing seen to happen (the palette appearing, each letter
+typed, each word of a caption punching in, each cut and sweep, each window
+going to its place, each letter of the address on the last card), over
+grooves that follow the film's sections. As a module: `render()` gives the
+stereo music, `loudness()` and `true_peak()` measure, `grid_report()` says
+how far the notes found by an onset detector are from the grid.
 
 Run by itself it writes OUT.wav (default music.wav) and prints the numbers.
 Needs numpy and scipy (librosa only for the grid report).
@@ -17,32 +19,24 @@ Needs numpy and scipy (librosa only for the grid report).
 import sys
 import wave
 
+from pathlib import Path
+
 import numpy as np
 from scipy.ndimage import minimum_filter1d
 from scipy.signal import butter, fftconvolve, lfilter, sosfilt, sosfilt_zi
 
-RATE = 48000
-BPM = 120
-BEAT = 60 / BPM
-SPB = round(BEAT * RATE)  # samples a beat
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plan  # noqa: E402
 
-# What the film shows, in beats. The music follows it: a build under the
-# opening and the title, a drop where dictation begins, a lift for the
-# windows that move on every beat, a breakdown, the last drop, a final hit
-# on the end card.
-SECTIONS = [
-    ("intro", 0, 16),      # cold open (palette on beat 0), title from beat 8
-    ("drop", 16, 48),      # dictation
-    ("lift", 48, 60),      # windows: one layout a beat from 52
-    ("groove", 60, 76),    # screenshot
-    ("breakdown", 76, 96), # clipboard, calculator
-    ("final", 96, 112),    # extensions
-    ("end", 112, 128),     # end card: the final hit on 112
-]
-LENGTH = SECTIONS[-1][2]
-TAIL = 1.0  # seconds after the last beat, for the sound to die
-WIPES = [48, 60, 76, 88, 96]
-SNAPS = list(range(52, 59))  # the beats the windows go to their places on
+RATE = 48000
+BPM = plan.BPM
+BEAT = plan.BEAT
+SPB = round(BEAT * RATE)  # samples a beat
+SECTIONS = plan.SECTIONS
+LENGTH = plan.LENGTH
+TAIL = plan.TAIL
+WIPES = sorted(plan.WIPES)
+SNAPS = plan.SNAPS
 
 KEY = 53  # F3
 MAIN = ["F", "C", "Dm", "Bb"]
@@ -170,31 +164,79 @@ def adsr(n, attack, decay, sustain, release, held):
 def kick(gain=1.0):
     n = int(0.5 * RATE)
     t = t_of(n)
-    freq = 52 + 120 * np.exp(-t / 0.03)
-    body = sine(freq, n) * np.exp(-t / 0.2)
-    click = highpass(noise(n), 2500) * np.exp(-t / 0.0025) * 0.35
-    return np.tanh(1.6 * (body + click)) * 0.9 * gain
+    freq = 56 + 150 * np.exp(-t / 0.022)
+    body = sine(freq, n) * np.exp(-t / 0.13)
+    click = highpass(noise(n), 3000) * np.exp(-t / 0.0018) * 0.9
+    knock = sine(1200 * np.exp(-t / 0.004) + 200, n) * np.exp(-t / 0.006) * 0.5
+    return np.tanh(2.4 * (body + click + knock)) * 0.95 * gain
 
 
 def clap(gain=1.0):
-    n = int(0.45 * RATE)
+    n = int(0.4 * RATE)
     t = t_of(n)
-    source = bandpass(noise(n), 900, 2600)
+    source = bandpass(noise(n), 900, 4200)
     env = np.zeros(n)
-    for k, at in enumerate((0, 0.009, 0.018)):
+    for k, at in enumerate((0, 0.007, 0.014)):
         s = t >= at
-        env[s] += np.exp(-(t[s] - at) / 0.005) * (0.8 if k < 2 else 1.0)
-    s = t >= 0.024
-    env[s] += 0.75 * np.exp(-(t[s] - 0.024) / 0.11)
-    return source * env * 0.55 * gain
+        env[s] += np.exp(-(t[s] - at) / 0.004) * (1.0 if k == 0 else 0.7)
+    s = t >= 0.02
+    env[s] += 0.6 * np.exp(-(t[s] - 0.02) / 0.08)
+    body = sine(210 + 60 * np.exp(-t / 0.008), n) * np.exp(-t / 0.03) * 0.5
+    return np.tanh(1.8 * (source * env + body)) * 0.75 * gain
 
 
 def snare(gain=1.0):
     n = int(0.3 * RATE)
     t = t_of(n)
-    tone = sine(185 + 40 * np.exp(-t / 0.01), n) * np.exp(-t / 0.05)
-    rattle = bandpass(noise(n), 1500, 9000) * np.exp(-t / 0.075)
-    return (0.6 * tone + 0.55 * rattle) * gain
+    tone = sine(190 + 60 * np.exp(-t / 0.008), n) * np.exp(-t / 0.045)
+    rattle = bandpass(noise(n), 1500, 10000) * np.exp(-t / 0.07)
+    snap = highpass(noise(n), 4000) * np.exp(-t / 0.003) * 0.8
+    return np.tanh(1.6 * (0.7 * tone + 0.6 * rattle + snap)) * gain
+
+
+def tick(note, gain=1.0):
+    """A bright, short pitched click: a letter typed."""
+    n = int(0.25 * RATE)
+    t = t_of(n)
+    f = hz(note)
+    body = (sine(f, n) + 0.5 * sine(2 * f, n) + 0.25 * square(f * 3.01, n)) * np.exp(-t / 0.05)
+    click = highpass(noise(n), 5000) * np.exp(-t / 0.0015)
+    return (0.5 * body + 0.6 * click) * gain
+
+
+def bell(note, gain=1.0):
+    """Two sines, one modulating the other: a struck, glassy note."""
+    n = int(1.6 * RATE)
+    t = t_of(n)
+    f = hz(note)
+    mod = np.sin(2 * np.pi * f * 3.5 * t) * 2.2 * np.exp(-t / 0.25)
+    body = np.sin(2 * np.pi * f * t + mod) * np.exp(-t / 0.5)
+    strike = highpass(noise(n), 3000) * np.exp(-t / 0.002) * 0.4
+    return (0.45 * body + strike) * gain
+
+
+def tom(note=45, gain=1.0):
+    n = int(0.6 * RATE)
+    t = t_of(n)
+    body = sine(hz(note) * (1 + 0.8 * np.exp(-t / 0.02)), n) * np.exp(-t / 0.22)
+    click = highpass(noise(n), 2500) * np.exp(-t / 0.002) * 0.5
+    return np.tanh(1.8 * (body + click)) * 0.8 * gain
+
+
+def rim(gain=1.0):
+    """A woodblock-like knock: a word of the title."""
+    n = int(0.15 * RATE)
+    t = t_of(n)
+    body = sine(1650, n) * np.exp(-t / 0.018) + 0.5 * sine(820, n) * np.exp(-t / 0.03)
+    click = highpass(noise(n), 4000) * np.exp(-t / 0.0015)
+    return (0.6 * body + 0.5 * click) * gain
+
+
+def swell(seconds, gain=1.0):
+    """A reversed cymbal: noise that grows into the beat it ends on."""
+    n = int(seconds * RATE)
+    x = np.linspace(0, 1, n)
+    return highpass(noise(n), 3000) * x ** 3 * 0.35 * gain
 
 
 def hat(open_=False, gain=1.0):
@@ -209,15 +251,16 @@ def crash(gain=1.0):
     n = int(2.6 * RATE)
     t = t_of(n)
     body = highpass(noise(n), 4200, order=2) + 0.3 * bandpass(noise(n), 2000, 6000)
-    return body * np.exp(-t / 0.75) * (1 - np.exp(-t / 0.002)) * 0.22 * gain
+    return body * np.exp(-t / 0.6) * (1 - np.exp(-t / 0.0008)) * 0.3 * gain
 
 
 def impact(gain=1.0):
     """A deep hit with a burst on top: the cold open and the last card."""
     n = int(2.5 * RATE)
     t = t_of(n)
-    boom = sine(40 + 60 * np.exp(-t / 0.08), n) * np.exp(-t / 0.45) * 0.7
-    burst = lowpass(noise(n), 1800) * np.exp(-t / 0.12) * 0.5
+    boom = sine(45 + 90 * np.exp(-t / 0.06), n) * np.exp(-t / 0.35) * 0.6
+    burst = lowpass(noise(n), 2500) * np.exp(-t / 0.08) * 0.6
+    burst += highpass(noise(n), 3000) * np.exp(-t / 0.003) * 0.6
     return np.tanh(1.4 * (boom + burst)) * 0.85 * gain
 
 
@@ -227,7 +270,12 @@ def riser(seconds, gain=1.0):
     cut = 300 * (9000 / 300) ** (t ** 1.6)
     body = sweep_filter(noise(n), cut, "low") * (t ** 2.2)
     tone = saw(220 * 2 ** (2 * t ** 1.3), n) * 0.12 * t ** 2
-    return (body * 0.45 + lowpass(tone, 4000)) * gain
+    out = (body * 0.45 + lowpass(tone, 4000)) * gain
+    # silent for the last sixteenth: the hit it leads to is heard alone
+    gap = int(BEAT / 4 * RATE)
+    out[-gap:] = 0
+    out[-gap - 480 : -gap] *= np.linspace(1, 0, 480)
+    return out
 
 
 def whoosh(seconds=0.6, gain=1.0):
@@ -320,81 +368,114 @@ def compose():
     track = Track(LENGTH * BEAT + TAIL + 2.0)
     K, CL, SN = kick(), clap(), snare()
     HC, HO = hat(), hat(True)
+    O, E = plan.OPEN, plan.END
+
+    def hit_kick(beat, gain=1.0):
+        track.add("kick", K, beat, gain)
+        track.kicks.append(beat)
 
     def drums_bar(bar_beat, full=True, claps=(1, 3), hats=True, kick_on=True):
         for b in range(4):
             if kick_on:
-                track.add("kick", K, bar_beat + b)
-                track.kicks.append(bar_beat + b)
+                hit_kick(bar_beat + b)
             if b in claps:
-                track.add("drums", CL, bar_beat + b, 0.9, send=0.25)
+                track.add("drums", CL, bar_beat + b, 0.9, send=0.12)
             if hats:
-                track.add("drums", HO if full else HC, bar_beat + b + 0.5, 0.55 if full else 0.7, pan=0.15)
+                track.add("drums", HO if full else HC, bar_beat + b + 0.5, 0.35 if full else 0.5, pan=0.15)
                 if full:
                     for s in (0.25, 0.75):
-                        track.add("drums", HC, bar_beat + b + s, 0.45 + 0.1 * (s == 0.75), pan=-0.2)
+                        track.add("drums", HC, bar_beat + b + s, 0.25 + 0.07 * (s == 0.75), pan=-0.2)
 
     def bass_bar(bar_beat, pattern="pump"):
         root = ROOTS[chord_at(bar_beat)]
         for b in range(4):
             if pattern == "pump":
-                for s in (0.5,):
-                    track.add("music", bass(root, 0.3, 0.2), bar_beat + b + s, 0.9)
+                track.add("music", bass(root, 0.3, 0.2), bar_beat + b + 0.5, 0.9)
                 track.add("music", bass(root, 0.3, 0.16, 600), bar_beat + b + 0.75, 0.55)
-            else:
-                track.add("music", bass(root, 2.2, 1.9, 500), bar_beat, 0.8) if b == 0 else None
+            elif b == 0:
+                track.add("music", bass(root, 2.2, 1.9, 500), bar_beat, 0.8)
 
     def pad_bar(bar_beat, gain=1.0, cutoff=3200, beats=4):
         notes = chord_notes(chord_at(bar_beat))
-        track.add("music", supersaw(notes, beats * BEAT + 0.6, beats * BEAT - 0.05, cutoff), bar_beat, 0.5 * gain, send=0.35)
+        track.add("music", supersaw(notes, beats * BEAT + 0.6, beats * BEAT - 0.05, cutoff), bar_beat, 0.38 * gain, send=0.2)
 
     def arp_bar(bar_beat, gain=1.0, cutoff=5000):
         notes = chord_notes(chord_at(bar_beat))
         order = [0, 1, 2, 3, 2, 1, 2, 3] * 2
         for k in range(16):
-            note = notes[order[k]] + 12
-            track.add("music", pluck(note, 0.4, cutoff), bar_beat + k / 4, 0.55 * gain, pan=(-0.35 if k % 2 else 0.35), send=0.3)
+            track.add("music", pluck(notes[order[k]] + 12, 0.4, cutoff), bar_beat + k / 4, 0.3 * gain, pan=(-0.35 if k % 2 else 0.35), send=0.18)
 
     def hook_bars(start, end, octave=0, gain=1.0):
         for bar_beat in range(start, end, 4):
             bar = HOOK[int((bar_beat - start) // 4) % 4]
             for beat, length, note in bar:
-                track.add("lead", lead(note + octave, length * BEAT + 0.4, length * BEAT * 0.9), bar_beat + beat, gain, send=0.25)
+                track.add("lead", lead(note + octave, length * BEAT + 0.4, length * BEAT * 0.9), bar_beat + beat, 0.8 * gain, send=0.2)
 
     def roll(start, beats, gain=1.0):
         """A snare roll: eighths, then sixteenths, growing."""
         half = start + beats / 2
-        steps = [start + k / 2 for k in range(int(beats))] + [half + k / 4 for k in range(int(beats * 2))]
-        for i, at in enumerate(sorted(set(steps))):
+        steps = sorted(set([start + k / 2 for k in range(int(beats))] + [half + k / 4 for k in range(int(beats * 2))]))
+        for i, at in enumerate(steps):
             if at >= start + beats - 0.5:
                 break
-            track.add("drums", SN, at, gain * (0.35 + 0.65 * i / max(1, len(steps))), send=0.2)
+            track.add("drums", SN, at, gain * (0.3 + 0.6 * i / max(1, len(steps))), send=0.1)
 
-    for name, a, b in SECTIONS:
+    def stab(beat, name, gain=1.0, cutoff=5000):
+        notes = chord_notes(name)
+        track.add("music", supersaw(notes + [notes[0] + 12], 0.5, 0.1, cutoff), beat, 0.55 * gain, send=0.3)
+
+    # --- The opening, a sound for each thing that happens ---------------------
+    track.add("fx", swell(O["palette"] * BEAT), 0, 0.9)
+    track.add("fx", impact(), O["palette"], 0.9)
+    track.add("drums", crash(), O["palette"], 1.0, send=0.2)
+    hit_kick(O["palette"])
+    stab(O["palette"], "F", 0.8)
+    for beat, note in zip(O["letters"], (77, 81, 84, 89)):
+        track.add("fx", tick(note), beat, 1.6, pan=0.1)
+        track.add("fx", rim(), beat, 0.7)
+    track.add("drums", SN, O["enter"], 1.0, send=0.15)
+    track.add("drums", CL, O["enter"], 0.6)
+    hit_kick(O["editor"])
+    track.add("drums", crash(0.6), O["editor"], 0.7)
+    stab(O["editor"], "C", 0.9)
+    track.add("music", bass(ROOTS["C"], 1.0, 0.8, 600), O["editor"], 0.8)
+    track.add("music", supersaw(chord_notes("Dm"), 4 * BEAT + 0.6, 4 * BEAT, np.linspace(600, 2400, int((4 * BEAT + 0.6) * RATE))), O["editor"], 0.3)
+    track.add("drums", tom(43), O["move"], 1.0, send=0.1)
+    hit_kick(O["move"], 0.8)
+    track.add("fx", riser((O["title"] - O["move"]) * BEAT), O["move"], 0.6)
+    # The title.
+    track.add("fx", impact(), O["title"], 1.0)
+    track.add("drums", crash(), O["title"], 1.0, send=0.2)
+    for k in range(int(O["title"]), int(O["throw"]) + 1):
+        if k < O["throw"]:
+            hit_kick(k, 0.9)
+    pad_bar(8, 0.7, 1800)
+    pad_bar(12, 0.8, np.linspace(1800, 5000, int((4 * BEAT + 0.6) * RATE)))
+    track.add("fx", bell(84), O["icon"], 1.0, send=0.3)
+    track.add("drums", SN, O["icon"], 1.4)
+    track.add("drums", crash(0.5), O["icon"], 0.8)
+    track.add("drums", CL, O["icon"], 0.9)
+    for beat, note in zip(O["name"], (81, 84, 86, 89)):
+        track.add("fx", tick(note), beat, 2.0)
+        track.add("fx", rim(), beat, 1.0)
+        track.add("drums", SN, beat, 0.6 if beat < O["name"][-1] else 1.1)
+        track.add("music", pluck(note, 0.5, 7000), beat, 0.5, send=0.2)
+    for beat in O["sub"]:
+        track.add("fx", rim(), beat, 1.0, pan=-0.1)
+        track.add("drums", SN, beat, 0.45)
+    for beat, note in zip(O["pills"], (77, 81, 84, 89, 93, 96)):
+        track.add("fx", tick(note), beat, 1.4)
+        track.add("music", pluck(note, 0.4, 8000), beat, 0.5, send=0.2)
+    track.add("fx", riser((O["throw"] - 12) * BEAT), 12, 0.7)
+    track.add("drums", SN, O["throw"], 1.6, send=0.2)
+    track.add("drums", CL, O["throw"], 1.0)
+    track.add("fx", impact(0.6), O["throw"], 0.6)
+
+    # --- The scenes ---------------------------------------------------------
+    for name, a, b in SECTIONS[1:-1]:
         for bar_beat in range(a, b, 4):
             in_section = bar_beat - a
-            if name == "intro":
-                # The cold open: a hit with the palette, then the build.
-                if bar_beat == 0:
-                    track.add("fx", impact(), 0, 0.8)
-                    track.add("drums", crash(), 0, 0.9, send=0.3)
-                cut = np.linspace(500 + 300 * in_section, 800 + 450 * (in_section + 4), int(4 * BEAT * RATE + 0.6 * RATE))
-                pad_bar(bar_beat, 0.9, cut)
-                if bar_beat >= 4:
-                    arp_bar(bar_beat, 0.5 + 0.1 * in_section / 4, 1400 + 500 * in_section / 4)
-                if bar_beat >= 8:
-                    for k in range(4):
-                        track.add("kick", K, bar_beat + k, 0.85)
-                        track.kicks.append(bar_beat + k)
-                        track.add("drums", HC, bar_beat + k + 0.5, 0.6)
-                if bar_beat == 8:
-                    track.add("fx", riser(8 * BEAT), 8, 0.8)
-                if bar_beat == 12:
-                    roll(12, 3.5, 0.9)
-            elif name in ("drop", "groove", "final"):
-                if bar_beat == a:
-                    track.add("drums", crash(), a, 1.0, send=0.3)
-                    track.add("fx", impact(), a, 0.45)
+            if name in ("drop", "groove", "final"):
                 drums_bar(bar_beat)
                 bass_bar(bar_beat)
                 pad_bar(bar_beat, 0.8)
@@ -404,8 +485,6 @@ def compose():
                 if name == "drop" and in_section >= 16:
                     hook_bars(bar_beat, bar_beat + 4, -12, 0.55)
             elif name == "lift":
-                if bar_beat == a:
-                    track.add("drums", crash(), a, 1.0, send=0.3)
                 drums_bar(bar_beat, claps=(0, 1, 2, 3) if bar_beat >= 52 else (1, 3))
                 bass_bar(bar_beat)
                 pad_bar(bar_beat, 0.85, 4200)
@@ -413,38 +492,81 @@ def compose():
                 hook_bars(bar_beat, bar_beat + 4, 12 if bar_beat >= 52 else 0, 0.85)
             elif name == "breakdown":
                 # Clipboard and calculator: lighter, then the build back.
-                if bar_beat == a:
-                    track.add("drums", crash(), a, 0.8, send=0.4)
-                    track.add("kick", K, a, 0.9)
                 pad_bar(bar_beat, 0.9, 2400)
                 arp_bar(bar_beat, 0.6, 3500)
                 for k in range(4):
-                    track.add("drums", HC, bar_beat + k + 0.5, 0.5, pan=0.2)
+                    track.add("drums", HC, bar_beat + k + 0.5, 0.35, pan=0.2)
+                    if bar_beat < 88 and k in (0, 2):
+                        hit_kick(bar_beat + k, 0.8)
                 if bar_beat >= 84:
                     bass_bar(bar_beat, "long")
                 if bar_beat >= 88:
                     for k in range(4):
-                        track.add("kick", K, bar_beat + k, 0.7 if bar_beat < 92 else 0.85)
-                        track.kicks.append(bar_beat + k)
+                        hit_kick(bar_beat + k, 0.85 if bar_beat < 92 else 0.95)
                 if bar_beat == 88:
-                    track.add("fx", riser(8 * BEAT), 88, 0.75)
+                    track.add("fx", riser(8 * BEAT), 88, 0.6)
                 if bar_beat == 92:
-                    roll(92, 3.5, 0.85)
-            elif name == "end":
-                if bar_beat == a:
-                    # The final hit, then the chord rings out.
-                    track.add("fx", impact(), a, 0.9)
-                    track.add("drums", crash(), a, 1.0, send=0.4)
-                    track.add("kick", K, a, 1.0)
-                    track.kicks.append(a)
-                    notes = chord_notes("F")
-                    track.add("music", supersaw(notes + [notes[0] + 24], (b - a) * BEAT + TAIL, (b - a) * BEAT - 2.5, 2600), a, 0.6, send=0.5)
-                    track.add("music", bass(ROOTS["F"], 4.0, 3.0, 400), a, 0.7)
-                    for k, note in enumerate([72, 77, 81, 84]):
-                        track.add("lead", lead(note, 2.2, 0.6), a + k * 0.5, 0.35, send=0.5)
-    # A sweep of noise under each change of scene, peaking on its beat.
-    for beat in WIPES:
-        track.add("fx", whoosh(0.7), beat - 0.7 * 0.55 / BEAT, 0.7)
+                    roll(92, 3.5, 0.8)
+    # A hit on every cut: an impact and a crash under a sweep or a new
+    # section, a crash and a kick on the others.
+    starts = {a for _, a, _ in SECTIONS}
+    # (the breakdown is quieter, and what is written for its pictures is
+    # made louder to stand out as much as elsewhere)
+    lift = lambda beat: 1.4 if section_of(beat) == "breakdown" else 1.0  # noqa: E731
+    for beat in plan.CUTS[2:]:
+        if beat in plan.WIPES or beat in starts:
+            track.add("fx", impact(), beat, 0.75)
+            track.add("drums", crash(), beat, 1.0, send=0.15)
+        else:
+            track.add("drums", crash(), beat, 0.9 * lift(beat))
+            track.add("drums", CL, beat, 0.8 * lift(beat))
+        if beat not in track.kicks:
+            hit_kick(beat)
+    for beat in plan.WIPES:
+        track.add("fx", whoosh(0.6), beat - (0.6 + BEAT / 4) / BEAT, 0.6)
+    # A clap under each word of a caption as it punches in; a heavier hit
+    # under the word in blue.
+    for caption in plan.CAPTIONS:
+        for word, beat in caption["words"]:
+            if word in caption["accent"]:
+                track.add("drums", SN, beat, 1.6 * lift(beat), send=0.1)
+                track.add("drums", CL, beat, 1.0 * lift(beat))
+                track.add("drums", crash(0.5), beat, 0.5)
+            else:
+                track.add("drums", CL, beat, 1.4 * lift(beat), pan=0.1)
+                track.add("drums", SN, beat, 0.6 * lift(beat))
+                track.add("fx", rim(), beat, 0.8)
+
+    # --- The last card --------------------------------------------------------
+    track.add("fx", impact(1.2), E["slam"], 1.0)
+    track.add("drums", crash(), E["slam"], 1.1, send=0.25)
+    hit_kick(E["slam"], 1.1)
+    stab(E["slam"], "F", 1.0)
+    track.add("music", bass(ROOTS["F"], 2.0, 1.6, 500), E["slam"], 0.8)
+    track.add("drums", CL, E["line"], 1.0, send=0.2)
+    hit_kick(E["line"], 0.9)
+    stab(E["line"], "Bb", 0.9)
+    track.add("drums", crash(0.6), E["line"], 0.6)
+    track.add("drums", SN, E["url"], 1.0, send=0.15)
+    hit_kick(E["url"], 0.8)
+    stab(E["url"], "C", 0.8)
+    track.add("music", supersaw(chord_notes("C"), 8 * BEAT, 8 * BEAT - 0.3, 1400), E["url"], 0.22)
+    scale = (77, 79, 81, 84, 86, 89, 91, 93)
+    for k, beat in enumerate(E["letters"]):
+        track.add("fx", tick(scale[(k * 3) % len(scale)]), beat, 1.6, pan=(-0.2 if k % 2 else 0.2))
+    # The caret blinks on the hats: off on the open hat, on on the closed.
+    for beat in E["blinks"]:
+        track.add("drums", HO if beat % 1 else HC, beat, 1.2, pan=0.15)
+        track.add("fx", rim(), beat, 0.5)
+    hit_kick(E["chord"], 1.1)
+    track.add("fx", impact(), E["chord"], 0.8)
+    track.add("drums", crash(), E["chord"], 1.0, send=0.5)
+    notes = chord_notes("F")
+    ring = (LENGTH - E["chord"]) * BEAT + TAIL
+    track.add("music", supersaw(notes + [notes[0] + 12, notes[0] + 24], ring, (E["fade"][0] - E["chord"]) * BEAT, 3000), E["chord"], 0.75, send=0.6)
+    track.add("music", bass(ROOTS["F"], ring, ring - 1.5, 400), E["chord"], 0.8)
+    for k, note in enumerate([72, 77, 81, 84]):
+        track.add("lead", lead(note, 2.4, 0.5), E["chord"] + k * 0.5, 0.3, send=0.6)
     return track
 
 
@@ -474,7 +596,7 @@ def delay(x, beats=0.75, feedback=0.35, mix=0.25):
     return out
 
 
-def sidechain(n, kicks, depth=0.6, release=0.16):
+def sidechain(n, kicks, depth=0.8, release=0.14):
     env = np.ones(n)
     t = t_of(int(release * 5 * RATE))
     dip = 1 - depth * np.exp(-t / release) * np.clip(t / 0.004, 0, 1) ** 0.5
@@ -485,8 +607,13 @@ def sidechain(n, kicks, depth=0.6, release=0.16):
     return env
 
 
-def limiter(x, ceiling=10 ** (-1.2 / 20), look=0.005, release=0.08):
-    peak = np.abs(x).max(1)
+def limiter(x, ceiling=10 ** (-1.3 / 20), look=0.005, release=0.08):
+    from scipy.signal import resample_poly
+
+    # the peaks between the samples too (four times over), as true peak
+    # meters see them
+    over = np.abs(resample_poly(x, 4, 1, axis=0)).max(1)
+    peak = over[: len(x) * 4].reshape(-1, 4).max(1)
     need = np.minimum(1.0, ceiling / np.maximum(peak, 1e-9))
     w = round(look * RATE)
     held = minimum_filter1d(need, 2 * w + 1)
@@ -544,7 +671,11 @@ def master(x, target=-14.0):
     return x
 
 
-def render():
+def parts():
+    """The music in two parts, as they leave the mixer: the hits (drums and
+    the sounds written for what is seen) and the bed (bass, chords, the
+    arpeggio, the hook, the reverb). The edit turns the bed down further
+    than the hits under speech, so that a cut or a word still lands."""
     track = compose()
     n = track.n
     duck = sidechain(n, track.kicks)[:, None]
@@ -552,23 +683,27 @@ def render():
     send = track.buses["send"] + 0.0
     wet = np.stack([fftconvolve(send[:, 0], ir[:, 0])[:n], fftconvolve(send[:, 1], ir[:, 1])[:n]], 1)
     lead_bus = delay(track.buses["lead"], 0.75, 0.38, 0.3)
-    mix = (
-        track.buses["kick"] * 0.8
-        + track.buses["drums"] * 1.0
-        + track.buses["music"] * duck * 0.7
-        + lead_bus * duck * 0.6
-        + track.buses["fx"] * 0.7
-        + wet * duck * 0.35
-    )
-    # glue: a gentle high-pass on everything, a soft clip on the bus
-    mix = np.stack([highpass(mix[:, 0], 28), highpass(mix[:, 1], 28)], 1)
-    mix = np.tanh(mix * 0.9) / 0.9
-    # out after the last beat
+    hits = track.buses["kick"] * 1.0 + track.buses["drums"] * 1.1 + track.buses["fx"] * 0.8
+    bed = track.buses["music"] * duck * 0.55 + lead_bus * duck * 0.5 + wet * duck * 0.25
     end = round((LENGTH * BEAT + TAIL) * RATE)
-    mix = mix[:end]
-    fade = round(TAIL * RATE * 0.9)
-    mix[-fade:] *= np.linspace(1, 0, fade)[:, None] ** 2
-    return master(mix)
+    # the last chord and its reverb, faded with the picture
+    fade = round((LENGTH + TAIL / BEAT - plan.END["fade"][0]) * BEAT * RATE)
+    out = []
+    for part in (hits, bed):
+        part = np.stack([highpass(part[:, 0], 35), highpass(part[:, 1], 35)], 1)[:end]
+        part[-fade:] *= np.linspace(1, 0, fade)[:, None] ** 1.5
+        out.append(part)
+    return out
+
+
+def glue(mix):
+    """A soft clip on the bus, then to the film's loudness."""
+    return master(np.tanh(mix * 0.9) / 0.9)
+
+
+def render():
+    hits, bed = parts()
+    return glue(hits + bed)
 
 
 def write(path, x):
