@@ -280,7 +280,9 @@ def storyboard(capture):
         (1, at("open-found", -0.1), None),
         (4, at("open-editor", 1.2), None),
     ], [(0, view(px, py, 1900)), (3.6, view(px, py, 2400), "power2.out"), (4, view(px, py, 2400)),
-        (5.5, view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 3000), "power3.inOut")]))
+        # with the editor, straight to it, then back from it
+        (4, view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 2900)),
+        (8, view(editor[0] + editor[2] / 2, editor[1] + editor[3] / 2, 3300), "power2.out")]))
     shots.append(Shot("title", [(8, at("open-editor", 1.2), None)], card="title"))
 
     # Dictation. The window that listens, close; then the words where the
@@ -297,8 +299,8 @@ def storyboard(capture):
     shots.append(Shot("dictation-words", [(8, listening + 4 * PERIOD, "live")], [(0, PILL), (2.5, WORDS, "power2.inOut")]))
     heard = speech_starts(capture, "chinese")
     sentences = SPEECH["chinese"]["sentences"]
-    shots.append(Shot("dictation-mixed", [(12, heard + sentences[0][0] - 0.3, "live")], [(0, WORDS), (12, NEARER, "none")]))
-    shots.append(Shot("dictation-mixed-on", [(8, heard + sentences[-1][0] - 0.25, "live")], [(0, NEARER), (6, view(nx, SCREEN[1], 2150), "power1.inOut")]))
+    # Chinese with English in it: every sentence, as it was said.
+    shots.append(Shot("dictation-mixed", [(20, heard + sentences[0][0] - 0.3, "live")], [(0, WORDS), (20, NEARER, "power1.inOut")]))
 
     # Windows: asked for by name once, then a layout on every beat.
     shots.append(Shot("windows-ask", [

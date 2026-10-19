@@ -30,10 +30,15 @@
 #                      open dictation windows screenshot clipboard calculator
 #                      store); for trying one
 #   HEYO_FILM_SPEECH   the kept take of the Chinese sentences (default:
-#                      demo-zh.wav beside the speech model say-zh.cjs uses);
-#                      without one say-zh.cjs speaks them anew, and the
-#                      recognizer may mishear that
-#   HEYO_FILM_SPEECH_ENGLISH  the same for the English sentence (demo-en.wav)
+#                      demo-zh-cosy.wav beside the speech model say-zh.cjs
+#                      uses); without one say-zh.cjs speaks them anew, and
+#                      the recognizer may mishear that
+#   HEYO_FILM_SPEECH_ENGLISH  the same for the English sentence
+#                      (demo-en-cosy.wav)
+#                      The kept takes were made outside the repository by
+#                      CosyVoice3 (Fun-CosyVoice3-0.5B-2512, Apache-2.0),
+#                      from a prompt voice by CosyVoice-300M-Instruct, at
+#                      1.1 times the speed; both are heard right by Heyo.
 #   HEYO_FILM_HYPERFRAMES  the HyperFrames command; when not given, npm puts
 #                      hyperframes@$HYPERFRAMES in $HEYO_FILM_CACHE/hyperframes
 #   HEYO_FILM_BROWSER  the headless Chromium it renders with (where its own
@@ -47,7 +52,7 @@
 # network: the Raycast Store, the exchange rates, HyperFrames and GSAP. The
 # capture takes about five minutes, the edit about ten.
 STAGE=${1:-all}; THEME=${2:-light}
-case "$STAGE" in capture | edit | all) ;; *) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
+case "$STAGE" in capture | edit | all) ;; *) sed -n '2,53p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
 case "$THEME" in light | dark) ;; *) echo "demo-film: the theme is light or dark" >&2; exit 2 ;; esac
 HERE=$(cd "$(dirname "$0")" && pwd)
 
@@ -117,12 +122,11 @@ said() {
     HEYO_TTS_MODEL="$TTS" HEYO_TTS_LIB="$HEYO_TEST_SPEECH/node_modules" node "$HERE/say-zh.cjs" "$out" "$@"
   fi
 }
-ENGLISH_LENGTH=$(said "$ENGLISH" "${HEYO_FILM_SPEECH_ENGLISH:-$(dirname "$TTS")/demo-en.wav}" \
+ENGLISH_LENGTH=$(said "$ENGLISH" "${HEYO_FILM_SPEECH_ENGLISH:-$(dirname "$TTS")/demo-en-cosy.wav}" \
   "We can have lunch by the lake.") || exit 1
-CHINESE_LENGTH=$(said "$CHINESE" "${HEYO_FILM_SPEECH:-$(dirname "$TTS")/demo-zh.wav}" \
-  "这个 feature 下周上线。" \
+CHINESE_LENGTH=$(said "$CHINESE" "${HEYO_FILM_SPEECH:-$(dirname "$TTS")/demo-zh-cosy.wav}" \
+  "这个 demo 下周上线。" \
   "明天早上可以 review 一下。" \
-  "有问题的话，直接发 email 给我。" \
   "中文和 English 混着说也可以。") || exit 1
 export HEYO_DICTATION_WAV="$SPOKEN"
 
@@ -422,7 +426,7 @@ scene_windows() {
   arrange "$FILES" top-right windows-3
   arrange "$TERMINAL" bottom-right windows-4
   arrange "$EDITOR" almost-maximize windows-5
-  arrange "$EDITOR" maximize windows-6
+  arrange "$EDITOR" first-two-thirds windows-6
   arrange "$EDITOR" left-half windows-7
   w 1
 }

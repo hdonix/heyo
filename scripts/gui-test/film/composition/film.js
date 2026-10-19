@@ -175,7 +175,7 @@
     });
     tl.set(root, { visibility: "visible" }, t);
     tl.set(root, { visibility: "hidden" }, c.to);
-    flashAt(t, 0.35, 0.3);
+    flashAt(t, 0.18, 0.2);
     tl.fromTo($(".glow", root), { scale: 0.6, opacity: 0 }, { scale: 1.15, opacity: 1, duration: 4, ease: "power1.out", immediateRender: false }, t);
     tl.fromTo($(".icon", root), { scale: 0.3, rotation: -14, opacity: 0 }, { scale: 1, rotation: 0, opacity: 1, duration: 0.7, ease: "back.out(2.2)", immediateRender: false }, t);
     tl.set(letters, { yPercent: 115 }, 0);
@@ -188,7 +188,7 @@
     tl.to($(".lockup", root), { scale: 1.6, opacity: 0, duration: B / 2, ease: "power3.in" }, c.to - B / 2);
     tl.to([sub, list], { scale: 1.3, opacity: 0, duration: B / 2, ease: "power3.in" }, c.to - B / 2);
     tl.to(root, { opacity: 0, duration: 0.12, ease: "none" }, c.to - 0.12);
-    flashAt(c.to, 0.5, 0.4);
+    flashAt(c.to, 0.3, 0.25);
   }
 
   // --- The end card ---------------------------------------------------------
@@ -205,7 +205,7 @@
     const caret = $(".caret", url);
     const address = "github.com/hdonix/heyo";
     tl.set(root, { visibility: "visible", opacity: 1 }, t);
-    flashAt(t, 0.55, 0.5);
+    flashAt(t, 0.25, 0.3);
     tl.fromTo($(".glow", root), { scale: 1.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.2, ease: "power2.out", immediateRender: false }, t);
     tl.fromTo($(".lockup", root), { scale: 1.35, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, ease: "expo.out", immediateRender: false }, t);
     tl.set(letters, { yPercent: 0 }, t);
