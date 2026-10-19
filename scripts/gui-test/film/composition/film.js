@@ -150,17 +150,19 @@
     const word = make("div", "word", w.word);
     box.append(back, front, word);
     wipes.appendChild(box);
+    // In on the title's hit, held (still) until the scene's, out on it.
     const t = w.t;
+    const out = rev(w.to);
     tl.set([back, front], { xPercent: 120 }, 0);
     tl.set(word, { opacity: 0 }, 0);
     tl.set(box, { visibility: "visible" }, t - 0.45);
-    tl.set(box, { visibility: "hidden" }, t + 0.34);
+    tl.set(box, { visibility: "hidden" }, out + 0.34);
     tl.fromTo(back, { xPercent: 120 }, { xPercent: 0, duration: 0.25, ease: "power3.in", immediateRender: false }, t - 0.45);
     tl.fromTo(front, { xPercent: 120 }, { xPercent: 0, duration: 0.25, ease: "power3.in", immediateRender: false }, t - 0.4);
     tl.fromTo(word, { opacity: 0, scale: 1.35 }, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, rev(t));
-    tl.to(word, { opacity: 0, x: -140, duration: 0.14, ease: "power2.in" }, t + 0.12);
-    tl.to(front, { xPercent: -120, duration: 0.18, ease: "power3.in" }, t + 0.12);
-    tl.to(back, { xPercent: -120, duration: 0.18, ease: "power3.in" }, t + 0.15);
+    tl.to(word, { opacity: 0, x: -140, duration: 0.14, ease: "expo.out" }, out);
+    tl.to(front, { xPercent: -120, duration: 0.25, ease: "expo.out" }, out);
+    tl.to(back, { xPercent: -120, duration: 0.25, ease: "expo.out" }, out + 0.03);
   }
 
   // --- The title ------------------------------------------------------------

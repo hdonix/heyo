@@ -408,7 +408,15 @@ def storyboard(capture):
         (5, at("store-blue", -0.1), None),
     ], [(0, low(2440)), (3, low(2440)), (8, low(2400), "power2.inOut")]))
     shots.append(Shot("end", [(plan.LENGTH - SECTION["end"][0], at("open-editor", 1.2), None)], card="end"))
-    return shots
+    # Each section's title held before its scene (plan.TITLES), drawn by
+    # the composition over a plate with nothing in it.
+    titled, beat = [], 0
+    for shot in shots:
+        if beat in plan.WRITTEN.WIPES:
+            titled.append(Shot("title-" + plan.WRITTEN.WIPES[beat].lower().replace(" ", "-"), [(plan.HOLD, 0, None)], card="section"))
+        titled.append(shot)
+        beat += shot.beats
+    return titled
 
 
 # --- The plate -----------------------------------------------------------------
@@ -522,7 +530,7 @@ def composition(shots, start_beats, capture, total, project):
         "cameras": cameras,
         "flashes": flashes,
         "punches": [[round(b * PERIOD, 4), amount] for b, amount in plan.punches()],
-        "wipes": [{"t": round(b * PERIOD, 4), "word": word} for b, word in sorted(plan.WIPES.items())],
+        "wipes": [{"t": round(a * PERIOD, 4), "to": round(b * PERIOD, 4), "word": word} for a, b, word in plan.TITLES],
         "title": {key: (seconds(value) if isinstance(value, list) else round(value * PERIOD, 4)) for key, value in plan.OPEN.items()}
         | {"sub_words": plan.TITLE_SUB, "pills_words": plan.TITLE_PILLS},
         "end": {key: (seconds(value) if isinstance(value, (list, tuple)) else round(value * PERIOD, 4)) for key, value in plan.END.items()}
@@ -575,6 +583,7 @@ def stills(out, shots, start_beats, data):
         wanted[round((caption["words"][-1]["t"] + 0.6) * RATE)] = f"caption-{k}"
     for wipe in data["wipes"]:
         wanted[round(wipe["t"] * RATE)] = f"wipe-{wipe['word']}"
+        wanted[round((wipe["t"] + 1.0) * RATE)] = f"title-held-{wipe['word']}"
     numbers = sorted(wanted)
     pick = "+".join(f"eq(n\\,{n})" for n in numbers)
     subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(out), "-vf", f"select='{pick}'", "-vsync", "0", "-q:v", "3", str(folder / "%03d.jpg")], check=True)

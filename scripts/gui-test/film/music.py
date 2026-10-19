@@ -32,11 +32,13 @@ RATE = 48000
 BPM = plan.BPM
 BEAT = plan.BEAT
 SPB = round(BEAT * RATE)  # samples a beat
-SECTIONS = plan.SECTIONS
+# The music is composed in the beats as written (plan.WRITTEN, each sweep a
+# single beat) and every sound is moved to the film's beats as it is put
+# down (plan.shift); the section titles held between get their own bars.
+W = plan.WRITTEN
+SECTIONS = W.SECTIONS
 LENGTH = plan.LENGTH
 TAIL = plan.TAIL
-WIPES = sorted(plan.WIPES)
-SNAPS = plan.SNAPS
 
 KEY = 53  # F3
 MAIN = ["F", "C", "Dm", "Bb"]
@@ -352,8 +354,10 @@ class Track:
         self.buses = {name: np.zeros((self.n, 2)) for name in ("drums", "kick", "music", "lead", "fx", "send")}
         self.kicks = []
 
-    def add(self, bus, sound, beat, gain=1.0, pan=0.0, send=0.0):
-        at = round(beat * SPB)
+    def add(self, bus, sound, beat, gain=1.0, pan=0.0, send=0.0, held=False):
+        """`sound` at `beat` as written, or at that beat of the film itself
+        when `held` (in the bars of a section title)."""
+        at = round((beat if held else plan.shift(beat)) * SPB)
         if at >= self.n:
             return
         if sound.ndim == 1:
@@ -368,11 +372,11 @@ def compose():
     track = Track(LENGTH * BEAT + TAIL + 2.0)
     K, CL, SN = kick(), clap(), snare()
     HC, HO = hat(), hat(True)
-    O, E = plan.OPEN, plan.END
+    O, E = W.OPEN, W.END
 
-    def hit_kick(beat, gain=1.0):
-        track.add("kick", K, beat, gain)
-        track.kicks.append(beat)
+    def hit_kick(beat, gain=1.0, held=False):
+        track.add("kick", K, beat, gain, held=held)
+        track.kicks.append(beat if held else plan.shift(beat))
 
     def drums_bar(bar_beat, full=True, claps=(1, 3), hats=True, kick_on=True):
         for b in range(4):
@@ -513,20 +517,20 @@ def compose():
     # (the breakdown is quieter, and what is written for its pictures is
     # made louder to stand out as much as elsewhere)
     lift = lambda beat: 1.4 if section_of(beat) == "breakdown" else 1.0  # noqa: E731
-    for beat in plan.CUTS[2:]:
-        if beat in plan.WIPES or beat in starts:
+    for beat in W.CUTS[2:]:
+        if beat in W.WIPES or beat in starts:
             track.add("fx", impact(), beat, 0.75)
             track.add("drums", crash(), beat, 1.0, send=0.15)
         else:
             track.add("drums", crash(), beat, 0.9 * lift(beat))
             track.add("drums", CL, beat, 0.8 * lift(beat))
-        if beat not in track.kicks:
+        if plan.shift(beat) not in track.kicks:
             hit_kick(beat)
-    for beat in plan.WIPES:
+    for beat in W.WIPES:
         track.add("fx", whoosh(0.6), beat - (0.6 + BEAT / 4) / BEAT, 0.6)
     # A clap under each word of a caption as it punches in; a heavier hit
     # under the word in blue.
-    for caption in plan.CAPTIONS:
+    for caption in W.CAPTIONS:
         for word, beat in caption["words"]:
             if word in caption["accent"]:
                 track.add("drums", SN, beat, 1.6 * lift(beat), send=0.1)
@@ -562,11 +566,38 @@ def compose():
     track.add("fx", impact(), E["chord"], 0.8)
     track.add("drums", crash(), E["chord"], 1.0, send=0.5)
     notes = chord_notes("F")
-    ring = (LENGTH - E["chord"]) * BEAT + TAIL
+    ring = (W.LENGTH - E["chord"]) * BEAT + TAIL
     track.add("music", supersaw(notes + [notes[0] + 12, notes[0] + 24], ring, (E["fade"][0] - E["chord"]) * BEAT, 3000), E["chord"], 0.75, send=0.6)
     track.add("music", bass(ROOTS["F"], ring, ring - 1.5, 400), E["chord"], 0.8)
     for k, note in enumerate([72, 77, 81, 84]):
         track.add("lead", lead(note, 2.4, 0.5), E["chord"] + k * 0.5, 0.3, send=0.6)
+
+    # --- The section titles, held -------------------------------------------
+    # Struck as the title lands; a stab of the next section's first chord on
+    # each beat, claps, hats growing to sixteenths, a snare fill and a riser
+    # into the scene, which comes in on the sweep's hit as before.
+    for (start, end, _), wipe in zip(plan.TITLES, sorted(W.WIPES)):
+        name = chord_at(wipe)
+        notes = chord_notes(name)
+        track.add("fx", whoosh(0.6), start - (0.6 + BEAT / 4) / BEAT, 0.6, held=True)
+        track.add("fx", impact(), start, 0.9, held=True)
+        track.add("drums", crash(), start, 1.0, send=0.2, held=True)
+        track.add("music", supersaw(notes + [notes[0] + 12], 0.5, 0.1, 5000), start, 0.6, send=0.3, held=True)
+        track.add("music", bass(ROOTS[name], 0.45, 0.35, 700), start, 0.9, held=True)
+        for k in range(1, plan.HOLD):
+            hit_kick(start + k, 0.9, held=True)
+            track.add("music", supersaw(notes + [notes[0] + 12], 0.35, 0.08, 2000 + 1200 * k), start + k, 0.4, send=0.2, held=True)
+            track.add("music", bass(ROOTS[name], 0.3, 0.2, 600), start + k + 0.5, 0.7, held=True)
+            if k % 2:
+                track.add("drums", CL, start + k, 0.9, held=True)
+        for k in range(4 * (plan.HOLD - 1)):
+            at = start + 0.5 + k / 4
+            if at >= end - 1:
+                break
+            track.add("drums", HC, at, 0.25 + 0.3 * k / (4 * plan.HOLD), pan=0.15, held=True)
+        for k in range(4):
+            track.add("drums", SN, end - 1 + k / 4, 0.4 + 0.2 * k, send=0.1, held=True)
+        track.add("fx", riser((plan.HOLD - 1) * BEAT), start + 1, 0.5, held=True)
     return track
 
 
@@ -749,7 +780,7 @@ def describe(x):
     ]
     st = short_term(x)
     lines.append(f"short-term loudness (3 s): {st.min():.1f} to {st.max():.1f} LUFS")
-    for name, a, b in SECTIONS:
+    for name, a, b in plan.SECTIONS:
         part = x[round(a * BEAT * RATE) : round(b * BEAT * RATE)]
         lines.append(f"  {name:10s} beats {a:3d}-{b:3d}: {loudness(part):6.1f} LUFS")
     lines.append("spectrum: " + ", ".join(f"{name} {db:.1f} dB" for name, db in bands(x)))

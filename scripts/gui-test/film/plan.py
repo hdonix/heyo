@@ -13,6 +13,8 @@ beat is 0.5 s, 12 pictures (the film is 24 a second, so that every
 sixteenth of a beat is a picture, 3 of them).
 """
 
+from types import SimpleNamespace
+
 BPM = 120
 BEAT = 60 / BPM
 
@@ -81,20 +83,58 @@ CAPTIONS = [
 ]
 
 
+# --- The section titles held -------------------------------------------------
+#
+# Everything above is written as if each sweep came and went on one beat.
+# Each section's title is held on screen instead: the film stops for HOLD
+# beats where a sweep is (its own music, the next scene after it). What is
+# written above is kept as WRITTEN (the music is composed in those beats and
+# moved by shift()); the names above are then rebound to the film's beats.
+
+HOLD = 4
+WRITTEN = SimpleNamespace(SECTIONS=SECTIONS, LENGTH=LENGTH, CUTS=CUTS, WIPES=WIPES, SNAPS=SNAPS, OPEN=OPEN, END=END, CAPTIONS=CAPTIONS)
+
+
+def shift(beat):
+    """A written beat in the film's beats: later by HOLD for each section
+    title held before it (a scene that begins on a sweep begins after it)."""
+    return beat + HOLD * sum(1 for wipe in WRITTEN.WIPES if beat >= wipe)
+
+
+def _shifted(value):
+    if isinstance(value, (list, tuple)):
+        return type(value)(_shifted(v) for v in value)
+    return shift(value)
+
+
+# The titles: (the beat the title comes on, the beat the scene does).
+TITLES = [(shift(wipe) - HOLD, shift(wipe), word) for wipe, word in sorted(WRITTEN.WIPES.items())]
+SECTIONS = sorted([(name, shift(a), shift(b) - (HOLD if b in WRITTEN.WIPES else 0)) for name, a, b in WRITTEN.SECTIONS]
+                  + [("title", a, b) for a, b, _ in TITLES], key=lambda section: section[1])
+LENGTH = shift(WRITTEN.LENGTH)
+CUTS = sorted([shift(beat) for beat in WRITTEN.CUTS] + [a for a, _, _ in TITLES])
+WIPES = {a: word for a, _, word in TITLES}
+SNAPS = _shifted(WRITTEN.SNAPS)
+OPEN = {key: _shifted(value) for key, value in WRITTEN.OPEN.items()}
+END = {key: _shifted(value) for key, value in WRITTEN.END.items()}
+CAPTIONS = [dict(caption, **{"from": shift(caption["from"]), "to": shift(caption["to"]), "words": [(w, shift(b)) for w, b in caption["words"]]})
+            for caption in WRITTEN.CAPTIONS]
+
+
 def punches():
     """The picture punched on the kicks while a scene is on: (beat, how
     much). Lightly, and only on the bar, while words are being dictated."""
     out = []
     for beat in range(16, 112):
-        if beat in WIPES or beat in SNAPS:
+        if beat in WRITTEN.WIPES or beat in WRITTEN.SNAPS:
             continue
         if beat < 48:
             if beat % 4 == 0:
                 out.append((beat, 0.014))
         else:
             out.append((beat, 0.024 if beat % 4 == 0 else 0.01))
-    out += [(beat, 0.035) for beat in SNAPS]
-    return sorted(out)
+    out += [(beat, 0.035) for beat in WRITTEN.SNAPS]
+    return sorted((shift(beat), amount) for beat, amount in out)
 
 
 def seen():
@@ -119,7 +159,7 @@ def seen():
         events.append((beat, f"pill {word!r}", (x, 685, w, 80)))
     events.append((OPEN["throw"], "title thrown at the camera", None))
     for beat in CUTS[2:]:
-        events.append((beat, "sweep: " + WIPES[beat] if beat in WIPES else "cut", None))
+        events.append((beat, "title: " + WIPES[beat] if beat in WIPES else "cut", None))
     for beat in SNAPS[1:]:
         events.append((beat, "window to its place", None))
     for caption in CAPTIONS:
