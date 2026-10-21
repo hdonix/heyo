@@ -9,7 +9,8 @@
 //! against the entry rather than trusted.
 
 import { classifyModelAddress } from "../../src/modelAddress";
-import { type AiSettings, streamLocal } from "./llm";
+import type { AiSettings } from "./model";
+import { openAiCompatible } from "./openai";
 
 /// An entry to write queries for.
 export interface CaseEntry {
@@ -136,6 +137,7 @@ export function localOnly(ai: AiSettings) {
 
 export async function casesFor(entry: CaseEntry, ai: AiSettings): Promise<Case[]> {
   localOnly(ai);
-  const answer = await streamLocal({ settings: { ...ai, provider: "local" }, system: SYSTEM, prompt: prompt(entry) });
+  // Never the provider the settings name: only the model on this computer.
+  const answer = await openAiCompatible(ai.localUrl, ai.localModel).answer({ system: SYSTEM, prompt: prompt(entry) });
   return parse(answer, entry.text);
 }

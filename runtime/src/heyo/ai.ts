@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { AiProvider } from "../../../shared/bindings/AiProvider";
-import { CLAUDE_MODEL, describeClaudeError, type PromptImage, streamClaude } from "../ai";
+import { askModel, CLAUDE_MODEL, describeModelError, type PromptImage } from "../ai";
 import { ask, implement } from "./asking";
 import { HeyoError } from "./error";
 import { gained } from "./members";
@@ -87,7 +87,7 @@ export function turns(messages: Message[]): Message[] {
 function failure(error: unknown, signal?: AbortSignal): HeyoError {
   if (error instanceof HeyoError) return error;
   if (signal?.aborted) return new HeyoError("cancelled", "The question was withdrawn.");
-  return new HeyoError("failed", describeClaudeError(error));
+  return new HeyoError("failed", describeModelError(error));
 }
 
 /// Which model answers, with Claude's name filled in.
@@ -120,7 +120,7 @@ const added = implement(gained.AI, {
           pictures = images.map(readImage);
         }
       }
-      return streamClaude({
+      return askModel({
         system: system ?? INSTRUCTIONS,
         prompt,
         history,

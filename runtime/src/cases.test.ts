@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { acceptable, casesFor, localOnly, parse, prompt } from "./cases";
-import type { AiSettings } from "./llm";
+import type { AiSettings } from "./model";
 
 const local: AiSettings = { provider: "local", apiKey: "", localUrl: "http://127.0.0.1:8000/v1", localModel: "tiny" };
 const entry = { id: 7, text: "ssh deploy@10.0.3.17 -p 2222", app: "org.gnome.Terminal", copied: "3 days ago" };

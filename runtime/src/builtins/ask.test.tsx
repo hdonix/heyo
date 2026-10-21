@@ -8,8 +8,8 @@ import { answers, requests, reset, sent } from "../testing";
 const model = vi.hoisted(() => ({ calls: [] as { prompt: string; onText(text: string): void; finish(answer: string): void }[] }));
 vi.mock("../ai", () => ({
   CLAUDE_MODEL: "claude",
-  describeClaudeError: (error: unknown) => String(error),
-  streamClaude: (options: { prompt: string; onText(text: string): void }) => new Promise<string>((finish) => model.calls.push({ ...options, finish })),
+  describeModelError: (error: unknown) => String(error),
+  askModel: (options: { prompt: string; onText(text: string): void }) => new Promise<string>((finish) => model.calls.push({ ...options, finish })),
 }));
 
 import { Navigator } from "../api/navigation";

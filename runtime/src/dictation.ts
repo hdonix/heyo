@@ -14,7 +14,7 @@
 //! The user's vocabulary (`vocabulary.ts`) is applied to everything
 //! recognized, and given to the model that polishes.
 //!
-//!   in:  {cmd:"start", source?, language?, vocabulary?}   {cmd:"stop", polish?, apiKey?, ai?}   {cmd:"cancel"}
+//!   in:  {cmd:"start", source?, language?, vocabulary?}   {cmd:"stop", polish?, ai}   {cmd:"cancel"}
 //!   out: ready | level | partial | segment | result | error | progress | installed
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -22,10 +22,9 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import Anthropic from "@anthropic-ai/sdk";
-
 import { download, installPackages, type PinnedFile } from "./install";
-import { type AiSettings, LocalModelError, streamLocal } from "./llm";
+import type { AiSettings } from "./model";
+import { describeModelError, modelFrom } from "./models";
 import { type Engine, SAMPLE_RATE, Session, VAD_WINDOW } from "./sentences";
 import { streams } from "./transport";
 import { type Corrector, corrector, parseVocabulary, type Vocabulary, vocabularyPrompt } from "./vocabulary";
@@ -147,38 +146,10 @@ First resolve fillers, self-corrections and obvious recognition errors, then tra
 Output only the English text.`,
 };
 
-async function polish(transcript: string, mode: string, vocabulary: Vocabulary, apiKey: string | undefined, ai?: AiSettings) {
-  const system = POLISH_PROMPTS[mode] + vocabularyPrompt(vocabulary);
-  if (ai?.provider === "local") return streamLocal({ settings: ai, system, prompt: transcript });
-  // Without an explicit key the SDK resolves ANTHROPIC_API_KEY or an `ant auth login` profile.
-  const client = apiKey ? new Anthropic({ apiKey }) : new Anthropic();
-  const response = await client.beta.messages.create({
-    model: "claude-opus-5-5",
-    max_tokens: 16000,
-    // A dictation tool should answer quickly; this is a light rewriting task.
-    output_config: { effort: "low" },
-    // If a safety classifier declines, retry on the recommended fallback model.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system,
-    messages: [{ role: "user", content: transcript }],
-  } as Anthropic.Beta.MessageCreateParamsNonStreaming);
-  if (response.stop_reason === "refusal") throw new Error("Claude declined to process this text");
-  const text = response.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
-  if (!text.trim()) throw new Error("Claude returned no text");
-  return text.trim();
+async function polish(transcript: string, mode: string, vocabulary: Vocabulary, ai: AiSettings) {
+  return modelFrom(ai).answer({ system: POLISH_PROMPTS[mode] + vocabularyPrompt(vocabulary), prompt: transcript });
 }
 
-function describe(error: unknown) {
-  if (error instanceof LocalModelError) return error.message;
-  if (error instanceof Anthropic.AuthenticationError) return "Claude API key is missing or invalid (set it in Settings → Advanced)";
-  if (error instanceof Anthropic.RateLimitError) return "Claude rate limit reached; try again shortly";
-  if (error instanceof Anthropic.APIConnectionError) return "Could not reach the Claude API";
-  if (error instanceof Anthropic.APIError) return `Claude API error ${error.status}: ${error.message}`;
-  // The SDK's own (non-HTTP) errors here mean no credentials could be resolved.
-  if (error instanceof Anthropic.AnthropicError) return "No Claude API key is set (add one in Settings → Advanced)";
-  return error instanceof Error ? error.message : String(error);
-}
 
 // --- Recording -----------------------------------------------------------
 
@@ -292,11 +263,11 @@ function serve() {
       send({ type: "polishing" });
       try {
         // The model is told the vocabulary; what it still wrote otherwise is put right.
-        const polished = correct(await polish(raw, message.polish, vocabulary, message.apiKey || undefined, message.ai));
+        const polished = correct(await polish(raw, message.polish, vocabulary, message.ai));
         send({ type: "result", text: polished, raw, polished: true });
       } catch (e) {
         // The recognized text is still worth having.
-        send({ type: "result", text: raw, raw, polished: false, warning: describe(e) });
+        send({ type: "result", text: raw, raw, polished: false, warning: describeModelError(e) });
       }
     },
     cancel() {

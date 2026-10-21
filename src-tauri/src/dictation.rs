@@ -797,14 +797,14 @@ pub fn finish(app: &AppHandle) {
     if !state.recording {
         return;
     }
-    let (polish, api_key, ai) = {
+    let (polish, ai) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (settings.dictation_polish.clone(), settings.anthropic_api_key.clone(), settings.ai())
+        (settings.dictation_polish.clone(), settings.ai())
     };
     // An extension is given what was said, as it was said.
     let polish = if state.listener.is_some() { "off".to_owned() } else { polish };
-    if let Err(e) = send(&mut state, &json!({ "cmd": "stop", "polish": polish, "apiKey": api_key, "ai": ai })) {
+    if let Err(e) = send(&mut state, &json!({ "cmd": "stop", "polish": polish, "ai": ai })) {
         eprintln!("heyo: {e}");
         // What the recording wrote is finished off by its own thread.
         if let Some(writing) = state.writing.clone() {

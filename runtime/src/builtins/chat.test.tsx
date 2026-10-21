@@ -9,8 +9,8 @@ import { answers, reset } from "../testing";
 const model = vi.hoisted(() => ({ calls: [] as { prompt: string; history: unknown[]; signal: AbortSignal; onText(text: string): void; finish(answer: string): void }[] }));
 vi.mock("../ai", () => ({
   CLAUDE_MODEL: "claude",
-  describeClaudeError: (error: unknown) => String(error),
-  streamClaude: (options: { prompt: string; history: unknown[]; signal: AbortSignal; onText(text: string): void }) =>
+  describeModelError: (error: unknown) => String(error),
+  askModel: (options: { prompt: string; history: unknown[]; signal: AbortSignal; onText(text: string): void }) =>
     new Promise<string>((finish, fail) => {
       options.signal.addEventListener("abort", () => fail(new Error("aborted")));
       model.calls.push({ ...options, finish });

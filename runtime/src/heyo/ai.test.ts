@@ -8,7 +8,7 @@ const model = vi.hoisted(() => ({
 }));
 vi.mock("../ai", async () => ({
   ...(await vi.importActual<typeof import("../ai")>("../ai")),
-  streamClaude: (options: any) =>
+  askModel: (options: any) =>
     new Promise<string>((finish, fail) => {
       options.signal?.addEventListener("abort", () => fail(new Error("aborted")));
       model.calls.push({ options, finish, fail });
