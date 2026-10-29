@@ -188,7 +188,7 @@ pub(super) struct Life<C: ComponentHandle + 'static> {
 fn seen<C: ComponentHandle + 'static>(window: &C, id: u64, told: Told, stage: &Rc<Cell<Stage>>, lost: Option<fn()>) {
     let outside = standing::outside(told, window.window());
     let (weak, stage) = (window.as_weak(), stage.clone());
-    watch::on(Watched { id, outside, keys: told.keys != standing::Keys::Left, lost }, move || {
+    watch::on(Watched { id, outside, keys: told.keys != standing::Keys::Left, since: std::time::Instant::now(), lost }, move || {
         if let Some(window) = weak.upgrade() {
             leave(&window, &stage, told);
         }

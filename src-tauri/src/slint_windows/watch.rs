@@ -14,13 +14,13 @@
 //! screen and when it goes off ([`on`], [`off`]), with what the window is
 //! known by outside Slint's thread (`standing::Outside`) and what the
 //! host is to hear if it was lost. What is decided is decided as values
-//! ([`verdict`], [`order`]), which is what the tests are of.
+//! ([`patience`], [`verdict`], [`order`]), which is what the tests are of.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::guard::{self, State};
 use super::standing::{self, Outside};
@@ -30,6 +30,12 @@ use super::thread;
 /// of its is on the screen, and how many times it may not answer.
 const BEAT: Duration = Duration::from_millis(250);
 const MISSED_BEATS: u32 = 6;
+/// How long a window that has just come on may keep the thread from
+/// answering, while nothing on the screen has every key: its first
+/// picture can take seconds (OpenGL's shaders made with Mesa's cache
+/// empty), and a window that does not have the keys traps no one while
+/// it is waited for.
+const FIRST_PICTURE: Duration = Duration::from_secs(10);
 
 /// A window on the screen, as the watcher knows it.
 #[derive(Clone, Copy)]
@@ -37,8 +43,11 @@ pub(super) struct Watched {
     /// Which life's it is ([`id`]).
     pub id: u64,
     pub outside: Outside,
-    /// It has every key: it is the first to go.
+    /// It has every key: it is the first to go, and the thread is given
+    /// no more than [`MISSED_BEATS`] while it is on the screen.
     pub keys: bool,
+    /// When it came on the screen.
+    pub since: Instant,
     /// What whoever it was for is told when it was lost. From the
     /// watcher's thread.
     pub lost: Option<fn()>,
@@ -98,12 +107,27 @@ pub(super) enum Verdict {
     Gone,
 }
 
-/// By whether it could be asked at all, what the guard says of it, and
-/// how many times running it has not answered.
-pub(super) fn verdict(asked: bool, state: State, missed: u32) -> Verdict {
+/// How many beats the thread may miss with these windows on the screen,
+/// at `now`: [`MISSED_BEATS`] whenever one of them has every key; else as
+/// many as [`FIRST_PICTURE`] has while one of them came on less than that
+/// long ago, and [`MISSED_BEATS`] after.
+pub(super) fn patience(on: &[Watched], now: Instant) -> u32 {
+    let keys = on.iter().any(|window| window.keys);
+    let new = on.iter().any(|window| now.saturating_duration_since(window.since) < FIRST_PICTURE);
+    if new && !keys {
+        (FIRST_PICTURE.as_millis() / BEAT.as_millis()) as u32
+    } else {
+        MISSED_BEATS
+    }
+}
+
+/// By whether it could be asked at all, what the guard says of it, how
+/// many times running it has not answered, and how many it may not
+/// ([`patience`]).
+pub(super) fn verdict(asked: bool, state: State, missed: u32, patience: u32) -> Verdict {
     if !asked || state != State::Running {
         Verdict::Gone
-    } else if missed >= MISSED_BEATS {
+    } else if missed >= patience {
         Verdict::Stalled
     } else {
         Verdict::There
@@ -137,7 +161,8 @@ fn watch() {
             });
             std::thread::sleep(BEAT);
             missed = if BEATS.load(Ordering::SeqCst) == before { missed + 1 } else { 0 };
-            found = verdict(asked, guard::state(), missed);
+            let patience = ON.lock().map(|on| patience(&on, Instant::now())).unwrap_or(MISSED_BEATS);
+            found = verdict(asked, guard::state(), missed, patience);
         }
         if found != Verdict::There {
             let taken = order(ON.lock().map(|mut on| std::mem::take(&mut *on)).unwrap_or_default());
@@ -184,24 +209,51 @@ fn back(ids: &[u64]) {
 mod tests {
     use super::*;
 
+    fn window(id: u64, keys: bool, since: Instant) -> Watched {
+        Watched { id, outside: Outside::None, keys, since, lost: None }
+    }
+
     #[test]
-    fn a_thread_is_given_six_beats_to_answer() {
-        assert_eq!(verdict(true, State::Running, 0), Verdict::There);
-        assert_eq!(verdict(true, State::Running, MISSED_BEATS - 1), Verdict::There);
-        assert_eq!(verdict(true, State::Running, MISSED_BEATS), Verdict::Stalled);
+    fn a_thread_is_given_its_patience_to_answer() {
+        assert_eq!(verdict(true, State::Running, 0, MISSED_BEATS), Verdict::There);
+        assert_eq!(verdict(true, State::Running, MISSED_BEATS - 1, MISSED_BEATS), Verdict::There);
+        assert_eq!(verdict(true, State::Running, MISSED_BEATS, MISSED_BEATS), Verdict::Stalled);
+        assert_eq!(verdict(true, State::Running, MISSED_BEATS, 40), Verdict::There);
+        assert_eq!(verdict(true, State::Running, 40, 40), Verdict::Stalled);
     }
 
     #[test]
     fn a_thread_that_is_gone_is_not_waited_for() {
         // Its loop no longer hears, or the guard has said so.
-        assert_eq!(verdict(false, State::Running, 0), Verdict::Gone);
-        assert_eq!(verdict(true, State::Gone, 0), Verdict::Gone);
-        assert_eq!(verdict(true, State::Gone, MISSED_BEATS), Verdict::Gone);
+        assert_eq!(verdict(false, State::Running, 0, MISSED_BEATS), Verdict::Gone);
+        assert_eq!(verdict(true, State::Gone, 0, 40), Verdict::Gone);
+        assert_eq!(verdict(true, State::Gone, MISSED_BEATS, MISSED_BEATS), Verdict::Gone);
+    }
+
+    #[test]
+    fn a_new_window_without_the_keys_is_given_ten_seconds_for_its_first_picture() {
+        let now = Instant::now();
+        let later = now + Duration::from_secs(3);
+        assert_eq!(patience(&[window(1, false, now)], later), 40);
+        // As much as is left of ten seconds from its coming on, then six beats.
+        assert_eq!(patience(&[window(1, false, now)], now + FIRST_PICTURE - BEAT), 40);
+        assert_eq!(patience(&[window(1, false, now)], now + FIRST_PICTURE), MISSED_BEATS);
+        // One new among others that are not.
+        assert_eq!(patience(&[window(1, false, now), window(2, false, later)], later + Duration::from_secs(8)), 40);
+        assert_eq!(patience(&[], now), MISSED_BEATS);
+    }
+
+    #[test]
+    fn with_a_window_that_has_the_keys_the_thread_is_given_six_beats_whatever_is_new() {
+        let now = Instant::now();
+        assert_eq!(patience(&[window(1, true, now)], now), MISSED_BEATS);
+        assert_eq!(patience(&[window(1, false, now), window(2, true, now)], now + BEAT), MISSED_BEATS);
     }
 
     #[test]
     fn the_window_with_the_keys_goes_first_and_the_others_as_they_came() {
-        let window = |id, keys| Watched { id, outside: Outside::None, keys, lost: None };
+        let now = Instant::now();
+        let window = |id, keys| window(id, keys, now);
         let taken = order(vec![window(1, false), window(2, false), window(3, true), window(4, false)]);
         assert_eq!(taken.iter().map(|window| window.id).collect::<Vec<_>>(), [3, 1, 2, 4]);
     }

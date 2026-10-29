@@ -634,15 +634,19 @@ pinned capture are drawn by Slint, with Skia on the CPU, inside the host
     the capture came to nothing).
   - What it is promised: while anything of Slint's is on the screen, one
     thread asks Slint's for a beat every 250 ms. After six that were not
-    answered, every window then on the screen is taken off it from
+    answered (ten seconds' worth while a window came on less than ten
+    seconds ago and none on the screen has every key: its first picture
+    may take that long, and such a window traps no one meanwhile),
+    every window then on the screen is taken off it from
     outside (`standing::take_down`), the one that has every key first,
     and each one's `when_lost` is called once; when the guard says the
     thread is gone, its windows are gone with it already and only that
     is said. If a thread that stalled goes on after all, each window
     that was taken off is off the screen as far as its life knows, and
     comes on again when it is next wanted; nothing is drawn into it
-    meanwhile. The rule is two values that are tested: what has become
-    of the thread (`verdict`), and the order windows go in (`order`).
+    meanwhile. The rule is three values that are tested: how many beats
+    may be missed (`patience`), what has become of the thread
+    (`verdict`), and the order windows go in (`order`).
   - What a caller must never do: keep beats or a watcher of its own,
     look at the guard's state to know whether it is still on the screen,
     or take another window down.
