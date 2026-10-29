@@ -68,6 +68,13 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphic
 # does not wrap. Tauri builds this crate anyway; only these features are added.
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Com", "Win32_System_Variant", "Win32_UI_Accessibility", "Win32_UI_Shell"] }
 
+# Slint's core by its own name, on every system: a token of it for the
+# layer surface (`slint_windows::layer`), and its window's tree of items,
+# to have assistive technologies told anew where everything is
+# (`slint_windows::life::relaid`). In the build already, through Slint.
+[dependencies.i-slint-core]
+version = "=1.18.1"
+
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = "5"
 freedesktop-icons = "0.4"
@@ -84,12 +91,11 @@ x11-dl = "2.21"
 libc = "0.2"
 # A layer surface of Heyo's own on Wayland (`slint_windows::layer`): the
 # Wayland client and toolkit winit is built on, and Slint's winit backend
-# and core by their own names, to wrap the one and be handed a token of
-# the other. All four are in the build already, through Slint and winit.
+# by its own name, to wrap it. All three are in the build already,
+# through Slint and winit.
 smithay-client-toolkit = { version = "0.19.2", default-features = false }
 wayland-client = "0.31"
 i-slint-backend-winit = "=1.18.1"
-i-slint-core = "=1.18.1"
 # Skia drawing into a surface of Heyo's own (the overlay as a layer
 # surface): Slint's renderer by its own name. In the build already.
 i-slint-renderer-skia = "=1.18.1"
