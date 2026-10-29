@@ -125,9 +125,7 @@ case "${1:-}" in
       "$0" exec env HEYO_BUILD="$BUILD" "$IN/check-sway.py" 2>&1 || true
       "$0" exec test -e /tmp/check-passed || failed=1
       echo "== Sway at scale $scale: the interface in Chinese, AI and dictation through the host, the settings window, two outputs =="
-      # (At 2 not the input method: where the search field says it is, is
-      # not to be trusted there; see check-sway-more.py's `per`.)
-      if [ "$scale" = 1 ]; then SCALE=1 "$0" more || failed=1; else SCALE=$scale "$0" more language ai dictate settings outputs || failed=1; fi
+      SCALE=$scale "$0" more || failed=1
     done
     echo "== Sway, the overlay's safety =="
     SCALE=1 "$0" safe || failed=1

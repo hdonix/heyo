@@ -405,6 +405,7 @@ impl Overlay {
     /// The window is drawn at another scale than it was shown at: what is
     /// selected in it is reckoned for that scale, from the beginning.
     fn rescaled(&mut self) {
+        life::relaid(self.life.window().window());
         let scale = f64::from(self.life.window().window().scale_factor()).max(0.1);
         let Some(up) = self.up.as_mut().filter(|up| (up.scale - scale).abs() > 1e-6) else { return };
         up.scale = scale;

@@ -649,6 +649,23 @@ fn its(current: Option<usize>, scales: &[f64], drawn_at: f64) -> Option<usize> {
     current.filter(drawn_on).or_else(|| (0..scales.len()).find(drawn_on)).or(current)
 }
 
+/// The window is of another size or drawn at another scale: assistive
+/// technologies are told anew where everything in it is. Slint tells them
+/// in device pixels, of each control at the scale and size it had when
+/// that control last changed, and not again when only the scale or the
+/// window's size does: a window that learnt its scale once it was up
+/// (Wayland) said where it and its sidebar were at the first scale, and a
+/// page shown later at the new one. Once Slint has heard of it.
+pub(super) fn relaid(window: &slint::Window) {
+    let inner = i_slint_core::window::WindowInner::from_pub(window);
+    let (adapter, Some(component)) = (inner.window_adapter(), inner.try_component()) else { return };
+    // Telling Slint's backend of a tree of items has it build all of
+    // them again, the next time its loop turns.
+    if let Some(internal) = adapter.internal(i_slint_core::InternalToken) {
+        internal.register_item_tree(i_slint_core::item_tree::ItemTreeRc::borrow_pin(&component));
+    }
+}
+
 /// Has a window drawn clear where it draws nothing, or opaque, as what
 /// draws it allows (`thread::seen_through`), and corrected when that is
 /// only learnt at its first frame.

@@ -58,7 +58,7 @@ text fits is judged there, by eye.
   `settings` (moved, a click after, a press in its shadow's margin going
   through, closed, back), `sizes` (on each monitor and moved to the
   other, the settings window is its panel and margin there, drawn in that
-  monitor's own pixels), `ime` (Pinyin through IBus into its search
+  monitor's own pixels, and saying where its controls are in them), `ime` (Pinyin through IBus into its search
   field), `cold` (the first Slint window with Mesa's shader cache empty),
   and `upgrade` and `upgraded` (an extension of version 3 updated, before
   and after logging in again; `test.sh upgrade` alone).

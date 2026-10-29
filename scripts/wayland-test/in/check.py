@@ -18,7 +18,8 @@ Heyo does through its Shell extension against what the Shell itself says.
   check.py warm       no check: a Slint window drawn once, for the checks after it
   check.py settings   the settings window moved, clicked after, its margin let through, closed, back
   check.py sizes      on each monitor and moved to another, the settings window is its panel and
-                      margin there, drawn in that monitor's own pixels
+                      margin there, drawn in that monitor's own pixels, and it, its sidebar and a
+                      row of its page say where they are on the accessibility bus in those pixels
   check.py ime        Chinese typed through IBus (Pinyin) into the settings window's search field
   check.py upgrade    with the extension of an earlier Heyo running: Settings updates it
   check.py upgraded   after the next login: the new one runs
@@ -724,7 +725,9 @@ def fitted(title):
 
 
 def sizes():
-    """On each monitor, and moved from it to the other: the settings window is its panel and margin, sharp."""
+    """On each monitor, and moved from it to the other: the settings window is its panel and margin, sharp,
+    and says where its controls are in its own pixels."""
+    import atspi
     restart("hideOnBlur=false", 'language="system"')
     all_monitors = monitors()
     for index, monitor in enumerate(all_monitors):
@@ -738,6 +741,10 @@ def sizes():
         fits, sharp, seen = fitted("Heyo Settings")
         check(f"{how}: the settings window is its panel and margin", fits, seen)
         check(f"{how}: ... drawn in the monitor's own pixels", sharp, seen)
+        frame = window("Heyo Settings")
+        # The window's own pixels are the monitor's, and a logical one is `scale` of them.
+        same, said = atspi.in_pixels("Heyo Settings", frame["width"] * monitor["density"], frame["height"] * monitor["density"], monitor["scale"])
+        check(f"{how}: ... and it, its sidebar and its page say where they are in its own pixels", same, said)
         picture(f"sizes-monitor-{index}", "Heyo Settings")
         for there in [other for other in range(len(all_monitors)) if other != index] + [index]:
             run(f"global.get_window_actors().map(a => a.meta_window).find(w => w.get_title() === 'Heyo Settings').move_to_monitor({there})")
@@ -746,6 +753,9 @@ def sizes():
             moved = f"moved from monitor {index} to {there}" if there != index else f"moved back to monitor {index}"
             check(f"{moved}: it is its panel and margin there", fits and window("Heyo Settings")["monitor"] == there, seen)
             check(f"{moved}: ... drawn in that monitor's own pixels", sharp, seen)
+            frame, now = window("Heyo Settings"), monitors()[there]
+            same, said = atspi.in_pixels("Heyo Settings", frame["width"] * now["density"], frame["height"] * now["density"], now["scale"])
+            check(f"{moved}: ... and says where its controls are in its own pixels there", same, said)
         close("Heyo Settings")
         wait(lambda: not window("Heyo Settings"))
 

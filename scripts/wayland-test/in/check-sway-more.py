@@ -7,8 +7,6 @@ check-sway.py does not look at, each as a part that can be run alone.
   language   简体中文 chosen in the settings window while it is open (its
              title then changes at once), and the palette, the pill and the
              overlay's toolbar tips pictured in it; English again the same way
-             (at scale 1: at 2 the rows of a page do not say rightly where
-             they are on the accessibility bus, see `per`)
   ai         AI Chat answered by a stub model through the host
              (../../gui-test/llm-stub.py on this session's 127.0.0.1): a
              question, a follow-up with the conversation before it, Stop
@@ -69,22 +67,9 @@ def picture_of(name, title):
         shot(name, found)
 
 
-def per(title, frame, box=None):
-    """How many logical pixels one of the window's own (AT-SPI's) is, for a control at `box`.
-
-    What the window says is not all in one kind of pixel: at scale 2 the
-    window and its sidebar say where they are in logical pixels and the
-    rows of a page in the output's (seen with Slint 1.18 here). So a box
-    that reaches beyond the window as it says it is taken for the output's
-    pixels."""
-    whole = atspi.where("frame", title, title)
-    if not whole:
-        return 1 / scale
-    if whole[2] > frame["width"] * 1.5:
-        return 1 / scale
-    if box and (box[0] + box[2] > whole[2] + 1 or box[1] + box[3] > whole[3] + 1):
-        return 1 / scale
-    return 1
+def per(title):
+    """How many logical pixels one of the window's own (AT-SPI's, the output's) is."""
+    return 1 / scale
 
 
 def press_on(title, role, name, settle=0.6):
@@ -92,7 +77,7 @@ def press_on(title, role, name, settle=0.6):
     box, frame = atspi.where(role, name, title), window(title)
     if not box or not frame:
         return False
-    by = per(title, frame, box)
+    by = per(title)
     point(frame["x"] + (box[0] + box[2] / 2) * by, frame["y"] + (box[1] + box[3] / 2) * by)
     click()
     time.sleep(settle)
@@ -199,12 +184,7 @@ def language():
         shot(f"language-overlay-tip-{name}-zh", {"x": toolbar_left - 20, "y": y1 - 10, "width": 540, "height": 110})
     keys("-k", "Escape")
     time.sleep(1.0)
-    # And back to English, while the settings are open: at scale 1 only,
-    # where the controls of a page say rightly where they are (see `per`).
-    if scale != 1:
-        back.terminate()
-        restart('language="system"')
-        return
+    # And back to English, while the settings are open.
     check("in Chinese the Language menu is 语言", bool(open_settings("Heyo 设置")) and press_on("Heyo 设置", "combo box", "语言", 1.0))
     press_on("Heyo 设置", "list item", "English", 1.5)
     check("English chosen again (by that name): the open window's title is English at once", bool(wait(lambda: window("Heyo Settings"), 5)))
@@ -358,12 +338,15 @@ def settings():
     if not first:
         return
     check(f"it is its panel and margin on an output at scale {scale:g}", fits(first), f"{first} on {output['rect']}")
+    # It, its sidebar and a row of its page say where they are in the same pixels, the output's.
+    same, said = atspi.in_pixels("Heyo Settings", first["width"] * scale, first["height"] * scale, scale)
+    check("... and it, its sidebar and its page say where they are in its own pixels", same, said)
     close_button = atspi.where("button", "Close", "Heyo Settings")
     check("its close button is found", bool(close_button))
     if not close_button:
         return
     # By the page's top edge, left of the close button.
-    by = per("Heyo Settings", first, close_button)
+    by = per("Heyo Settings")
     point(first["x"] + (close_button[0] - 250) * by, first["y"] + (close_button[1] + close_button[3] / 2) * by)
     press()
     for step in range(1, 9):
@@ -378,7 +361,7 @@ def settings():
     picture_of("settings-moved", "Heyo Settings")
     # The margin round its panel, where what is behind shows: a press there is the window's underneath.
     general = atspi.where("list item", "General", "Heyo Settings")
-    margin = round(general[0] * per("Heyo Settings", window("Heyo Settings"), general) - 20) if general else 0
+    margin = round(general[0] * per("Heyo Settings") - 20) if general else 0
     if margin > 4:
         under = application("Under", "check-sway-under")
         frame = window("Heyo Settings")

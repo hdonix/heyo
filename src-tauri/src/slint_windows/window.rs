@@ -211,6 +211,8 @@ struct Live {
     held: Held,
     /// The pointer in the window, and whose each press is (`press`).
     pointer: Pointer,
+    /// The size and scale the window's panel was last settled at (`settle`).
+    settled: Cell<Option<(slint::PhysicalSize, f32)>>,
     /// Asks again, while something is under way that the page counts down.
     /// Kept, so that it goes on asking.
     _poll: slint::Timer,
@@ -311,11 +313,7 @@ impl Live {
                 // another monitor is seen as it is drawn.
                 if thread::wayland() {
                     slint::Timer::single_shot(Duration::ZERO, || {
-                        with(|live| {
-                            if live.fit() {
-                                live.reach();
-                            }
-                        });
+                        with(|live| live.settle(false));
                     });
                 }
                 EventResult::Propagate
@@ -323,11 +321,7 @@ impl Live {
             WindowEvent::Moved(_) => {
                 self.life.window().set_moved(self.life.window().get_moved().wrapping_add(1));
                 slint::Timer::single_shot(Duration::ZERO, || {
-                    with(|live| {
-                        if live.fit() {
-                            live.reach();
-                        }
-                    });
+                    with(|live| live.settle(false));
                 });
                 EventResult::Propagate
             }
@@ -339,26 +333,17 @@ impl Live {
                 self.life.draw();
                 self.pointed(if *state == ElementState::Pressed { Pointed::Pressed(Button::Left) } else { Pointed::Released(Button::Left) })
             }
-            // The desktop gave it a size, or another scale: it is its panel
-            // and margin again, for the monitor it is on, and its panel
-            // takes the pointer; once Slint has laid it out for what it
-            // was just told.
+            // The desktop gave it a size, or another scale: once Slint has
+            // laid it out for what it was just told.
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                 slint::Timer::single_shot(Duration::ZERO, || {
-                    with(|live| {
-                        live.fit();
-                        live.reach();
-                    });
+                    with(|live| live.settle(true));
                 });
                 // A Wayland window is told it is on another monitor after
                 // it is told the scale there, and may not be drawn again.
                 if thread::wayland() && matches!(event, WindowEvent::ScaleFactorChanged { .. }) {
                     slint::Timer::single_shot(Duration::from_millis(250), || {
-                        with(|live| {
-                            if live.fit() {
-                                live.reach();
-                            }
-                        });
+                        with(|live| live.settle(false));
                     });
                 }
                 EventResult::Propagate
@@ -446,6 +431,22 @@ impl Live {
             window.window().set_size(slint::LogicalSize::new(wanted.0, wanted.1));
         }
         roomed || resized
+    }
+
+    /// The window is its panel and margin for the monitor it is on (`fit`),
+    /// its panel takes the pointer, and assistive technologies are told
+    /// where its controls are: when its size or scale is not what they
+    /// were last settled at (Slint changes its size itself, as its room
+    /// changes), or `anyway`, which is when the desktop gave it a size or
+    /// a scale.
+    fn settle(&self, anyway: bool) {
+        let fitted = self.fit();
+        let now = (self.life.window().window().size(), self.life.window().window().scale_factor());
+        if fitted || anyway || self.settled.get() != Some(now) {
+            self.settled.set(Some(now));
+            self.reach();
+            life::relaid(self.life.window().window());
+        }
     }
 
     /// Has the window take the pointer where its panel is, and not in the
@@ -660,7 +661,7 @@ fn make() -> Result<Live, String> {
     poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
         with(|live| live.ask(live.model.poll()));
     });
-    let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: Pointer::default(), _poll: poll };
+    let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: Pointer::default(), settled: Cell::new(None), _poll: poll };
     live.push();
 
     // Whichever window there is hears them: it may be made again.

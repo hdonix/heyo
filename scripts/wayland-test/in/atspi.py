@@ -134,6 +134,23 @@ def text(role, name, title=None):
         return None
 
 
+def in_pixels(title, width, height, density):
+    """Whether the window, its sidebar's first entry and a row of its page (Heyo's settings) all say where
+    they are in the window's own pixels, `width` by `height` of them and `density` to a logical one: the
+    entry 208 logical pixels wide and 20 in from the panel's edge (settings.slint), the row right of it,
+    both inside the window. And what each says. How large the window says it is may lag behind its size,
+    though not by a scale: AccessKit hears of the window's size only from winit, which does not say it when
+    the window asked for a size itself (Wayland)."""
+    said = {name: where(role, name, title) for role, name in (("frame", title), ("list item", "General"), ("combo box", "Language"))}
+    whole, entry, row = said[title], said["General"], said["Language"]
+    if not (whole and entry and row):
+        return False, said
+    inside = lambda box: box[0] >= 0 and box[1] >= 0 and box[0] + box[2] <= width + 1 and box[1] + box[3] <= height + 1
+    window = whole[0] == 0 and whole[1] == 0 and 0.75 * width <= whole[2] <= width + 1 and 0.75 * height <= whole[3] <= height + 1
+    first = abs(entry[2] - 208 * density) <= 2 and any(abs(entry[0] - (margin + 20) * density) <= 2 for margin in (0, 32))
+    return window and first and inside(entry) and inside(row) and row[0] > entry[0] + entry[2], said
+
+
 if __name__ == "__main__":
     what, arguments = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
     if what == "tree":
