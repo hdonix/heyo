@@ -5,11 +5,17 @@ person would, through Mutter's RemoteDesktop interface.
   input.py type "some text"        type characters
   input.py key Return ctrl+k ...   press keys or combinations (X keysym names)
   input.py seq STEP...             down:KEY up:KEY tap:COMBO wait:SECONDS nudge:PIXELS press:left
+                                   hold:left let:left by:DX,DY
                                    (one after another, e.g. to press a key while another is held;
-                                   press clicks where the pointer is)
+                                   press clicks where the pointer is, hold and let press and let go
+                                   of the button there, by moves the pointer by so much, in steps)
   input.py click X Y               move the pointer there and click
   input.py drag X1 Y1 X2 Y2        press at the first point, release at the second
   input.py hold KEY SECONDS        hold one key down for a while
+  input.py stay                    keep a session, and so a pointer, until ended: the
+                                   headless session has none of its own, and a seat that
+                                   loses its pointer whenever one of these ends makes
+                                   winit let go of its text input
 """
 import sys, time
 import gi
@@ -26,10 +32,11 @@ S = "org.gnome.Mutter.RemoteDesktop.Session"
 call(session, S, "Start")
 # The first event of a session is lost unless the session has settled, and
 # even then the very first key sometimes is: wait, then spend one on a key
-# that does nothing.
+# that does nothing. (Not Shift: alone, it switches an input method such
+# as Pinyin between Chinese and English.)
 time.sleep(0.5)
-call(session, S, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (0xffe2, True)))   # Shift_R
-call(session, S, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (0xffe2, False)))
+call(session, S, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (0xffe4, True)))   # Control_R
+call(session, S, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (0xffe4, False)))
 time.sleep(0.15)
 
 MODIFIERS = {"ctrl": "Control_L", "shift": "Shift_L", "alt": "Alt_L", "super": "Super_L"}
@@ -77,6 +84,10 @@ elif command == "drag":
     for i in range(1, 9):
         call(session, S, "NotifyPointerMotionRelative", GLib.Variant("(dd)", ((x2 - x1) / 8, (y2 - y1) / 8))); time.sleep(0.03)
     button(False)
+elif command == "stay":
+    call(session, S, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (0.0, 0.0)))
+    sys.stdout.write("ok\n"); sys.stdout.flush()
+    sys.stdin.read()
 elif command == "hold":
     sym = keysym(args[0]); press(sym, True); time.sleep(float(args[1])); press(sym, False)
 elif command == "seq":
@@ -88,6 +99,12 @@ elif command == "seq":
         elif what == "wait": time.sleep(float(value))
         elif what == "press": button(True); button(False)
         elif what == "nudge": call(session, S, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (float(value), 0.0)))
+        elif what == "hold": button(True)
+        elif what == "let": button(False)
+        elif what == "by":
+            dx, dy = map(float, value.split(","))
+            for _ in range(8):
+                call(session, S, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (dx / 8, dy / 8))); time.sleep(0.04)
         else: sys.exit(__doc__)
 else:
     sys.exit(__doc__)

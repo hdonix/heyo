@@ -8,11 +8,27 @@ Heyo does through its Shell extension against what the Shell itself says.
                       pixels; the overlay covers that monitor; a click selects the window under it
   check.py relock     the extension switched off and on again (as locking the screen does):
                       the held key is watched again
+  check.py own        the pill, the overlay's keyboard and pinned captures, which the Shell stands for
+  check.py language   简体中文 chosen while the settings window is open, and every window in it
+  check.py ai         AI Chat answered by a stub model through the host: a follow-up, Stop
+                      Answering closing the connection, Escape not stopping the answer
+  check.py dictate    a recording dictated into another application, as heard and polished by the stub
+  check.py placement  the palette and the settings window on the monitor the pointer is on
+  check.py cold       the first of Slint's windows comes up with Mesa's shader cache emptied
+  check.py warm       no check: a Slint window drawn once, for the checks after it
+  check.py settings   the settings window moved, clicked after, its margin let through, closed, back
+  check.py ime        Chinese typed through IBus (Pinyin) into the settings window's search field
+  check.py upgrade    with the extension of an earlier Heyo running: Settings updates it
+  check.py upgraded   after the next login: the new one runs
+
+Pictures of what was checked are kept in /tmp/shots/ to be looked at
+(test.sh copies them out). A control of a Slint window is found by asking
+the window (atspi.py).
 
 Set the monitors' scales first (monitors.py) to check a layout other than
 one monitor at 100 %. Prints one line per check; exits 1 if any failed.
 """
-import glob, os, subprocess, sys, time
+import glob, json, os, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shell import run
@@ -350,7 +366,513 @@ def relock():
     check("... and again after the extension was switched off and on", bool(wait(lambda: watched() == 2, 5)), watched())
 
 
-CHECKS = {"lists": lists, "layout": layout, "capture": capture, "relock": relock, "own": own}
+# --- Pictures, and the controls of Slint's windows -------------------------------
+
+SHOTS = "/tmp/shots"
+
+
+def picture(name, title):
+    """The window of that title as it is on the screen, saved as SHOTS/NAME.png to be looked at."""
+    import gi
+    gi.require_version("GdkPixbuf", "2.0")
+    from gi.repository import GdkPixbuf
+    frame = window(title)
+    if not frame:
+        return None
+    os.makedirs(SHOTS, exist_ok=True)
+    screen("/tmp/check-shot.png")
+    image = GdkPixbuf.Pixbuf.new_from_file("/tmp/check-shot.png")
+    per = image.get_width() / max(monitor["x"] + monitor["width"] for monitor in monitors())
+    x, y = max(0, round(frame["x"] * per)), max(0, round(frame["y"] * per))
+    width, height = min(image.get_width() - x, round(frame["width"] * per)), min(image.get_height() - y, round(frame["height"] * per))
+    path = f"{SHOTS}/{name}.png"
+    image.new_subpixbuf(x, y, width, height).savev(path, "png", [], [])
+    return path
+
+
+def units(title):
+    """How many of the Shell's units one of the window's own pixels is (AT-SPI's), and where the window is."""
+    frame = window(title)
+    monitor = monitors()[frame["monitor"]]
+    return 1 / monitor["density"], frame
+
+
+def press_on(title, role, name, settle=0.6):
+    """A click in the middle of a control of a Slint window, found by what it is and says. False if it is not there."""
+    import atspi
+    box = atspi.where(role, name, title)
+    if not box or not window(title):
+        return False
+    per, frame = units(title)
+    point(frame["x"] + (box[0] + box[2] / 2) * per, frame["y"] + (box[1] + box[3] / 2) * per)
+    subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:3", "wait:0.2", "nudge:-3", "wait:0.3", "press:left", f"wait:{settle}"], check=True)
+    return True
+
+
+def hover_on(title, role, name):
+    import atspi
+    box = atspi.where(role, name, title)
+    if not box or not window(title):
+        return False
+    per, frame = units(title)
+    point(frame["x"] + (box[0] + box[2] / 2) * per, frame["y"] + (box[1] + box[3] / 2) * per)
+    subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:2", "wait:0.2", "nudge:-2"], check=True)
+    return True
+
+
+def names(title):
+    import atspi
+    return [name for _, _, name, _ in atspi.tree(title)]
+
+
+def stored(key):
+    try:
+        return json.load(open(os.path.expanduser("~/.config/heyo/settings.json"))).get(key)
+    except (OSError, ValueError):
+        return None
+
+
+def restart(*settings, **environment):
+    """Heyo started again with those settings (key=JSON value), as settings are read at start."""
+    if settings:
+        subprocess.run([os.path.join(HERE, "settings.py"), *settings], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["env", *[f"{key}={value}" for key, value in environment.items()], os.path.join(HERE, "start-heyo.sh")], check=True, stdout=subprocess.DEVNULL)
+    time.sleep(4)
+
+
+def language():
+    """The interface in 简体中文, chosen in the settings while they are open, and in each of Heyo's windows."""
+    colours = tool("colour.py", "A Colour", "check-language", "d81b60", 400, 300)
+    wait(lambda: window("A Colour"))
+    restart("hideOnBlur=false", 'language="system"')
+    heyo("--open", "heyo:settings")
+    check("the settings window comes up in English", bool(wait(lambda: window("Heyo Settings"), 8)))
+    time.sleep(1.5)
+    picture("language-settings-en", "Heyo Settings")
+    check("its Language menu is found", press_on("Heyo Settings", "combo box", "Language", 1.0))
+    picture("language-menu", "Heyo Settings")
+    check("简体中文 is chosen from it", press_on("Heyo Settings", "list item", "简体中文", 1.5))
+    chinese = wait(lambda: window("Heyo 设置"), 5)
+    check("the open settings window speaks Chinese at once: its title", bool(chinese), [w["title"] for w in [window("Heyo Settings")] if w])
+    check("... and the setting is kept", stored("language") == "zh_CN", stored("language"))
+    if chinese:
+        time.sleep(1)
+        said = names("Heyo 设置")
+        check("... its pages and rows are named in Chinese", all(word in said for word in ("通用", "语言", "快捷键")), said[:30])
+        picture("language-settings-zh", "Heyo 设置")
+        close("Heyo 设置")
+        wait(lambda: not window("Heyo 设置"))
+    # The palette, in the language chosen while it was hidden.
+    heyo()
+    check("the palette comes up", bool(wait(lambda: window("Heyo"))))
+    time.sleep(1.5)
+    picture("language-palette-zh", "Heyo")
+    heyo()
+    wait(lambda: not window("Heyo"))
+    # The pill (no speech engine here unless one is lent: it says why in Chinese).
+    heyo("--dictate")
+    pill = wait(lambda: window("Heyo Dictation"), 8)
+    check("the pill comes up", bool(pill))
+    if pill:
+        time.sleep(0.8)
+        picture("language-pill-zh", "Heyo Dictation")
+        said = names("Heyo Dictation")
+        check("... its body is named in Chinese", "听写" in said, said)
+        hover_on("Heyo Dictation", "button", "听写")
+        time.sleep(0.8)
+        picture("language-pill-hover-zh", "Heyo Dictation")
+        check("... and its X too, once the pointer is on it", "取消" in names("Heyo Dictation"), names("Heyo Dictation"))
+    if not wait(lambda: not window("Heyo Dictation"), 6):
+        heyo("--dictate")
+    wait(lambda: not window("Heyo Dictation"), 8)
+    # The overlay: a window selected, the toolbar's tip under the pointer.
+    frame = window("A Colour")
+    point(frame["x"] + frame["width"] + 60, frame["y"] + frame["height"] + 60)
+    heyo("--open", "heyo:screenshot")
+    overlay = wait(lambda: window("Heyo Screenshot"))
+    time.sleep(1.0)
+    check("the overlay comes up", bool(overlay))
+    if overlay:
+        point(frame["x"] + frame["width"] / 2, frame["y"] + frame["height"] / 2)
+        subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:5", "wait:0.3", "nudge:-4", "wait:0.4", "press:left", "wait:0.8"], check=True)
+        said = names("Heyo Screenshot")
+        check("its toolbar's buttons are named in Chinese", all(word in said for word in ("工具", "矩形", "撤销", "保存")), said)
+        # A tip shows once the pointer has rested on a button (an enabled one).
+        for name, button in (("rectangle", "矩形"), ("save", "保存")):
+            if hover_on("Heyo Screenshot", None, button):
+                time.sleep(1.4)
+                picture(f"language-overlay-tip-{name}-zh", "Heyo Screenshot")
+        subprocess.run([os.path.join(HERE, "input.py"), "key", "Escape"], check=True)
+        wait(lambda: not window("Heyo Screenshot"), 5)
+    # Back to English, again while the settings are open.
+    heyo("--open", "heyo:settings")
+    wait(lambda: window("Heyo 设置"), 8)
+    time.sleep(1.5)
+    check("in Chinese the Language menu is 语言", press_on("Heyo 设置", "combo box", "语言", 1.0))
+    press_on("Heyo 设置", "list item", "English", 1.5)
+    check("English chosen again: the open window's title is English at once", bool(wait(lambda: window("Heyo Settings"), 5)))
+    close("Heyo Settings")
+    wait(lambda: not window("Heyo Settings"))
+    colours.terminate()
+
+
+def conversation():
+    """The newest conversation AI Chat keeps: its messages' roles and contents."""
+    folder = os.path.expanduser("~/.local/share/heyo/support/@heyo/conversations")
+    try:
+        files = sorted(glob.glob(os.path.join(folder, "*")), key=os.path.getmtime)
+        return json.load(open(files[-1])).get("messages", []) if files else []
+    except (OSError, ValueError):
+        return []
+
+
+STUB_PORT, STUB_LOG = 18111, "/tmp/stub.log"
+
+
+def stub():
+    """The model that is not one (../../gui-test/llm-stub.py), on this session's 127.0.0.1, and the settings that ask it."""
+    if os.path.exists(STUB_LOG):
+        os.remove(STUB_LOG)
+    server = subprocess.Popen(["python3", "/heyo/scripts/gui-test/llm-stub.py", str(STUB_PORT), STUB_LOG])
+    time.sleep(0.5)
+    return server, ("aiProvider=\"local\"", 'anthropicApiKey=""', f'localModelUrl="http://127.0.0.1:{STUB_PORT}/v1"', 'localModelName="stub-model"')
+
+
+def stub_said():
+    try:
+        return open(STUB_LOG).read().splitlines()
+    except OSError:
+        return []
+
+
+def ai():
+    """AI Chat answered by a local model through the host: a question, a follow-up, an answer stopped midway, and Escape."""
+    server, settings = stub()
+    restart("hideOnBlur=false", *settings)
+    keys = lambda *k: subprocess.run([os.path.join(HERE, "input.py"), "key", *k], check=True)
+    typed = lambda text: subprocess.run([os.path.join(HERE, "input.py"), "type", text], check=True)
+    heyo("--open", "cmd:@heyo:ask-ai")
+    wait(lambda: window("Heyo"))
+    time.sleep(2.5)
+    typed("What is a launcher?")
+    time.sleep(0.4)
+    keys("ctrl+Return")
+    check("the question reaches the model", bool(wait(lambda: any("What is a launcher?" in line for line in stub_said()), 8)), stub_said())
+    time.sleep(1.2)
+    picture("ai-streaming", "Heyo")
+    check("... which answers it all", bool(wait(lambda: "answered" in stub_said(), 15)), stub_said())
+    time.sleep(1.0)
+    picture("ai-answered", "Heyo")
+    kept = conversation()
+    check("the answer is kept with the question", [m.get("role") for m in kept] == ["user", "assistant"] and "You asked: “What is a launcher?”" in kept[-1].get("content", ""), kept)
+    # Continued in AI Chat, with a follow-up.
+    keys("Return")
+    time.sleep(2.5)
+    typed("And a palette?")
+    time.sleep(0.4)
+    keys("Return")
+    follow = wait(lambda: next((line for line in stub_said() if "And a palette?" in line), None), 8)
+    check("a follow-up reaches the model with the conversation before it", bool(follow) and "after 4 messages" in follow, follow or stub_said())
+    check("... and is answered", bool(wait(lambda: stub_said().count("answered") == 2, 15)), stub_said())
+    time.sleep(1.0)
+    picture("ai-followup", "Heyo")
+    check("both exchanges are kept", [m.get("role") for m in conversation()] == ["user", "assistant", "user", "assistant"], [m.get("role") for m in conversation()])
+    # Stopped midway (Stop Answering, Ctrl+Shift+S): the connection is closed.
+    typed("Tell me slowly")
+    time.sleep(0.4)
+    keys("Return")
+    wait(lambda: any("Tell me slowly" in line for line in stub_said()), 8)
+    time.sleep(2.5)
+    keys("ctrl+shift+s")
+    closed = wait(lambda: any(line.startswith("closed after") for line in stub_said()), 6)
+    check("Stop Answering closes the model's connection midway", bool(closed), stub_said()[-2:])
+    time.sleep(1.0)
+    picture("ai-stopped", "Heyo")
+    last = conversation()[-1:] or [{}]
+    check("... and what had come is kept, marked as cut short", last[0].get("role") == "assistant" and "Tell me slowly" in last[0].get("content", ""), last)
+    # Escape in the middle of an answer only leaves the view: the answer
+    # goes on being written (runtime/src/builtins/answering.ts), and the
+    # palette put away does not stop it either.
+    before = len(stub_said())
+    typed("Once more slowly")
+    time.sleep(0.4)
+    keys("Return")
+    wait(lambda: any("Once more slowly" in line for line in stub_said()), 8)
+    time.sleep(2.0)
+    keys("Escape")
+    time.sleep(3.0)
+    after = stub_said()[before:]
+    check("Escape midway leaves the answer being written (as answering.ts means it to)", not any(line.startswith("closed") for line in after), after)
+    if window("Heyo"):
+        heyo()
+    # Heyo ended in the middle of an answer: nothing is left asking.
+    restart()
+    check("... and Heyo ended in the middle of it closes the connection", bool(wait(lambda: any(line.startswith("closed") for line in stub_said()[before:]), 8)), stub_said()[before:])
+    server.terminate()
+
+
+SPOKEN = "/heyo/src-tauri/target/wayland-test/spoken.wav"
+# What spoken.wav says (test.sh makes it with ../../gui-test/say.py).
+SAID = ["The weather is nice today, so let us walk to the park.", "See you at three thirty."]
+
+
+def words(text):
+    return [word.strip(".,“”").lower() for word in text.split() if word.strip(".,“”")]
+
+
+def dictate():
+    """Dictation into another application, recognized from a recording and polished by the stub."""
+    if not os.path.exists(SPOKEN) or not os.path.isdir(os.path.expanduser("~/.local/share/heyo/dictation/models")):
+        check("dictation: a recording and the speech engine are lent to the session (test.sh)", False, "none")
+        return
+    server, settings = stub()
+    app = tool("window.py", "Notes", "check-dictate", "Notes: ")
+    wait(lambda: window("Notes"))
+    for how, live, polish in (("sentences", "false", "off"), ("live", "true", "off"), ("polished", "true", "clean")):
+        restart("hideOnBlur=false", f"dictationLive={live}", f'dictationPolish="{polish}"', 'dictationLanguage="en"', 'dictationHoldKey=""', *settings, HEYO_DICTATION_WAV=SPOKEN)
+        os.kill(int(open("/tmp/window-check-dictate.pid.txt").read()), 10)
+        run("Main.activateWindow(global.get_window_actors().map(a => a.meta_window).find(w => w.get_title() === 'Notes')) ?? null")
+        time.sleep(0.8)
+        seen, start = [], time.time()
+        heyo("--dictate")
+        # The recording is read at the speed it was spoken; it ends by itself or by the second --dictate.
+        while time.time() - start < 14:
+            text = open("/tmp/window-check-dictate.txt").read()
+            if not seen or seen[-1][1] != text:
+                seen.append((round(time.time() - start, 1), text))
+            time.sleep(0.1)
+        heyo("--dictate")
+        wait(lambda: not window("Heyo Dictation"), 30)
+        time.sleep(2.0)
+        text = open("/tmp/window-check-dictate.txt").read()
+        print(f"     ({how}) the field went {[t for _, t in seen]} and ends as {text!r}")
+        heard = words(text[len("Notes: "):])
+        expected = words(" ".join(SAID))
+        alike = sum(1 for word in expected if word in heard)
+        check(f"dictation ({how}): the words reach the focused application", text.startswith("Notes: ") and alike >= len(expected) * 0.7, repr(text))
+        if polish == "off":
+            check("... while it is spoken, not all at the end", len({t for _, t in seen}) >= 3, [t for _, t in seen])
+        else:
+            check("... replaced by what the model made of them", "You asked: “" in text, repr(text))
+        check(f"dictation ({how}): the application kept the keyboard", focused() == "Notes", focused())
+    app.terminate()
+    server.terminate()
+
+
+def placement():
+    """With the pointer on each monitor: the palette in the middle of that one, the settings window on it."""
+    all_monitors = monitors()
+    for index, monitor in enumerate(all_monitors):
+        how = f"monitor {index} (scale {monitor['scale']:g})"
+        point(monitor["x"] + monitor["width"] / 3, monitor["y"] + monitor["height"] / 3)
+        heyo()
+        palette = wait(lambda: window("Heyo"))
+        time.sleep(1.0)
+        palette = window("Heyo")
+        check(f"{how}: the palette comes up", bool(palette))
+        if palette:
+            middle = palette["x"] + palette["width"] / 2
+            check(f"{how}: the palette is on the monitor the pointer is on, in its middle", palette["monitor"] == index and abs(middle - (monitor["x"] + monitor["width"] / 2)) <= 2, f"{palette} on {monitor}")
+            picture(f"palette-monitor-{index}", "Heyo")
+            heyo()
+            wait(lambda: not window("Heyo"))
+        heyo("--open", "heyo:settings")
+        settings = wait(lambda: window("Heyo Settings"), 8)
+        time.sleep(0.8)
+        settings = window("Heyo Settings")
+        check(f"{how}: the settings window comes up on the monitor the pointer is on", bool(settings) and settings["monitor"] == index, settings)
+        close("Heyo Settings")
+        wait(lambda: not window("Heyo Settings"))
+
+
+def cold():
+    """The first of Slint's windows with nothing kept of drawing before (Mesa's shader cache emptied, as after
+    installing or updating the driver): it comes up, though the first picture takes Slint's thread a while."""
+    for name in ("mesa_shader_cache", "mesa_shader_cache_db"):
+        subprocess.run(["rm", "-rf", os.path.expanduser(f"~/.cache/{name}")])
+    restart("hideOnBlur=false", 'language="system"')
+    heyo("--open", "heyo:settings")
+    up = wait(lambda: window("Heyo Settings"), 10)
+    time.sleep(2.5)
+    stalled = "does not answer" in open("/tmp/heyo.log").read()
+    check("with a cold shader cache, the settings window comes up and stays", bool(up) and bool(window("Heyo Settings")) and not stalled,
+          "the watcher took it for stalled" if stalled else "it did not come up")
+    close("Heyo Settings")
+    wait(lambda: not window("Heyo Settings"))
+
+
+def settings_window():
+    """The settings window as a window: moved by its top edge, a click after the move, closed, open again."""
+    import atspi
+    restart("hideOnBlur=false", 'language="system"')
+    heyo("--open", "heyo:settings")
+    first = wait(lambda: window("Heyo Settings"), 8)
+    time.sleep(1.5)
+    check("the settings window comes up", bool(first))
+    if not first:
+        return
+    per, frame = units("Heyo Settings")
+    # By the page's top edge: the band its close button is in, left of the button.
+    close_button = atspi.where("button", "Close", "Heyo Settings")
+    check("its close button is found", bool(close_button))
+    if not close_button:
+        return
+    point(frame["x"] + (close_button[0] - 250) * per, frame["y"] + (close_button[1] + close_button[3] / 2) * per)
+    subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:2", "wait:0.2", "nudge:-2", "wait:0.2", "hold:left", "wait:0.2", "by:120,80", "wait:0.3", "let:left", "wait:0.8"], check=True)
+    moved = window("Heyo Settings")
+    check("moved by its top edge, it goes as far as the pointer went", abs(moved["x"] - frame["x"] - 120) <= 4 and abs(moved["y"] - frame["y"] - 80) <= 4, f"from {frame} to {moved}")
+    # The desktop had the press: a click in the window must still be one.
+    press_on("Heyo Settings", "list item", "Shortcuts", 0.8)
+    check("a click after the move is a click: Shortcuts is the page shown", "selected" in atspi.states("list item", "Shortcuts", "Heyo Settings"), atspi.states("list item", "Shortcuts", "Heyo Settings"))
+    press_on("Heyo Settings", "list item", "General", 0.8)
+    check("... and again: General", "selected" in atspi.states("list item", "General", "Heyo Settings"), atspi.states("list item", "General", "Heyo Settings"))
+    picture("settings-moved", "Heyo Settings")
+    # Round its panel the window keeps a margin for its shadow, where what
+    # is behind it shows (when it is drawn through OpenGL, as here): a
+    # press there is the window's underneath.
+    # The sidebar's first entry is 20 of the window's logical pixels in from the panel's edge (settings.slint).
+    general = atspi.where("list item", "General", "Heyo Settings")
+    per, frame = units("Heyo Settings")
+    margin = round(general[0] * per - 20) if general else 0
+    if margin > 4:
+        under = tool("window.py", "Under", "check-under")
+        wait(lambda: window("Under"))
+        time.sleep(0.8)
+        place("Under", frame["monitor"], frame["x"] - 300, frame["y"] + 100)
+        heyo("--open", "heyo:settings")
+        wait(lambda: focused() == "Heyo Settings", 3)
+        point(frame["x"] + margin / 2, frame["y"] + frame["height"] / 2)
+        subprocess.run([os.path.join(HERE, "input.py"), "seq", "nudge:2", "wait:0.2", "nudge:-2", "wait:0.2", "press:left", "wait:0.8"], check=True)
+        check(f"a click in the margin round the panel ({margin} units) goes to the window underneath", focused() == "Under", f"{focused()} has it")
+        under.terminate()
+        wait(lambda: not window("Under"))
+        heyo("--open", "heyo:settings")
+        wait(lambda: focused() == "Heyo Settings", 3)
+    else:
+        print("     (the settings window keeps no margin here: drawn on the CPU, or no room for one)")
+    # Its own close button.
+    press_on("Heyo Settings", "button", "Close", 0.8)
+    check("its close button closes it", bool(wait(lambda: not window("Heyo Settings"), 5)))
+    check("... and Heyo goes on", subprocess.run(["kill", "-0", open("/tmp/heyo.pid").read().strip()]).returncode == 0)
+    heyo("--open", "heyo:settings")
+    again = wait(lambda: window("Heyo Settings"), 8)
+    check("asked for again, it comes back, with the keyboard", bool(again) and bool(wait(lambda: focused() == "Heyo Settings", 4)), focused())
+    time.sleep(1.0)
+    check("... and a click in it works", press_on("Heyo Settings", "list item", "Shortcuts", 0.8) and "selected" in atspi.states("list item", "Shortcuts", "Heyo Settings"))
+    subprocess.run([os.path.join(HERE, "input.py"), "key", "Escape"], check=True)
+    check("Esc closes it", bool(wait(lambda: not window("Heyo Settings"), 5)))
+
+
+def ime():
+    """Chinese typed into the settings window's search field (in Chinese) through IBus, as GNOME runs it."""
+    import atspi
+    subprocess.run(["gsettings", "set", "org.gnome.desktop.input-sources", "sources", "[('xkb', 'us'), ('ibus', 'libpinyin')]"], check=True)
+    time.sleep(2)
+    engine = lambda: subprocess.run(["ibus", "engine"], capture_output=True, text=True).stdout.strip()
+    # A pointer that stays (input.py stay): winit lets go of a window's
+    # text input when the seat loses its pointer, which each input.py
+    # call would otherwise do here as it ends.
+    stay = subprocess.Popen([os.path.join(HERE, "input.py"), "stay"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    stay.stdout.readline()
+    restart("hideOnBlur=false", 'language="zh_CN"')
+    heyo("--open", "heyo:settings")
+    wait(lambda: window("Heyo 设置"), 8)
+    time.sleep(1.5)
+    check("the search field is found", press_on("Heyo 设置", "text", "搜索设置", 0.5) or press_on("Heyo 设置", "entry", "搜索设置", 0.5),
+          [(role, name) for _, role, name, _ in atspi.tree("Heyo 设置")][:12])
+    if engine() != "libpinyin":
+        subprocess.run([os.path.join(HERE, "input.py"), "key", "super+space"], check=True)
+        time.sleep(1.5)
+    check("Pinyin is the input method in use", bool(wait(lambda: engine() == "libpinyin", 4)), engine())
+    subprocess.run([os.path.join(HERE, "input.py"), "type", "yuyan"], check=True)
+    time.sleep(1.0)
+    picture("ime-composing", "Heyo 设置")
+    subprocess.run([os.path.join(HERE, "input.py"), "key", "space"], check=True)
+    time.sleep(1.2)
+    picture("ime-committed", "Heyo 设置")
+    field = atspi.text("text", "搜索设置", "Heyo 设置") or atspi.text("entry", "搜索设置", "Heyo 设置")
+    said = names("Heyo 设置")
+    check("what Pinyin composed is committed into the field", bool(field) and "语言" in field, repr(field))
+    check("... and searched for: of the pages, General is left, which has Language on it", "通用" in said and "快捷键" not in said and "听写" not in said, said[:12])
+    subprocess.run([os.path.join(HERE, "input.py"), "key", "super+space"], check=True)
+    subprocess.run(["gsettings", "reset", "org.gnome.desktop.input-sources", "sources"], check=True)
+    close("Heyo 设置")
+    wait(lambda: not window("Heyo 设置"))
+    stay.stdin.close()
+    stay.wait()
+
+
+def shell_extension():
+    """Which version of Heyo's extension the Shell loaded."""
+    return run("Main.extensionManager.lookup('heyo@heyo.app')?.metadata?.version ?? null")
+
+
+def open_settings(title="Heyo Settings"):
+    """The settings window, asked for once more if it did not come: the first of Slint's windows in a new
+    session may be taken for stalled while its first picture is drawn (see `cold`), which is not what
+    the checks that use this are about."""
+    for _ in range(2):
+        heyo("--open", "heyo:settings")
+        wait(lambda: window(title), 8)
+        # Taken off again, if so, two seconds after it came.
+        time.sleep(3)
+        if window(title):
+            return window(title)
+    return None
+
+
+def warm():
+    """Not a check: one of Slint's windows drawn once, so that the first picture of the session (`cold`) is
+    not what the checks after this one meet."""
+    if open_settings():
+        close("Heyo Settings")
+        wait(lambda: not window("Heyo Settings"))
+
+
+def upgrade():
+    """Heyo with an older extension running (run.sh start old, at version 3): Settings offers the update, which waits for the next login."""
+    check("the session runs the older extension", shell_extension() == 3, shell_extension())
+    restart("hideOnBlur=false", 'language="system"')
+    open_settings()
+    picture("upgrade-offered", "Heyo Settings")
+    check("Settings → General offers to update it", press_on("Heyo Settings", "button", "Update", 1.5), names("Heyo Settings")[:30])
+    on_disk = open(os.path.expanduser("~/.local/share/gnome-shell/extensions/heyo@heyo.app/extension.js")).read()
+    check("... which puts the new one in place", "const API = 4;" in on_disk)
+    time.sleep(1.0)
+    picture("upgrade-pending", "Heyo Settings")
+    check("... and says to log out and back in", "Update" not in names("Heyo Settings"), names("Heyo Settings")[:30])
+    check("the older one keeps serving meanwhile", shell_extension() == 3)
+    close("Heyo Settings")
+    wait(lambda: not window("Heyo Settings"))
+    # It still serves: the pill is above, without the keyboard, as version 3 does it.
+    app = tool("window.py", "Notes", "check-upgrade")
+    wait(lambda: window("Notes"))
+    time.sleep(0.8)
+    heyo("--dictate")
+    pill = wait(lambda: standing("Heyo Dictation"), 8)
+    time.sleep(0.8)
+    pill = standing("Heyo Dictation")
+    check("... the pill is above the windows and leaves the keyboard alone", bool(pill) and pill["above"] and focused() == "Notes", (pill, focused()))
+    if not wait(lambda: not window("Heyo Dictation"), 8):
+        heyo("--dictate")
+    wait(lambda: not window("Heyo Dictation"), 8)
+    app.terminate()
+
+
+def upgraded():
+    """After the next login (run.sh relogin): the new extension runs, and Settings has nothing more to say about it."""
+    check("after logging in again the Shell runs version 4", shell_extension() == 4, shell_extension())
+    restart("hideOnBlur=false")
+    open_settings()
+    said = names("Heyo Settings")
+    check("... and Settings → General no longer speaks of the extension", "GNOME Shell Extension" not in said, said[:30])
+    picture("upgrade-done", "Heyo Settings")
+    close("Heyo Settings")
+    wait(lambda: not window("Heyo Settings"))
+
+
+CHECKS = {"lists": lists, "layout": layout, "capture": capture, "relock": relock, "own": own, "language": language, "ai": ai, "dictate": dictate,
+          "placement": placement, "settings": settings_window, "cold": cold, "warm": warm, "ime": ime, "upgrade": upgrade, "upgraded": upgraded}
 if len(sys.argv) < 2 or any(name not in CHECKS for name in sys.argv[1:]):
     sys.exit(__doc__)
 # For test.sh, which reads this through a pipe.

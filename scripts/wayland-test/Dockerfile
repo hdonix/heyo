@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libnotify-bin xdg-utils xdg-user-dirs curl ca-certificates \
       wl-clipboard gnome-screenshot python3 python3-gi gir1.2-gtk-3.0 \
       fonts-dejavu-core fonts-noto-cjk ibus ibus-libpinyin \
+      # The accessibility bus, on which Slint's windows say what is in
+      # them (in/atspi.py).
+      at-spi2-core \
     && rm -rf /var/lib/apt/lists/*
 
 # An ordinary user, as on a desktop.

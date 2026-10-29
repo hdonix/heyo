@@ -14,6 +14,12 @@
 #
 # The repository is mounted read-only at /heyo, so the binary built on the
 # host (src-tauri/target/…/heyo) and runtime/dist can be run as they are.
+# A speech engine named by HEYO_TEST_SPEECH (test.sh names the one
+# installed for whoever runs it) is lent read-only at /speech, where
+# start-heyo.sh finds it.
+#
+# HEYO_OLD_EXTENSION names the commit whose extension `start old` installs
+# (the first one, version 1, unless it says another).
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
@@ -22,6 +28,9 @@ NAME=${HEYO_WAYLAND_NAME:-heyo-wayland}
 IMAGE=heyo-wayland-test
 # The last commit whose extension answers version 1.
 FIRST_EXTENSION=149baf9
+SPEECH=${HEYO_TEST_SPEECH:-}
+LEND=
+[ -n "$SPEECH" ] && [ -d "$SPEECH/models" ] && LEND="-v $SPEECH:/speech:ro"
 
 case "${1:-}" in
   build) docker build -t "$IMAGE" "$HERE" ;;
@@ -35,12 +44,12 @@ case "${1:-}" in
         OLD="$REPO/src-tauri/target/wayland-test/heyo@heyo.app"
         mkdir -p "$OLD"
         for file in extension.js metadata.json; do
-          git -C "$REPO" show "$FIRST_EXTENSION:gnome-extension/heyo@heyo.app/$file" > "$OLD/$file"
+          git -C "$REPO" show "${HEYO_OLD_EXTENSION:-$FIRST_EXTENSION}:gnome-extension/heyo@heyo.app/$file" > "$OLD/$file"
         done
         ;;
       *) EXTENSION=yes ;;
     esac
-    docker run -d --name "$NAME" --shm-size=1g -e HEYO_EXTENSION=$EXTENSION -e MONITORS="${MONITORS:-1920x1080}" -v "$REPO:/heyo:ro" "$IMAGE" >/dev/null
+    docker run -d --name "$NAME" --shm-size=1g -e HEYO_EXTENSION=$EXTENSION -e MONITORS="${MONITORS:-1920x1080}" -v "$REPO:/heyo:ro" $LEND "$IMAGE" >/dev/null
     echo "started $NAME"
     ;;
   relogin) docker restart -t 2 "$NAME" >/dev/null && echo "restarted $NAME" ;;

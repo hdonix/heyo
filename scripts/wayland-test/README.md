@@ -19,9 +19,15 @@ built on the host there (`pnpm tauri build --no-bundle`) runs as it is.
 
 Sessions can be started in other states, to try what Heyo's settings do
 about the extension: `run.sh start bare` (not installed), `run.sh start old`
-(the first version of the extension, as after updating Heyo alone), then
+(the first version of the extension, as after updating Heyo alone; with
+`HEYO_OLD_EXTENSION=COMMIT`, the extension of that commit), then
 `run.sh relogin` once Heyo has installed or updated it. `MONITORS="1920x1080
-1920x1200" run.sh start` gives two monitors.
+1920x1200" run.sh start` gives two monitors. `HEYO_TEST_SPEECH=DIR` lends
+a speech engine (read only) for dictation; `test.sh` lends the one
+installed for you, and dictates a recording made with
+`../gui-test/say.py` (Flite). Pictures the checks take are copied out to
+`src-tauri/target/wayland-test/shots/`, to be looked at: whether Chinese
+text fits is judged there, by eye.
 
 `in/` has the tools for use inside the session:
 
@@ -43,7 +49,24 @@ about the extension: `run.sh start bare` (not installed), `run.sh start old`
   when shown again; also with the way GNOME 45–48 need, tried on this Shell),
   `layout`, `capture` (the right monitor, its own pixels, a window picked
   with a click and saved pixel for pixel) and `relock` (the extension
-  switched off and on, as the lock screen does).
+  switched off and on, as the lock screen does); and what goes through the
+  host there: `language` (简体中文 chosen while the settings window is
+  open, every window in it), `ai` (AI Chat against a stub model on the
+  session's 127.0.0.1, `../gui-test/llm-stub.py`: a follow-up, Stop
+  Answering closing the connection, Escape not), `dictate`, `placement`
+  (the palette and the settings window on the pointer's monitor),
+  `settings` (moved, a click after, a press in its shadow's margin going
+  through, closed, back), `ime` (Pinyin through IBus into its search
+  field), `cold` (the first Slint window with Mesa's shader cache empty),
+  and `upgrade` and `upgraded` (an extension of version 3 updated, before
+  and after logging in again; `test.sh upgrade` alone).
+- `atspi.py` asks a Slint window where its controls are (AT-SPI, through
+  AccessKit), in the window's own pixels: a Wayland client does not know
+  where its window is, the Shell does.
+- `input.py stay` keeps a pointer for as long as it runs: the headless
+  session has none of its own, and winit lets go of a window's text input
+  when the seat loses its pointer, as it does each time an `input.py`
+  call ends.
 
 How it is put together, and what that means for what a test shows:
 
@@ -69,7 +92,8 @@ does (`src-tauri/src/slint_windows/layer.rs`). `sway.sh` is a second
 session, headless Sway, on an image built on this one:
 
     scripts/wayland-test/sway.sh build     # after run.sh build
-    scripts/wayland-test/sway.sh test      # in/check-sway.py at scale 1 and 2, then `safe` and `lost`
+    scripts/wayland-test/sway.sh test      # in/check-sway.py and in/check-sway-more.py at scale 1 and 2, then `safe` and `lost`
+    scripts/wayland-test/sway.sh more ai   # a part of in/check-sway-more.py: language, ai, dictate, settings, ime, outputs
     scripts/wayland-test/sway.sh safe      # the overlay cannot trap anyone (in/safe-sway.py)
     scripts/wayland-test/sway.sh lost      # nothing is left on the screen when what draws it stops (in/lost-sway.py)
     SCALE=2 MONITORS=3840x2160 scripts/wayland-test/sway.sh drag   # how soon the overlay follows the pointer
@@ -79,3 +103,11 @@ own (`in/swaybed.py`): a virtual pointer (`in/pointer.py`), keys typed by
 `wtype`, and an input method that composes what it is told to
 (`in/ime.py`). A layer surface is in no tree, so what is on the screen is
 judged from pictures of it (`grim`).
+
+What this bed cannot show: whether dictated words reach a window. Heyo
+pastes them here (the clipboard, then Ctrl+V typed with `wtype`), and no
+GTK window of the bed takes a paste, not even one done with `wl-copy` and
+`wtype` by hand; so `check-sway-more.py dictate` checks what Heyo put on
+the clipboard. `wtype` cannot type a shifted letter with Control (its
+keyboard has no second level), nor Control and a letter into AI Chat's
+reply bar, so Stop Answering is chosen from the actions of Ask AI.
