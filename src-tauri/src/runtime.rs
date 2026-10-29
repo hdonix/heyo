@@ -122,6 +122,8 @@ fn spawn(app: &AppHandle, generation: u64, background: bool) -> Result<Process, 
             runtime_of(&ended, background, |runtime| runtime.exited(generation));
             // Whatever its commands subscribed to has nobody to tell.
             crate::ext::runtime_exited(&ended, background);
+            // Nor anyone the answers of its questions.
+            crate::ai::runtime_exited(background);
             if background {
                 crate::menubar::runtime_exited(&ended);
             } else {
@@ -212,6 +214,11 @@ fn route(message: &Value, background: bool) -> Route {
 fn handle(app: &AppHandle, message: Value, background: bool) {
     let answer = match route(&message, background) {
         Route::Extension => return crate::ext::handle(app, message, background),
+        Route::Host(HostRequest::AiAsk(question)) => return crate::ai::ask(app, &message["id"], background, question),
+        Route::Host(HostRequest::Cancel { request }) => {
+            crate::ai::cancel(background, request);
+            Ok(Value::Null)
+        }
         Route::Host(request) => crate::host_call(app, request),
         Route::Answered(answer) => answer,
         Route::Ready => return,

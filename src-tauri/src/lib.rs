@@ -1,3 +1,4 @@
+mod ai;
 mod apps;
 mod cli;
 mod clipboard;

@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { AiProvider } from "../../../shared/bindings/AiProvider";
-import { askModel, CLAUDE_MODEL, describeModelError, type PromptImage } from "../ai";
+import { askModel, type PromptImage } from "../ai";
 import { ask, implement } from "./asking";
 import { HeyoError } from "./error";
 import { gained } from "./members";
@@ -87,13 +87,13 @@ export function turns(messages: Message[]): Message[] {
 function failure(error: unknown, signal?: AbortSignal): HeyoError {
   if (error instanceof HeyoError) return error;
   if (signal?.aborted) return new HeyoError("cancelled", "The question was withdrawn.");
-  return new HeyoError("failed", describeModelError(error));
+  // The host words what went wrong for the user.
+  return new HeyoError("failed", error instanceof Error ? error.message : String(error));
 }
 
-/// Which model answers, with Claude's name filled in.
-async function provider(): Promise<AiProvider> {
-  const set = await ask("ext.ai.provider");
-  return set.kind === "claude" ? { ...set, model: CLAUDE_MODEL } : set;
+/// Which model answers.
+function provider(): Promise<AiProvider> {
+  return ask("ext.ai.provider");
 }
 
 const added = implement(gained.AI, {

@@ -16,4 +16,4 @@ action: Array<number> | null,
 /**
  * What `launchCommand` gave, when another command started this one.
  */
-arguments?: Record<string, string>, launchContext?: unknown, } | { "type": "dev-reload", extension: string, } | { "type": "appearance", dark: boolean, } | { "type": "language", translations: Translations, } | { "type": "event", subscription: number, data: unknown, };
+arguments?: Record<string, string>, launchContext?: unknown, } | { "type": "dev-reload", extension: string, } | { "type": "appearance", dark: boolean, } | { "type": "language", translations: Translations, } | { "type": "progress", id: number, data: { more: string } | { text: string }, } | { "type": "event", subscription: number, data: unknown, };

@@ -8,8 +8,6 @@ import { answers, reset } from "../testing";
 // The model: answers when the test says so, and fails when its question is withdrawn.
 const model = vi.hoisted(() => ({ calls: [] as { prompt: string; history: unknown[]; signal: AbortSignal; onText(text: string): void; finish(answer: string): void }[] }));
 vi.mock("../ai", () => ({
-  CLAUDE_MODEL: "claude",
-  describeModelError: (error: unknown) => String(error),
   askModel: (options: { prompt: string; history: unknown[]; signal: AbortSignal; onText(text: string): void }) =>
     new Promise<string>((finish, fail) => {
       options.signal.addEventListener("abort", () => fail(new Error("aborted")));

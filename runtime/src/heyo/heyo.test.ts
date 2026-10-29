@@ -199,7 +199,8 @@ test("what the host answers with nothing comes back as nothing", async () => {
     expect(await api.System.run("lock-screen")).toBeUndefined();
     answers["ext.system.run"] = () => "Volume 40%";
     expect(await api.System.run("volume-up")).toBe("Volume 40%");
-    answers["ext.ai.provider"] = () => ({ kind: "claude", model: "", local: false });
+    // As the host says it: Claude's model is named there.
+    answers["ext.ai.provider"] = () => ({ kind: "claude", model: "claude-opus-5-5", local: false });
     expect(await api.AI.provider()).toEqual({ kind: "claude", model: "claude-opus-5-5", local: false });
     answers["ext.ai.provider"] = () => ({ kind: "local", model: "qwen3", local: true });
     expect(await api.AI.provider()).toEqual({ kind: "local", model: "qwen3", local: true });

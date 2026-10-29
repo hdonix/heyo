@@ -88,8 +88,18 @@ pub enum HostRequest {
     Selection,
     #[serde(rename = "host.files.refresh")]
     FilesRefresh,
-    #[serde(rename = "host.ai")]
-    Ai,
+    /// Asks the model the settings name (`models`). The answer is told as
+    /// it is written (`HostMessage::Progress`) and then is the reply, or
+    /// what went wrong in words for the user; `host.cancel` calls it off.
+    #[serde(rename = "host.ai.ask")]
+    AiAsk(crate::models::Question),
+    /// Calls off a request of the runtime's that is still being answered
+    /// (`host.ai.ask`), by its number: it is never replied to.
+    #[serde(rename = "host.cancel")]
+    Cancel {
+        #[ts(type = "number")]
+        request: u64,
+    },
     /// Tells the user something in passing, the palette being gone.
     #[serde(rename = "host.hud")]
     Hud { text: String },
@@ -216,6 +226,15 @@ pub enum HostMessage {
     /// The language Heyo's own commands speak: said when the runtime
     /// starts, and when it changes.
     Language { translations: crate::i18n::Translations },
+    /// How far a request of the runtime's has got before its reply: the
+    /// answer of a model as it is written (`host.ai.ask`), as `{ more }`,
+    /// what follows what was told before, or `{ text }`, all of it anew.
+    Progress {
+        #[ts(type = "number")]
+        id: u64,
+        #[ts(type = "{ more: string } | { text: string }")]
+        data: Value,
+    },
     /// Something happened that a command subscribed to with an `ext.*`
     /// request (a sentence was recognized, say).
     Event {
@@ -801,6 +820,21 @@ mod tests {
             request(json!({ "method": "host.clipboard.write", "params": { "text": "a" } })).unwrap(),
             HostRequest::ClipboardWrite { text: "a".into(), html: None, concealed: None }
         );
+    }
+
+    #[test]
+    fn a_question_is_asked_without_anything_of_the_model_and_called_off_by_its_number() {
+        let asked = request(json!({ "method": "host.ai.ask", "params": { "system": "Be brief.", "prompt": "Why?", "history": [], "temperature": 0.5 } })).unwrap();
+        let HostRequest::AiAsk(question) = asked else { panic!("{asked:?}") };
+        assert_eq!((question.history, question.images.len(), question.temperature), (Some(vec![]), 0, Some(0.5)));
+        // Text to work on, and a picture.
+        let asked = request(json!({ "method": "host.ai.ask", "params": { "system": "", "prompt": "x", "images": [{ "mediaType": "image/png", "data": "AA==" }] } })).unwrap();
+        let HostRequest::AiAsk(question) = asked else { panic!("{asked:?}") };
+        assert_eq!((question.history, question.images[0].media_type.as_str()), (None, "image/png"));
+        assert_eq!(request(json!({ "method": "host.cancel", "params": { "request": 12 } })).unwrap(), HostRequest::Cancel { request: 12 });
+        // The settings the runtime once asked for, the key with them, are not to be had.
+        assert!(request(json!({ "method": "host.ai" })).is_err());
+        assert_eq!(HostMessage::Progress { id: 12, data: json!({ "more": "Ray" }) }.json(), json!({ "type": "progress", "id": 12, "data": { "more": "Ray" } }));
     }
 
     #[test]

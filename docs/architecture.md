@@ -123,8 +123,9 @@ its stdin and stdout. What it writes to stderr joins Heyo's log.
 | anything else from the background runtime (`menu`, `background-done`) | `menubar.rs` |
 
 In the other direction the host sends `launch` (start this command),
-`background-run`, the replies to requests, `event` (something a command
-subscribed to has happened), `oauth-callback`, `appearance` and
+`background-run`, the replies to requests, `progress` (how far a request
+answered over time has got), `event` (something a command subscribed to
+has happened), `oauth-callback`, `appearance` and
 `dev-reload`; and it passes on what the web view says through the
 `runtime_send` command: `dispatch` (call the function at this node and
 prop, such as an `onAction`), `pop`, `close`, `reply`.
@@ -138,6 +139,13 @@ and `protocol.ts` is the conversation itself: `request()` for `host.*` and
 A subscription is a request the host answers with a number; events with
 that number follow until the command ends it, the command itself ends, or
 the runtime's process is gone (`ext.rs`, `runtime/src/heyo/events.ts`).
+
+A question to a model (`host.ai.ask`) is a request answered over time:
+the host tells the answer as it is written (`progress`, with the
+request's number) before it replies with all of it, and `host.cancel`
+calls it off (`src-tauri/src/ai.rs`, `requestOverTime` in `protocol.ts`).
+The runtime sends the question alone: it has neither the key nor the
+address of any model.
 
 ### A command, from Enter to the screen
 
@@ -247,6 +255,12 @@ and keeps the list of applications current. The rest, by what it is for:
   for one request. It is consent and a record, not a sandbox: extensions
   run in one Node.js process and can read files themselves. `confirm.rs`
   is how the host puts a question of its own into the palette's dialog.
+- `models/` is every call to an AI model, and the only place one is made:
+  `Model` with its two adapters, Claude over HTTPS (`claude.rs`) and an
+  OpenAI-compatible server (`openai.rs`), picked from the settings, with
+  each failure worded for the user once; `address.rs` says whether a
+  model's address is this computer. `ai.rs` answers the runtime's
+  questions with it.
 - `menubar.rs` turns menu bar commands into tray icons and runs commands
   that have an `interval`. `links.rs` registers Heyo for the `raycast://`
   links that OAuth sign-ins come back through.

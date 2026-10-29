@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Incoming } from "../../shared/wire";
 import { runAs, type Current } from "./context";
 import { HeyoError } from "./heyo/error";
+import { askModel } from "./ai";
 import { ask, askThroughRaycast, connect, hear, on, request, send } from "./protocol";
 import { pair, type End } from "./transport";
 
@@ -114,6 +115,47 @@ test("nothing is asked for an extension outside any command", async () => {
   for (const asking of [ask("ext.windows.list"), askThroughRaycast("ext.windows.list")]) {
     expect(await asking.catch((e) => e)).toMatchObject({ name: "HeyoError", code: "invalid", message: "ext.windows.list was asked for outside any command." });
   }
+  expect(lines).toEqual([]);
+});
+
+test("a model is asked of the host, which tells the answer as it is written", async () => {
+  const seen: string[] = [];
+  const answer = askModel({ system: "Be brief.", prompt: "Why?", history: [], onText: (text) => seen.push(text) });
+  const [asked] = lines;
+  // The question and nothing else: no key, no address, no model.
+  expect(asked).toEqual({ type: "request", id: asked.id, method: "host.ai.ask", params: { system: "Be brief.", prompt: "Why?", history: [] } });
+  tell({ type: "progress", id: asked.id, data: { more: "Ray" } });
+  tell({ type: "progress", id: asked.id, data: { more: "leigh" } });
+  // Another request's progress is not this one's.
+  tell({ type: "progress", id: asked.id + 100, data: { more: "stray" } });
+  tell({ type: "progress", id: asked.id, data: { text: "Rayleigh scattering" } });
+  tell({ type: "reply", id: asked.id, result: "Rayleigh scattering." });
+  expect(await answer).toBe("Rayleigh scattering.");
+  expect(seen).toEqual(["Ray", "Rayleigh", "Rayleigh scattering"]);
+
+  // What went wrong comes worded by the host.
+  const failing = askModel({ system: "", prompt: "x" });
+  tell({ type: "reply", id: lines[1].id, error: "The local model returned no text." });
+  expect(await failing.catch((e) => e)).toMatchObject({ message: "The local model returned no text." });
+});
+
+test("a question called off fails at once, and the host is told to stop", async () => {
+  const controller = new AbortController();
+  const seen: string[] = [];
+  const answer = askModel({ system: "", prompt: "Wait", signal: controller.signal, onText: (text) => seen.push(text) });
+  const [asked] = lines;
+  tell({ type: "progress", id: asked.id, data: { more: "Once" } });
+  controller.abort();
+  expect(await answer.catch((e) => e)).toMatchObject({ name: "AbortError" });
+  expect(lines[1]).toEqual({ type: "request", id: lines[1].id, method: "host.cancel", params: { request: asked.id } });
+  // Whatever still comes of it is nobody's.
+  tell({ type: "progress", id: asked.id, data: { more: " upon" } });
+  tell({ type: "reply", id: asked.id, result: "Once upon" });
+  expect(seen).toEqual(["Once"]);
+
+  // One called off before it was asked is not asked at all.
+  lines.length = 0;
+  await expect(askModel({ system: "", prompt: "x", signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
   expect(lines).toEqual([]);
 });
 

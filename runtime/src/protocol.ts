@@ -26,19 +26,21 @@ export function send(message: Outgoing) {
 }
 
 let nextRequest = 0;
-/// The requests not answered yet. An extension's is kept with whose it is.
-const pending = new Map<number, { resolve(v: unknown): void; reject(e: Error): void; whose?: ExtCaller }>();
+/// The requests not answered yet. An extension's is kept with whose it is,
+/// one answered over time with who hears how far it has got.
+const pending = new Map<number, { resolve(v: unknown): void; reject(e: Error): void; whose?: ExtCaller; progress?(data: unknown): void }>();
 
-function call<T>(method: string, params: unknown, whose?: ExtCaller): Promise<T> {
+function call<T>(method: string, params: unknown, whose?: ExtCaller, progress?: (data: unknown) => void, numbered?: (id: number) => void): Promise<T> {
   const id = ++nextRequest;
   return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (v: unknown) => void, reject, whose });
+    pending.set(id, { resolve: resolve as (v: unknown) => void, reject, whose, progress });
     try {
       send({ type: "request", id, method, ...whose, params });
     } catch (e) {
       pending.delete(id);
       throw e;
     }
+    numbered?.(id);
   });
 }
 
@@ -54,6 +56,29 @@ function abandon() {
 
 export function request<T = unknown>(...[method, params]: Call): Promise<T> {
   return call<T>(method, params);
+}
+
+/// A request the host answers over time (`host.ai.ask`): what it says of
+/// it before the reply (`progress`) goes to `progress`, and `signal` calls
+/// it off. Called off, it fails at once with the signal's reason, and the
+/// host is told to stop (`host.cancel`); it replies nothing then.
+export function requestOverTime<T = unknown>([method, params]: Call, progress: (data: unknown) => void, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  let id = 0;
+  const answer = call<T>(method, params, undefined, progress, (number) => (id = number));
+  if (!signal) return answer;
+  const withdraw = () => {
+    const waiter = pending.get(id);
+    if (!waiter) return;
+    pending.delete(id);
+    waiter.reject(signal.reason);
+    // Nothing to tell a host that is gone.
+    call("host.cancel", { request: id }).catch(() => {});
+  };
+  signal.addEventListener("abort", withdraw, { once: true });
+  const done = () => signal.removeEventListener("abort", withdraw);
+  answer.then(done, done);
+  return answer;
 }
 
 /// Asks the host for something on behalf of the extension whose command is
@@ -85,7 +110,7 @@ export const hear = events.hear;
 type Handler<T extends Incoming["type"]> = (message: Extract<Incoming, { type: T }>) => void;
 const handlers = new Map<string, (message: any) => void>();
 
-export function on<T extends Exclude<Incoming["type"], "reply" | "event">>(type: T, handler: Handler<T>) {
+export function on<T extends Exclude<Incoming["type"], "reply" | "event" | "progress">>(type: T, handler: Handler<T>) {
   handlers.set(type, handler);
 }
 
@@ -102,6 +127,14 @@ function read(line: string) {
     pending.delete(message.id);
     if (message.error != null) waiter?.reject(fromReply(message.error));
     else waiter?.resolve(message.result);
+    return;
+  }
+  if (message.type === "progress") {
+    try {
+      pending.get(message.id)?.progress?.(message.data);
+    } catch (e) {
+      console.error(e);
+    }
     return;
   }
   try {
