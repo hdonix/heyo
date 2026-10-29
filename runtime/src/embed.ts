@@ -13,14 +13,11 @@
 //!     `vectors` is base64 of the vectors one after another, `size` 32-bit
 //!     floats each. Queries are answered before passages that wait. It ends
 //!     when its stdin closes, or after a while with nothing to do.
-//!   heyo-embed.cjs cases     → writes search cases for evaluation with the
-//!     local model (`cases.ts`); a JSON document in, JSON lines out.
 
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import { casesFor, type CaseRequest } from "./cases";
 import { padded, pooled, prefixed, Tokenizer } from "./embedding";
 import { download, installPackages, type PinnedFile } from "./install";
 import engineLock from "./locks/embed.json";
@@ -218,24 +215,7 @@ function packed(vectors: Float32Array[]) {
   return Buffer.from(all.buffer).toString("base64");
 }
 
-async function cases() {
-  let input = "";
-  for await (const chunk of process.stdin) input += chunk;
-  const request = JSON.parse(input) as CaseRequest;
-  for (const entry of request.entries) {
-    try {
-      send({ type: "cases", entry: entry.id, queries: await casesFor(entry, request.ai) });
-    } catch (e) {
-      // Without the model there is nothing more to do; say so once.
-      send({ type: "error", message: e instanceof Error ? e.message : String(e) });
-      return;
-    }
-  }
-  send({ type: "done" });
-}
-
 const failed = (e: unknown) => send({ type: "error", message: e instanceof Error ? e.message : String(e) });
-if (process.argv[2] === "cases") cases().catch(failed);
-else if (!DIR) send({ type: "error", message: "HEYO_EMBED_DIR is not set" });
+if (!DIR) send({ type: "error", message: "HEYO_EMBED_DIR is not set" });
 else if (process.argv[2] === "install") install().catch(failed);
 else serve();

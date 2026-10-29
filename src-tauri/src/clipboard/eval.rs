@@ -49,6 +49,7 @@ use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use serde::Deserialize;
 use serde_json::json;
 
+use super::cases::{self, CaseEntry};
 use super::embed::{self, Embed, Role};
 use super::fusion::{self, Tuning};
 use super::store::Store;
@@ -344,15 +345,7 @@ fn generate(store: &Store, count: usize) -> Result<i32, String> {
         return Ok(0);
     }
     let settings = crate::settings::Settings::load_from(&crate::paths::settings()).0;
-    let request = json!({
-        "ai": settings.ai(),
-        "entries": entries.iter().map(|entry| json!({ "id": entry.id, "text": entry.text, "app": entry.app, "copied": said(now - entry.copied_at as i64) })).collect::<Vec<_>>(),
-    });
-    let mut command = embed::command_alone()?;
-    command.arg("cases").stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped());
-    let mut child = command.spawn().map_err(|e| format!("could not start the helper: {e}"))?;
-    child.stdin.take().unwrap().write_all(request.to_string().as_bytes()).map_err(|e| e.to_string())?;
-    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    let model = cases::local_only(&settings)?;
 
     let dir = super::dir().join("eval");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -361,17 +354,21 @@ fn generate(store: &Store, count: usize) -> Result<i32, String> {
     let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     super::private(&path, 0o600);
     let (mut written, mut failure) = (BTreeMap::<String, usize>::new(), None);
-    for message in String::from_utf8_lossy(&output.stdout).lines().filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok()) {
-        match message["type"].as_str() {
-            Some("cases") => {
-                for case in message["queries"].as_array().into_iter().flatten() {
-                    let line = json!({ "query": case["query"], "expect": message["entry"], "bucket": case["type"], "now": now });
+    for entry in &entries {
+        let asked = CaseEntry { text: entry.text.clone().unwrap_or_default(), app: entry.app.clone(), copied: said(now - entry.copied_at as i64) };
+        match tauri::async_runtime::block_on(cases::cases_for(&asked, &model)) {
+            Ok(found) => {
+                for case in found {
+                    let line = json!({ "query": case.query, "expect": entry.id, "bucket": case.kind, "now": now });
                     writeln!(file, "{line}").map_err(|e| e.to_string())?;
-                    *written.entry(case["type"].as_str().unwrap_or_default().to_owned()).or_default() += 1;
+                    *written.entry(case.kind.to_owned()).or_default() += 1;
                 }
             }
-            Some("error") => failure = message["message"].as_str().map(str::to_owned),
-            _ => {}
+            // Without the model there is nothing more to do; say so once.
+            Err(why) => {
+                failure = Some(why);
+                break;
+            }
         }
     }
     // Counts only: what the cases say is the user's.

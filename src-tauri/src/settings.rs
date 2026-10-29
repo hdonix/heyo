@@ -114,18 +114,6 @@ pub struct Settings {
 }
 
 impl Settings {
-    /// What the helpers need to reach the configured model.
-    pub fn ai(&self) -> serde_json::Value {
-        serde_json::json!({
-            "provider": if self.ai_provider == "local" { "local" } else { "claude" },
-            "apiKey": self.anthropic_api_key,
-            "localUrl": self.local_model_url,
-            "localModel": self.local_model_name,
-        })
-    }
-}
-
-impl Settings {
     /// Whether the interface is dark right now: as chosen, or as the system
     /// is when the choice is to follow it.
     pub fn dark(&self) -> bool {

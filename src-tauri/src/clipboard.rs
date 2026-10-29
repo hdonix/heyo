@@ -7,6 +7,7 @@
 //! History lives in `$XDG_DATA_HOME/heyo/clipboard/` (`history.db` and
 //! `images/`).
 
+pub mod cases;
 pub mod embed;
 pub mod eval;
 pub mod fusion;
