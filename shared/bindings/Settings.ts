@@ -54,7 +54,8 @@ dictationLanguage: string,
  */
 dictationSource: string, 
 /**
- * What Claude does with the transcript: `off`, `clean` or `translate`.
+ * What the model (`ai_provider`) does with the transcript: `off`,
+ * `clean` or `translate`.
  */
 dictationPolish: string, 
 /**
@@ -70,7 +71,8 @@ dictationHoldKey: string,
  */
 dictationLive: boolean, 
 /**
- * Claude API key for polishing; empty uses the environment's credentials.
+ * Claude API key, for the host alone (`models`); empty uses the
+ * environment's credentials.
  */
 anthropicApiKey: string, 
 /**

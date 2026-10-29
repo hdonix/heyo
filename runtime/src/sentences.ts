@@ -90,8 +90,6 @@ export class Session {
 
   constructor(
     private engine: Engine,
-    /// Writes the user's own words their way.
-    private correct: (text: string) => string,
     private say: (said: Said) => void,
     private now: () => number = Date.now,
   ) {
@@ -131,7 +129,7 @@ export class Session {
     const seconds = this.speechSamples / SAMPLE_RATE;
     if (this.speaking && seconds >= MIN_PARTIAL_SECONDS && this.now() - this.lastPartial >= PARTIAL_INTERVAL_MS) {
       this.lastPartial = this.now();
-      const text = unfinished(this.correct(this.engine.decode(concat(this.speech))));
+      const text = unfinished(this.engine.decode(concat(this.speech)));
       if (meaningful(text)) this.say({ type: "partial", text: this.joined(text) });
     }
   }
@@ -154,7 +152,7 @@ export class Session {
     while (!vad.isEmpty()) {
       const segment = vad.front();
       vad.pop();
-      const text = this.correct(this.engine.decode(this.withPreroll(segment)));
+      const text = this.engine.decode(this.withPreroll(segment));
       this.speech = [];
       this.speechSamples = 0;
       this.speaking = false;

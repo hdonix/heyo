@@ -63,7 +63,8 @@ pub struct Settings {
     pub dictation_language: String,
     /// PulseAudio source to record from; empty means the default.
     pub dictation_source: String,
-    /// What Claude does with the transcript: `off`, `clean` or `translate`.
+    /// What the model (`ai_provider`) does with the transcript: `off`,
+    /// `clean` or `translate`.
     pub dictation_polish: String,
     /// A key that dictates while it is held (`talkkey::KEYS`); empty for none.
     pub dictation_hold_key: String,
@@ -73,7 +74,8 @@ pub struct Settings {
     /// corrected where it stands (`platform::Words`). Off, or elsewhere,
     /// nothing goes in before a sentence is finished.
     pub dictation_live: bool,
-    /// Claude API key for polishing; empty uses the environment's credentials.
+    /// Claude API key, for the host alone (`models`); empty uses the
+    /// environment's credentials.
     pub anthropic_api_key: String,
     /// Which model Heyo's AI features use: `claude` or `local`.
     pub ai_provider: String,

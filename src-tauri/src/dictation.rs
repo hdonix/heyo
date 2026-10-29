@@ -1,10 +1,11 @@
 //! Voice dictation: speak, and the text goes into the focused window.
 //!
-//! The work happens in a Node helper (`runtime/src/dictation.ts`) that
-//! records the microphone, recognizes speech locally and optionally polishes
-//! it with Claude. This module starts and stops it (`heyo --dictate`
-//! toggles), shows the progress window, and writes what is heard into the
-//! application the user is working in.
+//! The listening happens in a Node helper (`runtime/src/dictation.ts`)
+//! that records the microphone and recognizes speech locally. This module
+//! starts and stops it (`heyo --dictate` toggles), writes what it heard the
+//! user's way (`vocabulary`), shows the progress window, optionally has the
+//! transcript polished by the model the settings name (`polish`), and
+//! writes what is heard into the application the user is working in.
 //!
 //! The words reach the application one of two ways ([`Way`]), chosen when
 //! the recording starts, before a word is heard:
@@ -29,6 +30,8 @@
 
 mod composed;
 mod onscreen;
+mod polish;
+mod vocabulary;
 
 use crate::i18n::{t, tf, translate};
 use std::collections::VecDeque;
@@ -48,6 +51,7 @@ use crate::platform::typed::{self, Lost, Writing};
 use crate::{pasting, SettingsState};
 use composed::{Composed, Tell};
 use onscreen::{OnScreen, Shortfall, Standing, Step};
+use vocabulary::{Corrector, Vocabulary};
 
 
 #[derive(Default)]
@@ -68,6 +72,40 @@ struct State {
     /// Who is given the text of this recording instead of the focused
     /// window: an extension that asked to listen.
     listener: Option<Listener>,
+    /// The user's words, for the recording in progress or the last one:
+    /// what was heard is written their way, and the polishing model told them.
+    words: Arc<Words>,
+    /// How the recording is polished once it is over (`dictationPolish`),
+    /// as it was set when it was finished.
+    polish: String,
+    /// The polishing of the recording that is over, while it goes on.
+    polishing: Option<tauri::async_runtime::JoinHandle<()>>,
+}
+
+/// A vocabulary, and the correction pass made of it.
+#[derive(Default)]
+struct Words {
+    vocabulary: Vocabulary,
+    corrector: Corrector,
+}
+
+impl Words {
+    fn of(lines: &[String]) -> Arc<Words> {
+        let vocabulary = vocabulary::parse(lines);
+        Arc::new(Words { corrector: Corrector::new(&vocabulary), vocabulary })
+    }
+}
+
+/// What the helper said it heard, with the user's words written their way.
+fn corrected(mut event: Value, corrector: &Corrector) -> Value {
+    if matches!(event["type"].as_str(), Some("partial" | "segment" | "result")) {
+        for field in ["text", "raw"] {
+            if let Some(text) = event[field].as_str() {
+                event[field] = corrector.correct(text).into();
+            }
+        }
+    }
+    event
 }
 
 /// What an extension hears of the recording it started.
@@ -697,9 +735,14 @@ fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool, se
 
 /// Handles one event from the helper.
 fn handle(app: &AppHandle, event: Value) {
+    let (listener, words, polish) = {
+        let state = app.state::<Dictation>();
+        let state = state.0.lock().unwrap();
+        (state.listener.clone(), state.words.clone(), state.polish.clone())
+    };
+    let event = corrected(event, &words.corrector);
     // A recording an extension started: the text is the extension's, and
     // nothing is pasted anywhere.
-    let listener = app.state::<Dictation>().0.lock().unwrap().listener.clone();
     if let Some(listener) = listener {
         if let Some(heard) = heard(&event) {
             if heard.ends() {
@@ -719,16 +762,51 @@ fn handle(app: &AppHandle, event: Value) {
     match (event["type"].as_str().unwrap_or_default(), writing) {
         ("partial", Some(writing)) => writing.post(Said::Partial(text())),
         ("segment", Some(writing)) => writing.post(Said::Sentence(text())),
-        // The window hears of the end once all of it is written.
-        ("result" | "error", Some(writing)) => return writing.post(Said::Ended(event)),
-        // Nothing is writing: the recording ends as it is.
-        ("result" | "error", None) => {
-            app.state::<Dictation>().0.lock().unwrap().recording = false;
-            hide_window_after(app, linger(&event));
+        ("result", _) if event["cancelled"] != true => {
+            let raw = text();
+            match polish::instructions(&polish, &words.vocabulary).filter(|_| !raw.is_empty()) {
+                Some(instructions) => polish_then_end(app, raw, instructions, words),
+                None => ended(app, event),
+            }
+            return;
         }
+        ("result" | "error", _) => return ended(app, event),
         _ => {}
     }
     emit(app, event);
+}
+
+/// The recording is over, as `event` says (a result or an error).
+fn ended(app: &AppHandle, event: Value) {
+    let writing = app.state::<Dictation>().0.lock().unwrap().writing.clone();
+    match writing {
+        // The window hears of the end once all of it is written.
+        Some(writing) => writing.post(Said::Ended(event)),
+        // Nothing is writing: the recording ends as it is.
+        None => {
+            app.state::<Dictation>().0.lock().unwrap().recording = false;
+            hide_window_after(app, linger(&event));
+            emit(app, event);
+        }
+    }
+}
+
+/// Has what was heard polished, and then ends the recording with the
+/// polished text, or with what was heard and why it was not polished.
+fn polish_then_end(app: &AppHandle, raw: String, instructions: String, words: Arc<Words>) {
+    emit(app, json!({ "type": "polishing" }));
+    let model = crate::models::Model::from_settings(&app.state::<SettingsState>().0.read().unwrap());
+    let state = app.state::<Dictation>();
+    // Held until the task is known: it must be there to be taken back.
+    let mut state = state.0.lock().unwrap();
+    let ending = app.clone();
+    state.polishing = Some(tauri::async_runtime::spawn(async move {
+        let result = polish::polished(&model, &raw, instructions, &words.corrector).await;
+        // Unless the recording was discarded meanwhile (`cancel`).
+        if ending.state::<Dictation>().0.lock().unwrap().polishing.take().is_some() {
+            ended(&ending, result);
+        }
+    }));
 }
 
 /// A mouse button went down on the dictation window. That moves no cursor
@@ -797,14 +875,12 @@ pub fn finish(app: &AppHandle) {
     if !state.recording {
         return;
     }
-    let (polish, ai) = {
-        let settings = app.state::<SettingsState>();
-        let settings = settings.0.read().unwrap();
-        (settings.dictation_polish.clone(), settings.ai())
-    };
     // An extension is given what was said, as it was said.
-    let polish = if state.listener.is_some() { "off".to_owned() } else { polish };
-    if let Err(e) = send(&mut state, &json!({ "cmd": "stop", "polish": polish, "ai": ai })) {
+    state.polish = match state.listener {
+        Some(_) => "off".to_owned(),
+        None => app.state::<SettingsState>().0.read().unwrap().dictation_polish.clone(),
+    };
+    if let Err(e) = send(&mut state, &json!({ "cmd": "stop" })) {
         eprintln!("heyo: {e}");
         // What the recording wrote is finished off by its own thread.
         if let Some(writing) = state.writing.clone() {
@@ -846,11 +922,13 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
         if state.helper.is_none() {
             state.helper = Some(start_helper(app)?);
         }
-        // The helper keeps the vocabulary for the whole recording, polishing included.
-        send(&mut state, &json!({ "cmd": "start", "language": language, "source": source, "vocabulary": vocabulary }))
+        send(&mut state, &json!({ "cmd": "start", "language": language, "source": source }))
     })();
     match started {
         Ok(()) => {
+            // Kept for the whole recording, polishing included.
+            state.words = Words::of(&vocabulary);
+            state.polish = "off".into();
             state.recording = true;
             state.session += 1;
             let mailbox = Arc::new(Mailbox::default());
@@ -900,9 +978,11 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
         if state.helper.is_none() {
             state.helper = Some(start_helper(app)?);
         }
-        send(&mut state, &json!({ "cmd": "start", "language": language, "source": source, "vocabulary": vocabulary }))
+        send(&mut state, &json!({ "cmd": "start", "language": language, "source": source }))
     })();
     started.map_err(NotListening::Failed)?;
+    state.words = Words::of(&vocabulary);
+    state.polish = "off".into();
     state.recording = true;
     state.holding = false;
     state.session += 1;
@@ -958,6 +1038,12 @@ pub fn watch_hold_key(app: &AppHandle) {
 pub fn cancel(app: &AppHandle) {
     let state = app.state::<Dictation>();
     let mut state = state.0.lock().unwrap();
+    // Being polished: the helper is done with it, and the polishing stops.
+    if let Some(polishing) = state.polishing.take() {
+        polishing.abort();
+        drop(state);
+        return ended(app, json!({ "type": "result", "text": "", "raw": "", "polished": false, "cancelled": true }));
+    }
     if state.recording {
         let _ = send(&mut state, &json!({ "cmd": "cancel" }));
     }
@@ -1074,6 +1160,17 @@ mod tests {
         assert!(composing::supported());
         let paster = Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()])));
         Writer::new(Composer::begin(live, polishing, &[MENU]).ok(), paster)
+    }
+
+    #[test]
+    fn what_the_helper_heard_is_written_the_users_way_in_progress_and_finished() {
+        let words = Words::of(&["Heyo".into(), "jason -> JSON".into()]);
+        let fix = |event: Value| corrected(event, &words.corrector);
+        assert_eq!(fix(json!({ "type": "partial", "text": " open heyo" })), json!({ "type": "partial", "text": " open Heyo" }));
+        assert_eq!(fix(json!({ "type": "segment", "text": " Send the jason." })), json!({ "type": "segment", "text": " Send the JSON." }));
+        assert_eq!(fix(json!({ "type": "result", "text": "open heyo", "raw": "open heyo" })), json!({ "type": "result", "text": "open Heyo", "raw": "open Heyo" }));
+        // Nothing else the helper says has words in it.
+        assert_eq!(fix(json!({ "type": "error", "message": "heyo failed" })), json!({ "type": "error", "message": "heyo failed" }));
     }
 
     #[test]

@@ -15,7 +15,7 @@ mod openai;
 pub(crate) mod address;
 
 #[cfg(test)]
-mod mock;
+pub(crate) mod mock;
 
 use std::time::Duration;
 

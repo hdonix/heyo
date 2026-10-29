@@ -72,10 +72,10 @@ function audio(sentence: number[], pause = 1) {
 
 /// Feeds a recording a tenth of a second at a time, as the recorder does,
 /// with the clock moving along, and collects what it says.
-function record(recognizer: Engine, recording: Float32Array[], correct = (text: string) => text) {
+function record(recognizer: Engine, recording: Float32Array[]) {
   const said: Said[] = [];
   let now = 1000;
-  const session = new Session(recognizer, correct, (line) => said.push(line), () => now);
+  const session = new Session(recognizer, (line) => said.push(line), () => now);
   for (const samples of recording) {
     for (let offset = 0; offset < samples.length; offset += SAMPLE_RATE / 10) {
       session.feed(samples.subarray(offset, offset + SAMPLE_RATE / 10));
@@ -140,12 +140,6 @@ describe("a recording", () => {
     const second = record(kept, [audio([1, 2, 3, 4]), audio([6, 7, 1, 8])]);
     expect(second.texts("segment")).toEqual(first.texts("segment"));
     expect(second.text).toBe("the weather is nice. walk to the park.");
-  });
-
-  it("writes the user's words their way, in progress and finished", () => {
-    const { texts } = record(engine(WORDS), [audio([1, 2, 3, 4])], (text) => text.replace("weather", "Wetter"));
-    expect(texts("partial")[0]).toBe("the Wetter is");
-    expect(texts("segment")).toEqual(["the Wetter is nice."]);
   });
 
   it("joins sentences as their writing does", () => {
