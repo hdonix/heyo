@@ -58,6 +58,8 @@ const REFUSED = {
   "ext.screen.capture": { code: "unsupported", message: "There is no screen to take a picture of here." },
   "ext.screen.recognizeText": { code: "unavailable", message: "Text recognition is not set up yet. Download it in Heyo Settings → Screenshots." },
   "ext.dictation.listen": { code: "unavailable", message: "Dictation is not set up yet. Download it in Heyo Settings → Dictation." },
+  // No model is configured: the commands that need one say so, as the host would.
+  "host.ai.ask": "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced.",
 };
 
 const short = (value, limit = 200) => {
@@ -92,8 +94,6 @@ export function createHost({ home = "/home/user" } = {}) {
       return null;
     },
     "host.selection": () => "selected text",
-    // No model is configured: the commands that need one say so.
-    "host.ai": () => ({ provider: "claude", apiKey: "", localUrl: "", localModel: "" }),
     "host.files.refresh": () => null,
     "ext.files.search": () => ({
       files: [
@@ -122,8 +122,8 @@ export function createHost({ home = "/home/user" } = {}) {
     "ext.dictation.stop": () => null,
     "ext.unsubscribe": () => null,
     "ext.system.appearance": () => "dark",
-    // As `host.ai` has it: Claude, with no key.
-    "ext.ai.provider": () => ({ kind: "claude", model: "", local: false }),
+    // Claude, with no key (`host.ai.ask` above).
+    "ext.ai.provider": () => ({ kind: "claude", model: "claude-opus-5-5", local: false }),
     "ext.activity.start": ({ attributes } = {}) => ({ id: String(attributes?.id ?? "") }),
     "ext.activity.list": () => [],
     "ext.activity.get": () => false,

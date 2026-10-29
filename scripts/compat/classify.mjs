@@ -205,7 +205,7 @@ export function classifyCommand({ run, findings = [], absent = [] }) {
       return verdict("fails", "missing-api", absent.join(", "));
     }
     // Asked for a model and there is none: Heyo's AI is not set up here.
-    if (run.host?.["host.ai"] && !["macos-only", "missing-api", "missing-module"].includes(reason)) return verdict("configure", "needs-ai");
+    if (run.host?.["host.ai.ask"] &&!["macos-only", "missing-api", "missing-module"].includes(reason)) return verdict("configure", "needs-ai");
     // The made-up argument came back in the error: it was the argument.
     const quoted = Object.values(run.arguments ?? {}).some((value) => value && [`"${value}"`, `'${value}'`, `“${value}”`].some((q) => text.includes(q)));
     if (quoted && reason === "extension-error") return verdict("unknown", "needs-input", detail);

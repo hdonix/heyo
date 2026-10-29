@@ -134,7 +134,7 @@ describe("the verdict on a command", () => {
   });
 
   it("stops at Heyo's AI where a command asked for a model and got an error", () => {
-    const run = finished({ host: { "host.ai": 1 }, error: { message: "Could not resolve authentication method.", raisedIn: "runtime" }, toasts: [] });
+    const run = finished({ host: { "host.ai.ask": 1 }, error: { message: "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced.", raisedIn: "runtime" }, toasts: [] });
     expect(classifyCommand({ run })).toMatchObject({ status: "configure", reason: "needs-ai" });
   });
 

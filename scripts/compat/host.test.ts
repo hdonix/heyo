@@ -18,7 +18,9 @@ describe("the stand-in host", () => {
   });
 
   it("has no AI configured", () => {
-    expect(createHost().answer("host.ai").result).toEqual({ provider: "claude", apiKey: "", localUrl: "", localModel: "" });
+    // A question is refused as the host refuses it without a key or a local model.
+    expect(createHost().answer("host.ai.ask", { system: "", prompt: "Why?" }).error).toMatch(/^AI is not set up\./);
+    expect(createHost().answer("ext.ai.provider").result).toEqual({ kind: "claude", model: "claude-opus-5-5", local: false });
   });
 
   it("writes down what a command asks to have done, and says it was done", () => {
