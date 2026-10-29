@@ -52,6 +52,10 @@ tauri-plugin-updater = { version = "2", optional = true }
 sys-locale = "0.3"
 # For telling whether an address is this computer (the local model's).
 url = "2"
+# Asking a model (`models`): Claude's API and OpenAI-compatible servers,
+# over TLS by rustls with ring. Both in the build already, through Tauri.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 # The settings window is drawn by Slint, on a thread of its own
 # (src/slint_windows/): with Skia on the CPU, or Slint's own renderer or
 # Skia on the GPU when HEYO_SETTINGS_RENDERER names one. Skia is fetched

@@ -80,14 +80,6 @@ msgid "only web and mail links can be opened from here"
 msgstr "这里只能打开网页和邮件链接"
 
 #: src-tauri/src/commands/settings.rs
-msgid "could not run curl: {0}"
-msgstr "无法运行 curl：{0}"
-
-#: src-tauri/src/commands/settings.rs
-msgid "the server did not answer with a model list"
-msgstr "服务器没有返回模型列表"
-
-#: src-tauri/src/commands/settings.rs
 msgid "Settings need Heyo to be restarted"
 msgstr "需要重启 Heyo 才能打开设置"
 
@@ -641,6 +633,70 @@ msgstr "命令执行失败"
 #: runtime/src/builtins/system.tsx
 msgid "Refresh"
 msgstr "刷新"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
+msgstr "尚未设置 AI。请在“Heyo 设置”→“高级”中添加 Anthropic API 密钥，或选择本地模型。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
+msgstr "Claude API 密钥无效。请在“Heyo 设置”→“高级”中检查。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude's rate limit was reached. Try again shortly."
+msgstr "已达到 Claude 的速率限制，请稍后再试。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Could not reach the Claude API."
+msgstr "无法连接 Claude API。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude API error {0}: {1}"
+msgstr "Claude API 错误 {0}：{1}"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude declined this request."
+msgstr "Claude 拒绝了这个请求。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude returned no text."
+msgstr "Claude 没有返回任何文字。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
+msgstr "无法连接位于 {0} 的本地模型。它在运行吗？（“Heyo 设置”→“高级”）"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local model answered with an error ({0}): {1}"
+msgstr "本地模型返回了错误（{0}）：{1}"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local model is not given images."
+msgstr "本地模型不接收图片。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local server lists no models."
+msgstr "本地服务器没有列出任何模型。"
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local model returned no text."
+msgstr "本地模型没有返回任何文本。"
+
+#: src-tauri/src/models/mod.rs
+msgid "the server did not answer with a model list"
+msgstr "服务器没有返回模型列表"
 
 #: src-tauri/src/ocr.rs
 msgid "failed to run text recognition: {0}"
@@ -4101,34 +4157,6 @@ msgid "For example 25m, 1h 10m or 90s"
 msgstr "例如 25m、1h 10m 或 90s"
 
 #: runtime/src/claude.ts
-msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
-msgstr "尚未设置 AI。请在“Heyo 设置”→“高级”中添加 Anthropic API 密钥，或选择本地模型。"
-
-#: runtime/src/claude.ts
-msgid "Claude declined this request."
-msgstr "Claude 拒绝了这个请求。"
-
-#: runtime/src/claude.ts
-msgid "Claude returned no text."
-msgstr "Claude 没有返回任何文字。"
-
-#: runtime/src/claude.ts
-msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
-msgstr "Claude API 密钥无效。请在“Heyo 设置”→“高级”中检查。"
-
-#: runtime/src/claude.ts
-msgid "Claude's rate limit was reached. Try again shortly."
-msgstr "已达到 Claude 的速率限制，请稍后再试。"
-
-#: runtime/src/claude.ts
-msgid "Could not reach the Claude API."
-msgstr "无法连接 Claude API。"
-
-#: runtime/src/claude.ts
-msgid "Claude API error {0}: {1}"
-msgstr "Claude API 错误 {0}：{1}"
-
-#: runtime/src/claude.ts
 msgid "No Claude API key is set. Add one in Heyo Settings → Advanced."
 msgstr "尚未设置 Claude API 密钥。请在“Heyo 设置”→“高级”中添加。"
 
@@ -4147,26 +4175,6 @@ msgstr "无法下载 Speedtest（{0}）。"
 #: runtime/src/compat.ts
 msgid "The Speedtest download does not match the expected file; not using it."
 msgstr "下载的 Speedtest 与预期的文件不符，不会使用它。"
-
-#: runtime/src/openai.ts
-msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
-msgstr "无法连接位于 {0} 的本地模型。它在运行吗？（“Heyo 设置”→“高级”）"
-
-#: runtime/src/openai.ts
-msgid "The local model answered with an error ({0}): {1}"
-msgstr "本地模型返回了错误（{0}）：{1}"
-
-#: runtime/src/openai.ts
-msgid "The local model is not given images."
-msgstr "本地模型不接收图片。"
-
-#: runtime/src/openai.ts
-msgid "The local server lists no models."
-msgstr "本地服务器没有列出任何模型。"
-
-#: runtime/src/openai.ts
-msgid "The local model returned no text."
-msgstr "本地模型没有返回任何文本。"
 
 #: runtime/src/session.ts
 msgid "Could not prepare {0} for Linux"

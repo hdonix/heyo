@@ -19,6 +19,7 @@ use serde_json::{json, Map, Value};
 
 use super::host::Command;
 use crate::i18n::{self, marked, t, tf, tn, translate};
+use crate::models::{address, Address};
 use super::ids::{Act, Bound, Id};
 use super::keys;
 
@@ -349,42 +350,6 @@ fn flag(value: &Value, name: &str) -> bool {
 
 fn list<'a>(value: &'a Value, name: &str) -> &'a [Value] {
     value.get(name).and_then(Value::as_array).map_or(&[], Vec::as_slice)
-}
-
-/// Where the "local model" setting really points: this computer, or
-/// another (by name, and whether what is sent there is encrypted), or
-/// nowhere a model could be. Only loopback is this computer: an address in
-/// a private range is another machine, however near.
-#[derive(Debug, PartialEq)]
-pub(crate) enum Address {
-    ThisComputer,
-    Elsewhere { host: String, encrypted: bool },
-    Unknown,
-}
-
-pub(crate) fn address(url: &str) -> Address {
-    use url::{Host, Url};
-    let Ok(url) = Url::parse(url.trim()) else { return Address::Unknown };
-    if url.scheme() != "http" && url.scheme() != "https" {
-        return Address::Unknown;
-    }
-    let local = match url.host() {
-        None => return Address::Unknown,
-        Some(Host::Domain(name)) => {
-            let name = name.trim_end_matches('.');
-            name == "localhost" || name.ends_with(".localhost")
-        }
-        Some(Host::Ipv4(ip)) => ip.is_loopback(),
-        Some(Host::Ipv6(ip)) => ip.is_loopback() || ip.to_ipv4_mapped().is_some_and(|ip| ip.is_loopback()),
-    };
-    if local {
-        return Address::ThisComputer;
-    }
-    let host = match url.port() {
-        Some(port) => format!("{}:{port}", url.host_str().unwrap_or_default()),
-        None => url.host_str().unwrap_or_default().to_string(),
-    };
-    Address::Elsewhere { host, encrypted: url.scheme() == "https" }
 }
 
 impl Model {
@@ -1607,41 +1572,6 @@ mod tests {
         assert_eq!(row(&model.lines(), "Recognition Engine").control, "badge");
     }
 
-    #[test]
-    fn an_address_is_this_computer_only_when_it_is_loopback() {
-        for local in ["http://127.0.0.1:8000/v1", "http://localhost:1234", "https://LOCALHOST./v1", "http://api.localhost", "http://127.1/", "http://0x7f.0.0.1", "http://2130706433", "http://[::1]:8080", "http://[::ffff:127.0.0.1]"] {
-            assert_eq!(address(local), Address::ThisComputer, "{local}");
-        }
-        assert_eq!(address("http://192.168.1.20:8000/v1"), Address::Elsewhere { host: "192.168.1.20:8000".into(), encrypted: false });
-        assert_eq!(address(" https://models.example.com/v1 "), Address::Elsewhere { host: "models.example.com".into(), encrypted: true });
-        assert_eq!(address("http://localhost.example.com"), Address::Elsewhere { host: "localhost.example.com".into(), encrypted: false });
-        for unknown in ["", "localhost:8000", "ftp://127.0.0.1", "file:///etc/passwd", "not a url"] {
-            assert_eq!(address(unknown), Address::Unknown, "{unknown}");
-        }
-    }
-
-    /// The runtime has the same rule, for the same warning where it asks a
-    /// model (`src/modelAddress.ts`): what its tests say of an address,
-    /// this says too.
-    #[test]
-    fn an_address_is_judged_as_the_runtime_judges_it() {
-        let theirs = include_str!("../../../src/modelAddress.test.ts");
-        let local = theirs.split_once("for (const address of [").and_then(|(_, rest)| rest.split_once("]) {")).expect("the loopback addresses are no longer listed in src/modelAddress.test.ts").0;
-        let local: Vec<&str> = local.lines().filter_map(|line| line.trim().strip_prefix('"')?.strip_suffix("\",")).collect();
-        assert!(local.len() > 10, "{local:?}");
-        for address_ in local {
-            assert_eq!(address(address_), Address::ThisComputer, "{address_}");
-        }
-        let mut elsewhere = 0;
-        for line in theirs.lines() {
-            let Some(rest) = line.trim().strip_prefix("expect(classifyModelAddress(\"") else { continue };
-            let Some((url, rest)) = rest.split_once("\")).toEqual(elsewhere(\"") else { continue };
-            let Some((host, encrypted)) = rest.trim_end_matches(");").trim_end_matches(')').split_once("\", ") else { continue };
-            assert_eq!(address(url), Address::Elsewhere { host: host.to_string(), encrypted: encrypted == "true" }, "{url}");
-            elsewhere += 1;
-        }
-        assert!(elsewhere >= 7, "only {elsewhere} addresses elsewhere were read out of src/modelAddress.test.ts");
-    }
 
     #[test]
     fn advanced_says_where_text_goes_and_keeps_the_key_to_its_command() {

@@ -14,20 +14,7 @@ pub(crate) const SETTINGS_WINDOW: &str = "settings";
 /// The models an OpenAI-compatible server on this computer offers; an error
 /// says why it could not be asked.
 pub(crate) async fn local_models(url: String) -> Result<Vec<String>, String> {
-    let endpoint = format!("{}/models", url.trim_end_matches('/'));
-    let output = tauri::async_runtime::spawn_blocking(move || {
-        std::process::Command::new("curl").args(["-fsS", "--max-time", "3", "--proto", "=http,https", "--", &endpoint]).output()
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| tf("could not run curl: {0}", &[&e]))?;
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        // "curl: (7) Failed to connect to …" → the part after the code.
-        return Err(error.trim().split_once(") ").map_or(error.trim(), |(_, reason)| reason).to_owned());
-    }
-    let body: Value = serde_json::from_slice(&output.stdout).map_err(|_| t("the server did not answer with a model list").to_owned())?;
-    Ok(body["data"].as_array().into_iter().flatten().filter_map(|m| m["id"].as_str().map(str::to_owned)).collect())
+    crate::models::local_models(&url).await.map_err(|e| e.message())
 }
 
 /// Makes `next` the settings: saves them, does what the change calls for

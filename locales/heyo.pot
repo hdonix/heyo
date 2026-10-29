@@ -77,14 +77,6 @@ msgid "only web and mail links can be opened from here"
 msgstr ""
 
 #: src-tauri/src/commands/settings.rs
-msgid "could not run curl: {0}"
-msgstr ""
-
-#: src-tauri/src/commands/settings.rs
-msgid "the server did not answer with a model list"
-msgstr ""
-
-#: src-tauri/src/commands/settings.rs
 msgid "Settings need Heyo to be restarted"
 msgstr ""
 
@@ -637,6 +629,70 @@ msgstr ""
 #: src-tauri/src/menubar.rs
 #: runtime/src/builtins/system.tsx
 msgid "Refresh"
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude's rate limit was reached. Try again shortly."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Could not reach the Claude API."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude API error {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude declined this request."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/claude.ts
+msgid "Claude returned no text."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local model answered with an error ({0}): {1}"
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local model is not given images."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local server lists no models."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+#: runtime/src/openai.ts
+msgid "The local model returned no text."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "the server did not answer with a model list"
 msgstr ""
 
 #: src-tauri/src/ocr.rs
@@ -4104,34 +4160,6 @@ msgid "For example 25m, 1h 10m or 90s"
 msgstr ""
 
 #: runtime/src/claude.ts
-msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
-msgstr ""
-
-#: runtime/src/claude.ts
-msgid "Claude declined this request."
-msgstr ""
-
-#: runtime/src/claude.ts
-msgid "Claude returned no text."
-msgstr ""
-
-#: runtime/src/claude.ts
-msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
-msgstr ""
-
-#: runtime/src/claude.ts
-msgid "Claude's rate limit was reached. Try again shortly."
-msgstr ""
-
-#: runtime/src/claude.ts
-msgid "Could not reach the Claude API."
-msgstr ""
-
-#: runtime/src/claude.ts
-msgid "Claude API error {0}: {1}"
-msgstr ""
-
-#: runtime/src/claude.ts
 msgid "No Claude API key is set. Add one in Heyo Settings → Advanced."
 msgstr ""
 
@@ -4149,26 +4177,6 @@ msgstr ""
 
 #: runtime/src/compat.ts
 msgid "The Speedtest download does not match the expected file; not using it."
-msgstr ""
-
-#: runtime/src/openai.ts
-msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
-msgstr ""
-
-#: runtime/src/openai.ts
-msgid "The local model answered with an error ({0}): {1}"
-msgstr ""
-
-#: runtime/src/openai.ts
-msgid "The local model is not given images."
-msgstr ""
-
-#: runtime/src/openai.ts
-msgid "The local server lists no models."
-msgstr ""
-
-#: runtime/src/openai.ts
-msgid "The local model returned no text."
 msgstr ""
 
 #: runtime/src/session.ts

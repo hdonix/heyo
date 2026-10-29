@@ -10,6 +10,7 @@ mod host;
 mod i18n;
 mod links;
 mod menubar;
+mod models;
 mod library;
 mod ocr;
 mod open;

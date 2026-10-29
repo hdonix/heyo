@@ -543,10 +543,11 @@ pub struct MemoryResult {
 pub struct AiProvider {
     #[ts(type = "\"claude\" | \"local\"")]
     pub kind: &'static str,
-    /// The local model's name as set, empty for the first the server lists.
-    /// (Which Claude model is the runtime's to say.)
+    /// Claude's model, or the local model's name as set, empty for the
+    /// first the server lists.
     pub model: String,
-    /// Whether what is asked stays on this computer.
+    /// Whether what is asked stays on this computer: a local model at a
+    /// loopback address (`models::address`).
     pub local: bool,
 }
 

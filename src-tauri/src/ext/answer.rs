@@ -31,7 +31,7 @@ use crate::platform::{self, Support};
 use crate::root::Index;
 use crate::settings::Settings;
 use crate::wire::{
-    AiProvider, Capture, CaptureTarget, ErrorCode, ExtCaller, ExtError, ExtRequest, ExtWindow, MemoryItem, MemoryResult, Module, Presentation, RecognizedText, Subscription,
+    Capture, CaptureTarget, ErrorCode, ExtCaller, ExtError, ExtRequest, ExtWindow, MemoryItem, MemoryResult, Module, Presentation, RecognizedText, Subscription,
     Understood, WindowLayout,
 };
 
@@ -351,7 +351,7 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
 
         ClipboardPaste { text, html } => world.running.paste(text, html)?,
 
-        AiProvider => return value(provider(&world.settings.read().unwrap().ai())),
+        AiProvider => return value(crate::models::provider(&world.settings.read().unwrap())),
 
         ActivityStart { attributes, content, announce, launch_type, seq } => {
             let source = activities::Source { extension: caller.name.clone(), title: caller.title.clone(), location: caller.location.clone() };
@@ -630,14 +630,6 @@ fn confirmed(action: Action) -> Option<(&'static str, &'static str)> {
         Action::ShutDown => Some((t("Shut the computer down?"), t("Shut Down"))),
         Action::LogOut => Some((t("Log out?"), t("Log Out"))),
         _ => None,
-    }
-}
-
-/// Which model answers, from the settings as the helpers are given them.
-fn provider(ai: &Value) -> AiProvider {
-    match ai["provider"].as_str() {
-        Some("local") => AiProvider { kind: "local", model: ai["localModel"].as_str().unwrap_or_default().to_owned(), local: true },
-        _ => AiProvider { kind: "claude", model: String::new(), local: false },
     }
 }
 
@@ -1219,7 +1211,7 @@ mod tests {
         let bench = Bench::new(&[]);
         let writer = bench.install("writer", &["ai"]);
         bench.settings.write().unwrap().anthropic_api_key = "sk-secret".into();
-        assert_eq!(bench.result(&writer, "ext.ai.provider", Value::Null), json!({ "kind": "claude", "model": "", "local": false }));
+        assert_eq!(bench.result(&writer, "ext.ai.provider", Value::Null), json!({ "kind": "claude", "model": "claude-opus-5-5", "local": false }));
         {
             let mut settings = bench.settings.write().unwrap();
             settings.ai_provider = "local".into();
