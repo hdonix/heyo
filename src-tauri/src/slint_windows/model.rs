@@ -520,7 +520,9 @@ impl Model {
                 if self.hotkeys_supported() { hotkey.hotkey(&Bound::Own("toggle".into()).to_string(), self.hotkeys.get("toggle")) } else { hotkey.says(t("Bind a desktop keyboard shortcut to heyo.")) },
             ],
         );
-        let languages = [(i18n::SYSTEM, t("System")), (i18n::SOURCE, t("English"))].into_iter().chain(i18n::languages());
+        // Each language by its own name, as `i18n::languages` has them,
+        // English too: whoever cannot read the one in use finds theirs.
+        let languages = [(i18n::SYSTEM, t("System")), (i18n::SOURCE, "English")].into_iter().chain(i18n::languages());
         page.card(
             t("Appearance"),
             vec![
