@@ -164,6 +164,9 @@ impl Model {
     /// The whole answer, trimmed, with nothing of what the model says
     /// before it. `on_text` is given the answer so far each time it grows.
     pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
+        if !question.images.is_empty() && !self.sees_images() {
+            return Err(ModelError::NoImages);
+        }
         match self {
             Model::Claude(claude) => claude.answer(question, on_text).await,
             Model::Local(local) => local.answer(question, on_text).await,

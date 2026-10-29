@@ -22,9 +22,6 @@ impl Local {
     }
 
     pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
-        if !question.images.is_empty() {
-            return Err(ModelError::NoImages);
-        }
         let model = match self.model.as_str() {
             "" => list(&self.url, None).await?.into_iter().next().ok_or(ModelError::NoModels)?,
             chosen => chosen.to_owned(),
