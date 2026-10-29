@@ -18,14 +18,16 @@ check-sway.py does not look at, each as a part that can be run alone.
              ../../gui-test/say.py) dictated with the speech engine lent to
              the session, polished by the stub: what reaches the window that
              has the keyboard
-  settings   the settings window, a floating window here: moved by its top
-             edge, a click after the move, a press in the margin round its
+  settings   the settings window, a floating window here: its panel and
+             margin at the output's scale, moved by its top edge, a click after the move, a press in the margin round its
              panel going to the window underneath, its close button, asked
              for again, Esc
   ime        Chinese typed into its search field through an input method
              (ime.py), in Chinese
   outputs    a second output beside the first: the palette and the settings
-             window on the one the pointer is on, the pill on the first
+             window on the one the pointer is on, the settings window its
+             panel and margin there and when moved to the other, the pill on
+             the first
 
 The controls of the settings window are found by asking the window
 (atspi.py); the pill and the overlay are layer surfaces, which are not on
@@ -125,6 +127,18 @@ def open_settings(title="Heyo Settings"):
         if window(title):
             return window(title)
     return None
+
+
+def fits(found):
+    """Whether the settings window is exactly its panel and its shadow's margin for the output it is on."""
+    there = next((one for one in outputs() if one["name"] == found["output"]), None)
+    if not there:
+        return False
+    room = (there["rect"]["width"], there["rect"]["height"])
+    panel = (min(860, room[0]), min(640, room[1]))
+    # The shadow's margin (settings.slint), where there is room for it and what is behind can show.
+    margins = [0] + ([32] if room[0] >= 924 and room[1] >= 704 else [])
+    return any(abs(found["width"] - panel[0] - 2 * margin) <= 1 and abs(found["height"] - panel[1] - 2 * margin) <= 1 for margin in margins)
 
 
 def close_settings(title):
@@ -343,6 +357,7 @@ def settings():
     check("the settings window comes up, floating, with the keyboard", bool(first) and first["focused"], first)
     if not first:
         return
+    check(f"it is its panel and margin on an output at scale {scale:g}", fits(first), f"{first} on {output['rect']}")
     close_button = atspi.where("button", "Close", "Heyo Settings")
     check("its close button is found", bool(close_button))
     if not close_button:
@@ -381,6 +396,7 @@ def settings():
     check("its close button closes it", bool(wait(lambda: not window("Heyo Settings"), 5)))
     again = open_settings()
     check("asked for again, it comes back, with the keyboard", bool(again) and again["focused"], again)
+    check("... floating, its panel and margin again", bool(again) and fits(again), again)
     check("... and a click in it works", press_on("Heyo Settings", "list item", "Shortcuts", 0.8) and "selected" in atspi.states("list item", "Shortcuts", "Heyo Settings"))
     keys("-k", "Escape")
     check("Esc closes it", bool(wait(lambda: not window("Heyo Settings"), 5)))
@@ -433,6 +449,15 @@ def on_outputs():
         wait(lambda: not window("Heyo"), 4)
         found = open_settings()
         check(f"with the pointer on {target['name']}: the settings window is on it", bool(found) and found["output"] == target["name"], found)
+        if found:
+            scales = {one["name"]: one["scale"] for one in both}
+            check(f"... and is its panel and margin there (scale {scales[target['name']]:g})", fits(found), found)
+            # Moved to the other output, of another size or scale.
+            away = next(one for one in both if one["name"] != target["name"])
+            sway('[title="^Heyo Settings$"]', "move", "container", "to", "output", away["name"])
+            time.sleep(2)
+            moved = window("Heyo Settings")
+            check(f"moved to {away['name']} (scale {scales[away['name']]:g}): it is its panel and margin there", bool(moved) and moved["output"] == away["name"] and fits(moved), moved)
         close_settings("Heyo Settings")
     # The pill: something light on each output behind it, and the pointer on the second.
     lights = []

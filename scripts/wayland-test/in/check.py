@@ -17,6 +17,8 @@ Heyo does through its Shell extension against what the Shell itself says.
   check.py cold       the first of Slint's windows comes up with Mesa's shader cache emptied
   check.py warm       no check: a Slint window drawn once, for the checks after it
   check.py settings   the settings window moved, clicked after, its margin let through, closed, back
+  check.py sizes      on each monitor and moved to another, the settings window is its panel and
+                      margin there, drawn in that monitor's own pixels
   check.py ime        Chinese typed through IBus (Pinyin) into the settings window's search field
   check.py upgrade    with the extension of an earlier Heyo running: Settings updates it
   check.py upgraded   after the next login: the new one runs
@@ -701,6 +703,53 @@ def cold():
     wait(lambda: not window("Heyo Settings"))
 
 
+def fitted(title):
+    """Whether the window is exactly its panel and its shadow's margin for the monitor it is on, and
+    drawn in that monitor's own pixels: (fits, sharp, what was seen)."""
+    frame = window(title)
+    monitor = monitors()[frame["monitor"]]
+    texture = run(f"(a => (t => t && [t.get_width(), t.get_height()])(a.get_texture().get_texture()))"
+                  f"(global.get_window_actors().find(a => a.meta_window.get_title() === {title!r}))")
+    # In the window's logical pixels: the Shell's units are those, or the monitor's own when laid out in pixels.
+    logical = monitor["density"] / monitor["scale"]
+    size = (frame["width"] * logical, frame["height"] * logical)
+    # The room Heyo has for it is all of the monitor: Wayland tells a client nothing of panels.
+    room = (monitor["width"] * logical, monitor["height"] * logical)
+    panel = (min(860, room[0]), min(640, room[1]))
+    # The shadow's margin (settings.slint), where there is room for it and what is behind can show.
+    margins = [0] + ([32] if room[0] >= 924 and room[1] >= 704 else [])
+    fits = any(abs(size[0] - panel[0] - 2 * margin) <= 1 and abs(size[1] - panel[1] - 2 * margin) <= 1 for margin in margins)
+    sharp = bool(texture) and all(abs(texture[i] - frame[key] * monitor["density"]) <= 2 for i, key in enumerate(("width", "height")))
+    return fits, sharp, f"{frame['width']}x{frame['height']} drawn in {texture} on {monitor}"
+
+
+def sizes():
+    """On each monitor, and moved from it to the other: the settings window is its panel and margin, sharp."""
+    restart("hideOnBlur=false", 'language="system"')
+    all_monitors = monitors()
+    for index, monitor in enumerate(all_monitors):
+        how = f"monitor {index} (scale {monitor['scale']:g})"
+        point(monitor["x"] + monitor["width"] / 3, monitor["y"] + monitor["height"] / 3)
+        heyo("--open", "heyo:settings")
+        if not wait(lambda: window("Heyo Settings"), 8):
+            check(f"{how}: the settings window comes up", False)
+            continue
+        time.sleep(1.5)
+        fits, sharp, seen = fitted("Heyo Settings")
+        check(f"{how}: the settings window is its panel and margin", fits, seen)
+        check(f"{how}: ... drawn in the monitor's own pixels", sharp, seen)
+        picture(f"sizes-monitor-{index}", "Heyo Settings")
+        for there in [other for other in range(len(all_monitors)) if other != index] + [index]:
+            run(f"global.get_window_actors().map(a => a.meta_window).find(w => w.get_title() === 'Heyo Settings').move_to_monitor({there})")
+            time.sleep(2)
+            fits, sharp, seen = fitted("Heyo Settings")
+            moved = f"moved from monitor {index} to {there}" if there != index else f"moved back to monitor {index}"
+            check(f"{moved}: it is its panel and margin there", fits and window("Heyo Settings")["monitor"] == there, seen)
+            check(f"{moved}: ... drawn in that monitor's own pixels", sharp, seen)
+        close("Heyo Settings")
+        wait(lambda: not window("Heyo Settings"))
+
+
 def settings_window():
     """The settings window as a window: moved by its top edge, a click after the move, closed, open again."""
     import atspi
@@ -872,7 +921,7 @@ def upgraded():
 
 
 CHECKS = {"lists": lists, "layout": layout, "capture": capture, "relock": relock, "own": own, "language": language, "ai": ai, "dictate": dictate,
-          "placement": placement, "settings": settings_window, "cold": cold, "warm": warm, "ime": ime, "upgrade": upgrade, "upgraded": upgraded}
+          "placement": placement, "settings": settings_window, "sizes": sizes, "cold": cold, "warm": warm, "ime": ime, "upgrade": upgrade, "upgraded": upgraded}
 if len(sys.argv) < 2 or any(name not in CHECKS for name in sys.argv[1:]):
     sys.exit(__doc__)
 # For test.sh, which reads this through a pipe.

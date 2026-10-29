@@ -738,8 +738,10 @@ export component SettingsWindow inherits Window {
     // The shadow needs a margin to fall in, which a screen too small for
     // the window with it has not, nor a window that cannot be seen through.
     out property <length> margin: Theme.plain || opaque || room-width < 924px || room-height < 704px ? 0px : Tokens.window-margin;
-    property <length> panel-width: min(860px, room-width);
-    property <length> panel-height: min(640px, room-height);
+    // The panel, in the middle of the window: the window is it and its
+    // margin, which the host sees kept (`fit` in window.rs).
+    out property <length> panel-width: min(860px, room-width);
+    out property <length> panel-height: min(640px, room-height);
     property <bool> dark: appearance == "dark" || (appearance == "system" && (Palette.color-scheme == ColorScheme.dark || (Palette.color-scheme == ColorScheme.unknown && system-dark)));
     property <string> page: Host.page;
     pure function nav-y(index: int) -> length {

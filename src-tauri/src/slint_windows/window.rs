@@ -18,7 +18,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
-use slint::winit_030::winit::dpi::PhysicalPosition;
+use slint::winit_030::winit::dpi::{LogicalSize, PhysicalPosition};
 use slint::winit_030::winit::event::{ElementState, MouseButton, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
@@ -32,7 +32,7 @@ use super::life::{self, Life, Lives, Slot, Slotted};
 use super::press::{self, Pointer, Whose};
 use super::standing::{self, Button, Keyboard, Layer, Pointed, Standing};
 use super::{icons, reach, ui};
-use crate::platform::place::Which;
+use crate::platform::place::{Monitor, Which};
 
 /// For measuring: with `HEYO_SETTINGS_FRAMES` naming a file, how long each
 /// frame took is written there when the window is closed, a line a frame:
@@ -197,10 +197,6 @@ impl slint::Model for Lines {
 /// panel.
 const STANDING: Standing = Standing { layer: Layer::Among, keyboard: Keyboard::Ordinary, listed: true, clear: true };
 
-/// The panel the window draws, in logical pixels, as the markup has it
-/// (`panel-width`, `panel-height`) where the screen has room for it.
-const PANEL: (f64, f64) = (860.0, 640.0);
-
 /// The window while Slint runs.
 struct Live {
     life: Life<ui::SettingsWindow>,
@@ -311,10 +307,28 @@ impl Live {
         match event {
             WindowEvent::RedrawRequested => {
                 frames::begun();
+                // A Wayland window is told of no move: whether it is on
+                // another monitor is seen as it is drawn.
+                if thread::wayland() {
+                    slint::Timer::single_shot(Duration::ZERO, || {
+                        with(|live| {
+                            if live.fit() {
+                                live.reach();
+                            }
+                        });
+                    });
+                }
                 EventResult::Propagate
             }
             WindowEvent::Moved(_) => {
                 self.life.window().set_moved(self.life.window().get_moved().wrapping_add(1));
+                slint::Timer::single_shot(Duration::ZERO, || {
+                    with(|live| {
+                        if live.fit() {
+                            live.reach();
+                        }
+                    });
+                });
                 EventResult::Propagate
             }
             // Everything in it is Slint's: what is kept is whether a
@@ -325,12 +339,28 @@ impl Live {
                 self.life.draw();
                 self.pointed(if *state == ElementState::Pressed { Pointed::Pressed(Button::Left) } else { Pointed::Released(Button::Left) })
             }
-            // Its panel is elsewhere in it, or of another size: once Slint
-            // has laid it out for what it was just told.
+            // The desktop gave it a size, or another scale: it is its panel
+            // and margin again, for the monitor it is on, and its panel
+            // takes the pointer; once Slint has laid it out for what it
+            // was just told.
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                 slint::Timer::single_shot(Duration::ZERO, || {
-                    with(|live| live.reach());
+                    with(|live| {
+                        live.fit();
+                        live.reach();
+                    });
                 });
+                // A Wayland window is told it is on another monitor after
+                // it is told the scale there, and may not be drawn again.
+                if thread::wayland() && matches!(event, WindowEvent::ScaleFactorChanged { .. }) {
+                    slint::Timer::single_shot(Duration::from_millis(250), || {
+                        with(|live| {
+                            if live.fit() {
+                                live.reach();
+                            }
+                        });
+                    });
+                }
                 EventResult::Propagate
             }
             WindowEvent::ModifiersChanged(modifiers) => {
@@ -399,6 +429,23 @@ impl Live {
         self.stop_recording();
         self.life.off();
         frames::write();
+    }
+
+    /// Has the window fit the monitor it is on now: its room there, and
+    /// its size exactly its panel and margin. A desktop may give it
+    /// another size (Mutter answers a size it was told before with that
+    /// size, after it has changed), and Slint, whose window this is, keeps
+    /// what it is given. True when the window was asked to change.
+    fn fit(&self) -> bool {
+        let window = self.life.window();
+        let roomed = window.window().with_winit_window(|made| life::display(made, true).monitor(Which::Its).is_some_and(|monitor| room(window, &monitor))).unwrap_or(false);
+        let wanted = wanted(window);
+        let size = window.window().size().to_logical(window.window().scale_factor());
+        let resized = (size.width - wanted.0).abs() > 0.5 || (size.height - wanted.1).abs() > 0.5;
+        if resized {
+            window.window().set_size(slint::LogicalSize::new(wanted.0, wanted.1));
+        }
+        roomed || resized
     }
 
     /// Has the window take the pointer where its panel is, and not in the
@@ -510,15 +557,19 @@ fn furnish(window: &ui::SettingsWindow, shared: &thread::Shared, lines: &Rc<Line
 /// where its panel is; and in front.
 fn arrived(window: &ui::SettingsWindow, made: &slint::winit_030::winit::window::Window, asking: &mpsc::Sender<Job>, asked: Option<Instant>) {
     if let Some(monitor) = life::display(made, true).monitor(Which::Its) {
-        let (wide, high) = monitor.room_size();
-        window.set_room_width(wide as f32);
-        window.set_room_height(high as f32);
+        room(window, &monitor);
         // As large as it will be, which it may not be yet: the panel the
         // markup draws, no larger than the room, and its margin.
-        let margin = 2.0 * f64::from(window.get_margin());
-        let (x, y) = monitor.middle_of_room(((PANEL.0.min(wide) + margin) * monitor.scale, (PANEL.1.min(high) + margin) * monitor.scale));
+        let (wide, high) = wanted(window);
+        let (x, y) = monitor.middle_of_room((f64::from(wide) * monitor.scale, f64::from(high) * monitor.scale));
         made.set_outer_position(PhysicalPosition::new(x, y));
     }
+    // A window of winit's made anew for Slint's that was there before is
+    // told its size may not change only when that size changes, and a
+    // window manager that tiles (Sway) tiles a window that does not say so.
+    let (wide, high) = wanted(window);
+    made.set_min_inner_size(Some(LogicalSize::new(wide, high)));
+    made.set_max_inner_size(Some(LogicalSize::new(wide, high)));
     standing::reach(made, reach::panel((made.inner_size().width, made.inner_size().height), window.get_margin(), window.window().scale_factor()));
     made.focus_window();
     // Which on Wayland a window may not do for itself: the desktop is
@@ -528,6 +579,26 @@ fn arrived(window: &ui::SettingsWindow, made: &slint::winit_030::winit::window::
     if let Some(asked) = asked {
         eprintln!("heyo: settings up {} ms after they were asked for", asked.elapsed().as_millis());
     }
+}
+
+/// The size the window is to be, in logical pixels: its panel, as large as
+/// the room it has allows, and the margin round it.
+fn wanted(window: &ui::SettingsWindow) -> (f32, f32) {
+    let margin = 2.0 * window.get_margin();
+    (window.get_panel_width() + margin, window.get_panel_height() + margin)
+}
+
+/// Tells the window the room the monitor has for it: true when that is
+/// another room than it had.
+fn room(window: &ui::SettingsWindow, monitor: &Monitor) -> bool {
+    let (wide, high) = monitor.room_size();
+    let (wide, high) = (wide as f32, high as f32);
+    if window.get_room_width() == wide && window.get_room_height() == high {
+        return false;
+    }
+    window.set_room_width(wide);
+    window.set_room_height(high);
+    true
 }
 
 impl Lives for Live {

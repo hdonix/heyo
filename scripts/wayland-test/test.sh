@@ -92,14 +92,14 @@ else
   # lock screen; then the interface in Chinese, AI Chat and dictation
   # through the host, where windows come up, the settings window as a
   # window and an input method in it.
-  run "1 1" cold lists own relock layout capture language ai dictate placement settings ime
+  run "1 1" cold lists own relock layout capture language ai dictate placement settings sizes ime
   # Scaled units: one monitor at 200 % beside one at 100 %, then fractional scales.
   # (After the first, Slint's first picture of a session is drawn before
   # the checks: see `cold`.)
-  run "2 1" warm own layout capture language placement settings
-  run "1.5 1.25" warm own layout capture placement settings
+  run "2 1" warm own layout capture language placement settings sizes
+  run "1.5 1.25" warm own layout capture placement settings sizes
   # Laid out in pixels, as GNOME does until fractional scaling is switched on.
-  run "--pixels 2 1" warm own layout capture placement settings
+  run "--pixels 2 1" warm own layout capture placement settings sizes
   upgrade
 fi
 "$HERE/run.sh" stop >/dev/null

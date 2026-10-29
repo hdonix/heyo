@@ -622,9 +622,31 @@ pub(super) fn begin(app: &AppHandle, work: impl FnOnce() + Send + 'static) -> bo
 pub(super) fn display(made: &Window, rooms: bool) -> Display {
     let whole = |monitor: &slint::winit_030::winit::monitor::MonitorHandle| (monitor.position().x, monitor.position().y, monitor.size().width, monitor.size().height);
     let free = if rooms { place::kept_free() } else { None };
-    let (its, primary) = (made.current_monitor().map(|monitor| whole(&monitor)), made.primary_monitor().map(|monitor| whole(&monitor)));
-    let monitors: Vec<Monitor> = made.available_monitors().map(|monitor| Monitor::new(whole(&monitor), monitor.scale_factor(), Some(whole(&monitor)) == primary, free)).collect();
-    Display { its: its.and_then(|its| monitors.iter().position(|monitor| monitor.whole == its)), monitors }
+    let (current, primary) = (made.current_monitor().map(|monitor| whole(&monitor)), made.primary_monitor().map(|monitor| whole(&monitor)));
+    let available: Vec<_> = made.available_monitors().collect();
+    let drawn_at = made.scale_factor();
+    let scales: Vec<f64> = available.iter().map(|monitor| monitor.scale_factor()).collect();
+    let its = its(available.iter().position(|monitor| Some(whole(monitor)) == current), &scales, drawn_at);
+    let monitors = available
+        .iter()
+        .enumerate()
+        // A Wayland output says its scale rounded up to a whole one; the
+        // window on it is told the scale it is drawn at, which is the
+        // monitor's.
+        .map(|(at, monitor)| Monitor::new(whole(monitor), if Some(at) == its { drawn_at } else { monitor.scale_factor() }, Some(whole(monitor)) == primary, free))
+        .collect();
+    Display { its, monitors }
+}
+
+/// Which of the monitors (by the scales they say) a window drawn at
+/// `drawn_at` is on, winit saying `current`. A Wayland window on two
+/// monitors at once, as one is while it is moved to the other, is said to
+/// be on the one it came to first; it is drawn at the scale of the one the
+/// compositor counts it on, which an output says rounded up to a whole
+/// one.
+fn its(current: Option<usize>, scales: &[f64], drawn_at: f64) -> Option<usize> {
+    let drawn_on = |at: &usize| scales.get(*at).is_some_and(|scale| (scale - drawn_at).abs() < 0.01 || (scale - drawn_at.ceil()).abs() < 0.01);
+    current.filter(drawn_on).or_else(|| (0..scales.len()).find(drawn_on)).or(current)
 }
 
 /// Has a window drawn clear where it draws nothing, or opaque, as what
@@ -648,6 +670,23 @@ pub(super) fn seen_through(window: &slint::Window, renderer: &str, set_opaque: i
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_window_is_on_the_monitor_whose_scale_it_is_drawn_at() {
+        // As winit says, where that is drawn at the scale it is drawn at.
+        assert_eq!(its(Some(1), &[2.0, 1.0], 1.0), Some(1));
+        // Moved from one to the other: winit still says the first.
+        assert_eq!(its(Some(1), &[2.0, 1.0], 2.0), Some(0));
+        assert_eq!(its(Some(0), &[2.0, 1.0], 1.0), Some(1));
+        // Fractional scales, which outputs say rounded up.
+        assert_eq!(its(Some(1), &[2.0, 2.0], 1.25), Some(1));
+        assert_eq!(its(Some(0), &[2.0, 1.0], 1.5), Some(0));
+        // On none yet, or none drawn at its scale: as winit says.
+        assert_eq!(its(None, &[2.0, 1.0], 1.0), Some(1));
+        assert_eq!(its(None, &[1.0, 1.0], 1.0), Some(0));
+        assert_eq!(its(None, &[2.0, 2.0], 1.0), None);
+        assert_eq!(its(Some(1), &[1.0, 1.0], 3.0), Some(1));
+    }
 
     #[test]
     fn a_kept_window_is_made_once_and_then_put_on_and_taken_off_by_winit() {
