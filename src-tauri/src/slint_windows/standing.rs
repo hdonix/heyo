@@ -437,8 +437,9 @@ pub(super) fn take_down(outside: Outside) -> bool {
 /// - X11: the window is given an input shape (XFixes, on winit's own
 ///   connection). To the server and to the window manager the rest of it
 ///   is then not there for the pointer.
-/// - Wayland has the same thing (a surface's input region), but winit
-///   offers it only as all or nothing. Not done.
+/// - Wayland: the window's surface is given an input region, on winit's
+///   own connection (winit offers it only as all or nothing). The
+///   compositor then hands a press there to whatever is underneath.
 /// - Windows has none for a window drawn as these are: a window's region
 ///   cuts what is drawn along with what is pressed, a shadow too, and only
 ///   a layered window lets the pointer through where it is clear. Not
@@ -466,6 +467,8 @@ pub(super) fn reach(window: &Window, within: Option<Rect>) {
             }
             (x11.xlib.XFlush)(x11.display);
         }
+    } else {
+        wayland::reach(window, within);
     }
     #[cfg(not(target_os = "linux"))]
     let _ = (window, within);
@@ -644,6 +647,84 @@ pub(super) mod x11 {
         let RawDisplayHandle::Xlib(display) = window.display_handle().ok()?.as_raw() else { return None };
         let RawWindowHandle::Xlib(handle) = window.window_handle().ok()?.as_raw() else { return None };
         Some(OnX11 { xlib: XLIB.with(|xlib| *xlib)?, display: display.display?.as_ptr().cast(), window: handle.window })
+    }
+}
+
+/// A window on winit's own connection to a Wayland compositor: its
+/// surface given an input region.
+#[cfg(target_os = "linux")]
+mod wayland {
+    use std::cell::RefCell;
+
+    use slint::winit_030::winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
+    use slint::winit_030::winit::window::Window;
+    use wayland_client::backend::{Backend, ObjectId};
+    use wayland_client::globals::{registry_queue_init, GlobalListContents};
+    use wayland_client::protocol::{wl_compositor, wl_region, wl_registry, wl_surface};
+    use wayland_client::{Connection, Dispatch, EventQueue, Proxy, QueueHandle};
+
+    use crate::platform::place::Rect;
+
+    /// Nothing the compositor says to these objects matters here.
+    struct Unheard;
+
+    impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Unheard {
+        fn event(_: &mut Self, _: &wl_registry::WlRegistry, _: wl_registry::Event, _: &GlobalListContents, _: &Connection, _: &QueueHandle<Self>) {}
+    }
+
+    impl Dispatch<wl_compositor::WlCompositor, ()> for Unheard {
+        fn event(_: &mut Self, _: &wl_compositor::WlCompositor, _: wl_compositor::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    }
+
+    impl Dispatch<wl_region::WlRegion, ()> for Unheard {
+        fn event(_: &mut Self, _: &wl_region::WlRegion, _: wl_region::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+    }
+
+    /// winit's connection as a client of this library's, and its
+    /// compositor, on a queue of their own: found once, on winit's thread.
+    struct Found {
+        connection: Connection,
+        compositor: wl_compositor::WlCompositor,
+        queue: EventQueue<Unheard>,
+    }
+
+    thread_local! {
+        static FOUND: RefCell<Option<Found>> = const { RefCell::new(None) };
+    }
+
+    /// Has the window's surface take the pointer in `within` only (device
+    /// pixels), or everywhere. Nothing for a window that is not Wayland's.
+    pub(super) fn reach(window: &Window, within: Option<Rect>) {
+        let (Ok(display), Ok(handle)) = (window.display_handle(), window.window_handle()) else { return };
+        let (RawDisplayHandle::Wayland(display), RawWindowHandle::Wayland(handle)) = (display.as_raw(), handle.as_raw()) else { return };
+        FOUND.with_borrow_mut(|found| {
+            if found.is_none() {
+                // SAFETY: winit's display, which lives as long as its event loop, on its thread.
+                let connection = Connection::from_backend(unsafe { Backend::from_foreign_display(display.display.as_ptr().cast()) });
+                let Ok((globals, queue)) = registry_queue_init::<Unheard>(&connection) else { return };
+                let Ok(compositor) = globals.bind::<wl_compositor::WlCompositor, _, _>(&queue.handle(), 1..=1, ()) else { return };
+                *found = Some(Found { connection, compositor, queue });
+            }
+            let Some(Found { connection, compositor, queue }) = found.as_ref() else { return };
+            // SAFETY: the window's surface, which winit keeps while the window is there.
+            let Ok(id) = (unsafe { ObjectId::from_ptr(wl_surface::WlSurface::interface(), handle.surface.as_ptr().cast()) }) else { return };
+            let Ok(surface) = wl_surface::WlSurface::from_id(connection, id) else { return };
+            match within {
+                Some((x, y, width, height)) => {
+                    // A surface's own places are logical pixels.
+                    let scale = window.scale_factor();
+                    let logical = |pixels: f64| (pixels / scale).round() as i32;
+                    let region = compositor.create_region(&queue.handle(), ());
+                    region.add(logical(f64::from(x)), logical(f64::from(y)), logical(f64::from(width)), logical(f64::from(height)));
+                    surface.set_input_region(Some(&region));
+                    region.destroy();
+                }
+                None => surface.set_input_region(None),
+            }
+            // It takes effect with the surface's next commit: the next frame.
+            window.request_redraw();
+            let _ = connection.flush();
+        });
     }
 }
 
