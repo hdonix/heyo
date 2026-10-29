@@ -19,7 +19,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import { padded, pooled, prefixed, Tokenizer } from "./embedding";
-import { download, installPackages, type PinnedFile } from "./install";
+import { download, installPackages, type PinnedFile, said } from "./install";
 import engineLock from "./locks/embed.json";
 
 // Absolute: packages are found from it.
@@ -49,13 +49,13 @@ const REVISION = "Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4
 const FILES: PinnedFile[] = [
   {
     file: path.join(DIR, "model", "model_quantized.onnx"),
-    label: "Language model",
+    step: "language-model",
     sha256: "f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193",
     urls: [`https://huggingface.co/${REVISION}/onnx/model_quantized.onnx`, `https://hf-mirror.com/${REVISION}/onnx/model_quantized.onnx`],
   },
   {
     file: path.join(DIR, "model", "tokenizer.json"),
-    label: "Vocabulary",
+    step: "vocabulary",
     sha256: "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
     urls: [`https://huggingface.co/${REVISION}/tokenizer.json`, `https://hf-mirror.com/${REVISION}/tokenizer.json`],
   },
@@ -80,7 +80,7 @@ function runtimeHome(): string | undefined {
 
 async function install() {
   if (!runtimeHome()) {
-    send({ type: "progress", step: "Engine", received: 0, total: 0 });
+    send({ type: "progress", step: "embedding-engine", received: 0, total: 0 });
     // onnxruntime-node 1.30.0, from the lockfile (`npm install
     // --package-lock-only`, 2026-10-10). It carries its libraries; its
     // install script (which would fetch GPU libraries) is not run.
@@ -215,7 +215,8 @@ function packed(vectors: Float32Array[]) {
   return Buffer.from(all.buffer).toString("base64");
 }
 
-const failed = (e: unknown) => send({ type: "error", message: e instanceof Error ? e.message : String(e) });
-if (!DIR) send({ type: "error", message: "HEYO_EMBED_DIR is not set" });
+// What the user is shown of an installation, the host words (`install.ts`).
+const failed = (e: unknown) => send({ type: "error", ...said(e) });
+if (!DIR) send({ type: "error", code: "failed", detail: "HEYO_EMBED_DIR is not set" });
 else if (process.argv[2] === "install") install().catch(failed);
 else serve();

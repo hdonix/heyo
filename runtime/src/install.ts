@@ -2,6 +2,11 @@
 //! engines and their models), so that what runs is what was chosen when
 //! Heyo was built and not whatever the network hands over that day.
 //!
+//! What a helper has to say to the user it says as a code and its
+//! particulars (`Failure`, `said`), never in words: it has no translations,
+//! and the host words it in the user's language (`helper::worded` in
+//! `src-tauri/src/helper.rs`). The steps of an installation are codes too.
+//!
 //! Files are downloaded from an address that names one revision and are
 //! checked against a SHA-256 written here in the source before they get
 //! their name. npm packages are installed from a lockfile that ships with
@@ -15,11 +20,31 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
+/// What went wrong, as the host words it: a code, and its particulars.
+/// `detail` is what only the words of whatever failed can say (a server's
+/// answer, an exception's message), shown as it is.
+export class Failure extends Error {
+  constructor(
+    readonly code: string,
+    readonly particulars: Record<string, string> = {},
+  ) {
+    super(particulars.detail ? `${code}: ${particulars.detail}` : code);
+  }
+}
+
+/// What a helper sends for something that went wrong: a `Failure` as it
+/// is, anything else as a failure the host has no other words for.
+export function said(e: unknown): Record<string, string> {
+  if (e instanceof Failure) return { code: e.code, ...e.particulars };
+  return { code: "failed", detail: e instanceof Error ? e.message : String(e) };
+}
+
 /// A file to download: where it goes, where it comes from, and what it must be.
 export interface PinnedFile {
   file: string;
-  /// What it is, for progress and errors ("Speech model").
-  label: string;
+  /// What it is, as a step of the installation the host names
+  /// ("speech-model").
+  step: string;
   /// Lowercase hex.
   sha256: string;
   /// Tried in order; mirrors of the same bytes.
@@ -64,7 +89,7 @@ export async function download(entry: PinnedFile, progress: Progress = () => {},
           received += chunk.length;
           if (Date.now() - reported > 200) {
             reported = Date.now();
-            progress(entry.label, received, total);
+            progress(entry.step, received, total);
           }
           yield chunk;
         }
@@ -82,7 +107,7 @@ export async function download(entry: PinnedFile, progress: Progress = () => {},
     }
   }
   const reason = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new Error(`Could not download the ${entry.label.toLowerCase()}: ${reason}`);
+  throw new Failure("download", { step: entry.step, detail: reason });
 }
 
 /// An npm lockfile (version 3), as far as this module reads it.
@@ -105,7 +130,7 @@ function run(command: string, args: string[], cwd: string) {
     let stderr = "";
     child.stderr?.on("data", (d) => (stderr += d));
     child.once("error", reject);
-    child.once("exit", (code) => (code === 0 ? resolve() : reject(new Error(stderr.trim().split("\n").pop() || `${command} failed`))));
+    child.once("exit", (code) => (code === 0 ? resolve() : reject(new Failure("packages", { detail: stderr.trim().split("\n").pop() || `${command} failed` }))));
   });
 }
 

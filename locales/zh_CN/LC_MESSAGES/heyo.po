@@ -49,6 +49,7 @@ msgid "Could not move the window"
 msgstr "无法移动窗口"
 
 #: src-tauri/src/clipboard/meaning.rs
+#: src-tauri/src/helper.rs
 msgid "Language model"
 msgstr "语言模型"
 
@@ -608,6 +609,56 @@ msgid "Commands built into Heyo."
 msgstr "Heyo 内置的命令。"
 
 #: src-tauri/src/helper.rs
+msgid "{0}: {1}"
+msgstr "{0}：{1}"
+
+#: src-tauri/src/helper.rs
+msgid "No audio recorder"
+msgstr "未找到录音程序"
+
+#: src-tauri/src/helper.rs
+msgid "Install pulseaudio-utils or alsa-utils."
+msgstr "请安装 pulseaudio-utils 或 alsa-utils。"
+
+#: src-tauri/src/helper.rs
+msgid "Could not download: {0}"
+msgstr "无法下载：{0}"
+
+#: src-tauri/src/helper.rs
+msgid "Could not install the engine"
+msgstr "无法安装引擎"
+
+#: src-tauri/src/helper.rs
+msgid "Speech engine"
+msgstr "语音识别引擎"
+
+#: src-tauri/src/helper.rs
+msgid "Speech model"
+msgstr "语音识别模型"
+
+#: src-tauri/src/helper.rs
+msgid "Voice detector"
+msgstr "人声检测器"
+
+#: src-tauri/src/helper.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Vocabulary"
+msgstr "词汇表"
+
+#: src-tauri/src/helper.rs
+msgid "Engine"
+msgstr "引擎"
+
+#: src-tauri/src/helper.rs
+#: src-tauri/src/ocr.rs
+msgid "Text recognition engine"
+msgstr "文字识别引擎"
+
+#: src-tauri/src/helper.rs
+msgid "The download failed"
+msgstr "下载失败"
+
+#: src-tauri/src/helper.rs
 msgid "The download stopped unexpectedly"
 msgstr "下载意外停止"
 
@@ -693,10 +744,6 @@ msgstr "无法运行文字识别：{0}"
 #: src-tauri/src/ocr.rs
 msgid "text recognition returned nothing"
 msgstr "文字识别没有返回任何结果"
-
-#: src-tauri/src/ocr.rs
-msgid "Text recognition engine"
-msgstr "文字识别引擎"
 
 #: src-tauri/src/open.rs
 msgid "nothing to open for {0} (was it uninstalled?)"
@@ -1640,10 +1687,6 @@ msgstr "系统默认"
 #: src-tauri/src/slint_windows/model.rs
 msgid "Automatic detection handles mixed Chinese and English"
 msgstr "自动检测可处理中英文混说"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Vocabulary"
-msgstr "词汇表"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Your Words"

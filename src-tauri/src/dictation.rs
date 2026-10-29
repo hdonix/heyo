@@ -96,6 +96,18 @@ impl Words {
     }
 }
 
+/// What the helper says, with what it says went wrong in words: it says
+/// that as a code (`helper::worded`). The pill has room for the short
+/// words; the rest is for the log.
+fn said(event: Value) -> Value {
+    if event["type"] != "error" {
+        return event;
+    }
+    let worded = crate::helper::worded(&event, t("Dictation failed"));
+    eprintln!("heyo: dictation: {}", worded.full());
+    json!({ "type": "error", "message": worded.short })
+}
+
 /// What the helper said it heard, with the user's words written their way.
 fn corrected(mut event: Value, corrector: &Corrector) -> Value {
     if matches!(event["type"].as_str(), Some("partial" | "segment" | "result")) {
@@ -238,7 +250,7 @@ fn start_helper(app: &AppHandle) -> Result<Helper, String> {
     let (receiver, ended) = (app.clone(), app.clone());
     Helper::start(
         node_command(app, &[])?,
-        move |event| handle(&receiver, event),
+        move |event| handle(&receiver, said(event)),
         move || {
             // The helper exits when idle; the next recording starts a new one.
             let state = ended.state::<Dictation>();
@@ -1708,6 +1720,15 @@ mod tests {
 
     /// Everything `runtime/src/dictation.ts` writes while recording, and what
     /// the host says itself, is something the window is told.
+    #[test]
+    fn what_the_helper_says_went_wrong_is_worded_by_the_host_to_fit_the_pill() {
+        assert_eq!(said(json!({ "type": "error", "code": "no-recorder" })), json!({ "type": "error", "message": "No audio recorder" }));
+        // A failure it has no code for: the words of what failed are for the log.
+        assert_eq!(said(json!({ "type": "error", "code": "failed", "detail": "Cannot find module 'sherpa-onnx-node'" })), json!({ "type": "error", "message": "Dictation failed" }));
+        // What it heard is passed on as it is.
+        assert_eq!(said(json!({ "type": "segment", "text": "Hello." })), json!({ "type": "segment", "text": "Hello." }));
+    }
+
     #[test]
     fn the_window_is_told_what_the_helper_and_the_host_say() {
         let told = |event: Value| serde_json::from_value::<Told>(event);

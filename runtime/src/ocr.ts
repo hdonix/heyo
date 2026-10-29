@@ -9,7 +9,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { installPackages } from "./install";
+import { installPackages, said } from "./install";
 import engineLock from "./locks/ocr.json";
 
 const DIR = process.env.HEYO_OCR_DIR ?? "";
@@ -20,7 +20,7 @@ function send(message: Record<string, unknown>) {
 }
 
 async function install() {
-  send({ type: "progress", step: "Text recognition engine" });
+  send({ type: "progress", step: "ocr-engine" });
   // @gutenye/ocr-node 1.4.9 with its models, onnxruntime and sharp, from the
   // lockfile (`npm install --package-lock-only`, 2026-10-10). Both native
   // packages carry their prebuilt libraries; their install scripts (which
@@ -63,5 +63,5 @@ async function recognize(file: string) {
 }
 
 if (!DIR) send({ error: "HEYO_OCR_DIR is not set" });
-else if (process.argv[2] === "install") install().catch((e) => send({ type: "error", message: e instanceof Error ? e.message : String(e) }));
+else if (process.argv[2] === "install") install().catch((e) => send({ type: "error", ...said(e) }));
 else recognize(process.argv[2]).catch((e) => send({ error: e instanceof Error ? e.message : String(e) }));

@@ -14,13 +14,17 @@
 //!
 //!   in:  {cmd:"start", source?, language?}   {cmd:"stop"}   {cmd:"cancel"}
 //!   out: ready | level | partial | segment | result | error | progress | installed
+//!
+//! What it heard is the only text it sends: an error is a code and its
+//! particulars, and an installation's step a code, which the host words
+//! (`install.ts`).
 
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import { download, installPackages, type PinnedFile } from "./install";
+import { download, installPackages, type PinnedFile, said } from "./install";
 import { type Engine, SAMPLE_RATE, Session, VAD_WINDOW } from "./sentences";
 import { streams } from "./transport";
 import engineLock from "./locks/dictation.json";
@@ -37,19 +41,19 @@ const SENSE_VOICE = "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-
 const FILES: PinnedFile[] = [
   {
     file: path.join(MODEL_DIR, "model.int8.onnx"),
-    label: "Speech model",
+    step: "speech-model",
     sha256: "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
     urls: [`https://huggingface.co/${SENSE_VOICE}/model.int8.onnx`, `https://hf-mirror.com/${SENSE_VOICE}/model.int8.onnx`],
   },
   {
     file: path.join(MODEL_DIR, "tokens.txt"),
-    label: "Vocabulary",
+    step: "vocabulary",
     sha256: "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
     urls: [`https://huggingface.co/${SENSE_VOICE}/tokens.txt`, `https://hf-mirror.com/${SENSE_VOICE}/tokens.txt`],
   },
   {
     file: path.join(DIR, "models", "silero_vad.onnx"),
-    label: "Voice detector",
+    step: "voice-detector",
     // A release asset can be replaced under the same address; the hash is what pins it.
     sha256: "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
     urls: ["https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"],
@@ -66,7 +70,7 @@ function send(message: Record<string, unknown>) {
 
 async function install() {
   if (!fs.existsSync(path.join(DIR, "node_modules", "sherpa-onnx-node"))) {
-    send({ type: "progress", step: "Speech engine", received: 0, total: 0 });
+    send({ type: "progress", step: "speech-engine", received: 0, total: 0 });
     // sherpa-onnx-node 1.13.8 and the prebuilt library for this platform,
     // from the lockfile (`npm install --package-lock-only`, 2026-10-10).
     await installPackages(DIR, engineLock);
@@ -129,7 +133,7 @@ function toFloat(buffer: Buffer) {
 }
 
 /// Records 16 kHz mono PCM from PulseAudio/PipeWire, or ALSA as a fallback.
-function startRecorder(source: string | undefined, onSamples: (samples: Float32Array) => void, onError: (message: string) => void) {
+function startRecorder(source: string | undefined, onSamples: (samples: Float32Array) => void, onError: (code: string) => void) {
   // Tests feed a WAV file at real-time pace instead of a microphone.
   const wav = process.env.HEYO_DICTATION_WAV;
   if (wav) {
@@ -152,7 +156,7 @@ function startRecorder(source: string | undefined, onSamples: (samples: Float32A
   let stopped = false;
   let leftover = Buffer.alloc(0);
   const launch = (index: number) => {
-    if (index >= candidates.length) return onError("No audio recorder found (install pulseaudio-utils or alsa-utils)");
+    if (index >= candidates.length) return onError("no-recorder");
     const [command, args] = candidates[index];
     child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] });
     child.once("error", () => !stopped && launch(index + 1));
@@ -200,7 +204,7 @@ function serve() {
       stopRecorder = startRecorder(
         message.source || undefined,
         (samples) => (session ? session.feed(samples) : recording && backlog.push(samples)),
-        (error) => send({ type: "error", message: error }),
+        (code) => send({ type: "error", code }),
       );
       const previous = stopRecorder;
       stopRecorder = () => {
@@ -240,7 +244,7 @@ function serve() {
         })
         .catch((e) => {
           end();
-          send({ type: "error", message: e instanceof Error ? e.message : String(e) });
+          send({ type: "error", ...said(e) });
         });
     },
     () => process.exit(0),
@@ -248,11 +252,11 @@ function serve() {
 }
 
 if (!DIR) {
-  send({ type: "error", message: "HEYO_DICTATION_DIR is not set" });
+  send({ type: "error", code: "failed", detail: "HEYO_DICTATION_DIR is not set" });
   process.exit(1);
 } else if (process.argv[2] === "install") {
   install().catch((e) => {
-    send({ type: "error", message: e instanceof Error ? e.message : String(e) });
+    send({ type: "error", ...said(e) });
     process.exit(1);
   });
 } else {

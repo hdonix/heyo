@@ -46,6 +46,7 @@ msgid "Could not move the window"
 msgstr ""
 
 #: src-tauri/src/clipboard/meaning.rs
+#: src-tauri/src/helper.rs
 msgid "Language model"
 msgstr ""
 
@@ -605,6 +606,56 @@ msgid "Commands built into Heyo."
 msgstr ""
 
 #: src-tauri/src/helper.rs
+msgid "{0}: {1}"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "No audio recorder"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Install pulseaudio-utils or alsa-utils."
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Could not download: {0}"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Could not install the engine"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Speech engine"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Speech model"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Voice detector"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Vocabulary"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Engine"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+#: src-tauri/src/ocr.rs
+msgid "Text recognition engine"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "The download failed"
+msgstr ""
+
+#: src-tauri/src/helper.rs
 msgid "The download stopped unexpectedly"
 msgstr ""
 
@@ -689,10 +740,6 @@ msgstr ""
 
 #: src-tauri/src/ocr.rs
 msgid "text recognition returned nothing"
-msgstr ""
-
-#: src-tauri/src/ocr.rs
-msgid "Text recognition engine"
 msgstr ""
 
 #: src-tauri/src/open.rs
@@ -1637,10 +1684,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Automatic detection handles mixed Chinese and English"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Vocabulary"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs

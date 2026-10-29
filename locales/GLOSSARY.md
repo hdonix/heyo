@@ -53,6 +53,8 @@ for it. A translation uses these and no synonym; change a term here and in
 | Clean Up (a polish mode) | 整理 | Tidying without rewriting, which is what it does. |
 | Vocabulary | 词汇表 | A list of words, not a dictionary (“词典”). |
 | Speech Recognition | 语音识别 | Standard. |
+| Engine (what is downloaded to recognize speech or text, or to find by meaning) | 引擎 | Standard; the speech engine is 语音识别引擎, as Speech Recognition says. |
+| Audio recorder (the program dictation records with) | 录音程序 | A program to install, not the microphone (麦克风). |
 | Text Recognition (OCR) | 文字识别 | Standard; “文字” throughout for text in a picture. |
 | Screenshot | 截图 | Standard. |
 | Selection (of a screenshot) | 选区 | As image editors say it. |

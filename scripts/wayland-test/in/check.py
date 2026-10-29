@@ -485,6 +485,12 @@ def language():
         time.sleep(0.8)
         picture("language-pill-hover-zh", "Heyo Dictation")
         check("... and its X too, once the pointer is on it", "取消" in names("Heyo Dictation"), names("Heyo Dictation"))
+        # With a speech engine lent and no sound server, the helper finds no
+        # recorder: what it says, the host words, short enough for the pill.
+        if os.path.isdir("/speech/models"):
+            why = wait(lambda: "未找到录音程序" in names("Heyo Dictation"), 5)
+            picture("language-pill-why-zh", "Heyo Dictation")
+            check("... and why it cannot listen, in Chinese: no audio recorder", bool(why), names("Heyo Dictation"))
     if not wait(lambda: not window("Heyo Dictation"), 6):
         heyo("--dictate")
     wait(lambda: not window("Heyo Dictation"), 8)

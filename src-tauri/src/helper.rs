@@ -3,7 +3,9 @@
 //! line, over its stdin and stdout; what it writes to stderr joins Heyo's.
 //!
 //! This is the one place that finds the scripts, starts them, frames their
-//! messages and notices them ending.
+//! messages and notices them ending; and that words what they have to say
+//! to the user, which they say as codes (`worded`, `step`): they run
+//! without Heyo's translations.
 
 use crate::i18n::{t, tf};
 use std::fs::File;
@@ -172,6 +174,55 @@ pub fn run(mut command: Command) -> std::io::Result<Vec<Value>> {
     Ok(String::from_utf8_lossy(&output.stdout).lines().filter_map(|line| serde_json::from_str(line).ok()).collect())
 }
 
+/// What a helper said went wrong, worded in the user's language. A helper
+/// says it as a code and its particulars (`runtime/src/install.ts`,
+/// `said`); `short` fits where there is little room (the dictation pill),
+/// and `detail` is what only the words of whatever failed can say (a
+/// server's answer, an exception's message), as it was said.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Worded {
+    pub short: String,
+    pub detail: Option<String>,
+}
+
+impl Worded {
+    /// Both, for where there is room.
+    pub fn full(&self) -> String {
+        match &self.detail {
+            Some(detail) => tf("{0}: {1}", &[&self.short, detail]),
+            None => self.short.clone(),
+        }
+    }
+}
+
+/// Words what a helper said went wrong; `otherwise` is said of a failure
+/// it has no code for.
+pub fn worded(said: &Value, otherwise: &str) -> Worded {
+    let detail = said["detail"].as_str().filter(|detail| !detail.is_empty()).map(str::to_owned);
+    match said["code"].as_str().unwrap_or_default() {
+        "no-recorder" => Worded { short: t("No audio recorder").into(), detail: Some(t("Install pulseaudio-utils or alsa-utils.").into()) },
+        "download" => Worded { short: tf("Could not download: {0}", &[&step(said["step"].as_str().unwrap_or_default())]), detail },
+        "packages" => Worded { short: t("Could not install the engine").into(), detail },
+        _ => Worded { short: otherwise.into(), detail },
+    }
+}
+
+/// A step of an installation, as an installer names it, in the user's
+/// language.
+pub fn step(code: &str) -> String {
+    match code {
+        "speech-engine" => t("Speech engine").into(),
+        "speech-model" => t("Speech model").into(),
+        "voice-detector" => t("Voice detector").into(),
+        "vocabulary" => t("Vocabulary").into(),
+        "embedding-engine" => t("Engine").into(),
+        "language-model" => t("Language model").into(),
+        "ocr-engine" => t("Text recognition engine").into(),
+        // One this Heyo does not know: as it was said.
+        other => other.into(),
+    }
+}
+
 /// How an installation is going: what an installer script writes, a line
 /// each, and what the settings window is told of it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -198,6 +249,18 @@ impl InstallProgress {
     pub fn concludes(&self) -> bool {
         !matches!(self, InstallProgress::Progress { .. })
     }
+
+    /// What an installer wrote, worded for the settings window: its step
+    /// named, and what went wrong said (`worded`).
+    fn of(message: Value) -> Result<InstallProgress, serde_json::Error> {
+        if message["type"] == "error" {
+            return Ok(InstallProgress::Error { message: worded(&message, t("The download failed")).full() });
+        }
+        Ok(match serde_json::from_value(message)? {
+            InstallProgress::Progress { step: code, received, total } => InstallProgress::Progress { step: step(&code), received, total },
+            other => other,
+        })
+    }
 }
 
 /// Runs an installer in the background, passing its progress to `report`.
@@ -212,7 +275,7 @@ pub fn install(command: Result<Command, String>, report: impl Fn(InstallProgress
         Helper::start(
             command,
             move |message| {
-                let progress = match serde_json::from_value::<InstallProgress>(message) {
+                let progress = match InstallProgress::of(message) {
                     Ok(progress) => progress,
                     Err(e) => return eprintln!("heyo: an installer wrote something that is not its progress: {e}"),
                 };
@@ -321,6 +384,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn what_a_helper_says_went_wrong_is_worded_here() {
+        let worded = |said: Value| worded(&said, "Dictation failed");
+        assert_eq!(worded(json!({ "code": "no-recorder" })), Worded { short: "No audio recorder".into(), detail: Some("Install pulseaudio-utils or alsa-utils.".into()) });
+        assert_eq!(worded(json!({ "code": "download", "step": "speech-model", "detail": "500 Nope" })).full(), "Could not download: Speech model: 500 Nope");
+        assert_eq!(worded(json!({ "code": "packages", "detail": "npm ERR! code E404" })).full(), "Could not install the engine: npm ERR! code E404");
+        assert_eq!(worded(json!({ "code": "failed", "detail": "ENOSPC" })), Worded { short: "Dictation failed".into(), detail: Some("ENOSPC".into()) });
+        assert_eq!(worded(json!({ "code": "failed" })).full(), "Dictation failed");
+        // Every step an installer names has a name here (runtime/src: dictation.ts, embed.ts, ocr.ts).
+        for code in ["speech-engine", "speech-model", "voice-detector", "vocabulary", "embedding-engine", "language-model", "ocr-engine"] {
+            assert_ne!(super::step(code), code);
+        }
+    }
+
+    #[test]
+    fn an_installers_failure_is_worded_for_the_settings() {
+        let failed = installing(r#"echo '{"type":"progress","step":"vocabulary"}'; echo '{"type":"error","code":"download","step":"vocabulary","detail":"getaddrinfo ENOTFOUND"}'"#);
+        assert_eq!(failed, [step("Vocabulary"), InstallProgress::Error { message: "Could not download: Vocabulary: getaddrinfo ENOTFOUND".into() }]);
+    }
+
     fn installing(script: &str) -> Vec<InstallProgress> {
         let (tx, rx) = mpsc::channel();
         install(Ok(sh(script)), move |progress| tx.send(progress).unwrap());
@@ -349,8 +432,8 @@ mod tests {
         let died = installing(r#"echo '{"type":"progress","step":"a"}'; exit 3"#);
         assert_eq!(died, [step("a"), InstallProgress::Error { message: "The download stopped unexpectedly".into() }]);
 
-        let chatty = installing(r#"echo '{"type":"error","message":"no disk"}'; echo '{"type":"progress","step":"b"}'"#);
-        assert_eq!(chatty, [InstallProgress::Error { message: "no disk".into() }]);
+        let chatty = installing(r#"echo '{"type":"error","code":"failed","detail":"no disk"}'; echo '{"type":"progress","step":"b"}'"#);
+        assert_eq!(chatty, [InstallProgress::Error { message: "The download failed: no disk".into() }]);
 
         let (tx, rx) = mpsc::channel();
         install(Err("no Node.js".into()), move |progress| tx.send(progress).unwrap());
@@ -359,7 +442,7 @@ mod tests {
 
     #[test]
     fn progress_is_what_the_installers_write() {
-        let counted = installing(r#"echo '{"type":"progress","step":"Speech model","received":512,"total":2048}'; echo '{"type":"installed"}'"#);
+        let counted = installing(r#"echo '{"type":"progress","step":"speech-model","received":512,"total":2048}'; echo '{"type":"installed"}'"#);
         assert_eq!(counted[0], InstallProgress::Progress { step: "Speech model".into(), received: Some(512.0), total: Some(2048.0) });
         assert_eq!(serde_json::to_value(&counted[0]).unwrap(), json!({ "type": "progress", "step": "Speech model", "received": 512.0, "total": 2048.0 }));
         assert_eq!(serde_json::to_value(step("Engine")).unwrap(), json!({ "type": "progress", "step": "Engine" }));
