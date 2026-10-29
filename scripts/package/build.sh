@@ -47,13 +47,18 @@ for TARGET in "$@"; do
         # what compiles the program's icon into it looks for llvm-rc on PATH.
         TOOLS=$REPO/src-tauri/target/cross/msvc
         mkdir -p "$TOOLS"
+        # Some crates call clang by that name whatever CC says (ring does
+        # for arm64 Windows): it is llvm-mingw's too.
         ln -sfn "$MINGW/bin/clang" "$TOOLS/clang-cl"
+        ln -sfn "$MINGW/bin/clang" "$TOOLS/clang"
         for tool in lld-link llvm-lib llvm-rc; do ln -sfn "$MINGW/bin/$tool" "$TOOLS/$tool"; done
         export PATH="$TOOLS:$PATH"
-        INCLUDES="/imsvc$SDK/crt/include /imsvc$SDK/sdk/include/ucrt /imsvc$SDK/sdk/include/um /imsvc$SDK/sdk/include/shared"
+        # Where Microsoft's headers are, as both of clang's command lines
+        # read it: clang-cl's /imsvc would be a file name to clang.
+        export INCLUDE="$SDK/crt/include;$SDK/sdk/include/ucrt;$SDK/sdk/include/um;$SDK/sdk/include/shared"
         export "CC_$VAR=clang-cl" "CXX_$VAR=clang-cl" "AR_$VAR=llvm-lib"
-        export "CFLAGS_$VAR=--target=$TARGET -Wno-unused-command-line-argument -fuse-ld=lld-link $INCLUDES"
-        export "CXXFLAGS_$VAR=--target=$TARGET -Wno-unused-command-line-argument -fuse-ld=lld-link $INCLUDES"
+        export "CFLAGS_$VAR=--target=$TARGET -Wno-unused-command-line-argument -fuse-ld=lld-link"
+        export "CXXFLAGS_$VAR=--target=$TARGET -Wno-unused-command-line-argument -fuse-ld=lld-link"
         export "CARGO_TARGET_${UPPER}_LINKER=lld-link"
         export "CARGO_TARGET_${UPPER}_RUSTFLAGS=-Lnative=$SDK/crt/lib/$ARCH -Lnative=$SDK/sdk/lib/um/$ARCH -Lnative=$SDK/sdk/lib/ucrt/$ARCH"
         ;;
