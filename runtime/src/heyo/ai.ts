@@ -116,7 +116,8 @@ const added = implement(gained.AI, {
         // What Heyo adds is the extension's to use once its manifest says so.
         const model = await provider();
         if (images?.length) {
-          if (model.kind !== "claude") throw new HeyoError("unsupported", "The local model set up in Heyo is not given images.");
+          // Claude, also through Claude Code, and Codex take pictures.
+          if (model.kind === "local") throw new HeyoError("unsupported", "The local model set up in Heyo is not given images.");
           pictures = images.map(readImage);
         }
       }

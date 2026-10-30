@@ -478,3 +478,16 @@ test("a question with pictures is refused where the model cannot be given them",
   // The permission is asked of the host; the model's settings never were.
   expect(requests.map((r) => r.method)).toEqual(["ext.ai.provider"]);
 });
+
+test("a command-line tool is given the pictures", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "heyo-image-test-"));
+  fs.writeFileSync(path.join(dir, "shot.png"), Buffer.from([1, 2, 3]));
+  for (const kind of ["claude-code", "codex"]) {
+    answers["ext.ai.provider"] = () => ({ kind, model: "", local: false });
+    requests.length = 0;
+    runAs(as("looker"), () => api.AI.ask("What is this?", { images: [path.join(dir, "shot.png")] })).catch(() => {});
+    const asking = await until(() => requests.find((r) => r.method === "host.ai.ask"), `the ${kind} model to be asked`);
+    expect((asking.params as { images: unknown }).images).toEqual([{ mediaType: "image/png", data: "AQID" }]);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});

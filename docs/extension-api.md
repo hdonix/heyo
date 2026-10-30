@@ -718,7 +718,7 @@ another road to the model.
 ```ts
 export const AI: RaycastAI & {
   /** The current configuration: whose model it is and whether it is local. For an extension to decide whether to send sensitive content. */
-  provider(): Promise<{ kind: "claude" | "local"; model: string; local: boolean }>;
+  provider(): Promise<{ kind: "claude" | "local" | "claude-code" | "codex"; model: string; local: boolean }>;
   ask(prompt: string, options?: RaycastAI.AskOptions & {
     /** Replaces the default instructions Heyo gives extensions ("You are a helpful assistant inside a desktop launcher extension…"). */
     system?: string;
@@ -755,6 +755,13 @@ export namespace AI {
   call still runs with the model the user chose in the settings, because
   Raycast's model names have no counterpart here. This is a documented
   degradation.
+- `provider().kind` is `claude-code` or `codex` when the user has chosen
+  the model of the command-line tool Claude Code or Codex on this computer,
+  signed in with their own account: `model` is the one set for it (empty for
+  the tool's default), and `local` is false, since the tool sends what it is
+  asked to Anthropic or OpenAI. Both take `images`; neither has a
+  temperature, and an answer from Codex comes whole rather than as it is
+  written.
 - `images` makes "take a screenshot, then ask" two lines:
   `Screen.capture("selection")`, then
   `AI.ask(question, { images: [capture.path] })`.
