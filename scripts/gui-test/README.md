@@ -163,6 +163,7 @@ scripts/gui-test/sandbox.sh down
 | `dictate-live.sh` | dictated words going into another application as they are spoken, by pasting (xfwm, no input method) and through the input method (GNOME Shell, IBus with Pinyin): the script's head lists each recording and what must hold |
 | `heyo-api.sh`, `windows-api.sh`, `activities.sh` | `@heyo/api` as an extension sees it, the permission question, live activities |
 | `ai-chat.sh` | Ask AI and AI Chat against `llm-stub.py`, a server that answers with canned text |
+| `cli-models.sh` | Claude Code and Codex as the model, through `cli-stub.py` in their place on the PATH: the settings' AI card, Ask AI continued in AI Chat, a dictation polished; the real tools are never run |
 | `dev.sh` | `heyo dev` against a running Heyo |
 | `scroll.sh` | how smoothly lists scroll, measured in the web view |
 | `readme-shots.sh`, `readme-dictation.sh` | the README's pictures ([development.md](../../docs/development.md#the-readmes-pictures)) |
@@ -193,7 +194,7 @@ The parts they share: `grab.py` (a picture of the screen), `screen-read.py`
 compared), `screenshot-pixels.py`, `toolbar.py`, `seed.py` (settings to
 start from), `say.py` and `say-zh.cjs` (speech in place of a microphone,
 in English and in Chinese with English in it), `clip.py`,
-`llm-stub.py`, `menubar.py`, and `extensions/`, the small extensions some
+`llm-stub.py`, `cli-stub.py`, `menubar.py`, and `extensions/`, the small extensions some
 of them install.
 
 ## The film
