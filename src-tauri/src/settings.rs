@@ -77,12 +77,21 @@ pub struct Settings {
     /// Claude API key, for the host alone (`models`); empty uses the
     /// environment's credentials.
     pub anthropic_api_key: String,
-    /// Which model Heyo's AI features use: `claude` or `local`.
+    /// Which model Heyo's AI features use: `claude`, `local`, or the model
+    /// of a command-line tool on this computer, `claude-code` or `codex`.
     pub ai_provider: String,
     /// Base URL of an OpenAI-compatible server on this computer.
     pub local_model_url: String,
     /// Model to ask that server for; empty means the first one it lists.
     pub local_model_name: String,
+    /// Claude Code's executable; empty means `claude`, found (`models::cli`).
+    pub claude_code_path: String,
+    /// The model Claude Code is asked for; empty means its own default.
+    pub claude_code_model: String,
+    /// Codex's executable; empty means `codex`, found.
+    pub codex_path: String,
+    /// The model Codex is asked for; empty means its own default.
+    pub codex_model: String,
     /// Clipboard history is not recorded for now (`clipboard_history` is
     /// whether it is recorded at all).
     pub clipboard_paused: bool,
@@ -148,6 +157,10 @@ impl Default for Settings {
             ai_provider: "claude".into(),
             local_model_url: "http://127.0.0.1:8000/v1".into(),
             local_model_name: String::new(),
+            claude_code_path: String::new(),
+            claude_code_model: String::new(),
+            codex_path: String::new(),
+            codex_model: String::new(),
             clipboard_paused: false,
             clipboard_ignored_apps: Vec::new(),
             dictation_vocabulary: Vec::new(),

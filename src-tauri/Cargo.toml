@@ -56,6 +56,8 @@ url = "2"
 # over TLS by rustls with ring. Both in the build already, through Tauri.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# The command-line tools that answer as models (`models/cli.rs`) run as child processes read as they write.
+tokio = { version = "1", features = ["process", "io-util", "sync"] }
 # The settings window is drawn by Slint, on a thread of its own
 # (src/slint_windows/): with Skia on the CPU, or Slint's own renderer or
 # Skia on the GPU when HEYO_SETTINGS_RENDERER names one. Skia is fetched
@@ -88,7 +90,6 @@ gdkx11 = "0.18"
 # The socket of the X11 connection Slint draws through, which winit opens
 # with this (`slint_windows::guard`).
 x11-dl = "2.21"
-libc = "0.2"
 # A layer surface of Heyo's own on Wayland (`slint_windows::layer`): the
 # Wayland client and toolkit winit is built on, and Slint's winit backend
 # by its own name, to wrap it. All three are in the build already,
@@ -102,6 +103,10 @@ i-slint-renderer-skia = "=1.18.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1"
+
+[target.'cfg(unix)'.dependencies]
+# Ending a process group (`models/cli.rs`).
+libc = "0.2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

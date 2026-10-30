@@ -61,6 +61,8 @@ for it. A translation uses these and no synonym; change a term here and in
 | Live Activity | 实时活动 | Apple's Chinese for the same thing. |
 | Find by Meaning | 按含义查找 | Plain words; “语义搜索” is jargon. |
 | Local Model | 本地模型 | Standard. |
+| CLI (Claude Code, Codex as a model) | 命令行 | Short enough for a choice in a list; the tool's name says which. |
+| Executable (of a tool Heyo runs) | 可执行文件 | Standard; what PATH finds. |
 | Renderer | 渲染器 | Standard. |
 | Preferences (of an extension) | 偏好设置 | Distinct from Heyo's own 设置. |
 | Settings | 设置 | Standard. |

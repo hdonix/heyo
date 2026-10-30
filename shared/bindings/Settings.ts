@@ -76,7 +76,8 @@ dictationLive: boolean,
  */
 anthropicApiKey: string, 
 /**
- * Which model Heyo's AI features use: `claude` or `local`.
+ * Which model Heyo's AI features use: `claude`, `local`, or the model
+ * of a command-line tool on this computer, `claude-code` or `codex`.
  */
 aiProvider: string, 
 /**
@@ -87,6 +88,22 @@ localModelUrl: string,
  * Model to ask that server for; empty means the first one it lists.
  */
 localModelName: string, 
+/**
+ * Claude Code's executable; empty means `claude`, found (`models::cli`).
+ */
+claudeCodePath: string, 
+/**
+ * The model Claude Code is asked for; empty means its own default.
+ */
+claudeCodeModel: string, 
+/**
+ * Codex's executable; empty means `codex`, found.
+ */
+codexPath: string, 
+/**
+ * The model Codex is asked for; empty means its own default.
+ */
+codexModel: string, 
 /**
  * Clipboard history is not recorded for now (`clipboard_history` is
  * whether it is recorded at all).

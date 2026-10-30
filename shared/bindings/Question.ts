@@ -10,8 +10,8 @@ import type { Turn } from "./Turn";
  */
 export type Question = { system: string, prompt: string, history?: Array<Turn>, 
 /**
- * Only for a model that sees images (Claude); asking another with
- * images fails.
+ * Only for a model that sees images (Claude, also through Claude Code,
+ * and Codex); asking another with images fails.
  */
 images?: Array<PromptImage>, 
 /**

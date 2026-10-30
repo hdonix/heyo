@@ -682,6 +682,23 @@ msgstr ""
 msgid "Refresh"
 msgstr ""
 
+#: src-tauri/src/models/cli.rs
+msgid "{0} was not found. Install it, or name its executable here."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "There is no executable at {0}."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} --version did not answer"
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+#: src-tauri/src/settings.rs
+msgid "{0} --version failed"
+msgstr ""
+
 #: src-tauri/src/models/mod.rs
 msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
 msgstr ""
@@ -732,6 +749,26 @@ msgstr ""
 
 #: src-tauri/src/models/mod.rs
 msgid "the server did not answer with a model list"
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Advanced."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Advanced."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} stopped with an error: {1}"
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} returned no text."
 msgstr ""
 
 #: src-tauri/src/ocr.rs
@@ -1280,10 +1317,6 @@ msgid "Using defaults. The old file is kept as {0}."
 msgstr ""
 
 #: src-tauri/src/settings.rs
-msgid "{0} --version failed"
-msgstr ""
-
-#: src-tauri/src/settings.rs
 msgid "{0} is too old; extensions need Node.js 22 or newer"
 msgstr ""
 
@@ -1361,6 +1394,22 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "When you finish, Claude cleans up what you said and pastes it in English."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Claude"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Local Model"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Claude Code (CLI)"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Codex (CLI)"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1821,19 +1870,39 @@ msgid "Answers Selected Text Actions and polishes dictation."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Claude"
+msgid "Using {0} at {1}."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Local Model"
+msgid "{0} answers with the account it is signed in to ({1}); no API key is needed."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Server"
+msgid "What you select, ask about and dictate is sent to {0} through it."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Executable"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} (from PATH)"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Leave empty for Codex's default model. Heyo runs Codex without your config.toml, so its model setting does not apply here."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Leave empty for Claude Code's default model, or name one: an alias such as opus or sonnet, or a model's full name."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Model Name"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Server"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs

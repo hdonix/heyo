@@ -1,16 +1,20 @@
 //! A model that answers: what Heyo's AI features ask of one, whichever
-//! answers. Claude (`claude.rs`) and any model behind an OpenAI-compatible
-//! server (`openai.rs`) are its two adapters, and [`Model::from_settings`]
-//! picks one. Every model Heyo asks is asked here, in this process, which
+//! answers. Claude (`claude.rs`), any model behind an OpenAI-compatible
+//! server (`openai.rs`), and the models the command-line tools Claude Code
+//! and Codex reach with the user's own sign-in (`cli.rs`) are its
+//! adapters, and [`Model::from_settings`] picks one. Every model Heyo asks is asked here, in this process, which
 //! alone holds the key: the extension runtime asks through `host.ai.ask`
 //! (`ai.rs`), dictation polishes what it heard (`dictation.rs`), and the
 //! clipboard's evaluation has cases written (`clipboard/cases.rs`).
 //!
 //! An answer is written as it comes, to a callback; it is called off by
 //! dropping the future that asks (aborting the task it runs in), which
-//! closes the connection.
+//! closes the connection, or ends the tool that was answering.
 
 mod claude;
+mod claude_code;
+pub(crate) mod cli;
+mod codex;
 mod openai;
 pub(crate) mod address;
 
@@ -61,8 +65,8 @@ pub struct Question {
     #[serde(default)]
     #[ts(optional)]
     pub history: Option<Vec<Turn>>,
-    /// Only for a model that sees images (Claude); asking another with
-    /// images fails.
+    /// Only for a model that sees images (Claude, also through Claude Code,
+    /// and Codex); asking another with images fails.
     #[serde(default)]
     #[ts(optional, as = "Option<Vec<PromptImage>>")]
     pub images: Vec<PromptImage>,
@@ -86,6 +90,8 @@ pub enum Model {
     /// A model behind an OpenAI-compatible server (vLLM, LM Studio,
     /// Ollama, llama.cpp), on this computer or anywhere.
     Local(openai::Local),
+    /// Claude Code's or Codex's model, through the tool on this computer.
+    Cli(cli::Cli),
 }
 
 /// Why a model gave no answer, as the user is told it ([`ModelError::message`]).
@@ -112,6 +118,14 @@ pub enum ModelError {
     LocalSaidNothing,
     /// The server did not answer in the shape of one (a list of models).
     NotAModelList,
+    /// The tool's executable is not where the settings say (`at`), or,
+    /// with `at` empty, was not found.
+    CliNotFound { tool: cli::Tool, at: String },
+    /// The tool is not signed in to its service.
+    CliNotSignedIn(cli::Tool),
+    /// The tool failed, and what it said of it.
+    CliFailed { tool: cli::Tool, message: String },
+    CliSaidNothing(cli::Tool),
 }
 
 impl ModelError {
@@ -131,6 +145,11 @@ impl ModelError {
             ModelError::NoModels => t("The local server lists no models.").into(),
             ModelError::LocalSaidNothing => t("The local model returned no text.").into(),
             ModelError::NotAModelList => t("the server did not answer with a model list").into(),
+            ModelError::CliNotFound { tool, at } if at.is_empty() => tf("{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Advanced.", &[&tool.name()]),
+            ModelError::CliNotFound { tool, at } => tf("{0} was not found at {1}. Check its executable in Heyo Settings → Advanced.", &[&tool.name(), at]),
+            ModelError::CliNotSignedIn(tool) => tf("{0} is not signed in. Run “{1}” in a terminal, then try again.", &[&tool.name(), &tool.sign_in()]),
+            ModelError::CliFailed { tool, message } => tf("{0} stopped with an error: {1}", &[&tool.name(), message]),
+            ModelError::CliSaidNothing(tool) => tf("{0} returned no text.", &[&tool.name()]),
         }
     }
 }
@@ -146,6 +165,8 @@ impl Model {
     pub fn from_settings(settings: &Settings) -> Model {
         match settings.ai_provider.as_str() {
             "local" => Model::Local(openai::Local::new(&settings.local_model_url, &settings.local_model_name)),
+            CLAUDE_CODE => Model::Cli(cli::Cli::new(cli::Tool::ClaudeCode, &settings.claude_code_path, &settings.claude_code_model)),
+            CODEX => Model::Cli(cli::Cli::new(cli::Tool::Codex, &settings.codex_path, &settings.codex_model)),
             _ => Model::Claude(claude::Claude::new(&settings.anthropic_api_key)),
         }
     }
@@ -158,7 +179,7 @@ impl Model {
 
     /// Whether it can be given images besides text.
     pub fn sees_images(&self) -> bool {
-        matches!(self, Model::Claude(_))
+        !matches!(self, Model::Local(_))
     }
 
     /// The whole answer, trimmed, with nothing of what the model says
@@ -170,9 +191,15 @@ impl Model {
         match self {
             Model::Claude(claude) => claude.answer(question, on_text).await,
             Model::Local(local) => local.answer(question, on_text).await,
+            Model::Cli(cli) => cli.answer(question, on_text).await,
         }
     }
 }
+
+/// The provider (`Settings::ai_provider`) that is Claude Code.
+pub const CLAUDE_CODE: &str = "claude-code";
+/// The provider that is Codex.
+pub const CODEX: &str = "codex";
 
 /// The models an OpenAI-compatible server offers.
 pub async fn local_models(url: &str) -> Result<Vec<String>, ModelError> {
@@ -183,6 +210,9 @@ pub async fn local_models(url: &str) -> Result<Vec<String>, ModelError> {
 pub fn provider(settings: &Settings) -> AiProvider {
     match settings.ai_provider.as_str() {
         "local" => AiProvider { kind: "local", model: settings.local_model_name.clone(), local: address(&settings.local_model_url) == Address::ThisComputer },
+        // The tool runs here, and sends what it is asked to its maker's service.
+        CLAUDE_CODE => AiProvider { kind: CLAUDE_CODE, model: settings.claude_code_model.trim().into(), local: false },
+        CODEX => AiProvider { kind: CODEX, model: settings.codex_model.trim().into(), local: false },
         _ => AiProvider { kind: "claude", model: CLAUDE_MODEL.into(), local: false },
     }
 }
@@ -234,6 +264,13 @@ mod tests {
         settings.ai_provider = "local".into();
         let local = Model::from_settings(&settings);
         assert!(matches!(local, Model::Local(_)) && !local.sees_images());
+        settings.ai_provider = CLAUDE_CODE.into();
+        (settings.claude_code_path, settings.claude_code_model) = ("/opt/claude".into(), " opus ".into());
+        let claude_code = Model::from_settings(&settings);
+        assert!(claude_code == Model::Cli(cli::Cli::new(cli::Tool::ClaudeCode, "/opt/claude", "opus")) && claude_code.sees_images());
+        settings.ai_provider = CODEX.into();
+        let codex = Model::from_settings(&settings);
+        assert!(codex == Model::Cli(cli::Cli::new(cli::Tool::Codex, "", "")) && codex.sees_images());
     }
 
     #[test]
@@ -246,6 +283,12 @@ mod tests {
         // A server on another machine is a local model only by the setting's name.
         settings.local_model_url = "http://192.168.1.20:8000/v1".into();
         assert!(!provider(&settings).local);
+        // A tool on this computer sends what it is asked to its maker's service.
+        settings.ai_provider = CLAUDE_CODE.into();
+        settings.claude_code_model = "sonnet".into();
+        assert_eq!(provider(&settings), AiProvider { kind: "claude-code", model: "sonnet".into(), local: false });
+        settings.ai_provider = CODEX.into();
+        assert_eq!(provider(&settings), AiProvider { kind: "codex", model: "".into(), local: false });
     }
 
     #[test]
@@ -263,6 +306,12 @@ mod tests {
             (ModelError::NoImages, "The local model is not given images."),
             (ModelError::NoModels, "The local server lists no models."),
             (ModelError::LocalSaidNothing, "The local model returned no text."),
+            (ModelError::CliNotFound { tool: cli::Tool::ClaudeCode, at: "".into() }, "Claude Code is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Advanced."),
+            (ModelError::CliNotFound { tool: cli::Tool::Codex, at: "/opt/codex".into() }, "Codex was not found at /opt/codex. Check its executable in Heyo Settings → Advanced."),
+            (ModelError::CliNotSignedIn(cli::Tool::ClaudeCode), "Claude Code is not signed in. Run “claude auth login” in a terminal, then try again."),
+            (ModelError::CliNotSignedIn(cli::Tool::Codex), "Codex is not signed in. Run “codex login” in a terminal, then try again."),
+            (ModelError::CliFailed { tool: cli::Tool::Codex, message: "model not found".into() }, "Codex stopped with an error: model not found"),
+            (ModelError::CliSaidNothing(cli::Tool::ClaudeCode), "Claude Code returned no text."),
         ];
         for (error, words) in cases {
             assert_eq!(error.to_string(), words);

@@ -107,6 +107,9 @@ pub(crate) struct SettingsView {
     launch_at_login: bool,
     node_version: Result<String, String>,
     node_overridden: bool,
+    /// The command-line tool the provider is, where it is and its version,
+    /// or why there is none to run; none for a provider that is no tool.
+    cli_found: Option<Result<crate::models::cli::Found, String>>,
     extensions_dir: String,
     settings_path: String,
     version: String,
@@ -116,12 +119,14 @@ pub(crate) struct SettingsView {
 
 impl SettingsView {
     /// The view as the window of that label may see it. Where Heyo keeps
-    /// its files (the settings file holds the API key) is for the settings
-    /// window alone; the palette draws what extensions give it.
+    /// its files (the settings file holds the API key), and where the
+    /// tools it runs are, is for the settings window alone; the palette
+    /// draws what extensions give it.
     fn for_window(mut self, label: &str) -> SettingsView {
         if label != SETTINGS_WINDOW {
             self.extensions_dir.clear();
             self.settings_path.clear();
+            self.cli_found = None;
         }
         self
     }
@@ -135,6 +140,11 @@ fn view(app: &AppHandle) -> SettingsView {
         anthropic_api_key_set,
         node_version: settings::node_version(&settings.node()),
         node_overridden: std::env::var_os("HEYO_NODE").is_some(),
+        cli_found: match settings.ai_provider.as_str() {
+            crate::models::CLAUDE_CODE => Some(crate::models::cli::found(crate::models::cli::Tool::ClaudeCode, &settings.claude_code_path)),
+            crate::models::CODEX => Some(crate::models::cli::found(crate::models::cli::Tool::Codex, &settings.codex_path)),
+            _ => None,
+        },
         launch_at_login: settings::launch_at_login(),
         extensions_dir: paths::extensions().to_string_lossy().into_owned(),
         settings_path: settings::settings_path().to_string_lossy().into_owned(),
@@ -331,6 +341,7 @@ mod tests {
             launch_at_login: false,
             node_version: Ok("v24.0.0".into()),
             node_overridden: false,
+            cli_found: Some(Ok(crate::models::cli::Found { path: "/home/ada/.local/bin/claude".into(), version: "2.1.302 (Claude Code)".into() })),
             extensions_dir: "/home/ada/.local/share/heyo/extensions".into(),
             settings_path: "/home/ada/.config/heyo/settings.json".into(),
             version: "0.1.0".into(),
@@ -341,7 +352,7 @@ mod tests {
         assert_eq!(whole.extensions_dir, "/home/ada/.local/share/heyo/extensions");
         for label in ["main", "screenshot", "pin-1", "*", ""] {
             let seen = view.clone().for_window(label);
-            assert_eq!((seen.settings_path.as_str(), seen.extensions_dir.as_str()), ("", ""), "{label}");
+            assert_eq!((seen.settings_path.as_str(), seen.extensions_dir.as_str(), &seen.cli_found), ("", "", &None), "{label}");
             // What the palette lays itself out by is still there.
             assert!(seen.settings.compact_mode && seen.anthropic_api_key_set);
         }

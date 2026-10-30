@@ -560,13 +560,15 @@ pub struct MemoryResult {
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct AiProvider {
-    #[ts(type = "\"claude\" | \"local\"")]
+    #[ts(type = "\"claude\" | \"local\" | \"claude-code\" | \"codex\"")]
     pub kind: &'static str,
     /// Claude's model, or the local model's name as set, empty for the
-    /// first the server lists.
+    /// first the server lists; or the model Claude Code or Codex is asked
+    /// for, empty for the tool's own default.
     pub model: String,
     /// Whether what is asked stays on this computer: a local model at a
-    /// loopback address (`models::address`).
+    /// loopback address (`models::address`). Never through a command-line
+    /// tool, which sends it to its maker's service.
     pub local: bool,
 }
 

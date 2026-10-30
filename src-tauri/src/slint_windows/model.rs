@@ -19,7 +19,7 @@ use serde_json::{json, Map, Value};
 
 use super::host::Command;
 use crate::i18n::{self, marked, t, tf, tn, translate};
-use crate::models::{address, Address};
+use crate::models::{address, Address, CLAUDE_CODE, CODEX};
 use super::ids::{Act, Bound, Id};
 use super::keys;
 
@@ -46,6 +46,9 @@ const POLISH_MODES: &[(&str, &str, &str)] = &[
     ("clean", marked("Clean Up"), marked("When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted.")),
     ("translate", marked("Translate to English"), marked("When you finish, Claude cleans up what you said and pastes it in English.")),
 ];
+
+/// The models Heyo's AI features can use: the `aiProvider` setting, title.
+const PROVIDERS: &[(&str, &str)] = &[("claude", marked("Claude")), ("local", marked("Local Model")), (CLAUDE_CODE, marked("Claude Code (CLI)")), (CODEX, marked("Codex (CLI)"))];
 
 const RETENTION: &[(&str, &str)] = &[("1", marked("1 Day")), ("7", marked("7 Days")), ("30", marked("1 Month")), ("90", marked("3 Months")), ("180", marked("6 Months")), ("365", marked("1 Year"))];
 
@@ -701,7 +704,8 @@ impl Model {
         let polish = self.chosen("dictationPolish");
         let mode = POLISH_MODES.iter().find(|(value, ..)| *value == polish).unwrap_or(&POLISH_MODES[0]);
         let mut rows = vec![Line::row(Id::Set("dictationPolish".into()), t("Mode")).says(translate(mode.2)).select(mode.0, POLISH_MODES.iter().map(|(value, title, _)| (*value, translate(title))))];
-        if mode.0 != "off" && self.chosen("aiProvider") != "local" && !self.set("anthropicApiKeySet") {
+        // Claude's API is the one that needs a key (or a sign-in Heyo cannot see).
+        if mode.0 != "off" && self.chosen("aiProvider") == "claude" && !self.set("anthropicApiKeySet") {
             rows.push(Line::row("", t("Claude API Key")).says(t("Polishing needs a Claude API key or a local model. Set either in Advanced.")));
         }
         page.card(t("Polish with AI"), rows);
@@ -763,9 +767,27 @@ impl Model {
             t("Rendering"),
             vec![Line::row(Id::Set("renderer".into()), t("Renderer")).says(t("How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started.")).select(&self.chosen("renderer"), RENDERERS.iter().map(|(value, title)| (*value, translate(title))))],
         );
-        let local = self.chosen("aiProvider") == "local";
-        let mut rows = vec![Line::row(Id::Set("aiProvider".into()), t("Model")).says(t("Answers Selected Text Actions and polishes dictation.")).select(if local { "local" } else { "claude" }, [("claude", t("Claude")), ("local", t("Local Model"))])];
-        if local {
+        let provider = self.chosen("aiProvider");
+        let provider = PROVIDERS.iter().find(|(value, _)| *value == provider).map_or("claude", |(value, _)| value);
+        let mut rows = vec![Line::row(Id::Set("aiProvider".into()), t("Model")).says(t("Answers Selected Text Actions and polishes dictation.")).select(provider, PROVIDERS.iter().map(|(value, title)| (*value, translate(title))))];
+        if let Some((tool, path, model)) = match provider {
+            CLAUDE_CODE => Some(("Claude Code", "claudeCodePath", "claudeCodeModel")),
+            CODEX => Some(("Codex", "codexPath", "codexModel")),
+            _ => None,
+        } {
+            let found = self.setting("cliFound");
+            let (program, sign_in, maker) = if provider == CODEX { ("codex", "codex login", "OpenAI") } else { ("claude", "claude auth login", "Anthropic") };
+            let (said, missing) = match (found.get("Ok"), found.get("Err").and_then(Value::as_str)) {
+                (Some(found), _) => (tf("Using {0} at {1}.", &[&text(found, "version"), &text(found, "path")]), false),
+                (None, Some(why)) => (why.to_string(), true),
+                _ => (t("Checking…").to_string(), false),
+            };
+            let signed_in = tf("{0} answers with the account it is signed in to ({1}); no API key is needed.", &[&tool, &sign_in]);
+            let sent = tf("What you select, ask about and dictate is sent to {0} through it.", &[&maker]);
+            rows.push(Line::row(Id::Set(path.into()), t("Executable")).says(format!("{said} {signed_in} {sent}")).warns(missing).field(self.chosen(path), &tf("{0} (from PATH)", &[&program])));
+            let default = if provider == CODEX { t("Leave empty for Codex's default model. Heyo runs Codex without your config.toml, so its model setting does not apply here.") } else { t("Leave empty for Claude Code's default model, or name one: an alias such as opus or sonnet, or a model's full name.") };
+            rows.push(Line::row(Id::Set(model.into()), t("Model Name")).says(default).field(self.chosen(model), "default"));
+        } else if provider == "local" {
             let (description, warning) = self.server_description();
             rows.push(Line::row(Id::Set("localModelUrl".into()), t("Server")).says(description).warns(warning).field(self.chosen("localModelUrl"), "http://127.0.0.1:8000/v1"));
             rows.push(Line::row(Id::Set("localModelName".into()), t("Model Name")).says(t("Leave empty to use the first model the server offers.")).field(self.chosen("localModelName"), "automatic"));
@@ -1600,6 +1622,35 @@ mod tests {
         model.answered(Then::Models("http://127.0.0.1:1/v1".into()), Err("connection refused".into()));
         assert!(row(&model.lines(), "Server").description.starts_with("Not reachable: connection refused."));
         assert!(model.error.is_empty(), "a server that does not answer is said on its row");
+    }
+
+    #[test]
+    fn a_command_line_tool_is_shown_found_or_not_with_its_model() {
+        let found = json!({ "Ok": { "path": "/home/ada/.local/bin/claude", "version": "2.1.302 (Claude Code)" } });
+        let mut model = told(json!({ "aiProvider": "claude-code", "cliFound": found, "claudeCodePath": "", "claudeCodeModel": "opus", "anthropicApiKeySet": false }), json!({}));
+        model.page = "advanced".into();
+        let lines = model.lines();
+        assert_eq!(row(&lines, "Model").value, "claude-code");
+        assert_eq!(row(&lines, "Model").choices.iter().map(|(_, title)| title.as_str()).collect::<Vec<_>>(), ["Claude", "Local Model", "Claude Code (CLI)", "Codex (CLI)"]);
+        let executable = row(&lines, "Executable").clone();
+        assert_eq!((executable.id.as_str(), executable.control, executable.value.as_str(), executable.placeholder.as_str(), executable.danger), ("set:claudeCodePath", "field", "", "claude (from PATH)", false));
+        assert!(executable.description.starts_with("Using 2.1.302 (Claude Code) at /home/ada/.local/bin/claude. ") && executable.description.contains("Claude Code answers with the account it is signed in to (claude auth login)") && executable.description.ends_with("sent to Anthropic through it."), "{}", executable.description);
+        assert_eq!((row(&lines, "Model Name").id.as_str(), row(&lines, "Model Name").value.as_str()), ("set:claudeCodeModel", "opus"));
+        // Neither a key nor a server is asked for, and nothing is asked of the host but the change.
+        assert!(!has(&lines, "API Key") && !has(&lines, "Server"));
+        assert_eq!(model.acted("set:aiProvider", "codex").iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["change_settings"]);
+        // Not found: said as a warning on its row.
+        model.settings.insert("cliFound".into(), json!({ "Err": "Codex was not found. Install it, or name its executable here." }));
+        let lines = model.lines();
+        let executable = row(&lines, "Executable").clone();
+        assert!(executable.danger && executable.id == "set:codexPath" && executable.description.starts_with("Codex was not found.") && executable.description.contains("(codex login)") && executable.description.ends_with("sent to OpenAI through it."));
+        assert_eq!(row(&lines, "Model Name").id, "set:codexModel");
+        // Polishing does not ask for Claude's key when a tool answers.
+        model.page = "dictation".into();
+        model.settings.insert("dictationPolish".into(), json!("clean"));
+        assert!(!has(&model.lines(), "Claude API Key"));
+        model.settings.insert("aiProvider".into(), json!("claude"));
+        assert!(has(&model.lines(), "Claude API Key"));
     }
 
     #[test]

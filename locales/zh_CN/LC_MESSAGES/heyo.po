@@ -685,6 +685,23 @@ msgstr "命令执行失败"
 msgid "Refresh"
 msgstr "刷新"
 
+#: src-tauri/src/models/cli.rs
+msgid "{0} was not found. Install it, or name its executable here."
+msgstr "未找到 {0}。请安装它，或在此填写其可执行文件。"
+
+#: src-tauri/src/models/cli.rs
+msgid "There is no executable at {0}."
+msgstr "{0} 处没有可执行文件。"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} --version did not answer"
+msgstr "{0} --version 没有响应"
+
+#: src-tauri/src/models/cli.rs
+#: src-tauri/src/settings.rs
+msgid "{0} --version failed"
+msgstr "{0} --version 运行失败"
+
 #: src-tauri/src/models/mod.rs
 msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
 msgstr "尚未设置 AI。请在“Heyo 设置”→“高级”中添加 Anthropic API 密钥，或选择本地模型。"
@@ -736,6 +753,26 @@ msgstr "本地模型没有返回任何文本。"
 #: src-tauri/src/models/mod.rs
 msgid "the server did not answer with a model list"
 msgstr "服务器没有返回模型列表"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Advanced."
+msgstr "{0} 未安装，或 Heyo 找不到它。请安装它，或在 Heyo 设置 → 高级中填写其可执行文件。"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Advanced."
+msgstr "在 {1} 未找到 {0}。请在 Heyo 设置 → 高级中检查其可执行文件。"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
+msgstr "{0} 尚未登录。请在终端中运行“{1}”，然后重试。"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} stopped with an error: {1}"
+msgstr "{0} 出错停止：{1}"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} returned no text."
+msgstr "{0} 没有返回任何文字。"
 
 #: src-tauri/src/ocr.rs
 msgid "failed to run text recognition: {0}"
@@ -1282,10 +1319,6 @@ msgid "Using defaults. The old file is kept as {0}."
 msgstr "正在使用默认设置。原文件已另存为 {0}。"
 
 #: src-tauri/src/settings.rs
-msgid "{0} --version failed"
-msgstr "{0} --version 运行失败"
-
-#: src-tauri/src/settings.rs
 msgid "{0} is too old; extensions need Node.js 22 or newer"
 msgstr "{0} 版本太旧；扩展需要 Node.js 22 或更高版本"
 
@@ -1364,6 +1397,22 @@ msgstr "翻译成英语"
 #: src-tauri/src/slint_windows/model.rs
 msgid "When you finish, Claude cleans up what you said and pastes it in English."
 msgstr "说完后，Claude 会整理你说的话，并以英语粘贴。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Claude"
+msgstr "Claude"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Local Model"
+msgstr "本地模型"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Claude Code (CLI)"
+msgstr "Claude Code（命令行）"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Codex (CLI)"
+msgstr "Codex（命令行）"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "1 Day"
@@ -1823,20 +1872,40 @@ msgid "Answers Selected Text Actions and polishes dictation."
 msgstr "用于回答“选中文本操作”并润色听写。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Claude"
-msgstr "Claude"
+msgid "Using {0} at {1}."
+msgstr "正在使用 {1} 处的 {0}。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Local Model"
-msgstr "本地模型"
+msgid "{0} answers with the account it is signed in to ({1}); no API key is needed."
+msgstr "{0} 使用它已登录的账户回答（{1}），无需 API 密钥。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Server"
-msgstr "服务器"
+msgid "What you select, ask about and dictate is sent to {0} through it."
+msgstr "你选中、提问和听写的内容会经由它发送给 {0}。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Executable"
+msgstr "可执行文件"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} (from PATH)"
+msgstr "{0}（来自 PATH）"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Leave empty for Codex's default model. Heyo runs Codex without your config.toml, so its model setting does not apply here."
+msgstr "留空则使用 Codex 的默认模型。Heyo 运行 Codex 时不读取你的 config.toml，因此其中的模型设置在这里不起作用。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Leave empty for Claude Code's default model, or name one: an alias such as opus or sonnet, or a model's full name."
+msgstr "留空则使用 Claude Code 的默认模型，也可以指定一个：opus、sonnet 等别名，或模型的完整名称。"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Model Name"
 msgstr "模型名称"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Server"
+msgstr "服务器"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Leave empty to use the first model the server offers."

@@ -129,8 +129,9 @@ pub(crate) fn parse(answer: &str, text: &str) -> Vec<Case> {
 }
 
 /// The model on this computer the settings name, whichever provider they
-/// choose for everything else; none at an address that is not this
-/// computer, whatever the settings say.
+/// choose for everything else (Claude's API, or Claude Code or Codex, which
+/// run here but send what they are asked to their makers' services); none
+/// at an address that is not this computer, whatever the settings say.
 pub(crate) fn local_only(settings: &Settings) -> Result<Model, String> {
     let url = settings.local_model_url.trim();
     if address(url) != Address::ThisComputer {
@@ -171,6 +172,15 @@ mod tests {
         for url in ["http://127.0.0.1:8000/v1", "http://localhost:11434/v1"] {
             settings.local_model_url = url.into();
             assert_eq!(local_only(&settings), Ok(Model::local(url, "tiny")));
+        }
+        // A command-line tool runs here but answers from its maker's
+        // service, as Claude's API does: never the one asked.
+        for provider in [crate::models::CLAUDE_CODE, crate::models::CODEX] {
+            settings.ai_provider = provider.into();
+            assert_eq!(local_only(&settings), Ok(Model::local("http://localhost:11434/v1", "tiny")));
+            settings.local_model_url = "https://api.example.com/v1".into();
+            assert!(local_only(&settings).is_err());
+            settings.local_model_url = "http://localhost:11434/v1".into();
         }
     }
 
