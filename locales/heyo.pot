@@ -112,7 +112,6 @@ msgid "part of it had become the application's text as it was heard"
 msgstr ""
 
 #: src-tauri/src/dictation/listening.rs
-#: src-tauri/src/dictation.rs
 msgid "dictation is not running"
 msgstr ""
 

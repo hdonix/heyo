@@ -115,7 +115,6 @@ msgid "part of it had become the application's text as it was heard"
 msgstr "其中一部分已按听到的内容写入应用程序"
 
 #: src-tauri/src/dictation/listening.rs
-#: src-tauri/src/dictation.rs
 msgid "dictation is not running"
 msgstr "听写未在运行"
 
