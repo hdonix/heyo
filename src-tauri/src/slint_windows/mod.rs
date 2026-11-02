@@ -34,7 +34,7 @@
 mod fonts;
 mod guard;
 mod host;
-mod icons;
+pub(crate) mod icons;
 mod ids;
 mod keys;
 #[cfg(target_os = "linux")]

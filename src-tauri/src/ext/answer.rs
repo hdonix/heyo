@@ -1210,12 +1210,12 @@ mod tests {
     fn the_model_is_said_without_its_key() {
         let bench = Bench::new(&[]);
         let writer = bench.install("writer", &["ai"]);
-        use crate::models::registry::{self, Kind, ModelRef, Provider};
+        use crate::models::{kinds, registry::{self, ModelRef, Provider}};
         bench.settings.write().unwrap().providers[1].config.insert(registry::KEY.into(), "sk-secret".into());
         assert_eq!(bench.result(&writer, "ext.ai.provider", Value::Null), json!({ "kind": "claude", "model": "claude-opus-5-5", "local": false }));
         {
             let mut settings = bench.settings.write().unwrap();
-            let mut server = Provider::new("ollama", Kind::OpenaiCompatible);
+            let mut server = Provider::new("ollama", kinds::OPENAI_COMPATIBLE);
             server.config.insert(registry::URL.into(), "http://127.0.0.1:8000/v1".into());
             settings.providers.push(server);
             settings.ai_model = ModelRef::to("ollama", "qwen3");

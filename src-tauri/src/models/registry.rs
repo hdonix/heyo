@@ -4,8 +4,8 @@
 //! A provider is one place models are reached through: Claude's API, an
 //! OpenAI-compatible server, Claude Code or Codex on this computer, the
 //! speech models Heyo downloads and runs itself, or Doubao's speech
-//! service. Its kind declares what it needs to be set up (`Kind::fields`)
-//! and what it can do (`Can`); there may be several of one kind (two
+//! service. Its kind (`kinds`) declares what it needs to be set up and
+//! what it can do (`Can`); there may be several of one kind (two
 //! servers, say), each by an id of its own. The speech models on this
 //! computer are always there, once.
 //!
@@ -20,31 +20,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::i18n::marked;
 use crate::settings::Settings;
 
-use super::{address, Address, CLAUDE_MODEL};
-
-/// What a provider is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, TS)]
-#[serde(rename_all = "kebab-case")]
-#[ts(export, export_to = "../../shared/bindings/", rename = "ProviderKind")]
-pub enum Kind {
-    /// Claude, through Anthropic's API.
-    Anthropic,
-    /// Any server that speaks OpenAI's chat API: vLLM, LM Studio, Ollama,
-    /// llama.cpp, on this computer or elsewhere.
-    OpenaiCompatible,
-    ClaudeCode,
-    Codex,
-    /// The speech models Heyo downloads and runs in its own process.
-    LocalSpeech,
-    /// Volcengine's streaming speech recognition.
-    Doubao,
-}
-
-/// The kinds a user can add, in the order they are offered.
-pub const ADDABLE: &[Kind] = &[Kind::Anthropic, Kind::OpenaiCompatible, Kind::ClaudeCode, Kind::Codex, Kind::Doubao];
+use super::kinds::{self, ProviderKind};
 
 /// What a provider can do, which is what a use asks of it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,11 +73,11 @@ pub struct Field {
     pub shown_when: Option<(&'static str, &'static str)>,
 }
 
-const fn field(name: &'static str, title: &'static str, entry: Entry, placeholder: &'static str, description: &'static str) -> Field {
+pub(crate) const fn field(name: &'static str, title: &'static str, entry: Entry, placeholder: &'static str, description: &'static str) -> Field {
     Field { name, title, entry, placeholder, description, shown_when: None }
 }
 
-const fn when(field: Field, other: &'static str, value: &'static str) -> Field {
+pub(crate) const fn when(field: Field, other: &'static str, value: &'static str) -> Field {
     Field { shown_when: Some((other, value)), ..field }
 }
 
@@ -109,86 +87,14 @@ pub const KEY: &str = "key";
 pub const PATH: &str = "path";
 pub const MODELS: &str = "models";
 
-const ANTHROPIC_FIELDS: &[Field] = &[field(KEY, marked("API Key"), Entry::Secret, "sk-ant-…", marked("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."))];
-const OPENAI_FIELDS: &[Field] = &[
-    field(URL, marked("Server"), Entry::Url, "http://127.0.0.1:8000/v1", marked("Any OpenAI-compatible server works (vLLM, LM Studio, Ollama).")),
-    field(KEY, marked("API Key"), Entry::Secret, "", marked("Only for a server that asks for one.")),
-    field(MODELS, marked("More Models"), Entry::List, "qwen3, llama3.3", marked("Models to offer besides the ones the server lists, separated by commas.")),
-];
-const CLAUDE_CODE_FIELDS: &[Field] = &[
-    field(PATH, marked("Executable"), Entry::Path, "claude (from PATH)", ""),
-    field(MODELS, marked("More Models"), Entry::List, "claude-opus-5-5", marked("Besides its default, opus, sonnet and haiku: a model's full name, separated by commas.")),
-];
-const CODEX_FIELDS: &[Field] = &[
-    field(PATH, marked("Executable"), Entry::Path, "codex (from PATH)", ""),
-    field(MODELS, marked("More Models"), Entry::List, "gpt-5.5", marked("Besides its default: models to offer, separated by commas. Heyo runs Codex without your config.toml, so its model setting does not apply here.")),
-];
-const DOUBAO_FIELDS: &[Field] = {
-    use crate::dictation::doubao::*;
-    &[
-        field(CONSOLE, marked("Console"), Entry::Choice(CONSOLES), "", marked("Which of Volcengine's consoles your key is from.")),
-        when(field(API_KEY, marked("API Key"), Entry::Secret, "", marked("From the new console.")), CONSOLE, "new"),
-        when(field(APP_ID, marked("App ID"), Entry::Text, "", marked("From the old console, with its Access Token.")), CONSOLE, "old"),
-        when(field(ACCESS_TOKEN, marked("Access Token"), Entry::Secret, "", marked("From the old console.")), CONSOLE, "old"),
-        field(REMOVE_FILLERS, marked("Remove Filler Words"), Entry::Switch, "", marked("Doubao takes out filler words, stutters and repeated words.")),
-    ]
-};
-
-impl Kind {
-    /// What it is called, and what a new one is named.
-    pub fn title(self) -> &'static str {
-        match self {
-            Kind::Anthropic => marked("Claude API"),
-            Kind::OpenaiCompatible => marked("OpenAI-Compatible Server"),
-            Kind::ClaudeCode => "Claude Code",
-            Kind::Codex => "Codex",
-            Kind::LocalSpeech => marked("Speech Models on This Computer"),
-            Kind::Doubao => marked("Doubao (Volcengine)"),
-        }
-    }
-
-    /// What it needs to be set up.
-    pub fn fields(self) -> &'static [Field] {
-        match self {
-            Kind::Anthropic => ANTHROPIC_FIELDS,
-            Kind::OpenaiCompatible => OPENAI_FIELDS,
-            Kind::ClaudeCode => CLAUDE_CODE_FIELDS,
-            Kind::Codex => CODEX_FIELDS,
-            Kind::LocalSpeech => &[],
-            Kind::Doubao => DOUBAO_FIELDS,
-        }
-    }
-
-    /// Its name as it is stored, which an id is made from.
-    pub fn word(self) -> &'static str {
-        match self {
-            Kind::Anthropic => "anthropic",
-            Kind::OpenaiCompatible => "openai-compatible",
-            Kind::ClaudeCode => "claude-code",
-            Kind::Codex => "codex",
-            Kind::LocalSpeech => "local-speech",
-            Kind::Doubao => "doubao",
-        }
-    }
-
-    pub fn from_word(word: &str) -> Option<Kind> {
-        [Kind::Anthropic, Kind::OpenaiCompatible, Kind::ClaudeCode, Kind::Codex, Kind::LocalSpeech, Kind::Doubao].into_iter().find(|kind| kind.word() == word)
-    }
-
-    /// Whether the user may remove it: not the speech models of this
-    /// computer, which are always there.
-    pub fn removable(self) -> bool {
-        self != Kind::LocalSpeech
-    }
-}
-
 /// A connected provider.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct Provider {
     /// Its own, never reused while it is there: what references name.
     pub id: String,
-    pub kind: Kind,
+    /// Its kind, by the word it is stored as (`ProviderKind::word`).
+    pub kind: String,
     /// As the user calls it.
     pub name: String,
     /// The values of its kind's fields, by name; a missing one is empty.
@@ -202,14 +108,22 @@ pub const LOCAL_SPEECH: &str = "local-speech";
 pub const CLAUDE: &str = "claude";
 
 impl Provider {
-    pub fn new(id: &str, kind: Kind) -> Provider {
-        Provider { id: id.into(), kind, name: crate::i18n::translate(kind.title()).into(), config: BTreeMap::new() }
+    /// A new one of the kind `kind` names, named as its kind is.
+    pub fn new(id: &str, kind: &str) -> Provider {
+        let mut provider = Provider { id: id.into(), kind: kind.into(), name: String::new(), config: BTreeMap::new() };
+        provider.name = crate::i18n::translate(provider.kind().title()).into();
+        provider
+    }
+
+    /// What it is.
+    pub fn kind(&self) -> &'static dyn ProviderKind {
+        kinds::find(&self.kind).unwrap_or(&kinds::Unknown)
     }
 
     /// Whether `field` applies, as the other fields are set.
     pub fn applies(&self, field: &Field) -> bool {
         let Some((other, value)) = field.shown_when else { return true };
-        let first = self.kind.fields().iter().find(|known| known.name == other).and_then(|known| match known.entry {
+        let first = self.kind().fields().iter().find(|known| known.name == other).and_then(|known| match known.entry {
             Entry::Choice(choices) => choices.first().map(|(first, _)| *first),
             _ => None,
         });
@@ -231,32 +145,20 @@ impl Provider {
 
     /// What it can do.
     pub fn can(&self, need: Can) -> bool {
-        use Can::*;
-        match self.kind {
-            Kind::Anthropic | Kind::ClaudeCode | Kind::Codex => matches!(need, Text | Images | Streaming),
-            // Only as private as where the server is.
-            Kind::OpenaiCompatible => matches!(need, Text | Streaming) || (need == Private && address(self.get(URL)) == Address::ThisComputer),
-            Kind::LocalSpeech => matches!(need, Speech | Streaming | Private),
-            Kind::Doubao => matches!(need, Speech | Streaming),
-        }
+        self.kind().can(self, need)
     }
 
     /// The models it offers that are known without asking it, the default
-    /// (an empty name) first where it has one. An OpenAI-compatible server
-    /// also offers what it lists (`openai::list`), which the settings window
-    /// asks for.
+    /// (an empty name) first where it has one, and those its `models`
+    /// field adds. A service that lists its models (`Source::Listed`) also
+    /// offers what it lists, which the settings window asks for.
     pub fn models(&self) -> Vec<String> {
-        let mut models: Vec<String> = match self.kind {
-            Kind::Anthropic => vec![CLAUDE_MODEL.into()],
-            Kind::OpenaiCompatible | Kind::Codex => vec![String::new()],
-            Kind::ClaudeCode => ["", "opus", "sonnet", "haiku"].map(String::from).to_vec(),
-            // The default (or the one downloaded, `dictation::models::chosen`) first.
-            Kind::LocalSpeech => std::iter::once(String::new()).chain(crate::dictation::models::CATALOGUE.iter().map(|model| model.id.to_owned())).collect(),
-            Kind::Doubao => crate::dictation::doubao::RESOURCES.iter().map(|(id, _)| id.to_string()).collect(),
-        };
-        for more in self.listed(MODELS) {
-            if !models.contains(&more) {
-                models.push(more);
+        let mut models = self.kind().models(self);
+        if self.kind().fields().iter().any(|field| field.name == MODELS) {
+            for more in self.listed(MODELS) {
+                if !models.contains(&more) {
+                    models.push(more);
+                }
             }
         }
         models
@@ -264,24 +166,13 @@ impl Provider {
 
     /// What one of its models is called in a picker.
     pub fn model_title(&self, model: &str) -> String {
-        use crate::i18n::t;
-        match (self.kind, model) {
-            (Kind::OpenaiCompatible, "") => t("First Listed").into(),
-            (_, "") => t("Default").into(),
-            (Kind::Doubao, id) => crate::dictation::doubao::RESOURCES.iter().find(|(known, _)| *known == id).map_or(id.to_owned(), |(_, title)| crate::i18n::translate(title).into()),
-            (Kind::LocalSpeech, id) => crate::dictation::models::find(id).map_or(id.to_owned(), |model| model.name.to_owned()),
-            (_, name) => name.into(),
-        }
+        self.kind().model_title(self, model)
     }
 
-    /// What is missing for it to be used at all, in words; none if nothing is.
+    /// What is missing for it to be used at all, in words (`marked`); none
+    /// if nothing is.
     pub fn unset(&self) -> Option<&'static str> {
-        use crate::i18n::t;
-        match self.kind {
-            Kind::OpenaiCompatible if self.get(URL).is_empty() => Some(t("The server's address is missing.")),
-            Kind::Doubao if !crate::dictation::doubao::Config::keyed(self) => Some(t("The key is missing.")),
-            _ => None,
-        }
+        self.kind().unset(self).map(|missing| missing.said)
     }
 }
 
@@ -289,7 +180,7 @@ impl Provider {
 /// computer, and Claude's API (which needs no key where Anthropic's own
 /// tools are signed in).
 pub fn defaults() -> Vec<Provider> {
-    vec![Provider::new(LOCAL_SPEECH, Kind::LocalSpeech), Provider::new(CLAUDE, Kind::Anthropic)]
+    vec![Provider::new(LOCAL_SPEECH, kinds::LOCAL_SPEECH), Provider::new(CLAUDE, kinds::ANTHROPIC)]
 }
 
 /// Puts the speech models of this computer among `providers` if they are
@@ -297,22 +188,21 @@ pub fn defaults() -> Vec<Provider> {
 pub fn with_fixed(mut providers: Vec<Provider>) -> Vec<Provider> {
     let mut seen = false;
     providers.retain(|provider| {
-        let fixed = provider.kind == Kind::LocalSpeech;
+        let fixed = provider.kind().builtin();
         let keep = !fixed || (!seen && provider.id == LOCAL_SPEECH);
         seen |= fixed && keep;
         keep
     });
     if !seen {
-        providers.insert(0, Provider::new(LOCAL_SPEECH, Kind::LocalSpeech));
+        providers.insert(0, Provider::new(LOCAL_SPEECH, kinds::LOCAL_SPEECH));
     }
     providers
 }
 
 /// An id for a new provider of `kind`: its kind's word, numbered after the
 /// first.
-pub fn new_id(providers: &[Provider], kind: Kind) -> String {
+pub fn new_id(providers: &[Provider], word: &str) -> String {
     let taken = |id: &str| providers.iter().any(|provider| provider.id == id);
-    let word = kind.word();
     if !taken(word) {
         return word.into();
     }
@@ -333,7 +223,7 @@ pub fn set_field(providers: &mut [Provider], id: &str, field: &str, value: &str)
         provider.name = value.into();
         return Ok(());
     }
-    if !provider.kind.fields().iter().any(|known| known.name == field) {
+    if !provider.kind().fields().iter().any(|known| known.name == field) {
         return Err(tf("{0} has no setting {1}.", &[&provider.name, &field]));
     }
     if value.is_empty() {
@@ -348,7 +238,7 @@ pub fn set_field(providers: &mut [Provider], id: &str, field: &str, value: &str)
 pub fn remove(providers: &mut Vec<Provider>, id: &str) -> Result<(), String> {
     use crate::i18n::tf;
     let at = providers.iter().position(|provider| provider.id == id).ok_or_else(|| tf("There is no provider {0}.", &[&id]))?;
-    if !providers[at].kind.removable() {
+    if providers[at].kind().builtin() {
         return Err(tf("{0} cannot be removed.", &[&providers[at].name]));
     }
     providers.remove(at);
@@ -467,7 +357,7 @@ pub fn offered(providers: &[Provider], need: Use, listed: &BTreeMap<String, Vec<
             }
         }
         // The speech models of this computer are said short: there is one such provider.
-        let name = if provider.kind == Kind::LocalSpeech { crate::i18n::t("This Computer") } else { provider.name.as_str() };
+        let name = if provider.kind().builtin() { crate::i18n::t("This Computer") } else { provider.name.as_str() };
         offered.extend(models.into_iter().map(|model| (ModelRef::to(&provider.id, &model), format!("{name} · {}", provider.model_title(&model)))));
     }
     offered
@@ -476,35 +366,36 @@ pub fn offered(providers: &[Provider], need: Use, listed: &BTreeMap<String, Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::CLAUDE_MODEL;
 
     fn server(id: &str, url: &str) -> Provider {
-        Provider { config: BTreeMap::from([(URL.into(), url.into())]), ..Provider::new(id, Kind::OpenaiCompatible) }
+        Provider { config: BTreeMap::from([(URL.into(), url.into())]), ..Provider::new(id, kinds::OPENAI_COMPATIBLE) }
     }
 
     #[test]
     fn each_kind_declares_what_it_can_do() {
-        let claude = Provider::new("claude", Kind::Anthropic);
+        let claude = Provider::new("claude", kinds::ANTHROPIC);
         assert!(claude.can(Can::Text) && claude.can(Can::Images) && !claude.can(Can::Speech) && !claude.can(Can::Private));
         // A tool on this computer sends what it is asked to its maker's service.
-        for kind in [Kind::ClaudeCode, Kind::Codex] {
+        for kind in [kinds::CLAUDE_CODE, kinds::CODEX] {
             assert!(Provider::new("x", kind).can(Can::Images) && !Provider::new("x", kind).can(Can::Private));
         }
         // A server is as private as where it is.
         assert!(server("a", "http://127.0.0.1:11434/v1").can(Can::Private));
         assert!(!server("b", "http://192.168.1.20:8000/v1").can(Can::Private));
         assert!(!server("c", "http://127.0.0.1:8000/v1").can(Can::Images));
-        let speech = Provider::new(LOCAL_SPEECH, Kind::LocalSpeech);
+        let speech = Provider::new(LOCAL_SPEECH, kinds::LOCAL_SPEECH);
         assert!(speech.can(Can::Speech) && speech.can(Can::Private) && !speech.can(Can::Text));
-        let doubao = Provider::new("doubao", Kind::Doubao);
+        let doubao = Provider::new("doubao", kinds::DOUBAO);
         assert!(doubao.can(Can::Speech) && !doubao.can(Can::Private));
     }
 
     #[test]
     fn the_speech_models_of_this_computer_are_always_there_once() {
         assert_eq!(with_fixed(Vec::new()).iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), [LOCAL_SPEECH]);
-        let twice = vec![Provider::new("claude", Kind::Anthropic), Provider::new(LOCAL_SPEECH, Kind::LocalSpeech), Provider::new("other", Kind::LocalSpeech)];
+        let twice = vec![Provider::new("claude", kinds::ANTHROPIC), Provider::new(LOCAL_SPEECH, kinds::LOCAL_SPEECH), Provider::new("other", kinds::LOCAL_SPEECH)];
         assert_eq!(with_fixed(twice).iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["claude", LOCAL_SPEECH]);
-        assert!(!Kind::LocalSpeech.removable() && ADDABLE.iter().all(|kind| kind.removable()));
+        assert!(kinds::find(kinds::LOCAL_SPEECH).unwrap().builtin() && kinds::addable().all(|kind| !kind.builtin()));
     }
 
     #[test]
@@ -528,16 +419,16 @@ mod tests {
     #[test]
     fn several_of_one_kind_each_have_an_id() {
         let mut providers = defaults();
-        let first = new_id(&providers, Kind::OpenaiCompatible);
+        let first = new_id(&providers, kinds::OPENAI_COMPATIBLE);
         providers.push(server(&first, ""));
-        let second = new_id(&providers, Kind::OpenaiCompatible);
+        let second = new_id(&providers, kinds::OPENAI_COMPATIBLE);
         assert_eq!((first.as_str(), second.as_str()), ("openai-compatible", "openai-compatible-2"));
-        assert_eq!(new_id(&providers, Kind::Anthropic), "anthropic");
+        assert_eq!(new_id(&providers, kinds::ANTHROPIC), "anthropic");
     }
 
     #[test]
     fn a_reference_reaches_only_what_can_be_used_for_it() {
-        let providers = vec![Provider::new(LOCAL_SPEECH, Kind::LocalSpeech), Provider::new("claude", Kind::Anthropic), server("ollama", "http://localhost:11434/v1"), server("far", "https://api.example.com/v1"), server("blank", "")];
+        let providers = vec![Provider::new(LOCAL_SPEECH, kinds::LOCAL_SPEECH), Provider::new("claude", kinds::ANTHROPIC), server("ollama", "http://localhost:11434/v1"), server("far", "https://api.example.com/v1"), server("blank", "")];
         let to = ModelRef::to;
         assert_eq!(resolve(&providers, &to("ollama", " qwen3 "), Use::Answers).map(|(p, m)| (p.id.as_str(), m)), Ok(("ollama", "qwen3")));
         assert_eq!(resolve(&providers, &ModelRef::none(), Use::Answers), Err(Unusable::NoneChosen));
@@ -558,9 +449,9 @@ mod tests {
         let mut ollama = server("ollama", "http://localhost:11434/v1");
         ollama.name = "Ollama".into();
         ollama.config.insert(MODELS.into(), "qwen3, extra".into());
-        let mut code = Provider::new("claude-code", Kind::ClaudeCode);
+        let mut code = Provider::new("claude-code", kinds::CLAUDE_CODE);
         code.name = "Claude Code".into();
-        let providers = vec![Provider::new(LOCAL_SPEECH, Kind::LocalSpeech), ollama, code];
+        let providers = vec![Provider::new(LOCAL_SPEECH, kinds::LOCAL_SPEECH), ollama, code];
         let listed = BTreeMap::from([("ollama".to_string(), vec!["qwen3".to_string(), "llama3".to_string()])]);
         let titles = |need| offered(&providers, need, &listed).into_iter().map(|(_, title)| title).collect::<Vec<_>>();
         assert_eq!(titles(Use::Answers), ["Ollama · First Listed", "Ollama · qwen3", "Ollama · extra", "Ollama · llama3", "Claude Code · Default", "Claude Code · opus", "Claude Code · sonnet", "Claude Code · haiku"]);

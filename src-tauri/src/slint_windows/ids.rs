@@ -27,9 +27,11 @@ pub(crate) enum Act {
     Update,
     /// Shows the Models page.
     OpenModels,
+    /// Adds the provider whose form is filled in.
+    SaveProvider,
 }
 
-const ACTS: [(Act, &str); 8] = [
+const ACTS: [(Act, &str); 9] = [
     (Act::InstallShellExtension, "install-shell-extension"),
     (Act::InstallOcr, "install-ocr"),
     (Act::InstallMeaning, "install-meaning"),
@@ -38,6 +40,7 @@ const ACTS: [(Act, &str); 8] = [
     (Act::CopyDiagnostics, "copy-diagnostics"),
     (Act::Update, "update"),
     (Act::OpenModels, "open-models"),
+    (Act::SaveProvider, "save-provider"),
 ];
 
 /// What a picker's choice is written as: the provider and its model.
@@ -87,9 +90,15 @@ pub(crate) enum Id {
     ProviderField { provider: String, field: String },
     /// The button that forgets a provider's secret field.
     ForgetSecret { provider: String, field: String },
-    /// The menu that adds a provider, of the kind chosen.
-    AddProvider,
     RemoveProvider(String),
+    /// Checks whether a provider answers as it is set up, by its id.
+    CheckProvider(String),
+    /// A new provider of this kind (by its word), whose form is then shown.
+    NewProvider(String),
+    /// A field of that new provider's form, or its `name`.
+    DraftField(String),
+    /// Shows that page.
+    Go(String),
     /// A speech model of this computer, by its id: downloaded, its
     /// download called off, deleted, or used for dictation.
     SpeechDownload(String),
@@ -127,7 +136,10 @@ impl fmt::Display for Id {
             Id::Pick(setting) => write!(out, "pick:{setting}"),
             Id::ProviderField { provider, field } => write!(out, "provider:{provider}{SEP}{field}"),
             Id::ForgetSecret { provider, field } => write!(out, "forget:{provider}{SEP}{field}"),
-            Id::AddProvider => write!(out, "provider:add"),
+            Id::CheckProvider(provider) => write!(out, "check-provider:{provider}"),
+            Id::NewProvider(kind) => write!(out, "new-provider:{kind}"),
+            Id::DraftField(field) => write!(out, "draft:{field}"),
+            Id::Go(page) => write!(out, "go:{page}"),
             Id::RemoveProvider(provider) => write!(out, "remove-provider:{provider}"),
             Id::SpeechDownload(id) => write!(out, "speech-download:{id}"),
             Id::SpeechCancel(id) => write!(out, "speech-cancel:{id}"),
@@ -155,7 +167,6 @@ impl Id {
             "words" => return Id::Words,
             "ignore:add" => return Id::IgnoreAdd,
             "expand:add" => return Id::ExpandAdd,
-            "provider:add" => return Id::AddProvider,
             _ => {}
         }
         if let Some(act) = id.strip_prefix("act:").and_then(|name| ACTS.iter().find(|(_, known)| *known == name)) {
@@ -176,7 +187,7 @@ impl Id {
             return Id::ForgetSecret { provider: own(provider), field: own(field) };
         }
         // The longer of two that begin alike first.
-        let forms: [(&str, fn(String) -> Id); 18] = [
+        let forms: [(&str, fn(String) -> Id); 22] = [
             ("set:", Id::Set),
             ("num:", Id::Num),
             ("alias:", Id::Alias),
@@ -191,6 +202,10 @@ impl Id {
             ("cat:", Id::Category),
             ("pick:", Id::Pick),
             ("remove-provider:", Id::RemoveProvider),
+            ("check-provider:", Id::CheckProvider),
+            ("new-provider:", Id::NewProvider),
+            ("draft:", Id::DraftField),
+            ("go:", Id::Go),
             ("speech-download:", Id::SpeechDownload),
             ("speech-cancel:", Id::SpeechCancel),
             ("speech-delete:", Id::SpeechDelete),
@@ -252,8 +267,11 @@ mod tests {
             Id::ProviderField { provider: s("openai-compatible-2"), field: s("url") },
             Id::ProviderField { provider: s("claude"), field: s("name") },
             Id::ForgetSecret { provider: s("claude"), field: s("key") },
-            Id::AddProvider,
             Id::RemoveProvider(s("codex")),
+            Id::CheckProvider(s("doubao")),
+            Id::NewProvider(s("openai-compatible")),
+            Id::DraftField(s("url")),
+            Id::Go(s("provider:openai-compatible-2")),
             Id::SpeechDownload(s("whisper-turbo")),
             Id::SpeechCancel(s("parakeet-tdt-0.6b-v3")),
             Id::SpeechDelete(s("x-asr-2026-06-05")),

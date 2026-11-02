@@ -86,6 +86,23 @@ impl Claude {
         signed_in.await.ok().flatten().map(Credential::Token)
     }
 
+    /// Whether the API takes the credential, at no cost: the list of models.
+    pub async fn check(&self) -> Result<(), ModelError> {
+        let credential = self.credential().await.ok_or(ModelError::NotSetUp)?;
+        let request = super::client(false).get(format!("{}/v1/models?limit=1", self.base())).header("anthropic-version", VERSION).timeout(std::time::Duration::from_secs(10));
+        let request = match &credential {
+            Credential::Key(key) => request.header("x-api-key", key),
+            Credential::Token(token) => request.bearer_auth(token).header("anthropic-beta", OAUTH),
+        };
+        let response = request.send().await.map_err(|_| ModelError::ClaudeUnreachable)?;
+        match response.status().as_u16() {
+            200..=299 => Ok(()),
+            401 | 403 => Err(ModelError::InvalidKey),
+            429 => Err(ModelError::RateLimited),
+            code => Err(ModelError::Claude { status: code.to_string(), message: response.status().canonical_reason().unwrap_or_default().to_owned() }),
+        }
+    }
+
     pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
         let credential = self.credential().await.ok_or(ModelError::NotSetUp)?;
         let request = super::client(false).post(format!("{}/v1/messages", self.base())).header("content-type", "application/json").header("anthropic-version", VERSION);

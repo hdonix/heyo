@@ -27,12 +27,14 @@ export struct NavItem {
 // One line of a page. `kind` says what it is:
 //   heading  the title of a card
 //   note     a paragraph
-//   head     an extension's name, with its icon and what it is
-//   row      a setting: label and description, and on the right what
-//            `control` names (switch, select, field, password, button,
-//            confirm, badge, text, check), a hotkey field when `hotkey`
-//            names one, and a second button when `more` has its words
-//            (which says `more:<id>` when pressed)
+//   back     the way back to the page `id` names, called `label`
+//   head     an extension's or a provider's name, with its icon and what it is
+//   row      a setting: label and description, `chips` beside them, and on
+//            the right what `control` names (switch, select, field,
+//            password, button, confirm, badge, text, check, or link: the
+//            whole row is pressed, and a chevron says so), a hotkey field
+//            when `hotkey` names one, and a second button when `more` has
+//            its words (which acts on `more-id` when pressed)
 //   area     a field of several lines
 //   group    a row that opens and closes what is under it
 //   columns  the titles of the columns of a table
@@ -73,6 +75,7 @@ export struct Line {
     check-id: string,
     open: bool,
     busy: bool,
+    chips: [string],
 }
 
 export global Host {
@@ -298,6 +301,53 @@ component LineView inherits VerticalLayout {
             horizontal-alignment: left;
         }
     }
+    if line.kind == "back": HorizontalLayout {
+        alignment: start;
+        padding-left: 6px;
+        padding-bottom: 6px;
+        back-touch := TouchArea {
+            mouse-cursor: pointer;
+            accessible-role: button;
+            accessible-label: root.line.label;
+            accessible-action-default => {
+                Host.act(root.line.id, "");
+            }
+            clicked => {
+                Host.act(root.line.id, "");
+            }
+            Rectangle {
+                border-radius: Tokens.radius-md;
+                background: back-touch.pressed ? Tokens.fill-3 : back-touch.has-hover ? Tokens.fill-2 : transparent;
+                animate background {
+                    duration: Tokens.duration-fast;
+                    easing: Tokens.ease-out;
+                }
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 10px;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    spacing: 4px;
+                    VerticalLayout {
+                        alignment: center;
+                        Path {
+                            width: 9px;
+                            height: 9px;
+                            commands: "M 6.5 0.5 L 2 4.5 L 6.5 8.5";
+                            stroke: Tokens.accent;
+                            stroke-width: 1.5px;
+                            fill: transparent;
+                        }
+                    }
+                    TextSm {
+                        text: root.line.label;
+                        color: Tokens.accent;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
     if line.kind == "head": HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
@@ -337,6 +387,31 @@ component LineView inherits VerticalLayout {
             }
         }
 
+        // A row that goes somewhere: pressed as a whole, and lit up under
+        // the pointer.
+        if root.line.control == "link": link-touch := TouchArea {
+            mouse-cursor: pointer;
+            accessible-role: button;
+            accessible-label: root.line.label;
+            accessible-action-default => {
+                Host.act(root.line.id, "");
+            }
+            clicked => {
+                Host.act(root.line.id, "");
+            }
+            Rectangle {
+                border-top-left-radius: root.line.first ? Theme.radius-card : 0px;
+                border-top-right-radius: root.line.first ? Theme.radius-card : 0px;
+                border-bottom-left-radius: root.line.last ? Theme.radius-card : 0px;
+                border-bottom-right-radius: root.line.last ? Theme.radius-card : 0px;
+                background: link-touch.pressed ? Tokens.fill-3 : link-touch.has-hover ? Tokens.fill-2 : transparent;
+                animate background {
+                    duration: Tokens.duration-fast;
+                    easing: Tokens.ease-out;
+                }
+            }
+        }
+
         Row {
             first: root.line.first;
             label: root.line.label;
@@ -345,6 +420,9 @@ component LineView inherits VerticalLayout {
             icon: root.line.icon;
             has-icon: root.line.has-icon;
             tinted: root.line.tinted;
+            for chip in root.line.chips: Badge {
+                text: chip;
+            }
             if root.line.control == "text": TextXs {
                 text: root.line.value;
                 color: Tokens.text-muted;
@@ -407,6 +485,17 @@ component LineView inherits VerticalLayout {
                 mixed: root.line.mixed;
                 toggled(on) => {
                     Host.act(root.line.id, on ? "true" : "false");
+                }
+            }
+            if root.line.control == "link": VerticalLayout {
+                alignment: center;
+                Path {
+                    width: 9px;
+                    height: 9px;
+                    commands: "M 2 0.5 L 6.5 4.5 L 2 8.5";
+                    stroke: Tokens.text-muted;
+                    stroke-width: 1.5px;
+                    fill: transparent;
                 }
             }
         }

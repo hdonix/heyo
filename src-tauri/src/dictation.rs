@@ -30,13 +30,13 @@
 //! meanwhile is skipped.
 
 mod composed;
-mod engine;
+pub(crate) mod engine;
 mod listening;
 mod microphone;
 pub(crate) mod models;
 mod onscreen;
 mod polish;
-mod vocabulary;
+pub(crate) mod vocabulary;
 
 use crate::i18n::{t, translate};
 use std::collections::VecDeque;
@@ -182,15 +182,18 @@ fn on_this_computer(settings: &crate::settings::Settings) -> bool {
 }
 
 /// What recognizes dictation, as the settings choose it (`dictationModel`,
-/// resolved through the providers: the one place it is chosen): none for
-/// a model on this computer, or how Doubao is to. A reference to what
-/// cannot recognize speech, or Doubao without a key, is what to say instead.
+/// resolved through the providers and opened by the provider's kind: the
+/// one place it is chosen): none for a model on this computer, or how
+/// Doubao is to. A reference to what cannot recognize speech, or Doubao
+/// without a key, is what to say instead.
 fn cloud(settings: &crate::settings::Settings) -> Result<Option<doubao::Config>, String> {
-    use registry::{Kind, Use};
-    let (provider, model) = registry::resolve(&settings.providers, &settings.dictation_model, Use::DictationRecognition).map_err(|why| crate::models::ModelError::Unusable(why).message())?;
-    match provider.kind {
-        Kind::Doubao => doubao::Config::of(provider, model, &vocabulary::parse(&settings.dictation_vocabulary)).map(Some).map_err(|failure| crate::helper::worded(&failure.said(), t("Dictation failed")).full()),
-        _ => Ok(None),
+    use crate::models::kinds::{self, Recognizer};
+    let (provider, model) = registry::resolve(&settings.providers, &settings.dictation_model, registry::Use::DictationRecognition).map_err(|why| crate::models::ModelError::Unusable(why).message())?;
+    match provider.kind().recognizer(provider, model, &vocabulary::parse(&settings.dictation_vocabulary)) {
+        Some(Ok(Recognizer::ThisComputer)) => Ok(None),
+        Some(Ok(Recognizer::Doubao(config))) => Ok(Some(config)),
+        Some(Err(failure)) => Err(kinds::worded(&failure)),
+        None => Err(crate::models::ModelError::Unusable(registry::Unusable::Cannot(provider.name.clone())).message()),
     }
 }
 

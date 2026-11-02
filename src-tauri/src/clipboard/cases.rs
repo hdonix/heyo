@@ -149,7 +149,7 @@ pub(crate) async fn cases_for(entry: &CaseEntry, model: &Model) -> Result<Vec<Ca
 mod tests {
     use super::*;
     use crate::models::mock::{block_on, Server};
-    use crate::models::registry::{self, Kind, ModelRef, Provider};
+    use crate::models::{kinds, registry::{self, ModelRef, Provider}};
     use serde_json::json;
 
     fn entry() -> CaseEntry {
@@ -161,7 +161,7 @@ mod tests {
     }
 
     fn server(id: &str, url: &str) -> Provider {
-        let mut provider = Provider::new(id, Kind::OpenaiCompatible);
+        let mut provider = Provider::new(id, kinds::OPENAI_COMPATIBLE);
         provider.config.insert(registry::URL.into(), url.into());
         provider
     }
@@ -172,7 +172,7 @@ mod tests {
         let mut providers = registry::defaults();
         providers[1].config.insert(registry::KEY.into(), "sk-secret".into());
         providers.extend(servers);
-        providers.push(Provider::new("cc", Kind::ClaudeCode));
+        providers.push(Provider::new("cc", kinds::CLAUDE_CODE));
         Settings { providers, cases_model: cases, ..Settings::default() }
     }
 

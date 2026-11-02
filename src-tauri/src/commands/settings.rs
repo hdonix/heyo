@@ -8,16 +8,28 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::*;
-use crate::models::registry::{self, Kind, Provider};
+use crate::models::registry::{self, Provider};
 
 pub(crate) const SETTINGS_WINDOW: &str = "settings";
 
-/// The models the OpenAI-compatible server that is the provider `id`
-/// lists; an error says why it could not be asked.
-pub(crate) async fn provider_models(id: String, app: AppHandle) -> Result<Vec<String>, String> {
+/// The provider `id` as it is saved, secrets and all: for the host alone.
+fn saved_provider(app: &AppHandle, id: &str) -> Result<Provider, String> {
     let provider = app.state::<SettingsState>().0.read().unwrap().providers.iter().find(|provider| provider.id == id).cloned();
-    let provider = provider.ok_or_else(|| tf("There is no provider {0}.", &[&id]))?;
-    crate::models::listed_models(&provider).await.map_err(|e| e.message())
+    provider.ok_or_else(|| tf("There is no provider {0}.", &[&id]))
+}
+
+/// The models the service that is the provider `id` lists; an error says
+/// why it could not be asked. Blocks.
+pub(crate) fn provider_models(id: String, app: AppHandle) -> Result<Vec<String>, String> {
+    let provider = saved_provider(&app, &id)?;
+    provider.kind().list(&provider)
+}
+
+/// Whether the provider `id` answers as it is set up, in words, and the
+/// models it listed if it lists them. Blocks, up to some seconds.
+pub(crate) fn check_provider(id: String, app: AppHandle) -> Result<crate::models::kinds::Checked, String> {
+    let provider = saved_provider(&app, &id)?;
+    provider.kind().check(&provider)
 }
 
 /// Makes `next` the settings: saves them, does what the change calls for
@@ -149,22 +161,17 @@ impl SettingsView {
 /// The providers as a window may see them: each secret taken out, and
 /// whether it was there said instead.
 fn without_secrets(providers: &mut [Provider]) -> std::collections::BTreeMap<String, ProviderState> {
-    use crate::models::cli::{found, Tool};
     providers
         .iter_mut()
         .map(|provider| {
             let mut state = ProviderState::default();
-            for field in provider.kind.fields().iter().filter(|field| field.entry == registry::Entry::Secret) {
+            for field in provider.kind().fields().iter().filter(|field| field.entry == registry::Entry::Secret) {
                 if let Some(value) = provider.config.get_mut(field.name).filter(|value| !value.trim().is_empty()) {
                     value.clear();
                     state.secrets_set.push(field.name.to_owned());
                 }
             }
-            state.cli_found = match provider.kind {
-                Kind::ClaudeCode => Some(found(Tool::ClaudeCode, provider.get(registry::PATH))),
-                Kind::Codex => Some(found(Tool::Codex, provider.get(registry::PATH))),
-                _ => None,
-            };
+            state.cli_found = provider.kind().found(provider);
             (provider.id.clone(), state)
         })
         .collect()
@@ -235,12 +242,20 @@ fn change_providers(app: &AppHandle, change: impl FnOnce(&mut Vec<Provider>) -> 
     commit(app, next)
 }
 
-/// Connects a new provider of `kind` (by its word), named as its kind is.
-pub(crate) fn add_provider(kind: String, app: AppHandle) -> Result<SettingsView, String> {
-    let kind = Kind::from_word(&kind).filter(|kind| registry::ADDABLE.contains(kind)).ok_or_else(|| tf("{0} is not a provider that can be added.", &[&kind]))?;
+/// Connects a new provider of `kind` (by its word), named `name`, set up
+/// with `config` (its fields by name), as the settings window's form for a
+/// new one says. Its id is made here.
+pub(crate) fn add_provider(kind: String, name: String, config: std::collections::BTreeMap<String, String>, app: AppHandle) -> Result<SettingsView, String> {
+    let known = crate::models::kinds::addable().find(|known| known.word() == kind).ok_or_else(|| tf("{0} is not a provider that can be added.", &[&kind]))?;
     change_providers(&app, |providers| {
-        let id = registry::new_id(providers, kind);
-        providers.push(Provider::new(&id, kind));
+        let id = registry::new_id(providers, known.word());
+        providers.push(Provider::new(&id, known.word()));
+        if !name.trim().is_empty() {
+            registry::set_field(providers, &id, "name", &name)?;
+        }
+        for (field, value) in &config {
+            registry::set_field(providers, &id, field, value)?;
+        }
         Ok(())
     })
 }
@@ -416,7 +431,7 @@ mod tests {
     fn no_window_is_told_a_secret_only_that_it_is_set() {
         let mut providers = registry::defaults();
         providers[1].config.insert(registry::KEY.into(), "sk-ant-secret".into());
-        let mut server = Provider::new("ollama", Kind::OpenaiCompatible);
+        let mut server = Provider::new("ollama", crate::models::kinds::OPENAI_COMPATIBLE);
         server.config.extend([(registry::URL.to_string(), "http://127.0.0.1:11434/v1".to_string()), (registry::KEY.to_string(), "  ".to_string())]);
         providers.push(server);
         let states = without_secrets(&mut providers);

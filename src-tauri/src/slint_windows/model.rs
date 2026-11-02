@@ -19,8 +19,8 @@ use serde_json::{json, Map, Value};
 
 use super::host::Command;
 use crate::i18n::{self, marked, t, tf, tn, translate};
-use crate::models::registry::{self, Entry as Field, Kind, ModelRef, Provider, Use};
-use crate::models::{address, Address};
+use crate::models::kinds::{self, Known, Source};
+use crate::models::registry::{self, Entry as Field, ModelRef, Provider, Use};
 use super::ids::{self, Act, Bound, Id};
 use super::keys;
 
@@ -34,6 +34,12 @@ pub(crate) const PAGES: &[(&str, &str, &str)] = &[
     ("advanced", marked("Advanced"), "wrench-screwdriver-16"),
     ("about", marked("About"), "info-01-16"),
 ];
+
+/// The pages of the Models page's providers: `provider:<id>` one's own,
+/// `provider:add` choosing the kind of a new one, `provider:new` its form.
+const PROVIDER: &str = "provider:";
+const ADDING: &str = "add";
+const NEW: &str = "new";
 
 /// The id the applications have among the extensions of the sidebar.
 pub(crate) const APPLICATIONS: &str = "@applications";
@@ -89,6 +95,8 @@ pub(crate) struct Line {
     pub check_id: String,
     pub open: bool,
     pub busy: bool,
+    /// Words shown as chips before its control: what a provider can do.
+    pub chips: Vec<String>,
 }
 
 impl Line {
@@ -143,6 +151,17 @@ impl Line {
     /// A button that asks for a second click, saying `again` in between.
     fn confirm(mut self, words: &str, again: &str) -> Line {
         (self.control, self.value, self.placeholder) = ("confirm", words.to_string(), again.to_string());
+        self
+    }
+
+    /// The whole row is pressed to go where its id says, which a chevron shows.
+    fn link(mut self) -> Line {
+        self.control = "link";
+        self
+    }
+
+    fn chips(mut self, chips: Vec<String>) -> Line {
+        self.chips = chips;
         self
     }
 
@@ -290,8 +309,12 @@ pub(crate) enum Then {
     Sources,
     /// What the extension with this id may ask Heyo for.
     Permissions(String),
-    /// The models the server that is this provider lists, by its id.
+    /// The models the service that is this provider lists, by its id.
     Models(String),
+    /// What checking this provider came to, by its id.
+    ProviderChecked(String),
+    /// A provider was added: the settings, with the ids there were before.
+    Added(Vec<String>),
     Copied,
     Checked,
     Installed,
@@ -307,6 +330,14 @@ pub(crate) enum Then {
 
 fn ask(command: Command, then: Then) -> Ask {
     Ask { command, then }
+}
+
+/// Checking a provider's connection.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Check {
+    Checking,
+    /// What it came to, in words.
+    Done(Result<String, String>),
 }
 
 /// Everything the window was told, and where it is.
@@ -338,6 +369,10 @@ pub(crate) struct Model {
     pub expanded: BTreeSet<String>,
     /// The speech models of this computer, as `dictation::models` says them.
     pub speech: Vec<Value>,
+    /// What checking each provider came to, by its id.
+    pub checks: BTreeMap<String, Check>,
+    /// A provider being added, until it is.
+    pub draft: Option<Provider>,
     pub ocr_installing: bool,
     pub meaning_installing: bool,
     pub update: Update,
@@ -444,8 +479,14 @@ impl Model {
         self.extensions.iter().find(|extension| extension["id"] == self.page.as_str()).cloned()
     }
 
+    /// The page of the sidebar the one shown belongs to: a provider's
+    /// belongs to Models.
+    pub(crate) fn section(&self) -> &str {
+        if self.page.starts_with(PROVIDER) { "models" } else { &self.page }
+    }
+
     pub(crate) fn title(&self) -> String {
-        match PAGES.iter().find(|(id, ..)| *id == self.page) {
+        match PAGES.iter().find(|(id, ..)| *id == self.section()) {
             Some((_, title, _)) => translate(title).to_string(),
             None => self.extension().as_ref().map(Self::extension_title).unwrap_or_else(|| t("Settings").into()),
         }
@@ -498,6 +539,9 @@ impl Model {
             "models" => self.models_page(),
             "advanced" => self.advanced(),
             "about" => self.about(),
+            page if page == format!("{PROVIDER}{ADDING}") => self.adding_page(),
+            page if page == format!("{PROVIDER}{NEW}") => self.new_page(),
+            _ if self.provider_page().is_some() => self.provider_page().and_then(|id| self.provider(id)).map(|provider| self.provider_page_lines(&provider)).unwrap_or_else(|| self.models_page()),
             _ => self.extension().map(|extension| self.extension_page(&extension)).unwrap_or_default(),
         }
     }
@@ -705,6 +749,7 @@ impl Model {
             rows.push(self.picker(Use::DictationPolish, t("Model"), "", None));
         }
         page.card(t("Polish with AI"), rows);
+        page.card("", vec![Self::to_models()]);
         page.done()
     }
 
@@ -750,7 +795,7 @@ impl Model {
             vec![
                 self.picker(Use::Answers, t("Model"), t("Answers Ask AI, AI Chat, Selected Text Actions and extensions."), None),
                 self.picker(Use::ClipboardCases, t("Clipboard Search Cases"), t("Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."), Some(t("None"))),
-                Line::row(Id::Act(Act::OpenModels), t("Providers")).says(t("Connect Claude, servers such as Ollama, Claude Code, Codex and speech services, and download speech models.")).button(t("Open Models")),
+                Self::to_models(),
             ],
         );
         page.card(t("Pasting"), vec![Line::row(Id::Set("confirmTerminalPaste".into()), t("Ask Before Pasting Several Lines into a Terminal")).says(t("A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces.")).switch(self.set("confirmTerminalPaste"))]);
@@ -773,6 +818,10 @@ impl Model {
         providers
     }
 
+    fn provider(&self, id: &str) -> Option<Provider> {
+        self.providers().into_iter().find(|provider| provider.id == id)
+    }
+
     /// The model `need` refers to.
     fn reference(&self, need: Use) -> ModelRef {
         serde_json::from_value(self.setting(need.setting()).clone()).unwrap_or_default()
@@ -787,7 +836,7 @@ impl Model {
         list(self.provider_state(id), "secretsSet").iter().any(|name| name == field)
     }
 
-    /// The models each server listed, of those that answered.
+    /// The models each service listed, of those that answered.
     fn listed_models(&self) -> BTreeMap<String, Vec<String>> {
         self.listed.iter().filter_map(|(id, models)| Some((id.clone(), models.as_ref().ok()?.clone()))).collect()
     }
@@ -797,20 +846,37 @@ impl Model {
         self.speech.iter().any(|entry| (if id.is_empty() { flag(entry, "inUse") } else { entry["id"] == id }) && flag(entry, "installed"))
     }
 
+    /// What is known of a provider besides its settings, as its kind's
+    /// status is said from.
+    fn known(&self, provider: &Provider) -> Known {
+        let found = &self.provider_state(&provider.id)["cliFound"];
+        let found = (!found.is_null()).then(|| match (found.get("Ok"), found.get("Err").and_then(Value::as_str)) {
+            (Some(found), _) => Ok((text(found, "version"), text(found, "path"))),
+            (_, why) => Err(why.unwrap_or_default().to_string()),
+        });
+        let source = provider.kind().source();
+        let listed = if source == Source::Listed && provider.unset().is_none() { self.listed.get(&provider.id).cloned() } else { None };
+        let downloaded = (source == Source::Catalogue && !self.speech.is_empty()).then(|| self.speech.iter().filter(|entry| flag(entry, "installed")).count());
+        Known { found, listed, downloaded }
+    }
+
     /// What keeps a provider from being used as it is now, as far as is
     /// known; none if nothing does.
     fn trouble(&self, provider: &Provider) -> Option<String> {
         if let Some(missing) = provider.unset() {
             return Some(translate(missing).into());
         }
-        match provider.kind {
-            Kind::ClaudeCode | Kind::Codex => self.provider_state(&provider.id)["cliFound"].get("Err").and_then(Value::as_str).map(str::to_string),
-            Kind::OpenaiCompatible => match self.listed.get(&provider.id) {
-                Some(Err(e)) => Some(tf("Not reachable: {0}.", &[e])),
-                _ => None,
-            },
+        let known = self.known(provider);
+        match (known.found, known.listed) {
+            (Some(Err(why)), _) => Some(why),
+            (_, Some(Err(e))) => Some(tf("Not reachable: {0}.", &[&e])),
             _ => None,
         }
+    }
+
+    /// The chips of what a provider can do.
+    fn abilities(provider: &Provider) -> Vec<String> {
+        kinds::ABILITIES.iter().filter(|(can, _)| provider.can(*can)).map(|(_, word)| translate(word).to_string()).collect()
     }
 
     /// A picker of the model `need` refers to: each model of each provider
@@ -826,7 +892,7 @@ impl Model {
         let problem = match registry::resolve(&providers, &reference, need) {
             Err(registry::Unusable::NoneChosen) if off.is_some() => None,
             Err(why) => Some(crate::models::ModelError::Unusable(why).message()),
-            Ok((provider, model)) => self.trouble(provider).or_else(|| (provider.kind == Kind::LocalSpeech && !self.speech.is_empty() && !self.speech_installed(model)).then(|| tf("{0} is not downloaded yet. Download it in Models.", &[&provider.model_title(model)]))),
+            Ok((provider, model)) => self.trouble(provider).or_else(|| (provider.kind().source() == Source::Catalogue && !self.speech.is_empty() && !self.speech_installed(model)).then(|| tf("{0} is not downloaded yet. Download it in Models.", &[&provider.model_title(model)]))),
         };
         if !choices.iter().any(|(choice, _)| *choice == value) {
             let name = providers.iter().find(|provider| provider.id == reference.provider).map_or(reference.provider.clone(), |provider| provider.name.clone());
@@ -843,80 +909,162 @@ impl Model {
         line
     }
 
-    /// What is asked to know the models of every server that has an address.
+    /// The row that goes to the Models page, under the pickers.
+    fn to_models() -> Line {
+        Line::row(Id::Act(Act::OpenModels), t("Providers")).says(t("Connect Claude, servers such as Ollama, Claude Code, Codex and speech services, and download speech models.")).button(t("Open Models"))
+    }
+
+    /// What is asked to know the models of every service that lists them
+    /// and is set up.
     fn listings(&self) -> Vec<Ask> {
-        self.providers().into_iter().filter(|provider| provider.kind == Kind::OpenaiCompatible && provider.unset().is_none()).map(|provider| ask(Command::ProviderModels(provider.id.clone()), Then::Models(provider.id))).collect()
+        self.providers().into_iter().filter(|provider| provider.kind().source() == Source::Listed && provider.unset().is_none()).map(|provider| ask(Command::ProviderModels(provider.id.clone()), Then::Models(provider.id))).collect()
     }
 
-    // --- Models --------------------------------------------------------------
+    // --- Models: the providers, each on a page of its own --------------------
 
-    /// What a provider can do and where what it is given goes, in words.
-    fn abilities(provider: &Provider) -> String {
-        use registry::Can;
-        let does = if provider.can(Can::Speech) {
-            t("Speech to text.")
-        } else if provider.can(Can::Images) {
-            t("Text, and pictures with it.")
-        } else {
-            t("Text.")
-        };
-        let goes = match provider.kind {
-            _ if provider.can(Can::Private) => t("Runs on this computer: what it is given stays here."),
-            Kind::ClaudeCode => t("Runs on this computer, and sends what it is given to Anthropic."),
-            Kind::Codex => t("Runs on this computer, and sends what it is given to OpenAI."),
-            Kind::OpenaiCompatible | Kind::Doubao => "",
-            _ => t("What it is given is sent to Anthropic."),
-        };
-        format!("{does} {goes}").trim().to_string()
+    /// The provider whose page is shown, by its id; none on another page.
+    fn provider_page(&self) -> Option<&str> {
+        self.page.strip_prefix(PROVIDER).filter(|id| *id != ADDING && *id != NEW)
     }
 
-    /// Whether a server answers, and where what is sent to it goes; the
-    /// second is whether that is a warning.
-    fn server_status(&self, provider: &Provider) -> (String, bool) {
-        let url = provider.get(registry::URL);
-        if url.is_empty() {
-            return (t("Type the server's address: any OpenAI-compatible server works (vLLM, LM Studio, Ollama).").into(), true);
+    /// The list of the providers, and the way to add one.
+    fn models_page(&self) -> Vec<Line> {
+        let mut page = Page::default();
+        page.note(t("Providers run the models Heyo's features use. Add one, then choose its models where each feature is set up: AI in Advanced, speech recognition and polishing in Dictation."));
+        let rows = self
+            .providers()
+            .iter()
+            .map(|provider| {
+                let kind = provider.kind();
+                let status = kind.status(provider, &self.known(provider));
+                let title = translate(kind.title());
+                // Its kind, where its name does not say it already.
+                let said = if provider.name == title { status.short } else { format!("{title} · {}", status.short) };
+                Line::row(Id::Go(format!("{PROVIDER}{}", provider.id)), provider.name.clone()).says(said).warns(status.warning).pictured(Some(kind.icon().into())).chips(Self::abilities(provider)).link()
+            })
+            .collect();
+        page.card(t("Providers"), rows);
+        page.card("", vec![Line::row(Id::Go(format!("{PROVIDER}{ADDING}")), t("Add Provider…")).says(t("Several of one kind can be added, two servers for instance.")).pictured(Some("plus".into())).link()]);
+        page.done()
+    }
+
+    /// The top of a provider's page: the way back, and what it is.
+    fn top(page: &mut Page, back: &str, back_title: &str, icon: &str, title: String, about: String) {
+        page.0.push(Line { kind: "back", id: Id::Go(back.into()).into(), label: back_title.into(), ..Line::default() });
+        page.0.push(Line { kind: "head", label: title, description: about, icon: Some(icon.into()), ..Line::default() });
+    }
+
+    /// Choosing the kind of a new provider.
+    fn adding_page(&self) -> Vec<Line> {
+        let mut page = Page::default();
+        Self::top(&mut page, "models", t("Models"), "plus", t("Add Provider").into(), t("Choose what to connect.").into());
+        let rows = kinds::addable().map(|kind| Line::row(Id::NewProvider(kind.word().into()), translate(kind.title())).says(translate(kind.about())).pictured(Some(kind.icon().into())).chips(Self::abilities(&Provider::new("", kind.word()))).link()).collect();
+        page.card("", rows);
+        page.done()
+    }
+
+    /// The fields of a provider, to edit: its name (unless it is always
+    /// there) and its kind's fields that apply. A new one's (`draft`) are
+    /// kept here until it is added.
+    fn form(&self, provider: &Provider, draft: bool) -> Vec<Line> {
+        let id = |field: &str| if draft { Id::DraftField(field.into()) } else { Id::ProviderField { provider: provider.id.clone(), field: field.into() } };
+        let kind = provider.kind();
+        let mut rows = Vec::new();
+        if !kind.builtin() {
+            rows.push(Line::row(id("name"), t("Name")).field(provider.name.clone(), translate(kind.title())));
         }
-        let (status, failed) = match self.listed.get(&provider.id) {
-            Some(Ok(models)) if models.is_empty() => (t("Connected, but the server lists no models.").to_string(), false),
-            Some(Ok(models)) => (tf("Connected: {}", &[&models.join(", ")]), false),
-            Some(Err(e)) => (tf("Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama).", &[e]), true),
-            None => (t("Checking…").to_string(), false),
-        };
-        match address(url) {
-            Address::ThisComputer => (format!("{status} {}", t("Text stays on this computer.")), failed),
-            Address::Unknown => (format!("{status} {}", t("This is not an http or https address.")), true),
-            Address::Elsewhere { host, encrypted: true } => (format!("{status} {}", tf("This address is not this computer: the text you select, ask about and dictate is sent to {0}.", &[&host])), true),
-            Address::Elsewhere { host, encrypted: false } => (format!("{status} {}", tf("This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer.", &[&host])), true),
+        for field in kind.fields().iter().filter(|field| provider.applies(field)) {
+            let row = Line::row(id(field.name), translate(field.title)).says(translate(field.description));
+            let set = if draft { !provider.get(field.name).is_empty() } else { self.secret_set(&provider.id, field.name) };
+            rows.push(match field.entry {
+                Field::Secret if set && draft => row.secret(t("Typed — type again to replace it")),
+                Field::Secret if set => row.secret(t("Saved — type a new key to replace it")).more(t("Remove"), Id::ForgetSecret { provider: provider.id.clone(), field: field.name.into() }),
+                Field::Secret => row.secret(field.placeholder),
+                Field::Choice(choices) => {
+                    let chosen = provider.get(field.name);
+                    row.select(if chosen.is_empty() { choices[0].0 } else { chosen }, choices.iter().map(|(value, title)| (*value, translate(title))))
+                }
+                Field::Switch => row.switch(provider.get(field.name) == "true"),
+                _ => row.field(provider.config.get(field.name).cloned().unwrap_or_default(), field.placeholder),
+            });
         }
+        rows
     }
 
-    /// How a provider is: whether it can be used, and what it does. The
-    /// second is whether that is a warning.
-    fn status(&self, provider: &Provider) -> (String, bool) {
-        let (status, warning) = match provider.kind {
-            Kind::Anthropic if self.secret_set(&provider.id, registry::KEY) => (t("Connected with an API key.").to_string(), false),
-            Kind::Anthropic => (t("No API key saved: Heyo uses ANTHROPIC_API_KEY or an `ant auth login` profile, if there is one.").to_string(), false),
-            Kind::OpenaiCompatible => self.server_status(provider),
-            Kind::ClaudeCode | Kind::Codex => {
-                let found = &self.provider_state(&provider.id)["cliFound"];
-                let (tool, sign_in) = if provider.kind == Kind::Codex { ("Codex", "codex login") } else { ("Claude Code", "claude auth login") };
-                let (said, missing) = match (found.get("Ok"), found.get("Err").and_then(Value::as_str)) {
-                    (Some(found), _) => (tf("Using {0} at {1}.", &[&text(found, "version"), &text(found, "path")]), false),
-                    (None, Some(why)) => (why.to_string(), true),
-                    _ => (t("Checking…").to_string(), false),
-                };
-                (format!("{said} {}", tf("{0} answers with the account it is signed in to ({1}); no API key is needed.", &[&tool, &sign_in])), missing)
+    /// A new provider's form, until it is added or left.
+    fn new_page(&self) -> Vec<Line> {
+        let Some(draft) = &self.draft else { return self.adding_page() };
+        let kind = draft.kind();
+        let mut page = Page::default();
+        Self::top(&mut page, &format!("{PROVIDER}{ADDING}"), t("Add Provider"), kind.icon(), tf("New {0}", &[&translate(kind.title())]), translate(kind.about()).into());
+        page.card(t("Settings"), self.form(draft, true));
+        page.card("", vec![Line::row(Id::Act(Act::SaveProvider), t("Add This Provider")).says(t("Its models can then be chosen where each feature is set up. It can be changed or removed here later.")).button(t("Add")).more(t("Cancel"), Id::Go("models".into()))]);
+        page.done()
+    }
+
+    /// Which uses refer to `model` of `provider`, in a word each.
+    fn used_for(&self, provider: &Provider, model: &str) -> Vec<String> {
+        const USES: &[(Use, &str)] = &[(Use::Answers, marked("AI")), (Use::DictationRecognition, marked("Dictation")), (Use::DictationPolish, marked("Polish")), (Use::ClipboardCases, marked("Clipboard Search"))];
+        USES.iter().filter(|(need, _)| need.suits(provider) && self.reference(*need) == ModelRef::to(&provider.id, model)).map(|(_, word)| translate(word).to_string()).collect()
+    }
+
+    /// A provider's models, as its kind has them: a catalogue to download
+    /// from, what the service lists, or what is known of it. Each says what
+    /// uses it.
+    fn model_rows(&self, provider: &Provider) -> Vec<Line> {
+        let kind = provider.kind();
+        if kind.source() == Source::Catalogue {
+            return self.speech_rows();
+        }
+        let mut models = provider.models();
+        let mut rows = Vec::new();
+        if kind.source() == Source::Listed {
+            match self.listed.get(&provider.id) {
+                Some(Ok(listed)) => models.extend(listed.iter().filter(|name| !models.contains(name)).cloned().collect::<Vec<_>>()),
+                Some(Err(e)) => rows.push(Line::row("", t("Not reachable")).says(e.clone()).warns(true)),
+                None if provider.unset().is_none() => rows.push(Line::row("", t("Checking…"))),
+                None => {}
             }
-            Kind::LocalSpeech => (t("Downloaded and run by Heyo itself.").to_string(), false),
-            Kind::Doubao => match provider.unset() {
-                Some(missing) => (translate(missing).to_string(), true),
-                None => (t("Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there.").to_string(), false),
-            },
+        }
+        rows.extend(models.iter().map(|model| {
+            let title = provider.model_title(model);
+            let row = Line::row("", title.clone()).says(if title == *model || model.is_empty() { String::new() } else { model.clone() });
+            let used = self.used_for(provider, model);
+            if used.is_empty() { row } else { row.badge(&tf("Used for {0}", &[&used.join(", ")])) }
+        }));
+        rows
+    }
+
+    /// A provider's page: how it is (and checking it), its settings, what
+    /// it can do, its models, and removing it.
+    fn provider_page_lines(&self, provider: &Provider) -> Vec<Line> {
+        let kind = provider.kind();
+        let mut page = Page::default();
+        // Its kind, where its name does not say it already.
+        let title = translate(kind.title());
+        Self::top(&mut page, "models", t("Models"), kind.icon(), provider.name.clone(), if provider.name == title { String::new() } else { title.into() });
+        let status = kind.status(provider, &self.known(provider));
+        let mut rows = vec![Line::row(Id::CheckProvider(provider.id.clone()), t("Status")).says(status.long).warns(status.warning)];
+        rows[0] = match self.checks.get(&provider.id) {
+            Some(Check::Checking) => rows[0].clone().button(t("Checking…")),
+            _ => rows[0].clone().button(t("Check Connection")),
         };
-        // A server says for itself where what it is given goes.
-        let abilities = if provider.kind == Kind::OpenaiCompatible { String::new() } else { Self::abilities(provider) };
-        (format!("{status} {abilities}").trim().to_string(), warning)
+        rows[0].busy = self.checks.get(&provider.id) == Some(&Check::Checking);
+        if let Some(Check::Done(result)) = self.checks.get(&provider.id) {
+            let (said, failed) = match result {
+                Ok(said) => (said.clone(), false),
+                Err(why) => (why.clone(), true),
+            };
+            rows.push(Line::row("", if failed { t("Connection Failed") } else { t("Connection Works") }).says(said).warns(failed));
+        }
+        rows.push(Line::row("", t("What It Can Do")).says(translate(kind.goes(provider))).chips(Self::abilities(provider)));
+        page.card("", rows);
+        page.card(t("Settings"), self.form(provider, false));
+        page.card(t("Models"), self.model_rows(provider));
+        if !kind.builtin() {
+            page.card("", vec![Line::row(Id::RemoveProvider(provider.id.clone()), t("Remove Provider")).says(t("What uses its models says so until another is chosen.")).confirm(t("Remove…"), t("Click Again to Remove"))]);
+        }
+        page.done()
     }
 
     /// The speech models of this computer: each with what it hears, how
@@ -945,46 +1093,6 @@ impl Model {
                 }
             })
             .collect()
-    }
-
-    fn provider_card(&self, page: &mut Page, provider: &Provider) {
-        let (status, warning) = self.status(provider);
-        // Its kind, where its name does not say it already.
-        let kind = translate(provider.kind.title());
-        let head = Line::row(Id::RemoveProvider(provider.id.clone()), if provider.name == kind { t("Status") } else { kind }).says(status).warns(warning);
-        let mut rows = vec![if provider.kind.removable() { head.confirm(t("Remove…"), t("Click Again to Remove")) } else { head }];
-        if provider.kind.removable() {
-            rows.push(Line::row(Id::ProviderField { provider: provider.id.clone(), field: "name".into() }, t("Name")).field(provider.name.clone(), translate(provider.kind.title())));
-        }
-        for field in provider.kind.fields().iter().filter(|field| provider.applies(field)) {
-            let row = Line::row(Id::ProviderField { provider: provider.id.clone(), field: field.name.into() }, translate(field.title)).says(translate(field.description));
-            rows.push(match field.entry {
-                Field::Secret if self.secret_set(&provider.id, field.name) => row.secret(t("Saved — type a new key to replace it")).more(t("Remove"), Id::ForgetSecret { provider: provider.id.clone(), field: field.name.into() }),
-                Field::Secret => row.secret(field.placeholder),
-                Field::Choice(choices) => {
-                    let chosen = provider.get(field.name);
-                    row.select(if chosen.is_empty() { choices[0].0 } else { chosen }, choices.iter().map(|(value, title)| (*value, translate(title))))
-                }
-                Field::Switch => row.switch(provider.get(field.name) == "true"),
-                _ => row.field(provider.config.get(field.name).cloned().unwrap_or_default(), field.placeholder),
-            });
-        }
-        if provider.kind == Kind::LocalSpeech {
-            rows.extend(self.speech_rows());
-        }
-        page.card(&provider.name, rows);
-    }
-
-    fn models_page(&self) -> Vec<Line> {
-        let mut page = Page::default();
-        page.note(t("Connect the services and programs that run models. Each feature then uses one of their models, chosen where the feature is set up: AI answers in Advanced, speech recognition and polishing in Dictation."));
-        // First, where it is found without scrolling past every provider.
-        let kinds = registry::ADDABLE.iter().map(|kind| (kind.word(), translate(kind.title())));
-        page.card("", vec![Line::row(Id::AddProvider, t("Add a Provider")).says(t("Several of one kind can be added, two servers for instance.")).select("", std::iter::once(("", t("Add Provider…"))).chain(kinds))]);
-        for provider in self.providers() {
-            self.provider_card(&mut page, &provider);
-        }
-        page.done()
     }
 
     // --- About -------------------------------------------------------------
@@ -1326,26 +1434,65 @@ impl Model {
             // A provider has commands of its own: the window never has its
             // secrets to send back with the rest of the settings.
             Id::ProviderField { provider, field } => {
-                let Some(known) = self.providers().into_iter().find(|known| known.id == provider) else { return Vec::new() };
-                let secret = known.kind.fields().iter().any(|known| known.name == field && known.entry == Field::Secret);
+                let Some(known) = self.provider(&provider) else { return Vec::new() };
+                let secret = known.kind().fields().iter().any(|known| known.name == field && known.entry == Field::Secret);
                 let was = if field == "name" { known.name.as_str() } else { known.get(&field) };
                 if (secret && value.trim().is_empty()) || (!secret && was == value.trim()) {
                     return Vec::new();
                 }
+                // What a check said may no longer be so.
+                self.checks.remove(&provider);
                 let mut asks = vec![ask(Command::SetProviderField { provider: provider.clone(), field: field.clone(), value: value.to_string() }, Then::Settings)];
-                // Where the server is, or what it asks for, changed: asked again.
-                if known.kind == Kind::OpenaiCompatible && (field == registry::URL || field == registry::KEY) {
+                // Where the service is, or what it asks for, changed: asked again.
+                if known.kind().source() == Source::Listed && known.kind().fields().iter().any(|known| known.name == field && matches!(known.entry, Field::Url | Field::Secret)) {
                     self.listed.remove(&provider);
                     asks.push(ask(Command::ProviderModels(provider.clone()), Then::Models(provider)));
                 }
                 asks
             }
-            Id::ForgetSecret { provider, field } => vec![ask(Command::SetProviderField { provider, field, value: String::new() }, Then::Settings)],
-            Id::AddProvider if value.is_empty() => Vec::new(),
-            Id::AddProvider => vec![ask(Command::AddProvider(value.to_string()), Then::Settings)],
+            Id::ForgetSecret { provider, field } => {
+                self.checks.remove(&provider);
+                vec![ask(Command::SetProviderField { provider, field, value: String::new() }, Then::Settings)]
+            }
             Id::RemoveProvider(provider) => {
                 self.listed.remove(&provider);
+                self.checks.remove(&provider);
+                self.page = "models".into();
                 vec![ask(Command::RemoveProvider(provider), Then::Settings)]
+            }
+            Id::Go(page) => self.show(&page),
+            Id::NewProvider(kind) => {
+                self.draft = Some(Provider::new("", &kind));
+                self.show(&format!("{PROVIDER}{NEW}"))
+            }
+            // A new one's fields are kept here until it is added.
+            Id::DraftField(field) => {
+                if let Some(draft) = &mut self.draft {
+                    let value = value.trim();
+                    match field.as_str() {
+                        "name" if !value.is_empty() => draft.name = value.into(),
+                        "name" => {}
+                        _ if value.is_empty() => {
+                            draft.config.remove(&field);
+                        }
+                        _ => {
+                            draft.config.insert(field, value.into());
+                        }
+                    }
+                }
+                Vec::new()
+            }
+            Id::Act(Act::SaveProvider) => {
+                let Some(draft) = self.draft.clone() else { return Vec::new() };
+                let before = self.providers().into_iter().map(|provider| provider.id).collect();
+                vec![ask(Command::AddProvider { kind: draft.kind, name: draft.name, config: draft.config }, Then::Added(before))]
+            }
+            Id::CheckProvider(provider) => {
+                if self.checks.get(&provider) == Some(&Check::Checking) {
+                    return Vec::new();
+                }
+                self.checks.insert(provider.clone(), Check::Checking);
+                vec![ask(Command::CheckProvider(provider.clone()), Then::ProviderChecked(provider))]
             }
             Id::Act(Act::OpenModels) => self.show("models"),
             Id::Act(Act::InstallShellExtension) => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
@@ -1406,6 +1553,7 @@ impl Model {
     pub(crate) fn entered(&self) -> Vec<Ask> {
         match self.page.as_str() {
             "dictation" | "models" => [vec![ask(Command::DictationStatus, Then::Dictation), ask(Command::SpeechModels, Then::Speech)], self.listings()].concat(),
+            page if page.starts_with(PROVIDER) => [vec![ask(Command::SpeechModels, Then::Speech)], self.listings()].concat(),
             "screenshots" => vec![ask(Command::OcrStatus, Then::Ocr)],
             "advanced" => self.listings(),
             BUILTIN => vec![ask(Command::ClipboardSources, Then::Sources), ask(Command::ClipboardMeaningStatus, Then::Meaning)],
@@ -1440,6 +1588,11 @@ impl Model {
                 match then {
                     Then::Models(provider) => {
                         self.listed.insert(provider, Err(message));
+                        return Vec::new();
+                    }
+                    // Said on the provider's page.
+                    Then::ProviderChecked(provider) => {
+                        self.checks.insert(provider, Check::Done(Err(message)));
                         return Vec::new();
                     }
                     Then::Started("ocr") => self.ocr_installing = false,
@@ -1500,6 +1653,22 @@ impl Model {
             }
             Then::Models(provider) => {
                 self.listed.insert(provider, Ok(answer.as_array().map(|models| models.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()));
+            }
+            Then::ProviderChecked(provider) => {
+                let checked: kinds::Checked = serde_json::from_value(answer).unwrap_or_default();
+                if let Some(models) = checked.models {
+                    self.listed.insert(provider.clone(), Ok(models));
+                }
+                self.checks.insert(provider, Check::Done(Ok(checked.said)));
+            }
+            Then::Added(before) => {
+                if let Value::Object(settings) = answer {
+                    self.settings = settings;
+                }
+                self.draft = None;
+                // Its own page, where it can be checked.
+                let added = self.providers().into_iter().find(|provider| !before.contains(&provider.id));
+                return self.show(&added.map_or("models".into(), |provider| format!("{PROVIDER}{}", provider.id)));
             }
             Then::Copied => self.copied = true,
             Then::Checked => self.update = answer.as_str().map_or(Update::Newest, |version| Update::Newer(version.to_string())),
@@ -1773,7 +1942,7 @@ mod tests {
         let recognition = row(&lines, "Speech Recognition");
         assert_eq!(&titles(recognition)[..3], ["This Computer · Default", "This Computer · SenseVoice Small", "This Computer · SenseVoice (Cantonese)"]);
         assert!(recognition.danger && recognition.description.starts_with("X-ASR Streaming is not downloaded yet. Download it in Models."), "{}", recognition.description);
-        assert!(!lines.iter().any(|line| line.control == "button"));
+        assert!(lines.iter().filter(|line| line.control == "button").all(|line| line.id == "act:open-models"));
         assert_eq!(titles(row(&lines, "Hold-to-Talk Key")), ["None", "Right Ctrl"]);
         assert!(row(&lines, "Hold-to-Talk Key").description.starts_with("A single key to hold"));
         let live = row(&lines, "Type as You Speak");
@@ -1811,12 +1980,14 @@ mod tests {
     #[test]
     fn a_speech_model_is_downloaded_used_and_deleted_on_the_models_page() {
         let mut model = told(providers(), json!({}));
-        model.show("models");
+        model.show("provider:local-speech");
         model.answered(Then::Speech, Ok(json!(speech())));
         let lines = model.lines();
-        let speech = card(&lines, "Speech Models on This Computer");
-        // Its status, then one row a model: downloaded but not used, downloading, not downloaded.
-        assert!(speech[0].label == "Status" && speech[0].control.is_empty() && speech[0].description.contains("stays here"), "{:?}", speech[0]);
+        // Always there: no name to change, nothing to remove.
+        assert!(!has(&lines, "Name") && !has(&lines, "Remove Provider"));
+        assert!(row(&lines, "What It Can Do").description.contains("stays here"));
+        // One row a model: downloaded but not used, downloading, not downloaded.
+        let speech = card(&lines, "Models");
         let downloaded = row(speech, "SenseVoice Small");
         assert_eq!((downloaded.control, downloaded.value.as_str(), downloaded.more.as_str()), ("confirm", "Delete…", "Use"));
         assert_eq!(downloaded.description, "Chinese, English · 240 MB. Fast.");
@@ -1840,7 +2011,7 @@ mod tests {
         used[0]["inUse"] = json!(true);
         model.answered(Then::Speech, Ok(json!(used)));
         let lines = model.lines();
-        assert_eq!(row(card(&lines, "Speech Models on This Computer"), "SenseVoice Small").control, "badge");
+        assert_eq!(row(card(&lines, "Models"), "SenseVoice Small").control, "badge");
     }
 
     #[test]
@@ -1867,56 +2038,162 @@ mod tests {
     }
 
 
-    /// The card of a provider on the Models page: its lines, from its
-    /// heading to the next.
+    /// A card of a page: its lines, from its heading to the next.
     fn card<'a>(lines: &'a [Line], title: &str) -> &'a [Line] {
         let at = lines.iter().position(|line| line.kind == "heading" && line.label == title).unwrap_or_else(|| panic!("no card {title}"));
-        let end = lines[at + 1..].iter().position(|line| line.kind == "heading" || line.kind == "end").map_or(lines.len(), |end| at + 1 + end);
+        let end = lines[at + 2..].iter().position(|line| line.kind == "heading" || line.kind == "end" || line.first).map_or(lines.len(), |end| at + 2 + end);
         &lines[at + 1..end]
     }
 
+    fn head(lines: &[Line]) -> &Line {
+        lines.iter().find(|line| line.kind == "head").expect("a head")
+    }
+
     #[test]
-    fn the_models_page_says_how_each_provider_is_and_where_what_it_is_given_goes() {
+    fn the_models_page_lists_each_provider_with_how_it_is_and_what_it_can_do() {
         let mut model = told(providers(), json!({}));
         assert_eq!(model.show("models").iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["dictation_status", "speech_models", "provider_models", "provider_models"]);
         let lines = model.lines();
-        // The speech models of this computer cannot be removed; their models are listed with their downloads.
-        assert!(card(&lines, "Speech Models on This Computer")[0].control.is_empty());
-        // Claude: the key is never shown, only that it is saved, and it can be forgotten.
-        let claude = card(&lines, "Claude");
-        assert!(claude[0].control == "confirm" && claude[0].description.starts_with("Connected with an API key."));
-        let key = row(claude, "API Key");
+        let listed = card(&lines, "Providers");
+        assert_eq!(listed.iter().map(|line| line.label.as_str()).collect::<Vec<_>>(), ["Speech Models on This Computer", "Claude", "Ollama", "Workstation", "Claude Code", "Codex"]);
+        // Each a row to its page: its kind (where its name does not say it), how it is, what it can do.
+        let claude = row(listed, "Claude");
+        assert_eq!((claude.control, claude.id.as_str(), claude.description.as_str()), ("link", "go:provider:claude", "Claude API · Set up"));
+        assert_eq!(claude.chips, ["Text", "Images", "Streaming"]);
+        assert_eq!(row(listed, "Ollama").description, "OpenAI-Compatible Server · Checking…");
+        assert_eq!(row(listed, "Ollama").chips, ["Text", "Streaming", "Private"]);
+        assert_eq!(row(listed, "Claude Code").description, "Set up");
+        assert!(row(listed, "Codex").danger && row(listed, "Codex").description == "Not found");
+        model.answered(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
+        model.answered(Then::Models("lan".into()), Err("connection refused".into()));
+        model.answered(Then::Speech, Ok(json!(speech())));
+        let lines = model.lines();
+        let listed = card(&lines, "Providers");
+        assert_eq!(row(listed, "Ollama").description, "OpenAI-Compatible Server · 2 models");
+        assert!(row(listed, "Workstation").danger && row(listed, "Workstation").description.ends_with("Not reachable"));
+        assert_eq!(row(listed, "Speech Models on This Computer").description, "1 downloaded");
+        assert!(model.error.is_empty(), "a server that does not answer is said on its row");
+        // No provider's details here: those are on its page.
+        assert!(!has(&lines, "API Key") && !has(&lines, "Server"));
+        assert_eq!(row(&lines, "Add Provider…").id, "go:provider:add");
+        assert!(model.acted("go:provider:ollama", "").iter().any(|ask| ask.command == Command::ProviderModels("ollama".into())));
+        assert_eq!((model.page.as_str(), model.section(), model.title().as_str()), ("provider:ollama", "models", "Models"));
+    }
+
+    #[test]
+    fn a_provider_is_added_by_its_kind_and_then_its_form() {
+        let mut model = told(providers(), json!({}));
+        model.show("models");
+        model.acted("go:provider:add", "");
+        let lines = model.lines();
+        assert_eq!((lines[0].kind, lines[0].id.as_str(), lines[0].label.as_str()), ("back", "go:models", "Models"));
+        assert_eq!(head(&lines).label, "Add Provider");
+        // Every kind there is but the one that is always there.
+        let kinds: Vec<&str> = lines.iter().filter(|line| line.control == "link").map(|line| line.label.as_str()).collect();
+        assert_eq!(kinds, ["Claude API", "OpenAI-Compatible Server", "Claude Code", "Codex", "Doubao (Volcengine)"]);
+        assert!(model.acted(&row(&lines, "OpenAI-Compatible Server").id, "").iter().all(|ask| ask.command != Command::GetSettings));
+        assert_eq!(model.page, "provider:new");
+        let lines = model.lines();
+        assert_eq!(head(&lines).label, "New OpenAI-Compatible Server");
+        let form = card(&lines, "Settings");
+        assert_eq!(form.iter().map(|line| line.label.as_str()).collect::<Vec<_>>(), ["Name", "Server", "API Key", "More Models"]);
+        // Its fields are kept here until it is added.
+        assert!(model.acted(&row(form, "Server").id, " http://127.0.0.1:8080/v1 ").is_empty());
+        assert!(model.acted(&row(form, "Name").id, "Lab").is_empty());
+        assert!(model.acted(&row(form, "API Key").id, "sk-1").is_empty());
+        let lines = model.lines();
+        assert_eq!(row(card(&lines, "Settings"), "API Key").placeholder, "Typed — type again to replace it");
+        assert_eq!(row(&lines, "Add This Provider").more_id, "go:models");
+        let asks = model.acted("act:save-provider", "");
+        let config = BTreeMap::from([("url".to_string(), "http://127.0.0.1:8080/v1".to_string()), ("key".to_string(), "sk-1".to_string())]);
+        assert_eq!(asks[0].command, Command::AddProvider { kind: "openai-compatible".into(), name: "Lab".into(), config });
+        // Added: its own page, where it can be checked.
+        let mut added = providers();
+        added["providers"].as_array_mut().unwrap().push(json!({ "id": "openai-compatible", "kind": "openai-compatible", "name": "Lab", "config": { "url": "http://127.0.0.1:8080/v1" } }));
+        let asks = model.answered(asks[0].then.clone(), Ok(added));
+        assert_eq!((model.page.as_str(), model.draft.is_none()), ("provider:openai-compatible", true));
+        assert!(asks.iter().any(|ask| ask.command == Command::ProviderModels("openai-compatible".into())));
+        assert_eq!(head(&model.lines()).label, "Lab");
+    }
+
+    #[test]
+    fn a_providers_page_edits_checks_and_removes_it() {
+        let mut model = told(providers(), json!({}));
+        model.show("provider:claude");
+        let lines = model.lines();
+        assert_eq!((lines[0].id.as_str(), head(&lines).label.as_str(), head(&lines).description.as_str()), ("go:models", "Claude", "Claude API"));
+        let status = row(&lines, "Status").clone();
+        assert!(status.description.starts_with("Connected with an API key.") && status.value == "Check Connection");
+        assert_eq!(row(&lines, "What It Can Do").chips, ["Text", "Images", "Streaming"]);
+        assert_eq!(row(&lines, "What It Can Do").description, "What it is given is sent to Anthropic.");
+        // The key is never shown, only that it is saved, and it can be forgotten.
+        let key = row(card(&lines, "Settings"), "API Key").clone();
         assert_eq!((key.control, key.value.as_str(), key.placeholder.as_str(), key.more.as_str()), ("secret", "", "Saved — type a new key to replace it", "Remove"));
         assert_eq!(asked(&model.acted(&key.id, "sk-ant-2")), Command::SetProviderField { provider: "claude".into(), field: "key".into(), value: "sk-ant-2".into() });
         assert!(model.acted(&key.id, "  ").is_empty());
         assert_eq!(asked(&model.acted(&key.more_id, "")), Command::SetProviderField { provider: "claude".into(), field: "key".into(), value: String::new() });
-        // A server: whether it answers, and whether it is this computer.
-        assert!(card(&lines, "Ollama")[0].description.starts_with("Checking… Text stays on this computer."));
-        model.answered(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
-        model.answered(Then::Models("lan".into()), Err("connection refused".into()));
+        assert_eq!(asked(&model.acted(&row(&lines, "Name").id, "Work")), Command::SetProviderField { provider: "claude".into(), field: "name".into(), value: "Work".into() });
+        // Checked on a thread of its own; once at a time; what it came to is said.
+        assert_eq!(asked(&model.acted(&status.id, "")), Command::CheckProvider("claude".into()));
+        assert!(Command::CheckProvider("claude".into()).slow());
+        assert!(model.acted(&status.id, "").is_empty());
+        assert!(row(&model.lines(), "Status").busy);
+        model.answered(Then::ProviderChecked("claude".into()), Err("The Claude API key is invalid.".into()));
+        let failed = row(&model.lines(), "Connection Failed").clone();
+        assert!(failed.danger && failed.description == "The Claude API key is invalid." && model.error.is_empty());
+        model.acted(&status.id, "");
+        model.answered(Then::ProviderChecked("claude".into()), Ok(json!({ "said": "Claude's API takes the key.", "models": null })));
+        assert!(!row(&model.lines(), "Connection Works").danger);
+        // The model it has, and what uses it.
+        assert_eq!(row(card(&model.lines(), "Models"), "claude-opus-5-5").value, "Used for Polish");
+        // Removed: back to the list.
+        let remove = row(&lines, "Remove Provider").clone();
+        assert_eq!(remove.control, "confirm");
+        assert_eq!(asked(&model.acted(&remove.id, "")), Command::RemoveProvider("claude".into()));
+        assert_eq!(model.page, "models");
+    }
+
+    #[test]
+    fn a_server_lists_its_models_and_says_where_what_it_is_given_goes() {
+        let mut model = told(providers(), json!({}));
+        model.show("provider:ollama");
+        assert!(row(&model.lines(), "Status").description.starts_with("Checking… Text stays on this computer."));
+        // A check lists its models too.
+        model.acted("check-provider:ollama", "");
+        model.answered(Then::ProviderChecked("ollama".into()), Ok(json!({ "said": "The server answers and lists 2 models.", "models": ["qwen3", "llama3"] })));
         let lines = model.lines();
-        assert!(card(&lines, "Ollama")[0].description.starts_with("Connected: qwen3, llama3 Text stays on this computer.") && !card(&lines, "Ollama")[0].danger);
-        let lan = &card(&lines, "Workstation")[0];
-        assert!(lan.danger && lan.description.starts_with("Not reachable: connection refused.") && lan.description.contains("sent to 10.0.0.5:8000 over plain http"));
-        assert!(model.error.is_empty(), "a server that does not answer is said on its card");
-        // Its address changed: it is asked again.
-        let url = row(card(&lines, "Ollama"), "Server").id.clone();
+        assert!(row(&lines, "Status").description.starts_with("Connected: qwen3, llama3. Text stays on this computer.") && !row(&lines, "Status").danger);
+        assert_eq!(row(&lines, "Connection Works").description, "The server answers and lists 2 models.");
+        let models = card(&lines, "Models");
+        assert_eq!(models.iter().map(|line| line.label.as_str()).collect::<Vec<_>>(), ["First Listed", "qwen3", "llama3"]);
+        assert_eq!(row(models, "qwen3").value, "Used for AI");
+        // Its address changed: asked again, and the check no longer said.
+        let url = row(card(&lines, "Settings"), "Server").id.clone();
         assert_eq!(model.acted(&url, "http://127.0.0.1:11434/v1").len(), 0, "the same address is no change");
         let asks = model.acted(&url, "http://127.0.0.1:8080/v1");
         assert_eq!(asks.iter().map(|ask| ask.command.clone()).collect::<Vec<_>>(), [Command::SetProviderField { provider: "ollama".into(), field: "url".into(), value: "http://127.0.0.1:8080/v1".into() }, Command::ProviderModels("ollama".into())]);
-        // The tools: found or not, and where what they are given goes.
-        let code = &card(&lines, "Claude Code")[0];
-        assert!(!code.danger && code.description.starts_with("Using 2.1.302 (Claude Code) at /home/ada/.local/bin/claude.") && code.description.ends_with("sends what it is given to Anthropic."), "{}", code.description);
-        let codex = &card(&lines, "Codex")[0];
-        assert!(codex.danger && codex.description.starts_with("There is no executable at /opt/codex."));
-        assert_eq!(row(card(&lines, "Codex"), "Executable").value, "/opt/codex");
-        // Added, renamed, removed: each a command of its own.
-        let add = lines.iter().find(|line| line.id == "provider:add").unwrap();
-        assert_eq!(titles(add), ["Add Provider…", "Claude API", "OpenAI-Compatible Server", "Claude Code", "Codex", "Doubao (Volcengine)"]);
-        assert_eq!(asked(&model.acted("provider:add", "openai-compatible")), Command::AddProvider("openai-compatible".into()));
-        assert!(model.acted("provider:add", "").is_empty());
-        assert_eq!(asked(&model.acted(&row(card(&lines, "Codex"), "Name").id, "Work Codex")), Command::SetProviderField { provider: "codex".into(), field: "name".into(), value: "Work Codex".into() });
-        assert_eq!(asked(&model.acted(&codex.id, "")), Command::RemoveProvider("codex".into()));
+        assert!(!has(&model.lines(), "Connection Works"));
+        // One elsewhere, over plain http, that does not answer.
+        model.show("provider:lan");
+        model.answered(Then::Models("lan".into()), Err("connection refused".into()));
+        let status = row(&model.lines(), "Status").clone();
+        assert!(status.danger && status.description.starts_with("Not reachable: connection refused.") && status.description.contains("sent to 10.0.0.5:8000 over plain http"));
+        assert_eq!(row(card(&model.lines(), "Models"), "Not reachable").description, "connection refused");
+    }
+
+    #[test]
+    fn a_tools_page_says_whether_it_is_found() {
+        let mut model = told(providers(), json!({}));
+        model.show("provider:claude-code");
+        let lines = model.lines();
+        let status = row(&lines, "Status");
+        assert!(!status.danger && status.description.starts_with("Using 2.1.302 (Claude Code) at /home/ada/.local/bin/claude."), "{}", status.description);
+        assert_eq!(row(&lines, "What It Can Do").description, "Runs on this computer, and sends what it is given to Anthropic.");
+        assert_eq!(card(&lines, "Models").iter().map(|line| line.label.as_str()).collect::<Vec<_>>(), ["Default", "opus", "sonnet", "haiku"]);
+        model.show("provider:codex");
+        let lines = model.lines();
+        assert!(row(&lines, "Status").danger && row(&lines, "Status").description.starts_with("There is no executable at /opt/codex."));
+        assert_eq!(row(card(&lines, "Settings"), "Executable").value, "/opt/codex");
     }
 
     #[test]
@@ -1925,18 +2202,21 @@ mod tests {
         settings["providers"].as_array_mut().unwrap().push(json!({ "id": "doubao", "kind": "doubao", "name": "Doubao", "config": {} }));
         let mut model = told(Value::Object(settings), json!({}));
         model.page = "models".into();
+        assert_eq!(row(&model.lines(), "Doubao").description, "Doubao (Volcengine) · Key missing");
+        model.show("provider:doubao");
         let lines = model.lines();
-        let doubao = card(&lines, "Doubao");
-        assert!(doubao[0].danger && doubao[0].description.starts_with("The key is missing."));
-        assert_eq!(row(doubao, "Console").value, "new");
-        assert!(has(doubao, "API Key") && !has(doubao, "App ID") && row(doubao, "Remove Filler Words").control == "switch");
+        assert!(row(&lines, "Status").danger && row(&lines, "Status").description.starts_with("The key is missing."));
+        let form = card(&lines, "Settings");
+        assert_eq!(row(form, "Console").value, "new");
+        assert!(has(form, "API Key") && !has(form, "App ID") && row(form, "Remove Filler Words").control == "switch");
+        assert!(has(card(&lines, "Models"), "Doubao Streaming ASR 2.0, Hourly"));
         // The old console: an App ID and an Access Token instead.
         model.settings["providers"][6]["config"] = json!({ "console": "old", "appId": "id" });
         model.settings["providerStates"]["doubao"] = json!({ "secretsSet": ["accessToken"] });
         let lines = model.lines();
-        let doubao = card(&lines, "Doubao");
-        assert!(!doubao[0].danger && !has(doubao, "API Key") && row(doubao, "App ID").value == "id" && row(doubao, "Access Token").more == "Remove");
-        assert_eq!(asked(&model.acted(&row(doubao, "Remove Filler Words").id, "true")), Command::SetProviderField { provider: "doubao".into(), field: "removeFillers".into(), value: "true".into() });
+        let form = card(&lines, "Settings");
+        assert!(!row(&lines, "Status").danger && !has(form, "API Key") && row(form, "App ID").value == "id" && row(form, "Access Token").more == "Remove");
+        assert_eq!(asked(&model.acted(&row(form, "Remove Filler Words").id, "true")), Command::SetProviderField { provider: "doubao".into(), field: "removeFillers".into(), value: "true".into() });
         // Recognition offers its resources beside the models of this computer.
         model.page = "dictation".into();
         let lines = model.lines();

@@ -18,6 +18,7 @@ pub(crate) mod cli;
 mod codex;
 mod openai;
 pub(crate) mod address;
+pub(crate) mod kinds;
 pub(crate) mod registry;
 
 #[cfg(test)]
@@ -31,7 +32,7 @@ use ts_rs::TS;
 use crate::i18n::{t, tf};
 use crate::settings::Settings;
 use crate::wire::AiProvider;
-use registry::{Kind, Provider, Unusable, Use};
+use registry::{Unusable, Use};
 
 pub(crate) use address::{address, Address};
 pub(crate) use claude::CLAUDE_MODEL;
@@ -167,21 +168,10 @@ impl std::fmt::Display for ModelError {
 }
 
 impl Model {
-    /// The model the settings name for `need`.
+    /// The model the settings name for `need`, as its provider's kind opens it.
     pub fn for_use(settings: &Settings, need: Use) -> Result<Model, ModelError> {
         let (provider, model) = registry::resolve(&settings.providers, need.reference(settings), need).map_err(ModelError::Unusable)?;
-        Ok(Model::of(provider, model))
-    }
-
-    /// `model` of `provider`, one that answers in text.
-    pub fn of(provider: &Provider, model: &str) -> Model {
-        match provider.kind {
-            Kind::OpenaiCompatible => Model::Local(openai::Local::new(provider.get(registry::URL), provider.get(registry::KEY), model)),
-            Kind::ClaudeCode => Model::Cli(cli::Cli::new(cli::Tool::ClaudeCode, provider.get(registry::PATH), model)),
-            Kind::Codex => Model::Cli(cli::Cli::new(cli::Tool::Codex, provider.get(registry::PATH), model)),
-            // `resolve` gives no other for text.
-            _ => Model::Claude(claude::Claude::new(provider.get(registry::KEY))),
-        }
+        provider.kind().text(provider, model).ok_or_else(|| ModelError::Unusable(Unusable::Cannot(provider.name.clone())))
     }
 
     /// The model `model` (empty: the first the server lists) of the
@@ -220,23 +210,13 @@ fn unusable(why: &Unusable) -> String {
     }
 }
 
-/// The models an OpenAI-compatible server offers.
-pub async fn listed_models(provider: &Provider) -> Result<Vec<String>, ModelError> {
-    openai::list(provider.get(registry::URL), provider.get(registry::KEY), Some(Duration::from_secs(3))).await
-}
-
 /// Which model answers `AI.ask`, for an extension deciding what to send.
 pub fn provider(settings: &Settings) -> AiProvider {
     let Ok((provider, model)) = registry::resolve(&settings.providers, &settings.ai_model, Use::Answers) else {
         return AiProvider { kind: "none", model: String::new(), local: false };
     };
-    let kind = match provider.kind {
-        Kind::OpenaiCompatible => "local",
-        Kind::ClaudeCode => "claude-code",
-        Kind::Codex => "codex",
-        _ => "claude",
-    };
-    let model = if provider.kind == Kind::Anthropic { CLAUDE_MODEL.into() } else { model.to_owned() };
+    let kind = provider.kind().api_name();
+    let model = if provider.kind == kinds::ANTHROPIC { CLAUDE_MODEL.into() } else { model.to_owned() };
     AiProvider { kind, model, local: provider.can(registry::Can::Private) }
 }
 
@@ -279,7 +259,7 @@ async fn events(mut response: reqwest::Response, mut each: impl FnMut(&str) -> b
 mod tests {
     use super::*;
 
-    use registry::ModelRef;
+    use registry::{ModelRef, Provider};
 
     fn with(providers: Vec<Provider>, ai: ModelRef) -> Settings {
         let mut all = registry::defaults();
@@ -287,14 +267,14 @@ mod tests {
         Settings { providers: all, ai_model: ai, ..Settings::default() }
     }
 
-    fn tool(id: &str, kind: Kind, path: &str) -> Provider {
+    fn tool(id: &str, kind: &str, path: &str) -> Provider {
         let mut provider = Provider::new(id, kind);
         provider.config.insert(registry::PATH.into(), path.into());
         provider
     }
 
     fn server(id: &str, url: &str) -> Provider {
-        let mut provider = Provider::new(id, Kind::OpenaiCompatible);
+        let mut provider = Provider::new(id, kinds::OPENAI_COMPATIBLE);
         provider.config.insert(registry::URL.into(), url.into());
         provider
     }
@@ -306,10 +286,10 @@ mod tests {
         let settings = with(vec![server("ollama", "http://127.0.0.1:11434/v1")], ModelRef::to("ollama", "qwen3"));
         let local = Model::for_use(&settings, Use::Answers).unwrap();
         assert!(local == Model::Local(openai::Local::new("http://127.0.0.1:11434/v1", "", "qwen3")) && !local.sees_images());
-        let settings = with(vec![tool("cc", Kind::ClaudeCode, "/opt/claude")], ModelRef::to("cc", " opus "));
+        let settings = with(vec![tool("cc", kinds::CLAUDE_CODE, "/opt/claude")], ModelRef::to("cc", " opus "));
         let claude_code = Model::for_use(&settings, Use::Answers).unwrap();
         assert!(claude_code == Model::Cli(cli::Cli::new(cli::Tool::ClaudeCode, "/opt/claude", "opus")) && claude_code.sees_images());
-        let settings = with(vec![tool("codex", Kind::Codex, "")], ModelRef::to("codex", ""));
+        let settings = with(vec![tool("codex", kinds::CODEX, "")], ModelRef::to("codex", ""));
         assert_eq!(Model::for_use(&settings, Use::Answers).unwrap(), Model::Cli(cli::Cli::new(cli::Tool::Codex, "", "")));
         // Each use goes by its own reference.
         let settings = Settings { polish_model: ModelRef::to("codex", ""), ai_model: ModelRef::to(registry::CLAUDE, ""), ..settings };
@@ -331,7 +311,7 @@ mod tests {
         // A server on another machine is not this computer, whatever it runs.
         assert!(!provider(&Settings { ai_model: ModelRef::to("lan", ""), ..settings.clone() }).local);
         // A tool on this computer sends what it is asked to its maker's service.
-        let settings = with(vec![tool("cc", Kind::ClaudeCode, ""), tool("codex", Kind::Codex, "")], ModelRef::to("cc", "sonnet"));
+        let settings = with(vec![tool("cc", kinds::CLAUDE_CODE, ""), tool("codex", kinds::CODEX, "")], ModelRef::to("cc", "sonnet"));
         assert_eq!(provider(&settings), AiProvider { kind: "claude-code", model: "sonnet".into(), local: false });
         assert_eq!(provider(&Settings { ai_model: ModelRef::to("codex", ""), ..settings.clone() }), AiProvider { kind: "codex", model: "".into(), local: false });
         assert_eq!(provider(&Settings { ai_model: ModelRef::none(), ..settings }).kind, "none");

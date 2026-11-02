@@ -181,6 +181,7 @@ impl slint::Model for Lines {
             check_id: line.check_id.as_str().into(),
             open: line.open,
             busy: line.busy,
+            chips: strings(&line.chips),
         })
     }
 
@@ -203,6 +204,9 @@ struct Live {
     /// When it was last asked for, for saying how long it took to be up.
     asked: Rc<Cell<Option<Instant>>>,
     asking: mpsc::Sender<Job>,
+    /// The same, for what may take seconds (`Command::slow`): checking a
+    /// provider does not hold up the rest.
+    waiting: mpsc::Sender<Job>,
     model: Model,
     lines: Rc<Lines>,
     pictures: Rc<Pictures>,
@@ -236,7 +240,8 @@ impl Live {
     /// wants asked is asked too.
     fn ask(&self, asks: Vec<Ask>) {
         for Ask { command, then } in asks {
-            let _ = self.asking.send(Box::new(move |host| {
+            let thread = if command.slow() { &self.waiting } else { &self.asking };
+            let _ = thread.send(Box::new(move |host| {
                 let answer = host.call(command);
                 let _ = slint::invoke_from_event_loop(move || {
                     with(|live| live.answered(then, answer));
@@ -265,7 +270,7 @@ impl Live {
     fn push(&mut self) {
         let host = self.life.window().global::<ui::Host>();
         let (entries, pages) = self.model.nav();
-        let selected = entries.iter().position(|entry| entry.id == self.model.page).map_or(-1, |at| at as i32);
+        let selected = entries.iter().position(|entry| entry.id == self.model.section()).map_or(-1, |at| at as i32);
         let nav: Vec<ui::NavItem> = entries
             .iter()
             .map(|entry| {
@@ -633,6 +638,7 @@ impl Slotted for Live {
 fn make() -> Result<Live, String> {
     let shared = thread::shared().ok_or("Slint has not begun")?;
     let asking = thread::asker("heyo-slint-host", shared.host.clone())?;
+    let waiting = thread::asker("heyo-slint-slow", shared.host.clone())?;
     let pictures = Rc::new(Pictures::default());
     let lines = Rc::new(Lines { lines: RefCell::default(), pictures: pictures.clone(), notify: ModelNotify::default() });
     let asked = Rc::new(Cell::new(None));
@@ -661,7 +667,7 @@ fn make() -> Result<Live, String> {
     poll.start(slint::TimerMode::Repeated, Duration::from_secs(2), || {
         with(|live| live.ask(live.model.poll()));
     });
-    let mut live = Live { life, asked, asking, model, lines, pictures, recording: None, held: Held::default(), pointer: Pointer::default(), settled: Cell::new(None), _poll: poll };
+    let mut live = Live { life, asked, asking, waiting, model, lines, pictures, recording: None, held: Held::default(), pointer: Pointer::default(), settled: Cell::new(None), _poll: poll };
     live.push();
 
     // Whichever window there is hears them: it may be made again.

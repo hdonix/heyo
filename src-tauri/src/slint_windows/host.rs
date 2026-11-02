@@ -68,8 +68,9 @@ pub(crate) enum Command {
     CopyDiagnostics,
     CheckForUpdate,
     InstallUpdate,
-    /// A provider of this kind (`registry::Kind::word`), connected.
-    AddProvider(String),
+    /// A provider of this kind (`ProviderKind::word`), connected: named
+    /// so, and set up with these fields (by name), as its form says.
+    AddProvider { kind: String, name: String, config: std::collections::BTreeMap<String, String> },
     /// A field of a provider's configuration, or its `name`, as it is to be.
     SetProviderField { provider: String, field: String, value: String },
     /// By its id.
@@ -80,8 +81,11 @@ pub(crate) enum Command {
     /// By the extension's id.
     UninstallExtension(String),
     ClearClipboardHistory,
-    /// The models the server that is this provider lists, by its id.
+    /// The models the service that is this provider lists, by its id.
     ProviderModels(String),
+    /// Whether this provider answers as it is set up, by its id. Slow:
+    /// asked on a thread of its own (`slow`).
+    CheckProvider(String),
     OcrStatus,
     OcrInstall,
     ClipboardSources,
@@ -93,6 +97,11 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Whether it may take seconds: a service asked over the network.
+    pub(crate) fn slow(&self) -> bool {
+        matches!(self, Command::CheckProvider(_) | Command::ProviderModels(_))
+    }
+
     /// What the host calls it: the name `invoke` knows it by where a web
     /// view may call it too, and the function's name where none may. For
     /// the tests, which hold which of these a web view may call.
@@ -117,7 +126,7 @@ impl Command {
             Command::CopyDiagnostics => "copy_diagnostics",
             Command::CheckForUpdate => "check_for_update",
             Command::InstallUpdate => "install_update",
-            Command::AddProvider(_) => "add_provider",
+            Command::AddProvider { .. } => "add_provider",
             Command::SetProviderField { .. } => "set_provider_field",
             Command::RemoveProvider(_) => "remove_provider",
             Command::OpenExtensionsFolder => "open_extensions_folder",
@@ -125,6 +134,7 @@ impl Command {
             Command::UninstallExtension(_) => "uninstall_extension",
             Command::ClearClipboardHistory => "clear_clipboard_history",
             Command::ProviderModels(_) => "provider_models",
+            Command::CheckProvider(_) => "check_provider",
             Command::OcrStatus => "ocr_status",
             Command::OcrInstall => "ocr_install",
             Command::ClipboardSources => "clipboard_sources",
@@ -169,7 +179,7 @@ impl Host for Running {
             Command::CopyDiagnostics => answer(settings::copy_diagnostics(app)?),
             Command::CheckForUpdate => answer(block_on(updates::check_for_update(app))?),
             Command::InstallUpdate => answer(block_on(updates::install_update(app))?),
-            Command::AddProvider(kind) => answer(settings::add_provider(kind, app)?),
+            Command::AddProvider { kind, name, config } => answer(settings::add_provider(kind, name, config, app)?),
             Command::SetProviderField { provider, field, value } => answer(settings::set_provider_field(provider, field, value, app)?),
             Command::RemoveProvider(id) => answer(settings::remove_provider(id, app)?),
             Command::OpenExtensionsFolder => answer(settings::open_extensions_folder()?),
@@ -178,7 +188,8 @@ impl Host for Running {
             Command::SetExtensionPreferences { extension, values } => answer(settings::set_extension_preferences(extension, serde_json::from_value(values).map_err(|e| format!("values: {e}"))?)?),
             Command::UninstallExtension(id) => answer(settings::uninstall_extension(id, app)?),
             Command::ClearClipboardHistory => answer(settings::clear_clipboard_history(app.state())),
-            Command::ProviderModels(id) => answer(block_on(settings::provider_models(id, app))?),
+            Command::ProviderModels(id) => answer(settings::provider_models(id, app)?),
+            Command::CheckProvider(id) => answer(settings::check_provider(id, app)?),
             Command::OcrStatus => answer(media::ocr_status()),
             Command::OcrInstall => answer(media::ocr_install(app)?),
             Command::ClipboardSources => answer(clipboard::clipboard_sources(app)),
@@ -244,7 +255,7 @@ mod tests {
         let (none, nothing) = (String::new, Value::Null);
         let changing = [
             Command::ChangeSettings(Map::new()),
-            Command::AddProvider(none()),
+            Command::AddProvider { kind: none(), name: none(), config: Default::default() },
             Command::SetProviderField { provider: none(), field: none(), value: none() },
             Command::RemoveProvider(none()),
             Command::SetExtensionPreferences { extension: none(), values: nothing },

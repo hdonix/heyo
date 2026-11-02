@@ -156,8 +156,8 @@ fn a_service_that_cannot_be_reached_is_said_to_be() {
 
 #[test]
 fn the_providers_configuration_makes_a_config_with_the_key_of_its_console_or_none() {
-    use crate::models::registry::{Kind, Provider};
-    let mut provider = Provider::new("doubao", Kind::Doubao);
+    use crate::models::{kinds, registry::Provider};
+    let mut provider = Provider::new("doubao", kinds::DOUBAO);
     provider.config.extend([(API_KEY, " k "), (APP_ID, " id "), (ACCESS_TOKEN, "token"), (REMOVE_FILLERS, "true")].map(|(name, value)| (name.to_string(), value.to_string())));
     let vocabulary = crate::dictation::vocabulary::parse(&["TypeScript".into(), "杰森 -> JSON".into()]);
     let none = crate::dictation::vocabulary::Vocabulary::default();

@@ -537,12 +537,10 @@ fn session(url: &str, config: &Config, audio: &Receiver<Out>, heard: &mut Heard)
 /// connection, the request, and the service's first answer to it, with
 /// no audio. Takes up to `CONNECTING` twice over; for a thread that can
 /// wait.
-#[allow(dead_code)] // For a "Test Connection" on the Models page.
 pub(crate) fn check(config: &Config) -> Result<(), Failure> {
     check_at(&endpoint(), config)
 }
 
-#[allow(dead_code)]
 fn check_at(url: &str, config: &Config) -> Result<(), Failure> {
     let mut socket = connect(url, config)?;
     let request = serde_json::to_vec(&config.request()).expect("JSON");
