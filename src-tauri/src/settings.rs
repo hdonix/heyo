@@ -120,7 +120,37 @@ pub struct Settings {
     pub live_activities: bool,
     /// Extensions (by manifest name) whose activities are turned off.
     pub activities_off: Vec<String>,
+    /// What recognizes dictation: a model of a provider, by reference
+    /// (`ModelRef`). No provider is the model on this computer.
+    pub dictation_model: ModelRef,
+    /// The Doubao provider's configuration (Volcengine's speech services,
+    /// `dictation::engine::doubao::provider`): which console its key is
+    /// from, `new` (an API key) or `old` (an App ID and Access Token), and
+    /// the key. Like the Claude key, for the host alone: the secrets never
+    /// go to a window.
+    pub doubao_console: String,
+    pub doubao_api_key: String,
+    pub doubao_app_id: String,
+    pub doubao_access_token: String,
+    /// Doubao takes filler words, stutters and repetitions out.
+    pub doubao_remove_fillers: bool,
 }
+
+/// A model of a provider, as a feature refers to it: Doubao's provider
+/// and one of its resources, say (`{"provider": "doubao", "model":
+/// "volc.seedasr.sauc.duration"}`). An empty provider is none.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(default)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct ModelRef {
+    pub provider: String,
+    pub model: String,
+}
+
+/// The settings that are secrets: each set by a command of its own
+/// (`commands::settings::set_secret`), and never sent to a window, which
+/// is only told whether it is set (`<name>Set`).
+pub const SECRETS: &[&str] = &["doubaoApiKey", "doubaoAccessToken"];
 
 impl Settings {
     /// Whether the interface is dark right now: as chosen, or as the system
@@ -171,6 +201,12 @@ impl Default for Settings {
             renderer: crate::renderer::Renderer::Auto,
             live_activities: true,
             activities_off: Vec::new(),
+            dictation_model: ModelRef::default(),
+            doubao_console: "new".into(),
+            doubao_api_key: String::new(),
+            doubao_app_id: String::new(),
+            doubao_access_token: String::new(),
+            doubao_remove_fillers: false,
         }
     }
 }
@@ -437,6 +473,7 @@ mod tests {
             serde_json::Value::String(s) if name == "renderer" => json!(if s == "cpu" { "auto" } else { "cpu" }),
             serde_json::Value::String(s) => json!(format!("{s}x")),
             serde_json::Value::Array(_) => json!(["x"]),
+            serde_json::Value::Object(_) if name == "dictationModel" => json!({ "provider": "doubao", "model": "volc.bigasr.sauc.duration" }),
             serde_json::Value::Object(_) => json!({ "x": "y" }),
             serde_json::Value::Null => panic!("{name} has no value"),
         }

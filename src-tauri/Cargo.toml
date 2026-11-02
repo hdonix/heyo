@@ -58,6 +58,12 @@ url = "2"
 # over TLS by rustls with ring. Both in the build already, through Tauri.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# Doubao's streaming speech recognition (`dictation/engine/doubao.rs`):
+# a WebSocket, over TLS by rustls with ring and the system's certificates,
+# checked as reqwest checks them; its packets are gzipped.
+tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-native-roots"] }
+rustls-platform-verifier = "0.7"
+flate2 = "1"
 # Checking what is downloaded against the hash it must have (the speech
 # models, `dictation/models.rs`). In the build already, through Tauri.
 sha2 = "0.10"

@@ -65,6 +65,9 @@ pub(crate) enum Command {
     InstallUpdate,
     /// The key; none, when it is empty.
     SetAnthropicApiKey(String),
+    /// One of the other secrets, by the name of its setting; none, when
+    /// the value is empty.
+    SetSecret { name: String, value: String },
     OpenExtensionsFolder,
     /// All the preferences of the extension of that name, as they are to be.
     SetExtensionPreferences { extension: String, values: Value },
@@ -106,6 +109,7 @@ impl Command {
             Command::CheckForUpdate => "check_for_update",
             Command::InstallUpdate => "install_update",
             Command::SetAnthropicApiKey(_) => "set_anthropic_api_key",
+            Command::SetSecret { .. } => "set_secret",
             Command::OpenExtensionsFolder => "open_extensions_folder",
             Command::SetExtensionPreferences { .. } => "set_extension_preferences",
             Command::UninstallExtension(_) => "uninstall_extension",
@@ -153,6 +157,7 @@ impl Host for Running {
             Command::CheckForUpdate => answer(block_on(updates::check_for_update(app))?),
             Command::InstallUpdate => answer(block_on(updates::install_update(app))?),
             Command::SetAnthropicApiKey(key) => answer(settings::set_anthropic_api_key(key, app)?),
+            Command::SetSecret { name, value } => answer(settings::set_secret(name, value, app)?),
             Command::OpenExtensionsFolder => answer(settings::open_extensions_folder()?),
             // The preferences are the host's own shape, which the model
             // was given and hands back with one of them changed.
@@ -226,6 +231,7 @@ mod tests {
         let changing = [
             Command::ChangeSettings(Map::new()),
             Command::SetAnthropicApiKey(none()),
+            Command::SetSecret { name: none(), value: none() },
             Command::SetExtensionPreferences { extension: none(), values: nothing },
             Command::UninstallExtension(none()),
             Command::RevokeExtensionPermission { extension: none(), permission: permissions::Permission::Windows },

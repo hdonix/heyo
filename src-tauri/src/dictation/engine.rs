@@ -9,7 +9,11 @@
 //! simply recognized again every 300 ms (`sentences`). A recognizer that
 //! streams, or one that sends the audio to a service, is fed the same way
 //! and says the same things.
+//!
+//! The other sends the audio to a service: Doubao's streaming recognition,
+//! at Volcengine (`doubao`), where the user chose it and gave it a key.
 
+pub(crate) mod doubao;
 mod sense_voice;
 mod sentences;
 
@@ -17,6 +21,7 @@ use std::fmt;
 
 use serde_json::{json, Value};
 
+pub(crate) use doubao::Doubao;
 pub(crate) use sense_voice::SenseVoice;
 
 /// Samples a second: what a recognizer is fed is 16 kHz mono, as `f32`
@@ -34,6 +39,9 @@ pub(crate) enum Recognized {
     Partial(String),
     /// A finished sentence: the text so far is these, one after the other.
     Sentence(String),
+    /// The recognizer cannot go on (a service that refused, or went
+    /// away): the recording ends with this. What it said before stays said.
+    Failed(Failure),
 }
 
 /// Where a recognizer says what it heard. It may say it from a thread of

@@ -169,6 +169,21 @@ fn heard(event: &Value) -> Option<Heard> {
     }
 }
 
+/// Doubao, as a provider of speech recognition: its configuration's
+/// fields, its models, checking it, and a recognizer of it (for the
+/// settings' Models page).
+pub(crate) use engine::doubao;
+
+/// What recognizes dictation, as the settings choose it (`dictationModel`,
+/// the one place it is chosen): none for the model on this computer, or
+/// how Doubao is to. Doubao without a key is what to say instead.
+fn cloud(settings: &crate::settings::Settings) -> Result<Option<doubao::Config>, String> {
+    if settings.dictation_model.provider != doubao::PROVIDER {
+        return Ok(None);
+    }
+    doubao::Config::from_settings(settings, &settings.dictation_model.model).map(Some).map_err(|failure| crate::helper::worded(&failure.said(), t("Dictation failed")).full())
+}
+
 pub fn dir() -> PathBuf {
     crate::paths::data().join("dictation")
 }
@@ -183,8 +198,12 @@ pub fn installed() -> bool {
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub(crate) enum Told {
-    /// A recording begins; `polish` is the mode it will be polished in.
-    Start { polish: String },
+    /// A recording begins; `polish` is the mode it will be polished in,
+    /// and `cloud` whether the audio is sent to a service to be recognized.
+    Start {
+        polish: String,
+        cloud: bool,
+    },
     /// The microphone is open.
     Ready,
     /// How loud it is, from 0 to 1; null when that could not be measured.
@@ -246,9 +265,9 @@ fn hide_window_after(app: &AppHandle, delay: Duration) {
 
 /// Starts recording, in `language` from `source`: what is heard comes to
 /// `handle`.
-fn start(app: &AppHandle, language: &str, source: &str) -> Result<listening::Listening, String> {
+fn start(app: &AppHandle, language: &str, source: &str, cloud: Option<doubao::Config>) -> Result<listening::Listening, String> {
     let receiver = app.clone();
-    listening::listen(dir(), source, language, Arc::new(move |event| handle(&receiver, said(event))))
+    listening::listen(dir(), source, language, cloud, Arc::new(move |event| handle(&receiver, said(event))))
 }
 
 /// What the thread that writes is told, in the order it was heard.
@@ -900,20 +919,27 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     if state.recording {
         return;
     }
-    if !installed() {
+    let (language, source, polish, vocabulary, live, cloud) = {
+        let settings = app.state::<SettingsState>();
+        let settings = settings.0.read().unwrap();
+        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live, cloud(&settings))
+    };
+    let cloud = match cloud {
+        Ok(cloud) => cloud,
+        Err(e) => {
+            drop(state);
+            return fail(app, e);
+        }
+    };
+    if cloud.is_none() && !installed() {
         drop(state);
         return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Dictation to download it.").into());
     }
-    let (language, source, polish, vocabulary, live) = {
-        let settings = app.state::<SettingsState>();
-        let settings = settings.0.read().unwrap();
-        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live)
-    };
     // Before the recording starts: a recognizer that is kept answers at
     // once, and the window must not hear that it is ready before it hears
     // that a recording begins.
-    emit(app, json!({ "type": "start", "polish": polish }));
-    match start(app, &language, &source) {
+    emit(app, json!({ "type": "start", "polish": polish, "cloud": cloud.is_some() }));
+    match start(app, &language, &source, cloud) {
         Ok(listening) => {
             state.listening = Some(listening);
             // Kept for the whole recording, polishing included.
@@ -955,16 +981,18 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
     if state.recording {
         return Err(NotListening::Busy);
     }
-    if !installed() {
-        return Err(NotListening::NotInstalled);
-    }
-    let (set_language, source, vocabulary) = {
+    let (set_language, source, vocabulary, cloud) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_vocabulary.clone())
+        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_vocabulary.clone(), cloud(&settings))
     };
+    let cloud = cloud.map_err(NotListening::Failed)?;
+    if cloud.is_none() && !installed() {
+        return Err(NotListening::NotInstalled);
+    }
+    let in_cloud = cloud.is_some();
     let language = language.unwrap_or(set_language);
-    state.listening = Some(start(app, &language, &source).map_err(NotListening::Failed)?);
+    state.listening = Some(start(app, &language, &source, cloud).map_err(NotListening::Failed)?);
     state.words = Words::of(&vocabulary);
     state.polish = "off".into();
     state.recording = true;
@@ -975,7 +1003,7 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
     drop(state);
     if indicator {
         show_window(app);
-        emit(app, json!({ "type": "start", "polish": "off" }));
+        emit(app, json!({ "type": "start", "polish": "off", "cloud": in_cloud }));
     }
     Ok(session)
 }
@@ -1692,7 +1720,8 @@ mod tests {
     fn the_window_is_told_what_the_recording_and_the_host_say() {
         let told = |event: Value| serde_json::from_value::<Told>(event);
         for event in [
-            json!({ "type": "start", "polish": "off" }),
+            json!({ "type": "start", "polish": "off", "cloud": false }),
+            json!({ "type": "start", "polish": "clean", "cloud": true }),
             json!({ "type": "ready" }),
             json!({ "type": "level", "value": 0.4 }),
             json!({ "type": "partial", "text": "Hel" }),

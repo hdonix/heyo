@@ -6,7 +6,8 @@
 //   raycast.tsv   a Raycast icon name <tab> the Lucide name it is drawn as,
 //                 where the two differ (src/raycast/iconAliases.ts)
 //
-// and the two the `.slint` files name themselves, search.svg and x.svg.
+// and the ones the `.slint` files name themselves: search.svg, x.svg and
+// cloud.svg.
 // Run from the repository after `pnpm install`, and again when lucide-react
 // or iconAliases.ts changes:
 //
@@ -55,5 +56,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const made = await tables();
   writeFileSync(join(here, "lucide.tsv"), made.lucide);
   writeFileSync(join(here, "raycast.tsv"), made.raycast);
-  for (const name of ["search", "x"]) writeFileSync(join(here, `${name}.svg`), made.svg(name));
+  for (const name of ["search", "x", "cloud"]) writeFileSync(join(here, `${name}.svg`), made.svg(name));
 }

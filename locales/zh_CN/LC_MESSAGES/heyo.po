@@ -114,6 +114,79 @@ msgstr "取消"
 msgid "part of it had become the application's text as it was heard"
 msgstr "其中一部分已按听到的内容写入应用程序"
 
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 2.0, Hourly"
+msgstr "豆包流式语音识别模型 2.0（小时版）"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 2.0, Concurrent"
+msgstr "豆包流式语音识别模型 2.0（并发版）"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 1.0, Hourly"
+msgstr "豆包流式语音识别模型 1.0（小时版）"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 1.0, Concurrent"
+msgstr "豆包流式语音识别模型 1.0（并发版）"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "New Console: API Key"
+msgstr "新版控制台：API 密钥"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Old Console: App ID and Access Token"
+msgstr "旧版控制台：APP ID 与 Access Token"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Console"
+msgstr "控制台"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Which of Volcengine's consoles your key is from."
+msgstr "你的密钥来自火山引擎的哪一版控制台。"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "API Key"
+msgstr "API 密钥"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "From the new console."
+msgstr "在新版控制台获取。"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "App ID"
+msgstr "APP ID"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "From the old console, with its Access Token."
+msgstr "在旧版控制台获取，与 Access Token 一起使用。"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Access Token"
+msgstr "Access Token"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "From the old console."
+msgstr "在旧版控制台获取。"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Remove Filler Words"
+msgstr "去除语气词"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao takes out filler words, stutters and repeated words."
+msgstr "由豆包删除语气词、口吃和重复的词（语义顺滑）。"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao (Volcengine)"
+msgstr "豆包（火山引擎）"
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."
+msgstr "听写时，你的音频会发送到火山引擎（字节跳动），在那里识别。"
+
 #: src-tauri/src/dictation/listening.rs
 msgid "dictation is not running"
 msgstr "听写未在运行"
@@ -623,6 +696,34 @@ msgstr "无法下载：{0}"
 #: src-tauri/src/helper.rs
 msgid "Could not install the engine"
 msgstr "无法安装引擎"
+
+#: src-tauri/src/helper.rs
+msgid "Doubao needs a key"
+msgstr "豆包需要密钥"
+
+#: src-tauri/src/helper.rs
+msgid "Add one in Heyo Settings."
+msgstr "请在“Heyo 设置”中添加。"
+
+#: src-tauri/src/helper.rs
+msgid "Doubao did not accept the key"
+msgstr "豆包不接受此密钥"
+
+#: src-tauri/src/helper.rs
+msgid "Doubao refused: check the resource and its quota"
+msgstr "豆包拒绝了请求：请检查资源及其额度"
+
+#: src-tauri/src/helper.rs
+msgid "Doubao is busy. Try again in a moment."
+msgstr "豆包繁忙，请稍后再试。"
+
+#: src-tauri/src/helper.rs
+msgid "Could not reach Doubao"
+msgstr "无法连接豆包"
+
+#: src-tauri/src/helper.rs
+msgid "Doubao could not recognize the speech"
+msgstr "豆包无法识别这段语音"
 
 #: src-tauri/src/helper.rs
 msgid "Speech model"
@@ -1904,10 +2005,6 @@ msgid "Leave empty to use the first model the server offers."
 msgstr "留空则使用服务器提供的第一个模型。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "API Key"
-msgstr "API 密钥"
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
 msgstr "留空则使用 ANTHROPIC_API_KEY 或 `ant auth login` 的配置。"
 
@@ -2296,6 +2393,10 @@ msgstr "无法检查新版本：{0}"
 #: src-tauri/src/updates.rs
 msgid "Could not install Heyo {0}: {1}"
 msgstr "无法安装 Heyo {0}：{1}"
+
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Recognized in the cloud"
+msgstr "在云端识别"
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint
 msgid "Selection"

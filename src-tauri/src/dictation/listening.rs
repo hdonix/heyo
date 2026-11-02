@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use super::engine::{Failure, Recognized, Recognizer, SenseVoice};
+use super::engine::{doubao, Doubao, Failure, Recognized, Recognizer, SenseVoice};
 use super::microphone::{self, Taker};
 
 /// How long a recognizer is kept without a recording: it holds a few
@@ -59,10 +59,11 @@ struct Kept {
 static KEPT: Mutex<Kept> = Mutex::new(Kept { recognizer: None, idle_since: None });
 
 /// Starts a recording from `source` (empty: the system's default
-/// microphone), recognized in `language`, from the files in `dir`.
-pub(crate) fn listen(dir: std::path::PathBuf, source: &str, language: &str, tell: Tell) -> Result<Listening, String> {
+/// microphone), recognized in `language` from the files in `dir`, or by
+/// Doubao where `cloud` says how.
+pub(crate) fn listen(dir: std::path::PathBuf, source: &str, language: &str, cloud: Option<doubao::Config>, tell: Tell) -> Result<Listening, String> {
     let (tx, rx) = mpsc::channel();
-    let (audio, failing) = (tx.clone(), tx.clone());
+    let (audio, failing, refused) = (tx.clone(), tx.clone(), tx.clone());
     // Record first, load second: nothing said during the load is lost.
     let recording = microphone::record(
         source,
@@ -77,7 +78,7 @@ pub(crate) fn listen(dir: std::path::PathBuf, source: &str, language: &str, tell
         .spawn(move || {
             // Whatever becomes of it, a recording that is waited for ends
             // with a word on how.
-            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&dir, &language, recording, rx, &tell)));
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&dir, &language, cloud, recording, (refused, rx), &tell)));
             match ran {
                 Ok(Some(last)) => tell(last),
                 // Nobody waits for it any more.
@@ -97,10 +98,13 @@ fn error(failure: &Failure) -> Value {
 
 /// The recording, until it ends: what it heard is told as it is heard,
 /// and its last word returned.
-fn run(dir: &std::path::Path, language: &str, recording: microphone::Recording, rx: Receiver<Input>, tell: &Tell) -> Option<Value> {
+/// A recognizer that fails says so where the microphone does (`tx`).
+fn run(dir: &std::path::Path, language: &str, cloud: Option<doubao::Config>, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Value> {
     let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     kept.idle_since = None;
-    if kept.recognizer.as_ref().is_none_or(|recognizer| recognizer.language() != language) {
+    // A connection is a recording's own: nothing is kept of it.
+    let mut doubao = cloud.map(Doubao::new);
+    if doubao.is_none() && kept.recognizer.as_ref().is_none_or(|recognizer| recognizer.language() != language) {
         kept.recognizer = None;
         match SenseVoice::load(dir, language) {
             Ok(recognizer) => kept.recognizer = Some(recognizer),
@@ -110,13 +114,15 @@ fn run(dir: &std::path::Path, language: &str, recording: microphone::Recording, 
             }
         }
     }
-    let recognizer: &mut dyn Recognizer = kept.recognizer.as_mut().expect("loaded above");
+    let recognizer: &mut dyn Recognizer = match doubao.as_mut() {
+        Some(doubao) => doubao,
+        None => kept.recognizer.as_mut().expect("loaded above"),
+    };
     let heard = tell.clone();
-    recognizer.begin(Box::new(move |recognized| {
-        heard(match recognized {
-            Recognized::Partial(text) => json!({ "type": "partial", "text": text }),
-            Recognized::Sentence(text) => json!({ "type": "segment", "text": text }),
-        })
+    recognizer.begin(Box::new(move |recognized| match recognized {
+        Recognized::Partial(text) => heard(json!({ "type": "partial", "text": text })),
+        Recognized::Sentence(text) => heard(json!({ "type": "segment", "text": text })),
+        Recognized::Failed(failure) => drop(tx.send(Input::Failed(failure))),
     }));
     tell(json!({ "type": "ready" }));
     let mut meter = Meter::new(Instant::now());
@@ -142,6 +148,8 @@ fn run(dir: &std::path::Path, language: &str, recording: microphone::Recording, 
         }
     };
     drop(recording);
+    // A connection still open is closed.
+    drop(doubao);
     // What was heard but not finished is forgotten when the next begins.
     kept.idle_since = Some(Instant::now());
     drop(kept);
@@ -206,7 +214,7 @@ mod tests {
         std::env::set_var("HEYO_DICTATION_WAV", &wav);
         let (tx, rx) = mpsc::channel();
         let tx = Mutex::new(tx);
-        let listening = listen(dir, "", "en", Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
+        let listening = listen(dir, "", "en", None, Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
         std::env::remove_var("HEYO_DICTATION_WAV");
         let mut events = Vec::new();
         while events.iter().filter(|event: &&Value| event["type"] == "segment").count() < 2 {

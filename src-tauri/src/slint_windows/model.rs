@@ -1142,6 +1142,10 @@ impl Model {
             Id::ApiKey if value.trim().is_empty() => Vec::new(),
             Id::ApiKey => vec![ask(Command::SetAnthropicApiKey(value.to_string()), Then::Settings)],
             Id::ForgetApiKey => vec![ask(Command::SetAnthropicApiKey(String::new()), Then::Settings)],
+            // The other secrets, by their settings' names (`settings::SECRETS`).
+            Id::Secret(_) if value.trim().is_empty() => Vec::new(),
+            Id::Secret(name) => vec![ask(Command::SetSecret { name, value: value.to_string() }, Then::Settings)],
+            Id::ForgetSecret(name) => vec![ask(Command::SetSecret { name, value: String::new() }, Then::Settings)],
             Id::Act(Act::InstallShellExtension) => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
             Id::Act(Act::InstallDictation) => {
                 self.progress = Some(t("Starting…").into());
@@ -1608,6 +1612,10 @@ mod tests {
         assert_eq!(asked(&model.acted("apikey", "sk-ant-1")), Command::SetAnthropicApiKey("sk-ant-1".into()));
         assert!(model.acted("apikey", "  ").is_empty());
         assert_eq!(asked(&model.acted("more:apikey", "")), Command::SetAnthropicApiKey(String::new()));
+        // Another secret goes by its own command too, by its setting's name.
+        assert_eq!(asked(&model.acted("secret:doubaoApiKey", " k ")), Command::SetSecret { name: "doubaoApiKey".into(), value: " k ".into() });
+        assert!(model.acted("secret:doubaoApiKey", "").is_empty());
+        assert_eq!(asked(&model.acted("forget-secret:doubaoAccessToken", "")), Command::SetSecret { name: "doubaoAccessToken".into(), value: String::new() });
         // A local model: its server is asked, and what is not this computer is a warning.
         let asks = model.acted("set:aiProvider", "local");
         assert_eq!(asks.iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["change_settings", "local_models"]);

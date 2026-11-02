@@ -73,6 +73,10 @@ pub(crate) enum Id {
     /// The API key, typed; and the button that forgets it.
     ApiKey,
     ForgetApiKey,
+    /// Another secret (`settings::SECRETS`), by its setting's name, typed;
+    /// and the button that forgets it.
+    Secret(String),
+    ForgetSecret(String),
     Act(Act),
     /// In the menu that narrows the Shortcuts table: one of its
     /// modifications, or one of its categories.
@@ -103,6 +107,8 @@ impl fmt::Display for Id {
             Id::ExpandRemove(application) => write!(out, "expand:remove:{application}"),
             Id::ApiKey => write!(out, "apikey"),
             Id::ForgetApiKey => write!(out, "more:apikey"),
+            Id::Secret(name) => write!(out, "secret:{name}"),
+            Id::ForgetSecret(name) => write!(out, "forget-secret:{name}"),
             Id::Act(act) => write!(out, "act:{}", ACTS.iter().find(|(known, _)| known == act).map_or("", |(_, name)| name)),
             Id::Modification(which) => write!(out, "mod:{which}"),
             Id::Category(which) => write!(out, "cat:{which}"),
@@ -141,7 +147,9 @@ impl Id {
             return Id::Revoke { extension: own(extension), permission: own(permission) };
         }
         // The longer of two that begin alike first.
-        let forms: [(&str, fn(String) -> Id); 12] = [
+        let forms: [(&str, fn(String) -> Id); 14] = [
+            ("secret:", Id::Secret),
+            ("forget-secret:", Id::ForgetSecret),
             ("set:", Id::Set),
             ("num:", Id::Num),
             ("alias:", Id::Alias),
@@ -209,6 +217,8 @@ mod tests {
             Id::ExpandRemove(s("org.gnome.Terminal.desktop")),
             Id::ApiKey,
             Id::ForgetApiKey,
+            Id::Secret(s("doubaoApiKey")),
+            Id::ForgetSecret(s("doubaoAccessToken")),
             Id::Modification(s("hotkey")),
             Id::Category(s("applications")),
             Id::Named(s("cmd:zeta:one")),

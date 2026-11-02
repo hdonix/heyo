@@ -206,6 +206,13 @@ pub fn worded(said: &Value, otherwise: &str) -> Worded {
         "no-microphone" => Worded { short: t("No microphone").into(), detail },
         "download" => Worded { short: tf("Could not download: {0}", &[&step(said["step"].as_str().unwrap_or_default())]), detail },
         "packages" => Worded { short: t("Could not install the engine").into(), detail },
+        // Doubao's speech recognition, at Volcengine.
+        "doubao-no-key" => Worded { short: t("Doubao needs a key").into(), detail: Some(t("Add one in Heyo Settings.").into()) },
+        "doubao-key" => Worded { short: t("Doubao did not accept the key").into(), detail },
+        "doubao-denied" => Worded { short: t("Doubao refused: check the resource and its quota").into(), detail },
+        "doubao-busy" => Worded { short: t("Doubao is busy. Try again in a moment.").into(), detail },
+        "doubao-unreachable" => Worded { short: t("Could not reach Doubao").into(), detail },
+        "doubao-error" => Worded { short: t("Doubao could not recognize the speech").into(), detail },
         _ => Worded { short: otherwise.into(), detail },
     }
 }

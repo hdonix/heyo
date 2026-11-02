@@ -72,6 +72,9 @@ export component PillWindow inherits Window {
     // loading, listening, polishing, done or error.
     in property <string> phase: "loading";
     in property <bool> recording;
+    // The audio is sent to a service to be recognized: a small cloud says
+    // so beside the waveform while it is.
+    in property <bool> cloud;
     // What it says of itself when it has no words to show.
     in property <string> saying;
     // The words: what is settled, and after it what may still change.
@@ -181,6 +184,16 @@ export component PillWindow inherits Window {
                     Waveform {
                         bars: root.bars;
                         colour: root.phase == "listening" ? Tokens.accent : Tokens.text-muted;
+                    }
+                }
+                if root.cloud && root.recording: VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: @image-url("icons/cloud.svg");
+                        size: 11px;
+                        tint: Tokens.text-muted;
+                        accessible-role: image;
+                        accessible-label: @tr("Recognized in the cloud");
                     }
                 }
                 // Clipped on the left, so that the newest words stay

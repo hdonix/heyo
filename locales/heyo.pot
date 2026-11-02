@@ -111,6 +111,79 @@ msgstr ""
 msgid "part of it had become the application's text as it was heard"
 msgstr ""
 
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 2.0, Hourly"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 2.0, Concurrent"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 1.0, Hourly"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao Streaming ASR 1.0, Concurrent"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "New Console: API Key"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Old Console: App ID and Access Token"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Console"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Which of Volcengine's consoles your key is from."
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "API Key"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "From the new console."
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "App ID"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "From the old console, with its Access Token."
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Access Token"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "From the old console."
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Remove Filler Words"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao takes out filler words, stutters and repeated words."
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Doubao (Volcengine)"
+msgstr ""
+
+#: src-tauri/src/dictation/engine/doubao.rs
+msgid "Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."
+msgstr ""
+
 #: src-tauri/src/dictation/listening.rs
 msgid "dictation is not running"
 msgstr ""
@@ -619,6 +692,34 @@ msgstr ""
 
 #: src-tauri/src/helper.rs
 msgid "Could not install the engine"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Doubao needs a key"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Add one in Heyo Settings."
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Doubao did not accept the key"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Doubao refused: check the resource and its quota"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Doubao is busy. Try again in a moment."
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Could not reach Doubao"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Doubao could not recognize the speech"
 msgstr ""
 
 #: src-tauri/src/helper.rs
@@ -1902,10 +2003,6 @@ msgid "Leave empty to use the first model the server offers."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "API Key"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
 msgstr ""
 
@@ -2295,6 +2392,10 @@ msgstr ""
 
 #: src-tauri/src/updates.rs
 msgid "Could not install Heyo {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/ui/pill.slint
+msgid "Recognized in the cloud"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint

@@ -46,6 +46,8 @@ pub(crate) struct Model {
     note: String,
     /// The words are going into the application as they are spoken.
     live: bool,
+    /// The audio is sent to a service to be recognized: a mark says so.
+    pub cloud: bool,
     levels: [f32; KEPT],
     /// The loudest level lately, slowly forgotten.
     peak: f32,
@@ -53,16 +55,16 @@ pub(crate) struct Model {
 
 impl Model {
     pub(crate) fn new() -> Model {
-        Model { phase: Phase::Loading, committed: String::new(), partial: String::new(), note: String::new(), live: false, levels: [0.0; KEPT], peak: 0.2 }
+        Model { phase: Phase::Loading, committed: String::new(), partial: String::new(), note: String::new(), live: false, cloud: false, levels: [0.0; KEPT], peak: 0.2 }
     }
 
     /// The host says something of a recording.
     pub(crate) fn told(&mut self, told: &Told) {
         match told {
-            Told::Start { .. } => {
+            Told::Start { cloud, .. } => {
                 // The next recording starts with nothing decided. (Not the
                 // peak: the microphone is the same one.)
-                *self = Model { peak: self.peak, ..Model::new() };
+                *self = Model { peak: self.peak, cloud: *cloud, ..Model::new() };
             }
             Told::Ready => self.phase = Phase::Listening,
             Told::Level { value } => {
@@ -170,7 +172,7 @@ mod tests {
     use super::*;
 
     fn start(polish: &str) -> Told {
-        Told::Start { polish: polish.into() }
+        Told::Start { polish: polish.into(), cloud: false }
     }
 
     fn partial(text: &str) -> Told {
@@ -199,6 +201,15 @@ mod tests {
             return Some(model.note().to_string());
         }
         (!settled.is_empty() || !changing.is_empty()).then(|| format!("{settled}{changing}"))
+    }
+
+    #[test]
+    fn a_recording_in_the_cloud_is_marked_and_the_next_one_need_not_be() {
+        let mut model = Model::new();
+        told(&mut model, &[Told::Start { polish: "off".into(), cloud: true }, Told::Ready, partial("你好")]);
+        assert!(model.cloud);
+        told(&mut model, &[start("off")]);
+        assert!(!model.cloud);
     }
 
     #[test]

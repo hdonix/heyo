@@ -104,6 +104,9 @@ pub(crate) struct SettingsView {
     /// Whether a Claude API key is stored. The key itself never goes to a
     /// window (`anthropicApiKey` is always empty here).
     anthropic_api_key_set: bool,
+    /// The same of Doubao's secrets (`settings::SECRETS`).
+    doubao_api_key_set: bool,
+    doubao_access_token_set: bool,
     launch_at_login: bool,
     node_version: Result<String, String>,
     node_overridden: bool,
@@ -136,8 +139,12 @@ fn view(app: &AppHandle) -> SettingsView {
     let mut settings = app.state::<SettingsState>().0.read().unwrap().clone();
     let anthropic_api_key_set = !settings.anthropic_api_key.is_empty();
     settings.anthropic_api_key.clear();
+    let doubao_api_key_set = !std::mem::take(&mut settings.doubao_api_key).is_empty();
+    let doubao_access_token_set = !std::mem::take(&mut settings.doubao_access_token).is_empty();
     SettingsView {
         anthropic_api_key_set,
+        doubao_api_key_set,
+        doubao_access_token_set,
         node_version: settings::node_version(&settings.node()),
         node_overridden: std::env::var_os("HEYO_NODE").is_some(),
         cli_found: match settings.ai_provider.as_str() {
@@ -170,7 +177,7 @@ pub(crate) fn get_settings(app: AppHandle, window: tauri::WebviewWindow) -> Sett
 /// change, by name, and nothing else. `launchAtLogin` may be among them.
 pub(crate) fn change_settings(mut changes: serde_json::Map<String, Value>, app: AppHandle) -> Result<SettingsView, String> {
     // The key has a command of its own, which is the only way it is set.
-    if changes.contains_key("anthropicApiKey") {
+    if changes.contains_key("anthropicApiKey") || settings::SECRETS.iter().any(|name| changes.contains_key(*name)) {
         return Err("the API key is not set this way".into());
     }
     if let Some(enabled) = changes.remove("launchAtLogin") {
@@ -200,6 +207,18 @@ pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<Setti
     let _changing = changing();
     let mut next = app.state::<SettingsState>().0.read().unwrap().clone();
     next.anthropic_api_key = key.trim().to_owned();
+    commit(&app, next)
+}
+
+/// Stores one of the secrets (`settings::SECRETS`) by its name; an empty
+/// one removes it.
+pub(crate) fn set_secret(name: String, value: String, app: AppHandle) -> Result<SettingsView, String> {
+    if !settings::SECRETS.contains(&name.as_str()) {
+        return Err(format!("{name} is not a secret"));
+    }
+    let _changing = changing();
+    let changes = serde_json::Map::from_iter([(name, Value::from(value.trim()))]);
+    let next = app.state::<SettingsState>().0.read().unwrap().changed(&changes)?;
     commit(&app, next)
 }
 
@@ -338,6 +357,8 @@ mod tests {
         let view = SettingsView {
             settings: Settings { anthropic_api_key: String::new(), compact_mode: true, ..Settings::default() },
             anthropic_api_key_set: true,
+            doubao_api_key_set: false,
+            doubao_access_token_set: false,
             launch_at_login: false,
             node_version: Ok("v24.0.0".into()),
             node_overridden: false,

@@ -152,6 +152,7 @@ impl Pill {
         window.set_saying(self.model.saying().into());
         window.set_note(self.model.note().into());
         window.set_recording(self.model.recording());
+        window.set_cloud(self.model.cloud);
         window.set_phase(
             match self.model.phase {
                 Phase::Loading => "loading",

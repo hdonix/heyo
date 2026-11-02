@@ -59,6 +59,12 @@ for it. A translation uses these and no synonym; change a term here and in
 | Screenshot | 截图 | Standard. |
 | Selection (of a screenshot) | 选区 | As image editors say it. |
 | Live Activity | 实时活动 | Apple's Chinese for the same thing. |
+| Doubao (the speech recognition service) | 豆包 | Its own Chinese name; the English is the pinyin of it. |
+| Volcengine | 火山引擎 | Its own Chinese name. |
+| Console (Volcengine's, new and old) | 控制台 (新版控制台, 旧版控制台) | As Volcengine's documentation says it. |
+| Hourly, Concurrent (a Doubao resource) | 小时版, 并发版 | As Volcengine names the two ways it is paid for. |
+| Remove filler words (Doubao's smoothing) | 去除语气词 | What it does; Volcengine's own term, 语义顺滑, is given beside it. |
+| In the cloud (recognized by a service) | 云端 | Standard. |
 | Find by Meaning | 按含义查找 | Plain words; “语义搜索” is jargon. |
 | Local Model | 本地模型 | Standard. |
 | CLI (Claude Code, Codex as a model) | 命令行 | Short enough for a choice in a list; the tool's name says which. |
