@@ -949,7 +949,9 @@ impl Model {
 
     fn provider_card(&self, page: &mut Page, provider: &Provider) {
         let (status, warning) = self.status(provider);
-        let head = Line::row(Id::RemoveProvider(provider.id.clone()), translate(provider.kind.title())).says(status).warns(warning);
+        // Its kind, where its name does not say it already.
+        let kind = translate(provider.kind.title());
+        let head = Line::row(Id::RemoveProvider(provider.id.clone()), if provider.name == kind { t("Status") } else { kind }).says(status).warns(warning);
         let mut rows = vec![if provider.kind.removable() { head.confirm(t("Remove…"), t("Click Again to Remove")) } else { head }];
         if provider.kind.removable() {
             rows.push(Line::row(Id::ProviderField { provider: provider.id.clone(), field: "name".into() }, t("Name")).field(provider.name.clone(), translate(provider.kind.title())));
@@ -976,11 +978,12 @@ impl Model {
     fn models_page(&self) -> Vec<Line> {
         let mut page = Page::default();
         page.note(t("Connect the services and programs that run models. Each feature then uses one of their models, chosen where the feature is set up: AI answers in Advanced, speech recognition and polishing in Dictation."));
+        // First, where it is found without scrolling past every provider.
+        let kinds = registry::ADDABLE.iter().map(|kind| (kind.word(), translate(kind.title())));
+        page.card("", vec![Line::row(Id::AddProvider, t("Add a Provider")).says(t("Several of one kind can be added, two servers for instance.")).select("", std::iter::once(("", t("Add Provider…"))).chain(kinds))]);
         for provider in self.providers() {
             self.provider_card(&mut page, &provider);
         }
-        let kinds = registry::ADDABLE.iter().map(|kind| (kind.word(), translate(kind.title())));
-        page.card(t("Add a Provider"), vec![Line::row(Id::AddProvider, t("Provider")).says(t("Several of one kind can be added, two servers for instance.")).select("", std::iter::once(("", t("Add Provider…"))).chain(kinds))]);
         page.done()
     }
 
