@@ -21,7 +21,7 @@ import { simpleParser } from "mailparser";
 import type { ItemPerson } from "../../../../shared/bindings/ItemPerson";
 import { t } from "../../../../shared/i18n";
 import type { Account, Connector, Item, SyncIo, WatchIo } from "../../heyo/connector";
-import { cursorOf, failure, list, number, pause, plain, required, secret, stopped, text } from "./common";
+import { cursorOf, failure, keepWatching, list, number, plain, required, secret, stopped, text } from "./common";
 
 // --- What is asked of a server -------------------------------------------------
 
@@ -339,9 +339,6 @@ function closedOnAbort(client: ImapFlow, signal: AbortSignal) {
   return () => signal.removeEventListener("abort", close);
 }
 
-/// How long the watch waits before connecting again, after a failure.
-export const RECONNECT = { first: 5_000, most: 5 * 60_000 };
-
 export const imap: Connector = {
   async check(account) {
     const client = await connect(account);
@@ -376,36 +373,23 @@ export const imap: Connector = {
 };
 
 /// Keeps INBOX in IDLE until `io.signal` aborts, saying when mail comes or
-/// goes, and connecting again (later each time it fails) when it drops.
+/// goes, and connecting again when the connection drops (`keepWatching`).
 export async function watchInbox(account: Account, io: WatchIo, open: (account: Account) => Promise<ImapFlow> = connect) {
-  let wait = RECONNECT.first;
-  let again = false;
-  while (!io.signal.aborted) {
-    let client: ImapFlow | undefined;
-    let release = () => {};
+  await keepWatching(io, async (connected) => {
+    const client = await open(account);
+    const release = closedOnAbort(client, io.signal);
     try {
-      client = await open(account);
-      release = closedOnAbort(client, io.signal);
       const changed = () => io.changed();
       client.on("exists", changed);
       client.on("expunge", changed);
       client.on("flags", changed);
       await client.mailboxOpen("INBOX", { readOnly: true });
-      wait = RECONNECT.first;
-      // What came while it was away is synced now.
-      if (again) io.changed();
-      again = true;
+      connected();
       // IDLE ends when the server or imapflow (renewing it) ends it, or the connection drops.
       while (client.usable && !io.signal.aborted) await client.idle();
-    } catch (error) {
-      // A password refused stays refused: the sync says so, the watch need not hammer the server.
-      if (failure(error).kind === "auth") return;
     } finally {
       release();
-      client?.close();
+      client.close();
     }
-    if (io.signal.aborted) return;
-    await pause(wait, io.signal);
-    wait = Math.min(wait * 2, RECONNECT.most);
-  }
+  });
 }

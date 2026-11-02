@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ConnectorError, type Item, type SyncIo } from "../../heyo/connector";
 import { loader } from "../load";
-import { attachmentsOf, imap, itemOf, RECONNECT, setOf, syncMail, textPart, uidsOf, watchInbox, type Mail, type Session } from "./imap";
+import { RECONNECT } from "./common";
+import { attachmentsOf, imap, itemOf, setOf, syncMail, textPart, uidsOf, watchInbox, type Mail, type Session } from "./imap";
 import { recorder } from "./testing";
 
 /// A server in memory: folders of mails by UID, each folder numbered by

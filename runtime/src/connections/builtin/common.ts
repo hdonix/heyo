@@ -5,7 +5,7 @@
 import { convert } from "html-to-text";
 
 import { t } from "../../../../shared/i18n";
-import { ConnectorError, type Account } from "../../heyo/connector";
+import { ConnectorError, type Account, type WatchIo } from "../../heyo/connector";
 
 /// The most text an item carries (the store cuts there too).
 export const TEXT_LIMIT = 8000;
@@ -96,6 +96,34 @@ export function pause(ms: number, signal: AbortSignal): Promise<void> {
       done();
     }
   });
+}
+
+/// How long a watch waits before connecting again, after a failure: the
+/// first time, and at the most (it doubles in between).
+export const RECONNECT = { first: 5_000, most: 5 * 60_000 };
+
+/// Keeps a watch's connection until `io.signal` aborts. `hold` connects,
+/// calls `connected` once it watches, and resolves or throws when the
+/// connection ends; then it is connected again, later each time it fails.
+/// Once connected again, a change is said: what came meanwhile is synced.
+/// Credentials refused end the watch: the sync says so to the user.
+export async function keepWatching(io: WatchIo, hold: (connected: () => void) => Promise<void>) {
+  let wait = RECONNECT.first;
+  let again = false;
+  while (!io.signal.aborted) {
+    try {
+      await hold(() => {
+        wait = RECONNECT.first;
+        if (again) io.changed();
+        again = true;
+      });
+    } catch (error) {
+      if (failure(error).kind === "auth") return;
+    }
+    if (io.signal.aborted) return;
+    await pause(wait, io.signal);
+    wait = Math.min(wait * 2, RECONNECT.most);
+  }
 }
 
 /// The cursor a connector wrote, read back; `undefined` (a sync from
