@@ -50,6 +50,14 @@ fn sherpa_onnx() {
     let target = std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from).or_else(|| out.ancestors().find(|dir| dir.file_name().is_some_and(|name| name == "target")).map(Into::into)).unwrap_or(out);
     let archive = target.join("sherpa-onnx-prebuilt").join(name);
     println!("cargo:rerun-if-changed={}", archive.display());
+    // The `-sys` crate unpacks the archive beside it and, finding it
+    // unpacked, fetches nothing again. A cache that keeps the unpacked
+    // libraries and not the archive (CI's) leaves nothing to check: they
+    // were checked when they were fetched, by the build that unpacked them.
+    let unpacked = archive.with_file_name(name.trim_end_matches(".tar.bz2")).join("lib");
+    if !archive.is_file() && unpacked.is_dir() {
+        return println!("cargo:warning=sherpa-onnx comes from {} as an earlier build unpacked it; its archive is gone, unchecked", unpacked.display());
+    }
     let bytes = std::fs::read(&archive).unwrap_or_else(|e| panic!("{}: {e} (fetched by sherpa-onnx-sys's build script, which should have run first)", archive.display()));
     let got: String = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect();
     if got != expected {
