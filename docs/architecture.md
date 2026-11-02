@@ -311,19 +311,41 @@ and keeps the list of applications current. The rest, by what it is for:
 - `screenshot.rs`, `ocr.rs` and `dictation.rs` are those features: the
   capture and what becomes of the part selected (`screenshot/selecting.rs`
   is the overlay's rules, which know no toolkit), the text-recognition
-  helper, dictation with its progress window.
+  helper, dictation with its pill.
+- Dictation's recordings, one after the other, are a session
+  (`dictation/session.rs`), in the manner of `activities.rs`: plain data
+  with the time passed in, which takes what happens (the hotkey is pressed
+  or let go, the recording heard a sentence or ended, the polishing is
+  done, an extension asks to listen) and answers with `Effect`s (start a
+  recording with this opener, show the pill or tell it something, post to
+  the writer, polish, tell the extension listening). The shell in
+  `dictation.rs` carries them out, feeds back what came of them, and is
+  the only part that holds the application. What a recording says is typed
+  from the recognizer to the pill (`listening::Event`, `session::End`,
+  `Told`). So the order of a recording's life (the pill hears of it before
+  it can hear that it is ready, a repeat of the hotkey after a hold
+  neither finishes nor starts anything, cancelling while it is polished)
+  is tested in a table, without a microphone or a window.
 - A recording (`dictation/listening.rs`) records the microphone
   (`dictation/microphone.rs`: the PulseAudio protocol on Linux, which
   PipeWire speaks too, cpal elsewhere; or a WAV file at the pace of speech,
   `HEYO_DICTATION_WAV`) and feeds a `Recognizer` (`dictation/engine.rs`),
-  which says the sentence in progress and each finished one. The one there
-  is, `engine/sense_voice.rs`, is SenseVoice with Silero's voice-activity
-  detector through sherpa-onnx's Rust API, from model files downloaded on
-  demand (`dictation/models.rs`: exact revisions, checked against hashes
-  written in the source); `engine/sentences.rs` is one recording as a
+  which says the sentence in progress and each finished one. What it is
+  heard with is an `Opener`, which the kind of the provider the settings
+  name gives (`models/kinds/`): it opens the recognizer and says whether
+  what it opens is kept between recordings, whether it needs a download
+  first, whether the audio leaves the computer and which languages it is
+  told. Another speech service is a kind's file and an `Opener`. There
+  are two: the models of a catalogue run in Heyo through sherpa-onnx's
+  Rust API (`engine/offline.rs` for SenseVoice, Whisper and the like, with
+  Silero's voice-activity detector finding where sentences end;
+  `engine/streaming.rs` for a model that streams), from files downloaded
+  on demand (`dictation/models.rs`: exact revisions, checked against
+  hashes written in the source; it also runs their downloads); and
+  Doubao's streaming recognition at Volcengine (`engine/doubao.rs`, with a
+  mock server for its tests). `engine/sentences.rs` is one recording as a
   recognizer that is not a streaming one hears it, apart from the engine
-  so that a test can play the recognizer. A recognizer that streams, or
-  one that sends the audio to a service, takes the same place.
+  so that a test can play the recognizer.
 - A recording's words reach the application one of two ways, which
   `dictation.rs` chooses when the recording starts (`Way`, with a thread
   of the recording's own to go it). Each has a module that is told what
