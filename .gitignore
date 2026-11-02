@@ -27,3 +27,4 @@ dist-ssr
 research_notes/
 reports/
 .claude/
+__pycache__/
