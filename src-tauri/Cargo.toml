@@ -26,6 +26,8 @@ slint-build = "=1.18.1"
 # Reads the translations (`locales/`) into the program: the reader Slint's
 # compiler reads the same files with, in the build already.
 rspolib = "0.1"
+# Checking the prebuilt sherpa-onnx that was fetched (`sherpa_onnx` in build.rs).
+sha2 = "0.10"
 
 [dependencies]
 # 2.12 moved to muda 0.20 while Slint 1.18 uses muda 0.19. Linking both
@@ -56,6 +58,9 @@ url = "2"
 # over TLS by rustls with ring. Both in the build already, through Tauri.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# Checking what is downloaded against the hash it must have (the speech
+# models, `dictation/models.rs`). In the build already, through Tauri.
+sha2 = "0.10"
 # The command-line tools that answer as models (`models/cli.rs`) run as child processes read as they write.
 tokio = { version = "1", features = ["process", "io-util", "sync"] }
 # The settings window is drawn by Slint, on a thread of its own
@@ -103,6 +108,39 @@ i-slint-renderer-skia = "=1.18.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1"
+
+# Speech recognition for dictation (`dictation/engine`): sherpa-onnx's own
+# Rust API, over its C API and ONNX Runtime, both of which its build script
+# fetches prebuilt for the target from the sherpa-onnx release of this
+# version; `build.rs` checks what was fetched against the hashes in
+# `sherpa-onnx.sha256`. On Linux and macOS linked into the program; on
+# Windows two DLLs beside it (`sherpa-onnx-c-api.dll`, `onnxruntime.dll`),
+# because the static libraries there are built against the C runtime linked
+# in (/MT) and Skia against the one in a DLL (/MD), which cannot be mixed.
+# The `-sys` crate is named to have its build script run before Heyo's.
+[target.'cfg(not(windows))'.dependencies]
+sherpa-onnx = { version = "=1.13.8", default-features = false, features = ["static"] }
+sherpa-onnx-sys = { version = "=1.13.8", default-features = false, features = ["static"] }
+
+[target.'cfg(windows)'.dependencies.sherpa-onnx]
+version = "=1.13.8"
+default-features = false
+features = ["shared"]
+
+[target.'cfg(windows)'.dependencies.sherpa-onnx-sys]
+version = "=1.13.8"
+default-features = false
+features = ["shared"]
+
+# Recording the microphone (`dictation/microphone`): on Linux by the
+# PulseAudio protocol, which PipeWire speaks too, in Rust and without a
+# library of the system's; elsewhere through cpal (WASAPI, CoreAudio). cpal
+# on Linux links ALSA's library whatever backend is used.
+[target.'cfg(target_os = "linux")'.dependencies.pulseaudio]
+version = "=0.3.2"
+
+[target.'cfg(not(target_os = "linux"))'.dependencies.cpal]
+version = "=0.18.2"
 
 [target.'cfg(unix)'.dependencies]
 # Ending a process group (`models/cli.rs`).

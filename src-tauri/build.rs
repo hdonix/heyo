@@ -9,7 +9,52 @@ const LOCALES: &str = "../locales";
 fn main() {
     locales();
     slint_windows();
+    sherpa_onnx();
     tauri_build::build()
+}
+
+/// Checks the prebuilt sherpa-onnx (and ONNX Runtime) that the build script
+/// of `sherpa-onnx-sys`, which runs before this one, fetched from the
+/// release of its version: a release's file can be replaced under the same
+/// address, and what is linked into Heyo must be what was chosen
+/// (`sherpa-onnx.sha256`, the digests GitHub lists for the release's
+/// files). Where the libraries were given (`SHERPA_ONNX_LIB_DIR`) nothing
+/// was fetched.
+fn sherpa_onnx() {
+    use sha2::{Digest, Sha256};
+    println!("cargo:rerun-if-changed=sherpa-onnx.sha256");
+    println!("cargo:rerun-if-env-changed=SHERPA_ONNX_LIB_DIR");
+    if std::env::var_os("SHERPA_ONNX_LIB_DIR").is_some() {
+        return println!("cargo:warning=sherpa-onnx comes from SHERPA_ONNX_LIB_DIR, unchecked");
+    }
+    let var = |name: &str| std::env::var(name).unwrap_or_default();
+    // Named as the `-sys` crate names them: linked in, but on Windows in
+    // DLLs (Cargo.toml says why).
+    let system = match (var("CARGO_CFG_TARGET_OS").as_str(), var("CARGO_CFG_TARGET_ARCH").as_str()) {
+        ("linux", "x86_64") => "linux-x64-static-lib",
+        ("linux", "aarch64") => "linux-aarch64-static-lib",
+        ("macos", "x86_64") => "osx-x64-static-lib",
+        ("macos", "aarch64") => "osx-arm64-static-lib",
+        ("windows", "x86_64") => "win-x64-shared-MT-Release-lib",
+        ("windows", "aarch64") => "win-arm64-shared-MT-Release-lib",
+        (os, arch) => panic!("no prebuilt sherpa-onnx is pinned for {os} on {arch}"),
+    };
+    let pins = std::fs::read_to_string("sherpa-onnx.sha256").expect("sherpa-onnx.sha256");
+    let (expected, name) = pins
+        .lines()
+        .filter_map(|line| line.split_once("  "))
+        .find(|(_, name)| name.contains(&format!("-{system}.tar")))
+        .unwrap_or_else(|| panic!("sherpa-onnx.sha256 pins nothing for {system}"));
+    // Where the `-sys` crate keeps what it fetched: in the target directory.
+    let out = std::path::PathBuf::from(var("OUT_DIR"));
+    let target = std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from).or_else(|| out.ancestors().find(|dir| dir.file_name().is_some_and(|name| name == "target")).map(Into::into)).unwrap_or(out);
+    let archive = target.join("sherpa-onnx-prebuilt").join(name);
+    println!("cargo:rerun-if-changed={}", archive.display());
+    let bytes = std::fs::read(&archive).unwrap_or_else(|e| panic!("{}: {e} (fetched by sherpa-onnx-sys's build script, which should have run first)", archive.display()));
+    let got: String = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect();
+    if got != expected {
+        panic!("{} is not the pinned file (SHA-256 {got}, expected {expected}): remove it and build again, or find out who changed it", archive.display());
+    }
 }
 
 /// Reads every language's `heyo.po` into the table `src/i18n.rs` finds a

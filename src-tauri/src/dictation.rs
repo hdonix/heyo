@@ -1,11 +1,12 @@
 //! Voice dictation: speak, and the text goes into the focused window.
 //!
-//! The listening happens in a Node helper (`runtime/src/dictation.ts`)
-//! that records the microphone and recognizes speech locally. This module
-//! starts and stops it (`heyo --dictate` toggles), writes what it heard the
-//! user's way (`vocabulary`), shows the progress window, optionally has the
-//! transcript polished by the model the settings name (`polish`), and
-//! writes what is heard into the application the user is working in.
+//! A recording (`listening`) records the microphone (`microphone`) and
+//! has a recognizer hear it (`engine`: SenseVoice on this computer, from
+//! files downloaded on demand, `models`). This module starts and stops it
+//! (`heyo --dictate` toggles), writes what it heard the user's way
+//! (`vocabulary`), shows the progress window, optionally has the transcript
+//! polished by the model the settings name (`polish`), and writes what is
+//! heard into the application the user is working in.
 //!
 //! The words reach the application one of two ways ([`Way`]), chosen when
 //! the recording starts, before a word is heard:
@@ -24,19 +25,22 @@
 //! another input method, no field has the focus when it ends) goes on by
 //! pasting, from what the application holds by then. A thread per
 //! recording (`write`) carries all of it out, so that a slow application
-//! holds up neither the helper nor the window, and of the sentence in
+//! holds up neither the recognizer nor the window, and of the sentence in
 //! progress only the newest state is ever written: what was heard
 //! meanwhile is skipped.
 
 mod composed;
+mod engine;
+mod listening;
+mod microphone;
+mod models;
 mod onscreen;
 mod polish;
 mod vocabulary;
 
-use crate::i18n::{t, tf, translate};
+use crate::i18n::{t, translate};
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -45,7 +49,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::helper::{self, Helper};
+use crate::helper::InstallProgress;
 use crate::platform::composing::{self, Composing, Stir};
 use crate::platform::typed::{self, Lost, Writing};
 use crate::{pasting, SettingsState};
@@ -59,7 +63,8 @@ pub struct Dictation(Mutex<State>);
 
 #[derive(Default)]
 struct State {
-    helper: Option<Helper>,
+    /// The recording in progress, until it is told to end.
+    listening: Option<listening::Listening>,
     recording: bool,
     /// The hotkey that started the recording has not been released yet.
     holding: bool,
@@ -96,8 +101,8 @@ impl Words {
     }
 }
 
-/// What the helper says, with what it says went wrong in words: it says
-/// that as a code (`helper::worded`). The pill has room for the short
+/// What the recording says, with what it says went wrong in words: it
+/// says that as a code (`helper::worded`). The pill has room for the short
 /// words; the rest is for the log.
 fn said(event: Value) -> Value {
     if event["type"] != "error" {
@@ -108,7 +113,7 @@ fn said(event: Value) -> Value {
     json!({ "type": "error", "message": worded.short })
 }
 
-/// What the helper said it heard, with the user's words written their way.
+/// What the recording said it heard, with the user's words written their way.
 fn corrected(mut event: Value, corrector: &Corrector) -> Value {
     if matches!(event["type"].as_str(), Some("partial" | "segment" | "result")) {
         for field in ["text", "raw"] {
@@ -149,7 +154,7 @@ pub(crate) enum NotListening {
     Failed(String),
 }
 
-/// What an event from the helper tells the one listening, if anything.
+/// What an event of the recording tells the one listening, if anything.
 fn heard(event: &Value) -> Option<Heard> {
     let text = || event["text"].as_str().unwrap_or_default().to_owned();
     match event["type"].as_str().unwrap_or_default() {
@@ -166,21 +171,12 @@ pub fn dir() -> PathBuf {
     crate::paths::data().join("dictation")
 }
 
-/// Whether the speech engine and models have been downloaded.
+/// Whether the speech models have been downloaded.
 pub fn installed() -> bool {
-    let dir = dir();
-    ["node_modules/sherpa-onnx-node", "models/sense-voice/model.int8.onnx", "models/sense-voice/tokens.txt", "models/silero_vad.onnx"]
-        .iter()
-        .all(|file| dir.join(file).exists())
+    models::installed(&dir())
 }
 
-fn node_command(app: &AppHandle, args: &[&str]) -> Result<Command, String> {
-    let mut command = helper::node(app, "heyo-dictation.cjs", "HEYO_DICTATION")?;
-    command.args(args).env("HEYO_DICTATION_DIR", dir());
-    Ok(command)
-}
-
-/// What the dictation window is told of a recording: the helper's account
+/// What the dictation window is told of a recording: the recording's account
 /// of it, and the host's own of one starting or failing.
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -246,43 +242,11 @@ fn hide_window_after(app: &AppHandle, delay: Duration) {
     });
 }
 
-fn start_helper(app: &AppHandle) -> Result<Helper, String> {
-    let (receiver, ended) = (app.clone(), app.clone());
-    Helper::start(
-        node_command(app, &[])?,
-        move |event| handle(&receiver, said(event)),
-        move || {
-            // The helper exits when idle; the next recording starts a new one.
-            let state = ended.state::<Dictation>();
-            let mut state = state.0.lock().unwrap();
-            state.helper = None;
-            if !state.recording {
-                return;
-            }
-            let stopped = json!({ "type": "error", "message": t("Dictation stopped unexpectedly") });
-            // What the recording wrote is finished off by its own thread.
-            if let Some(writing) = state.writing.clone() {
-                return writing.post(Said::Ended(stopped));
-            }
-            state.recording = false;
-            let listener = state.listener.take();
-            drop(state);
-            if let Some(listener) = listener {
-                listener(Heard::Failed(t("Dictation stopped unexpectedly").into()));
-            }
-            emit(&ended, stopped);
-            hide_window_after(&ended, Duration::from_secs(3));
-        },
-    )
-    .map_err(|e| tf("failed to start dictation: {0}", &[&e]))
-}
-
-fn send(state: &mut State, message: &Value) -> Result<(), String> {
-    let helper = state.helper.as_mut().ok_or(t("dictation is not running"))?;
-    helper.send(message).map_err(|e| {
-        state.helper = None;
-        tf("dictation is not running: {0}", &[&e])
-    })
+/// Starts recording, in `language` from `source`: what is heard comes to
+/// `handle`.
+fn start(app: &AppHandle, language: &str, source: &str) -> Result<listening::Listening, String> {
+    let receiver = app.clone();
+    listening::listen(dir(), source, language, Arc::new(move |event| handle(&receiver, said(event))))
 }
 
 /// What the thread that writes is told, in the order it was heard.
@@ -291,11 +255,11 @@ enum Said {
     Partial(String),
     /// A finished sentence.
     Sentence(String),
-    /// The helper's last word on the recording: its result, or an error.
+    /// The recording's last word: its result, or an error.
     Ended(Value),
 }
 
-/// Between the helper, which says what it hears as it hears it, and the
+/// Between the recording, which says what it hears as it hears it, and the
 /// thread that writes, which may take longer over a piece than the next
 /// one takes to come.
 #[derive(Default)]
@@ -631,7 +595,7 @@ impl Writer {
         self.way.live()
     }
 
-    /// The helper's last word on the recording, as the window is to be
+    /// The recording's last word, as the window is to be
     /// told it: with what could not be done added.
     fn end(&mut self, mut event: Value) -> Value {
         if event["type"] != "result" {
@@ -745,7 +709,7 @@ fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool, se
     spawned.map(|_| ())
 }
 
-/// Handles one event from the helper.
+/// Handles one event of the recording.
 fn handle(app: &AppHandle, event: Value) {
     let (listener, words, polish) = {
         let state = app.state::<Dictation>();
@@ -892,7 +856,8 @@ pub fn finish(app: &AppHandle) {
         Some(_) => "off".to_owned(),
         None => app.state::<SettingsState>().0.read().unwrap().dictation_polish.clone(),
     };
-    if let Err(e) = send(&mut state, &json!({ "cmd": "stop" })) {
+    let stopped = state.listening.take().ok_or_else(|| t("dictation is not running").to_owned()).and_then(|listening| listening.stop());
+    if let Err(e) = stopped {
         eprintln!("heyo: {e}");
         // What the recording wrote is finished off by its own thread.
         if let Some(writing) = state.writing.clone() {
@@ -926,18 +891,13 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
         let settings = settings.0.read().unwrap();
         (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live)
     };
-    // Before the helper is told: one that is already running answers at
+    // Before the recording starts: a recognizer that is kept answers at
     // once, and the window must not hear that it is ready before it hears
     // that a recording begins.
     emit(app, json!({ "type": "start", "polish": polish }));
-    let started = (|| {
-        if state.helper.is_none() {
-            state.helper = Some(start_helper(app)?);
-        }
-        send(&mut state, &json!({ "cmd": "start", "language": language, "source": source }))
-    })();
-    match started {
-        Ok(()) => {
+    match start(app, &language, &source) {
+        Ok(listening) => {
+            state.listening = Some(listening);
             // Kept for the whole recording, polishing included.
             state.words = Words::of(&vocabulary);
             state.polish = "off".into();
@@ -986,13 +946,7 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
         (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_vocabulary.clone())
     };
     let language = language.unwrap_or(set_language);
-    let started = (|| {
-        if state.helper.is_none() {
-            state.helper = Some(start_helper(app)?);
-        }
-        send(&mut state, &json!({ "cmd": "start", "language": language, "source": source }))
-    })();
-    started.map_err(NotListening::Failed)?;
+    state.listening = Some(start(app, &language, &source).map_err(NotListening::Failed)?);
     state.words = Words::of(&vocabulary);
     state.polish = "off".into();
     state.recording = true;
@@ -1050,39 +1004,15 @@ pub fn watch_hold_key(app: &AppHandle) {
 pub fn cancel(app: &AppHandle) {
     let state = app.state::<Dictation>();
     let mut state = state.0.lock().unwrap();
-    // Being polished: the helper is done with it, and the polishing stops.
+    // Being polished: the recording is over, and the polishing stops.
     if let Some(polishing) = state.polishing.take() {
         polishing.abort();
         drop(state);
         return ended(app, json!({ "type": "result", "text": "", "raw": "", "polished": false, "cancelled": true }));
     }
-    if state.recording {
-        let _ = send(&mut state, &json!({ "cmd": "cancel" }));
+    if let Some(listening) = state.listening.take().filter(|_| state.recording) {
+        listening.cancel();
     }
-}
-
-#[derive(Serialize, ts_rs::TS)]
-#[ts(export, export_to = "../../shared/bindings/")]
-pub struct Microphone {
-    name: String,
-    description: String,
-}
-
-/// Input devices known to PulseAudio/PipeWire, without output monitors.
-pub fn microphones() -> Vec<Microphone> {
-    let Ok(output) = Command::new("pactl").args(["-f", "json", "list", "sources"]).output() else { return Vec::new() };
-    let Ok(Value::Array(sources)) = serde_json::from_slice(&output.stdout) else { return Vec::new() };
-    sources
-        .iter()
-        .filter_map(|source| {
-            let name = source["name"].as_str()?;
-            let monitor = name.ends_with(".monitor") || source["monitor_source"].as_str().is_some_and(|m| !m.is_empty());
-            (!monitor).then(|| Microphone {
-                name: name.to_owned(),
-                description: source["description"].as_str().unwrap_or(name).to_owned(),
-            })
-        })
-        .collect()
 }
 
 /// Whether dictation can be used, for the settings page.
@@ -1091,29 +1021,40 @@ pub fn microphones() -> Vec<Microphone> {
 pub struct Status {
     installed: bool,
     installing: bool,
-    microphones: Vec<Microphone>,
+    microphones: Vec<microphone::Microphone>,
 }
 
 pub fn status(app: &AppHandle) -> Status {
     Status {
         installed: installed(),
         installing: app.state::<Dictation>().0.lock().unwrap().installing,
-        microphones: microphones(),
+        microphones: microphone::microphones(),
     }
 }
 
-/// Downloads the speech engine and models, reporting progress to the
-/// settings window as `heyo://dictation-install` events.
+/// Downloads the speech models, reporting progress to the settings window
+/// as `heyo://dictation-install` events.
 pub fn install(app: &AppHandle) -> Result<(), String> {
     if std::mem::replace(&mut app.state::<Dictation>().0.lock().unwrap().installing, true) {
         return Ok(());
     }
     let window = app.clone();
-    helper::install(node_command(app, &["install"]), move |progress| {
-        if progress.concludes() {
-            window.state::<Dictation>().0.lock().unwrap().installing = false;
+    tauri::async_runtime::spawn(async move {
+        let report = |message: Value| match InstallProgress::of(message) {
+            Ok(progress) => drop(window.emit(crate::wire::event::DICTATION_INSTALL, progress)),
+            Err(e) => eprintln!("heyo: dictation: not the progress of an installation: {e}"),
+        };
+        let progress = |step: &str, received: u64, total: u64| report(json!({ "type": "progress", "step": step, "received": received, "total": total }));
+        let done = models::install(&dir(), &progress).await;
+        window.state::<Dictation>().0.lock().unwrap().installing = false;
+        match done {
+            Ok(()) => report(json!({ "type": "installed" })),
+            Err(failure) => {
+                let mut said = failure.said();
+                said["type"] = "error".into();
+                report(said)
+            }
         }
-        let _ = window.emit(crate::wire::event::DICTATION_INSTALL, progress);
     });
     Ok(())
 }
@@ -1136,7 +1077,7 @@ mod tests {
         Writer::new(None, Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()]))))
     }
 
-    /// What the helper said, line by line: `~text` is the sentence in
+    /// What the recording said, line by line: `~text` is the sentence in
     /// progress, anything else a finished one.
     fn hear(writer: &mut Writer, said: &[&str]) {
         for line in said {
@@ -1175,13 +1116,13 @@ mod tests {
     }
 
     #[test]
-    fn what_the_helper_heard_is_written_the_users_way_in_progress_and_finished() {
+    fn what_was_heard_is_written_the_users_way_in_progress_and_finished() {
         let words = Words::of(&["Heyo".into(), "jason -> JSON".into()]);
         let fix = |event: Value| corrected(event, &words.corrector);
         assert_eq!(fix(json!({ "type": "partial", "text": " open heyo" })), json!({ "type": "partial", "text": " open Heyo" }));
         assert_eq!(fix(json!({ "type": "segment", "text": " Send the jason." })), json!({ "type": "segment", "text": " Send the JSON." }));
         assert_eq!(fix(json!({ "type": "result", "text": "open heyo", "raw": "open heyo" })), json!({ "type": "result", "text": "open Heyo", "raw": "open Heyo" }));
-        // Nothing else the helper says has words in it.
+        // Nothing else a recording says has words in it.
         assert_eq!(fix(json!({ "type": "error", "message": "heyo failed" })), json!({ "type": "error", "message": "heyo failed" }));
     }
 
@@ -1297,7 +1238,7 @@ mod tests {
         desktop.during(|| {
             let mut writer = composer(desktop, pasting, true, false);
             hear(&mut writer, &["One.", "~ Two th"]);
-            let error = json!({ "type": "error", "message": "Dictation stopped unexpectedly" });
+            let error = json!({ "type": "error", "message": "the sound server stopped the recording" });
             assert_eq!(writer.end(error.clone()), error);
             assert_eq!((desktop.field().as_str(), desktop.composing.lock().unwrap().as_str()), ("One. Two th", ""));
         });
@@ -1680,7 +1621,7 @@ mod tests {
             let mut writer = writer(pasting, true, false);
             hear(&mut writer, &["~Hello"]);
             asked(desktop);
-            let error = json!({ "type": "error", "message": "Dictation stopped unexpectedly" });
+            let error = json!({ "type": "error", "message": "the sound server stopped the recording" });
             assert_eq!(writer.end(error.clone()), error);
             assert_eq!(asked(desktop), Vec::<String>::new());
             assert_eq!(desktop.field(), "Hello");
@@ -1718,19 +1659,19 @@ mod tests {
         assert!(!listening(&state, 4));
     }
 
-    /// Everything `runtime/src/dictation.ts` writes while recording, and what
-    /// the host says itself, is something the window is told.
     #[test]
-    fn what_the_helper_says_went_wrong_is_worded_by_the_host_to_fit_the_pill() {
+    fn what_went_wrong_is_worded_to_fit_the_pill() {
         assert_eq!(said(json!({ "type": "error", "code": "no-recorder" })), json!({ "type": "error", "message": "No audio recorder" }));
         // A failure it has no code for: the words of what failed are for the log.
-        assert_eq!(said(json!({ "type": "error", "code": "failed", "detail": "Cannot find module 'sherpa-onnx-node'" })), json!({ "type": "error", "message": "Dictation failed" }));
+        assert_eq!(said(json!({ "type": "error", "code": "failed", "detail": "the speech model could not be loaded" })), json!({ "type": "error", "message": "Dictation failed" }));
         // What it heard is passed on as it is.
         assert_eq!(said(json!({ "type": "segment", "text": "Hello." })), json!({ "type": "segment", "text": "Hello." }));
     }
 
+    /// Everything a recording says (`listening`), and what the host says
+    /// itself, is something the window is told.
     #[test]
-    fn the_window_is_told_what_the_helper_and_the_host_say() {
+    fn the_window_is_told_what_the_recording_and_the_host_say() {
         let told = |event: Value| serde_json::from_value::<Told>(event);
         for event in [
             json!({ "type": "start", "polish": "off" }),

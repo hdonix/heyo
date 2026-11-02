@@ -1,11 +1,12 @@
-//! Node.js helper processes: the extension runtime, dictation and text
-//! recognition (`runtime/` in the repo). Each speaks JSON, one message a
+//! Node.js helper processes: the extension runtime, text recognition and
+//! embeddings (`runtime/` in the repo). Each speaks JSON, one message a
 //! line, over its stdin and stdout; what it writes to stderr joins Heyo's.
 //!
 //! This is the one place that finds the scripts, starts them, frames their
 //! messages and notices them ending; and that words what they have to say
 //! to the user, which they say as codes (`worded`, `step`): they run
-//! without Heyo's translations.
+//! without Heyo's translations. Dictation, which runs in the host, says
+//! what went wrong the same way, and is worded here too.
 
 use crate::i18n::{t, tf};
 use std::fs::File;
@@ -200,7 +201,9 @@ impl Worded {
 pub fn worded(said: &Value, otherwise: &str) -> Worded {
     let detail = said["detail"].as_str().filter(|detail| !detail.is_empty()).map(str::to_owned);
     match said["code"].as_str().unwrap_or_default() {
-        "no-recorder" => Worded { short: t("No audio recorder").into(), detail: Some(t("Install pulseaudio-utils or alsa-utils.").into()) },
+        // Linux, where neither a sound server answered nor `arecord` was there.
+        "no-recorder" => Worded { short: t("No audio recorder").into(), detail: Some(t("Start PipeWire or PulseAudio, or install alsa-utils.").into()) },
+        "no-microphone" => Worded { short: t("No microphone").into(), detail },
         "download" => Worded { short: tf("Could not download: {0}", &[&step(said["step"].as_str().unwrap_or_default())]), detail },
         "packages" => Worded { short: t("Could not install the engine").into(), detail },
         _ => Worded { short: otherwise.into(), detail },
@@ -211,7 +214,6 @@ pub fn worded(said: &Value, otherwise: &str) -> Worded {
 /// language.
 pub fn step(code: &str) -> String {
     match code {
-        "speech-engine" => t("Speech engine").into(),
         "speech-model" => t("Speech model").into(),
         "voice-detector" => t("Voice detector").into(),
         "vocabulary" => t("Vocabulary").into(),
@@ -252,7 +254,7 @@ impl InstallProgress {
 
     /// What an installer wrote, worded for the settings window: its step
     /// named, and what went wrong said (`worded`).
-    fn of(message: Value) -> Result<InstallProgress, serde_json::Error> {
+    pub(crate) fn of(message: Value) -> Result<InstallProgress, serde_json::Error> {
         if message["type"] == "error" {
             return Ok(InstallProgress::Error { message: worded(&message, t("The download failed")).full() });
         }
@@ -376,7 +378,7 @@ mod tests {
     fn built_scripts_carry_this_version() {
         let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         let version = config["version"].as_str().unwrap();
-        for file in ["heyo-runtime.cjs", "heyo-dictation.cjs", "heyo-ocr.cjs", "heyo-dev.cjs", "heyo-embed.cjs"] {
+        for file in ["heyo-runtime.cjs", "heyo-ocr.cjs", "heyo-dev.cjs", "heyo-embed.cjs"] {
             let script = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../runtime/dist")).join(file);
             if script.exists() {
                 assert_eq!(check(&script, version), Ok(()), "{file}: run pnpm build:runtime");
@@ -387,13 +389,14 @@ mod tests {
     #[test]
     fn what_a_helper_says_went_wrong_is_worded_here() {
         let worded = |said: Value| worded(&said, "Dictation failed");
-        assert_eq!(worded(json!({ "code": "no-recorder" })), Worded { short: "No audio recorder".into(), detail: Some("Install pulseaudio-utils or alsa-utils.".into()) });
+        assert_eq!(worded(json!({ "code": "no-recorder" })), Worded { short: "No audio recorder".into(), detail: Some("Start PipeWire or PulseAudio, or install alsa-utils.".into()) });
+        assert_eq!(worded(json!({ "code": "no-microphone" })).full(), "No microphone");
         assert_eq!(worded(json!({ "code": "download", "step": "speech-model", "detail": "500 Nope" })).full(), "Could not download: Speech model: 500 Nope");
         assert_eq!(worded(json!({ "code": "packages", "detail": "npm ERR! code E404" })).full(), "Could not install the engine: npm ERR! code E404");
         assert_eq!(worded(json!({ "code": "failed", "detail": "ENOSPC" })), Worded { short: "Dictation failed".into(), detail: Some("ENOSPC".into()) });
         assert_eq!(worded(json!({ "code": "failed" })).full(), "Dictation failed");
-        // Every step an installer names has a name here (runtime/src: dictation.ts, embed.ts, ocr.ts).
-        for code in ["speech-engine", "speech-model", "voice-detector", "vocabulary", "embedding-engine", "language-model", "ocr-engine"] {
+        // Every step an installer names has a name here (src-tauri/src/dictation/models.rs; runtime/src: embed.ts, ocr.ts).
+        for code in ["speech-model", "voice-detector", "vocabulary", "embedding-engine", "language-model", "ocr-engine"] {
             assert_ne!(super::step(code), code);
         }
     }

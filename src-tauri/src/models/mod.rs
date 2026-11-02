@@ -221,7 +221,7 @@ pub fn provider(settings: &Settings) -> AiProvider {
 
 /// An HTTP client for one question. Not kept: a connection belongs to the
 /// async runtime it was opened on, and questions are asked from more than one.
-fn client(direct: bool) -> reqwest::Client {
+pub(crate) fn client(direct: bool) -> reqwest::Client {
     static TLS: std::sync::Once = std::sync::Once::new();
     // TLS through rustls, with ring for its cryptography (another crate
     // may have chosen first, which is as good).

@@ -111,6 +111,15 @@ msgstr ""
 msgid "part of it had become the application's text as it was heard"
 msgstr ""
 
+#: src-tauri/src/dictation/listening.rs
+#: src-tauri/src/dictation.rs
+msgid "dictation is not running"
+msgstr ""
+
+#: src-tauri/src/dictation/listening.rs
+msgid "failed to start dictation: {0}"
+msgstr ""
+
 #: src-tauri/src/dictation/onscreen.rs
 msgid "there is too much text to replace where it stands"
 msgstr ""
@@ -121,22 +130,6 @@ msgstr ""
 
 #: src-tauri/src/dictation.rs
 msgid "Dictation failed"
-msgstr ""
-
-#: src-tauri/src/dictation.rs
-msgid "Dictation stopped unexpectedly"
-msgstr ""
-
-#: src-tauri/src/dictation.rs
-msgid "failed to start dictation: {0}"
-msgstr ""
-
-#: src-tauri/src/dictation.rs
-msgid "dictation is not running"
-msgstr ""
-
-#: src-tauri/src/dictation.rs
-msgid "dictation is not running: {0}"
 msgstr ""
 
 #: src-tauri/src/dictation.rs
@@ -614,7 +607,11 @@ msgid "No audio recorder"
 msgstr ""
 
 #: src-tauri/src/helper.rs
-msgid "Install pulseaudio-utils or alsa-utils."
+msgid "Start PipeWire or PulseAudio, or install alsa-utils."
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "No microphone"
 msgstr ""
 
 #: src-tauri/src/helper.rs
@@ -623,10 +620,6 @@ msgstr ""
 
 #: src-tauri/src/helper.rs
 msgid "Could not install the engine"
-msgstr ""
-
-#: src-tauri/src/helper.rs
-msgid "Speech engine"
 msgstr ""
 
 #: src-tauri/src/helper.rs
