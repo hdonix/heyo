@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn dictations_answers_are_read_by_their_own_names() {
         assert_eq!(shape::<DictationStatus>(), shape::<crate::dictation::Status>());
-        assert_eq!(shape::<SpeechModel>(), shape::<crate::dictation::ModelState>());
+        assert_eq!(shape::<SpeechModel>(), shape::<crate::dictation::models::downloads::ModelState>());
     }
 
     /// Every answer reaches the macOS window as it left the host.

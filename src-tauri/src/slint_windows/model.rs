@@ -19,7 +19,7 @@ use super::host::Command;
 use super::ids::{Bound, Id, PageId};
 use super::keys;
 use super::pages::{self, Known, Page, Reaction, To};
-use crate::i18n::{marked, t};
+use crate::i18n::t;
 
 /// The languages dictation can be told to hear.
 pub(crate) use crate::dictation::LANGUAGES as DICTATION_LANGUAGES;

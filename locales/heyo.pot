@@ -109,7 +109,7 @@ msgstr ""
 
 #: src-tauri/src/confirm.rs
 #: src-tauri/src/permissions.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
 #: src/RootSearch.tsx
@@ -298,14 +298,15 @@ msgid "Capturing the screen"
 msgstr ""
 
 #: src-tauri/src/ext/answer.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
 msgid "Dictation"
 msgstr ""
 
 #: src-tauri/src/ext/answer.rs
 #: src-tauri/src/platform/desktop.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Pasting"
 msgstr ""
 
@@ -396,7 +397,7 @@ msgid "uninstall, preferences, plugins"
 msgstr ""
 
 #: src-tauri/src/extensions.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/extensions.rs
 #: runtime/src/builtins/clipboard.tsx
 msgid "Clipboard History"
 msgstr ""
@@ -782,7 +783,7 @@ msgid "Voice detector"
 msgstr ""
 
 #: src-tauri/src/helper.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
 msgid "Vocabulary"
 msgstr ""
 
@@ -965,7 +966,8 @@ msgstr ""
 
 #: src-tauri/src/models/kinds/claude_code.rs
 #: src-tauri/src/models/kinds/openai.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/about.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Checking…"
 msgstr ""
 
@@ -1063,7 +1065,7 @@ msgstr ""
 
 #: src-tauri/src/models/kinds/local_speech.rs
 #: src-tauri/src/models/kinds/mod.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Default"
 msgstr ""
 
@@ -1121,12 +1123,12 @@ msgid "Connected: {0}."
 msgstr ""
 
 #: src-tauri/src/models/kinds/mod.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Not reachable"
 msgstr ""
 
 #: src-tauri/src/models/kinds/mod.rs
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Not reachable: {0}."
 msgstr ""
 
@@ -1659,6 +1661,7 @@ msgstr ""
 
 #: src-tauri/src/root.rs
 #: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/screenshots.rs
 msgid "Capture Screenshot"
 msgstr ""
 
@@ -1672,6 +1675,7 @@ msgstr ""
 
 #: src-tauri/src/root.rs
 #: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/screenshots.rs
 msgid "Capture Text from Screen"
 msgstr ""
 
@@ -1836,524 +1840,696 @@ msgid "what draws it failed; Heyo's log has the details"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "General"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Shortcuts"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Screenshots"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Models"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Advanced"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "About"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Off"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "The text is left as it was recognized."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Clean Up"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "When you finish, the model removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Translate to English"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "When you finish, the model cleans up what you said and pastes it in English."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "1 Day"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "7 Days"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "1 Month"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "3 Months"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "6 Months"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "1 Year"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Automatic"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "GPU, shared memory"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "GPU, DMA-BUF (WebKit's default)"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Hotkey Set"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Alias Set"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/ui/settings.slint
-msgid "Enabled"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Disabled"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "All categories"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Applications"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Extensions"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Give an application a hotkey to launch it from anywhere."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Heyo Commands"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Settings"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-#: src/raycast/CommandView.tsx
-msgid "Search…"
+#: src-tauri/src/slint_windows/pages/about.rs
+msgid "About"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Search applications…"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Modifications"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Categories"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Install"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This version of Heyo comes with a newer extension than the one installed. Update it, then log out and back in. An extension that is already running keeps working until then, without what the new one adds."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/about.rs
 #: runtime/src/builtins/store.tsx
-msgid "Update"
+msgid "Check for Updates"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "In place. Log out and back in to finish: GNOME loads a new or updated extension only when a session starts."
+#: src-tauri/src/slint_windows/pages/about.rs
+msgid "Heyo Is Up to Date"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "GNOME Shell Extension"
+#: src-tauri/src/slint_windows/pages/about.rs
+msgid "Install Heyo {0} and Restart"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Wayland"
+#: src-tauri/src/slint_windows/pages/about.rs
+msgid "Installing…"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Heyo Hotkey"
+#: src-tauri/src/slint_windows/pages/about.rs
+msgid "A command palette launcher for Linux that runs Raycast extensions."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Open at Login"
+#: src-tauri/src/slint_windows/pages/about.rs
+msgid "For a bug report: versions, the desktop session and the end of Heyo's log, with keys and tokens removed. Read it before you share it."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Bind a desktop keyboard shortcut to heyo."
+#: src-tauri/src/slint_windows/pages/advanced.rs
+msgid "Automatic"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "System"
+#: src-tauri/src/slint_windows/pages/advanced.rs
+msgid "GPU, shared memory"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Appearance"
+#: src-tauri/src/slint_windows/pages/advanced.rs
+msgid "GPU, DMA-BUF (WebKit's default)"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Theme"
+#: src-tauri/src/slint_windows/pages/advanced.rs
+msgid "Advanced"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Light, dark, or whichever the system is using"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Light"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Dark"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Language"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "What Heyo itself says. Extensions speak their own."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Window"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Compact Mode"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Show only the search field until you type"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Hide When Focus Is Lost"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Close the window when you click elsewhere"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Keep the Running Command"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Reopening Heyo returns to the command you were using instead of the root search"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Live Activities"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Show What Is in Progress"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Nothing matches."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Your words go into the window as you speak, through the input method: the sentence you are speaking is shown there as text being composed, and becomes the window's text when it is finished. Your own input method (Pinyin, say) is set aside while you dictate and comes back when you finish. {} When this is off, nothing is shown before a sentence is finished."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A window that takes no input method gets the words by pasting, corrected where they stand until you press a key or click."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A window that takes no input method gets each sentence pasted when it is finished."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Your words go into the window as they are recognized, and are corrected there when a later word changes an earlier one. Heyo only ever erases what it wrote itself: once you press a key or click while dictating, it stops correcting and adds each finished sentence where the cursor is. In terminals, password managers and the applications excluded from snippet expansion, and when this is off, each sentence is pasted when it is finished."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not available on Wayland, where Heyo cannot tell whether you typed in between, and so must not erase anything. Each sentence is pasted when it is finished."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not available in this desktop session. Each sentence is pasted when it is finished."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Speech Recognition"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Models on this computer keep your audio here; a service is sent it. Download speech models in Models."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/ui/settings.slint
-msgid "Hotkey"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Tap to start and tap again to finish, or hold it while you speak"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Bind a desktop keyboard shortcut to heyo --dictate."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Hold-to-Talk Key"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A single key cannot be watched in this desktop session; use the hotkey instead."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A single key to hold while you speak. It keeps working as usual in shortcuts."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Hold it and speak; let go to finish. A quick tap, or using it in a shortcut, does nothing."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/ui/widgets.slint
-msgid "None"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Type as You Speak"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/system.tsx
-msgid "Input"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Microphone"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "No microphone found. Connect one to use dictation."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "System Default"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Automatic detection handles mixed Chinese and English"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Your Words"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Names, jargon and product names, one to a line, written the way you want them: “type script” then comes out as TypeScript. For a word that is heard as something else, write heard as -> written as. The recognizer cannot be taught new words, so these are put right in its text; a Chinese name heard as other characters of the same sound is only fixed if you list those characters as “heard as”. Polishing with AI is given the list too."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Mode"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Model"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Polish with AI"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Drag to select part of the screen, or click a window to select exactly that. Mark it up with rectangles, arrows or the pen, then copy it, save it to Pictures/Screenshots, pin it on top of other windows, or copy the text in it."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Hotkeys"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Enter copies, Ctrl+S saves, Esc cancels"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Drag over text and it is copied"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Recognition Engine"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "PaddleOCR is installed. Chinese and English; images never leave this computer."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A one-time download of about 340 MB (PaddleOCR, Chinese and English)."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Text Recognition"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/store.tsx
-msgid "Installed"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Download"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Using {0}."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Extensions"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Node.js"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "HEYO_NODE overrides this setting."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Extensions need Node.js 22 or newer."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Extensions Folder"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 #: src/rows.ts
 #: runtime/src/api/components.ts
 msgid "Open"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Rendering"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Renderer"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Model"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Answers Ask AI, AI Chat, Selected Text Actions and extensions."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Clipboard Search Cases"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "None"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Ask Before Pasting Several Lines into a Terminal"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 #: src/calculator.ts
 msgid "Data"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Settings File"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Off"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "The text is left as it was recognized."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Clean Up"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "When you finish, the model removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Translate to English"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "When you finish, the model cleans up what you said and pastes it in English."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Your words go into the window as you speak, through the input method: the sentence you are speaking is shown there as text being composed, and becomes the window's text when it is finished. Your own input method (Pinyin, say) is set aside while you dictate and comes back when you finish. {} When this is off, nothing is shown before a sentence is finished."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "A window that takes no input method gets the words by pasting, corrected where they stand until you press a key or click."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "A window that takes no input method gets each sentence pasted when it is finished."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Your words go into the window as they are recognized, and are corrected there when a later word changes an earlier one. Heyo only ever erases what it wrote itself: once you press a key or click while dictating, it stops correcting and adds each finished sentence where the cursor is. In terminals, password managers and the applications excluded from snippet expansion, and when this is off, each sentence is pasted when it is finished."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Not available on Wayland, where Heyo cannot tell whether you typed in between, and so must not erase anything. Each sentence is pasted when it is finished."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Not available in this desktop session. Each sentence is pasted when it is finished."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Speech Recognition"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Models on this computer keep your audio here; a service is sent it. Download speech models in Models."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Hotkey"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Tap to start and tap again to finish, or hold it while you speak"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Bind a desktop keyboard shortcut to heyo --dictate."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Hold-to-Talk Key"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "A single key cannot be watched in this desktop session; use the hotkey instead."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "A single key to hold while you speak. It keeps working as usual in shortcuts."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Hold it and speak; let go to finish. A quick tap, or using it in a shortcut, does nothing."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Type as You Speak"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: runtime/src/builtins/system.tsx
+msgid "Input"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Microphone"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "No microphone found. Connect one to use dictation."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "System Default"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Language"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Automatic detection handles mixed Chinese and English"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Your Words"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Names, jargon and product names, one to a line, written the way you want them: “type script” then comes out as TypeScript. For a word that is heard as something else, write heard as -> written as. The recognizer cannot be taught new words, so these are put right in its text; a Chinese name heard as other characters of the same sound is only fixed if you list those characters as “heard as”. Polishing with AI is given the list too."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Mode"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/dictation.rs
+msgid "Polish with AI"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "1 Day"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "7 Days"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "1 Month"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "3 Months"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "6 Months"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "1 Year"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Applications"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Give an application a hotkey to launch it from anywhere."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Heyo Commands"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src/raycast/FormView.tsx
+#: runtime/src/builtins/store.tsx
+msgid "Remove"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Opens Clipboard History from anywhere"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Record Clipboard History"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Copies marked as secret by password managers are never recorded"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: runtime/src/builtins/clipboard.tsx
+msgid "Pause Recording"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Keep History For"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Pinned entries are kept forever"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Clear History"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Pinned entries are not deleted"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Clear…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Click Again to Clear"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "A one-time download of about 135 MB, or 250 MB if text recognition is not installed. It takes about 350 MB of memory while you search, and none a few minutes after."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "It is not working at present: {0}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Reading the history: {0} entry to go; until then some are found by their words only."
+msgid_plural "Reading the history: {0} entries to go; until then some are found by their words only."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "{0} entry can be found this way."
+msgid_plural "{0} entries can be found this way."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Find by Meaning"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Download"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Not installed"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Never Record Copies From"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Add Application…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Ignored Applications"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Expand Snippets as You Type"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Typing a snippet's keyword in any application replaces it with the snippet's text. While this is on, Heyo watches what you type to find the keywords; none of it is stored. “Pause or Resume Snippet Expansion” in the root search switches it too."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Not available on Wayland, where an application cannot see what is typed in another. Snippets can still be pasted from the root search."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Not available in this desktop session. Snippets can still be pasted from the root search."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Never Expand In"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Snippet Expansion"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "In development from {0}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "by {0}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Built into Heyo"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Preferences"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: runtime/src/builtins/system.tsx
+msgid "No matches"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Commands"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "{} Preferences"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Declared; turn it off here"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Live activities are off in General"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Allowed by you"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Asks you the first time it is used"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Needs no asking"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Revoke"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Permissions"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Permissions are about what Heyo hands over or does for an extension. They do not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: runtime/src/builtins/store.tsx
+msgid "Stop Developing"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Uninstall Extension"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Takes it out of Heyo; its sources are not touched"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Its preferences are kept"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: runtime/src/builtins/store.tsx
+msgid "Uninstall"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Click Again to Remove"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Click Again to Uninstall"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/extensions.rs
+msgid "Search applications…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "General"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "On Wayland, switching and arranging windows, pasting, clipboard history, screenshots and the hold-to-talk key go through a small GNOME Shell extension that only Heyo can use."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Install"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "This version of Heyo comes with a newer extension than the one installed. Update it, then log out and back in. An extension that is already running keeps working until then, without what the new one adds."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+#: runtime/src/builtins/store.tsx
+msgid "Update"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "In place. Log out and back in to finish: GNOME loads a new or updated extension only when a session starts."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "GNOME Shell Extension"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Wayland"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Heyo Hotkey"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Open at Login"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Bind a desktop keyboard shortcut to heyo."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "System"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Appearance"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Theme"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Light, dark, or whichever the system is using"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Light"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Dark"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "What Heyo itself says. Extensions speak their own."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Window"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Compact Mode"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Show only the search field until you type"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Hide When Focus Is Lost"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Close the window when you click elsewhere"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Keep the Running Command"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Reopening Heyo returns to the command you were using instead of the root search"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Live Activities"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Show What Is in Progress"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/general.rs
+msgid "Timers, downloads and what extensions report as under way, at the top of the root search, with a notification when one ends or needs you"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "{0} is not downloaded yet. Download it in Models."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Providers"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Connect Claude, servers such as Ollama, Claude Code, Codex and speech services, and download speech models."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Open Models"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Providers run the models Heyo's features use. Add one, then choose its models where each feature is set up: AI in Advanced, speech recognition and polishing in Dictation."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Add Provider…"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Several of one kind can be added, two servers for instance."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Models"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Add Provider"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Choose what to connect."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 #: src-tauri/src/slint_windows/ui/settings.slint
 #: runtime/src/api/quicklook.tsx
 #: runtime/src/builtins/library.tsx
@@ -2361,343 +2537,183 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Typed — type again to replace it"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Saved — type a new key to replace it"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-#: src/raycast/FormView.tsx
-#: runtime/src/builtins/store.tsx
-msgid "Remove"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "New {0}"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Add This Provider"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Its models can then be chosen where each feature is set up. It can be changed or removed here later."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Add"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "AI"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Polish"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Clipboard Search"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Used for {0}"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Status"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Check Connection"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Connection Failed"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Connection Works"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "What It Can Do"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Remove Provider"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "What uses its models says so until another is chosen."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Remove…"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Click Again to Remove"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "{0} MB"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "{0} · {1}. {2}"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "In Use"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Delete…"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Click Again to Delete"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Use"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Screenshots"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Drag to select part of the screen, or click a window to select exactly that. Mark it up with rectangles, arrows or the pen, then copy it, save it to Pictures/Screenshots, pin it on top of other windows, or copy the text in it."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Hotkeys"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Enter copies, Ctrl+S saves, Esc cancels"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Drag over text and it is copied"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Recognition Engine"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "PaddleOCR is installed. Chinese and English; images never leave this computer."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "A one-time download of about 340 MB (PaddleOCR, Chinese and English)."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
+msgid "Text Recognition"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/screenshots.rs
 #: runtime/src/builtins/store.tsx
-msgid "Check for Updates"
+msgid "Installed"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Heyo Is Up to Date"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Hotkey Set"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Install Heyo {0} and Restart"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Alias Set"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Installing…"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+msgid "Enabled"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "A command palette launcher for Linux that runs Raycast extensions."
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Disabled"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "For a bug report: versions, the desktop session and the end of Heyo's log, with keys and tokens removed. Read it before you share it."
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "All categories"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Opens Clipboard History from anywhere"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Shortcuts"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Record Clipboard History"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Nothing matches."
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Copies marked as secret by password managers are never recorded"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Modifications"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/clipboard.tsx
-msgid "Pause Recording"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+msgid "Categories"
 msgstr ""
 
-#: src-tauri/src/slint_windows/model.rs
-msgid "Nothing you copy is recorded while this is on. “Pause or Resume Clipboard History” in the root search does the same, and can have a hotkey."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Keep History For"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Pinned entries are kept forever"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Clear History"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Pinned entries are not deleted"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Clear…"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Click Again to Clear"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A one-time download of about 135 MB, or 250 MB if text recognition is not installed. It takes about 350 MB of memory while you search, and none a few minutes after."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "It is not working at present: {0}"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Reading the history: {0} entry to go; until then some are found by their words only."
-msgid_plural "Reading the history: {0} entries to go; until then some are found by their words only."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "{0} entry can be found this way."
-msgid_plural "{0} entries can be found this way."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Find by Meaning"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "“服务器登录命令” or “server login command” finds an ssh line: entries are found by what they are about as well as by their words, in Chinese and English alike. A language model on this computer reads what you copy; nothing is sent anywhere."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not installed"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Never Record Copies From"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "What you copy while a window of one of these applications is in front stays out of the history. Password managers are always left out."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Add Application…"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Ignored Applications"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Expand Snippets as You Type"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Typing a snippet's keyword in any application replaces it with the snippet's text. While this is on, Heyo watches what you type to find the keywords; none of it is stored. “Pause or Resume Snippet Expansion” in the root search switches it too."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not available on Wayland, where an application cannot see what is typed in another. Snippets can still be pasted from the root search."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not available in this desktop session. Snippets can still be pasted from the root search."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Never Expand In"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Password managers are always left out. A password field in any other application cannot be told from an ordinary one. Nothing expands while an input method (Chinese, Japanese, …) is in use."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Snippet Expansion"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "In development from {0}"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "by {0}"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Built into Heyo"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Preferences"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/system.tsx
-msgid "No matches"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Commands"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "{} Preferences"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Declared; turn it off here"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Live activities are off in General"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Allowed by you"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Asks you the first time it is used"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Needs no asking"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Revoke"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Permissions"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Permissions are about what Heyo hands over or does for an extension. They do not confine it: an extension is a program on this computer, and can read your files and start other programs by itself."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/store.tsx
-msgid "Stop Developing"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Uninstall Extension"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Takes it out of Heyo; its sources are not touched"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Its preferences are kept"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/store.tsx
-msgid "Uninstall"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Click Again to Uninstall"
+#: src-tauri/src/slint_windows/pages/shortcuts.rs
+#: src/raycast/CommandView.tsx
+msgid "Search…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pill/model.rs
