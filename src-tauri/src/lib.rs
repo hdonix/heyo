@@ -2,6 +2,7 @@ mod ai;
 mod apps;
 mod cli;
 mod clipboard;
+mod connections;
 mod commands;
 mod dictation;
 mod extensions;
