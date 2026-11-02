@@ -5,6 +5,7 @@
 
 import type { ConnectorErrorKind } from "../../../shared/bindings/ConnectorErrorKind";
 import type { ConnectionItem } from "../../../shared/bindings/ConnectionItem";
+import type { ConnectorTool } from "../../../shared/bindings/ConnectorTool";
 
 /// One thing a connector brings: a mail, an event, a message, a document,
 /// a task.
@@ -30,10 +31,16 @@ export interface SyncIo {
   remove(ids: string[]): Promise<void>;
   /// How far it is, from 0 to 1, and what it is doing.
   progress(fraction: number, text?: string): void;
+  /// The tools the service offers (an MCP server's), all of them: the
+  /// settings list them with the account. Heyo does not call them.
+  tools(tools: Tool[]): void;
   /// Aborted when Heyo stops the sync: the account was edited or removed,
   /// or it took too long.
   signal: AbortSignal;
 }
+
+/// A tool a service offers.
+export type Tool = ConnectorTool;
 
 export interface WatchIo {
   /// Something changed: Heyo syncs the account (at most once a minute).

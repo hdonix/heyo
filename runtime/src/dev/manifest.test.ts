@@ -126,6 +126,7 @@ describe("a manifest", () => {
     expect(wrong({ fields, presets: [{ title: "Leak", values: { password: "pw" } }] })[0]).toContain('sets the secret "password"');
     expect(wrong({ fields, presets: [{ title: "Odd", values: { colour: "red" } }] })[0]).toContain("not a field");
     expect(wrong({ fields, presets: [{ title: "Web", values: {}, web: "mail.example.com" }] })[0]).toContain("not an http(s) address");
+    expect(wrong({ fields, presets: [{ title: "Noted", values: {}, description: 3 }] })[0]).toContain('"description" that is not text');
     expect(wrong({ sync: { every: "often" } })[0]).toContain("15m");
     expect(wrong({ sync: { watch: "yes" } })[0]).toContain("true or false");
   });

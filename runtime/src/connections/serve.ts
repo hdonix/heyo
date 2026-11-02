@@ -16,7 +16,8 @@ import type { ConnectorCall } from "../../../shared/bindings/ConnectorCall";
 import type { ConnectorCommand } from "../../../shared/bindings/ConnectorCommand";
 import type { ConnectorError as WireError } from "../../../shared/bindings/ConnectorError";
 import type { ConnectorRequest } from "../../../shared/bindings/ConnectorRequest";
-import { ConnectorError, type Account, type Connector, type Item } from "../heyo/connector";
+import { speak } from "../../../shared/i18n";
+import { ConnectorError, type Account, type Connector, type Item, type Tool } from "../heyo/connector";
 import type { Transport } from "../transport";
 
 /// The most items one `host.items.put` carries (`ITEMS_AT_ONCE` in wire.rs).
@@ -112,6 +113,9 @@ export function serve(host: Transport, load: Loader): Promise<void> {
       progress: (fraction: number, text?: string) => {
         if (!signal.aborted) tell({ method: "host.connector.progress", params: { account: given.id, fraction, ...(text === undefined ? {} : { text }) } });
       },
+      tools: (tools: Tool[]) => {
+        if (!signal.aborted) tell({ method: "host.connector.tools", params: { account: given.id, tools } });
+      },
       signal,
     };
     const next = await connector.sync(account(given), cursor, io);
@@ -148,6 +152,9 @@ export function serve(host: Transport, load: Loader): Promise<void> {
         }
         return reply(message.id, { result: null });
       }
+      case "connector.language":
+        speak(message.params.translations);
+        return reply(message.id, { result: null });
     }
   }
 

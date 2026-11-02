@@ -1062,7 +1062,7 @@ accounts have to be given:
 |---|---|
 | `items` | What it brings: `email`, `event`, `message`, `document`, `task`. |
 | `fields` | What an account is given, each `text`, `number`, `list` (of text), `choice` (of `choices`), `switch` or `secret`, with a `default` and `required` where wanted. A secret is kept apart from the settings, never shown again once saved, never sent to a window, and handed to the connector only when it asks for it. |
-| `presets` | Ways of filling the fields in for services the connector knows; never a secret. A preset's `web` is where the service is read in a browser: the root search offers to open it for an item of an account set up so. |
+| `presets` | Ways of filling the fields in for services the connector knows (`title`, `values`, and a `description` of what else to know, such as that the service wants an app password); never a secret. A preset's `web` is where the service is read in a browser: the root search offers to open it for an item of an account set up so. |
 | `sync` | `every`: how often an account is synced (15 minutes when left out; a minute at the least). `watch`: the connector has a `watch` that tells Heyo of changes as they happen. |
 
 The extension's manifest lists the `connector` permission. `heyo ext
@@ -1107,6 +1107,10 @@ export default imap;
   is written, so a sync that fails or is stopped is done again from the
   cursor before. A sync from no cursor brings everything: what it does not
   bring is dropped from the store when it finishes.
+- `tools(list)`, also given to `sync`, says which tools the service
+  offers (`{ name, title?, description? }`, as an MCP server lists them),
+  all of them each time: the settings show them with the account. Heyo
+  does not call them.
 - What a connector throws decides what comes next: a `ConnectorError` of
   kind `auth` waits for the user (the account is marked, and nothing is
   tried again until they edit it or ask for a sync); `unavailable`,

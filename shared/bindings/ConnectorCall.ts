@@ -4,4 +4,4 @@ import type { ConnectorAccount } from "./ConnectorAccount";
 /**
  * What the host asks the connections runtime.
  */
-export type ConnectorCall = { "method": "connector.check", "params": { account: ConnectorAccount, } } | { "method": "connector.sync", "params": { account: ConnectorAccount, cursor?: string, } } | { "method": "connector.watch", "params": { account: ConnectorAccount, } } | { "method": "connector.stop", "params": { request: number, } };
+export type ConnectorCall = { "method": "connector.check", "params": { account: ConnectorAccount, } } | { "method": "connector.sync", "params": { account: ConnectorAccount, cursor?: string, } } | { "method": "connector.watch", "params": { account: ConnectorAccount, } } | { "method": "connector.stop", "params": { request: number, } } | { "method": "connector.language", "params": { translations: import("./Translations").Translations, } };

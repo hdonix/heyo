@@ -38,7 +38,7 @@ use super::accounts::{Kept, Kind, Synced, Trouble};
 use crate::index::items::{Found, ItemKind, Items};
 use super::scheduler::{Effect, ErrorKind, Input, Limits, Phase, Plan, Scheduler, Time};
 use crate::helper::Helper;
-use crate::wire::{ConnectorAccount, ConnectorCall, ConnectorError, ConnectorRequest, ITEMS_AT_ONCE};
+use crate::wire::{ConnectorAccount, ConnectorCall, ConnectorError, ConnectorRequest, ConnectorTool, ITEMS_AT_ONCE};
 
 /// What the shell asks of the running Heyo.
 pub trait Place: Send + Sync + 'static {
@@ -49,6 +49,12 @@ pub trait Place: Send + Sync + 'static {
     fn secret(&self, account: &str, name: &str) -> Option<String>;
     /// Node.js running the connections runtime.
     fn runtime(&self) -> Result<Command, String>;
+    /// The translations of the language Heyo speaks (`i18n::Translations`),
+    /// for the runtime to say what Heyo's own connectors say in it; none
+    /// to leave it in English.
+    fn language(&self) -> Option<Value> {
+        None
+    }
 }
 
 /// The numbers it goes by, and where it remembers the syncing.
@@ -107,6 +113,11 @@ pub struct State {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub progress: Option<Progress>,
+    /// The tools its service offers (an MCP server's), which Heyo lists
+    /// but does not call.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<ConnectorTool>>")]
+    pub tools: Vec<ConnectorTool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, TS)]
@@ -352,6 +363,21 @@ impl Shell {
             error: kept.and_then(|kept| kept.error.clone()),
             items: self.items.count(account).unwrap_or(0) as u32,
             progress: inner.progress.get(account).cloned(),
+            tools: kept.map(|kept| kept.tools.clone()).unwrap_or_default(),
+        }
+    }
+
+    /// Tells the runtime, if it is running, the language Heyo speaks now.
+    pub fn speak(self: &Arc<Self>) {
+        let mut inner = self.lock();
+        if inner.process.is_some() {
+            self.tell_language(&mut inner);
+        }
+    }
+
+    fn tell_language(self: &Arc<Self>, inner: &mut Inner) {
+        if let Some(translations) = self.place.language() {
+            let _ = self.ask(inner, ConnectorCall::Language { translations }, Waiting::Stop, Some(Instant::now() + self.setup.request_timeout));
         }
     }
 
@@ -497,6 +523,8 @@ impl Shell {
         )
         .map_err(|e| format!("failed to start the connections runtime: {e}"))?;
         inner.process = Some(Running { helper, generation, started: Instant::now() });
+        // First of all, so that nothing it says is said in another language.
+        self.tell_language(inner);
         Ok(())
     }
 
@@ -619,6 +647,15 @@ impl Shell {
                 let mut inner = self.lock();
                 if inner.scheduler.syncing(&account) {
                     inner.progress.insert(account, Progress { fraction: fraction.clamp(0.0, 1.0), text });
+                }
+                Ok(Value::Null)
+            }
+            ConnectorRequest::Tools { account, tools } => {
+                let mut inner = self.lock();
+                // Of an account that is there, not one removed meanwhile.
+                if inner.scheduler.shown(&account).is_some() {
+                    inner.kept.accounts.entry(account).or_default().tools = tools;
+                    inner.kept.save();
                 }
                 Ok(Value::Null)
             }

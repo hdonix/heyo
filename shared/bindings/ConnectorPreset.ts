@@ -9,4 +9,9 @@ export type ConnectorPreset = { title: string, values: Record<string, unknown>,
  * Where the service is read in a browser (`https://mail.google.com`):
  * what an item of an account set up so is opened in from the palette.
  */
-web?: string, };
+web?: string, 
+/**
+ * What to know of the service to fill the rest in: that it wants an
+ * app password, where to turn IMAP on.
+ */
+description?: string, };

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConnectorAccount } from "../../../shared/bindings/ConnectorAccount";
 import type { ConnectionItem } from "../../../shared/bindings/ConnectionItem";
 import { ConnectorError, type Connector } from "../heyo/connector";
+import { speak, t } from "../../../shared/i18n";
 import { pair } from "../transport";
 import { loader } from "./load";
 import { limits, serve } from "./serve";
@@ -89,6 +90,26 @@ describe("the connections runtime", () => {
     // In the order they were given: the puts, then the removal.
     expect(run.asked.map((asked) => asked.method).filter((method) => method.startsWith("host.items"))).toEqual(["host.items.put", "host.items.put", "host.items.put", "host.items.remove"]);
     expect(run.asked[0]).toEqual({ method: "host.connector.progress", params: { account: "work", fraction: 0.5, text: "Half" } });
+  });
+
+  it("tells the host of the tools a service offers, and speaks the language it is told", async () => {
+    const connector: Connector = {
+      check: async () => {
+        throw new ConnectorError("failed", t("The password is not set."));
+      },
+      async sync(_, __, io) {
+        io.tools([{ name: "echo", description: "Says it back" }]);
+        return "c";
+      },
+    };
+    const run = bench(connector);
+    await run.ask("connector.sync", { account });
+    expect(run.asked).toContainEqual({ method: "host.connector.tools", params: { account: "work", tools: [{ name: "echo", description: "Says it back" }] } });
+
+    const translations = { language: "zh_CN", plural: [], messages: { "The password is not set.": ["没有设置密码。"] } };
+    expect(await run.ask("connector.language", { translations })).toMatchObject({ result: null });
+    expect((await run.ask("connector.check", { account })).error).toEqual({ kind: "failed", message: "没有设置密码。" });
+    speak({ language: "en", plural: [], messages: {} });
   });
 
   it("hands a connector its account, whose secrets it asks for", async () => {

@@ -83,6 +83,9 @@ fn tell_language(app: &AppHandle) {
     slint_windows::speak();
     let translations = crate::i18n::translations();
     let _ = crate::runtime::tell_running(app, &HostMessage::Language { translations: translations.clone() }.json());
+    if let Some(connections) = app.state::<crate::connections::Connections>().shell() {
+        connections.speak();
+    }
     let _ = app.emit(crate::wire::event::LANGUAGE_CHANGED, translations);
 }
 

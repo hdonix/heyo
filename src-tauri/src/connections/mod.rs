@@ -82,6 +82,10 @@ impl Place for Live {
         command.envs(crate::paths::for_runtime());
         Ok(command)
     }
+
+    fn language(&self) -> Option<serde_json::Value> {
+        serde_json::to_value(crate::i18n::translations()).ok()
+    }
 }
 
 /// Starts the connections: the accounts there are are scheduled from where

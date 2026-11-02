@@ -62,6 +62,7 @@ pub(crate) fn list(app: &AppHandle) -> Vec<View> {
                 error: None,
                 items: 0,
                 progress: None,
+                tools: Vec::new(),
             }),
             id: account.id,
             connector: account.connector,

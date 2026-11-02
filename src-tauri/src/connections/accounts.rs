@@ -103,6 +103,11 @@ pub struct Preset {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub web: Option<String>,
+    /// What to know of the service to fill the rest in: that it wants an
+    /// app password, where to turn IMAP on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub description: Option<String>,
 }
 
 /// How its accounts are synced (`heyo.sync`).
@@ -378,6 +383,9 @@ pub struct Synced {
     pub failures: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<Trouble>,
+    /// The tools its service offers, as its connector last said.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<crate::wire::ConnectorTool>,
 }
 
 impl Synced {
@@ -552,7 +560,7 @@ pub(crate) mod tests {
         let path = std::env::temp_dir().join(format!("heyo-connections-kept-{}.json", std::process::id()));
         let mut kept = Kept::load(Some(path.clone()));
         let at = chrono::Utc::now();
-        kept.accounts.insert("imap".into(), Synced { cursor: Some("42".into()), last_attempt: Some(at), last_sync: Some(at), failures: 2, error: Some(Trouble { kind: ErrorKind::Auth, message: "No".into() }) });
+        kept.accounts.insert("imap".into(), Synced { cursor: Some("42".into()), last_attempt: Some(at), last_sync: Some(at), failures: 2, error: Some(Trouble { kind: ErrorKind::Auth, message: "No".into() }), tools: vec![crate::wire::ConnectorTool { name: "echo".into(), title: None, description: Some("Says it back".into()) }] });
         kept.save();
         let again = Kept::load(Some(path.clone()));
         assert_eq!(again.accounts, kept.accounts);

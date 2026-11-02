@@ -865,6 +865,28 @@ pub enum ConnectorCall {
         #[ts(type = "number")]
         request: u64,
     },
+    /// Heyo speaks this language: what Heyo's own connectors say (their
+    /// failures, their progress) is said in it. Told when the runtime
+    /// starts and when the language changes; answered with nothing.
+    #[serde(rename = "connector.language")]
+    Language {
+        #[ts(type = "import(\"./Translations\").Translations")]
+        translations: Value,
+    },
+}
+
+/// A tool a connected service offers (an MCP server's), as the settings
+/// show it. Heyo does not call it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct ConnectorTool {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub description: Option<String>,
 }
 
 /// What the connections runtime asks the host.
@@ -894,6 +916,10 @@ pub enum ConnectorRequest {
         #[ts(optional)]
         text: Option<String>,
     },
+    /// The tools the account's service offers, all of them, in place of
+    /// those said before.
+    #[serde(rename = "host.connector.tools")]
+    Tools { account: String, tools: Vec<ConnectorTool> },
 }
 
 /// Why something the host asked a connector failed.

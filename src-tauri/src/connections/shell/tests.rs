@@ -39,6 +39,11 @@ impl Place for Bench {
         command.arg(SCRIPT);
         Ok(command)
     }
+
+    /// Told first, as Heyo tells it: the runtime goes on as before.
+    fn language(&self) -> Option<Value> {
+        Some(json!({ "language": "zh_CN", "plural": [0], "messages": {} }))
+    }
 }
 
 struct Test {
@@ -123,13 +128,15 @@ fn mail(id: &str, title: &str) -> Value {
 #[test]
 fn an_account_is_checked_synced_watched_synced_again_and_removed_with_everything_of_it() {
     let test = Test::quick("life");
-    test.says(json!({ "version": 1, "password": "pw", "items": [mail("1", "Invoice 1"), mail("2", "Lunch")] }));
+    let tools = json!([{ "name": "echo", "description": "Says it back" }]);
+    test.says(json!({ "version": 1, "password": "pw", "items": [mail("1", "Invoice 1"), mail("2", "Lunch")], "tools": tools }));
     let id = test.add("pw");
     assert_eq!(test.shell.check(&id), Ok(()));
     // The first sync brings everything.
     until("the first sync", || test.shell.state(&id).last_sync.is_some());
     let state = test.shell.state(&id);
     assert_eq!((state.phase.as_str(), state.items, state.error), ("idle", 2, None));
+    assert_eq!(serde_json::to_value(&state.tools).unwrap(), tools);
     assert_eq!(test.titles("ada"), ["Invoice 1", "Lunch"]);
     // The watch sees the file change, and the sync after brings what changed.
     test.says(json!({ "version": 2, "password": "pw", "items": [mail("3", "Invoice 3")], "removed": ["2"] }));
@@ -188,7 +195,9 @@ fn a_sync_that_is_stopped_is_no_failure_and_writes_nothing_after() {
     let test = Test::quick("stop");
     test.says(json!({ "version": 1, "password": "pw", "hang": true, "items": [mail("1", "Invoice")] }));
     let id = test.add("pw");
-    until("the sync to start", || test.shell.state(&id).phase == "syncing" && test.shell.lock().pending.len() >= 2);
+    // Its sync and its watch, not what needs no answer (the language told).
+    let running = || test.shell.lock().pending.values().filter(|pending| !matches!(pending.waiting, Waiting::Stop)).count();
+    until("the sync to start", || test.shell.state(&id).phase == "syncing" && running() >= 2);
     // Edited, it is stopped and starts again from the new settings.
     test.says(json!({ "version": 1, "password": "pw", "items": [mail("1", "Invoice")] }));
     test.shell.edited(&id, test.kind.plan());

@@ -4,7 +4,7 @@
 //
 //   { "version": 2, "password": "…", "items": [ConnectionItem…], "removed": ["id"…],
 //     "fail": "auth" | "unavailable" | "failed", "hang": true | "deaf",
-//     "progress": 0.42, "doing": "…" }
+//     "tools": [ConnectorTool…], "progress": 0.42, "doing": "…" }
 //
 // `progress` is said as soon as a sync begins (before it hangs).
 //
@@ -40,6 +40,7 @@ module.exports.default = {
     const version = String(source.version ?? 1);
     if (cursor === version) return version;
     io.progress(0, "Reading");
+    if (source.tools) io.tools(source.tools);
     await io.put(source.items ?? []);
     if (cursor !== undefined) await io.remove(source.removed ?? []);
     io.progress(1);
