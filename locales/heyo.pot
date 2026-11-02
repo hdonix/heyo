@@ -78,6 +78,15 @@ msgid "only web and mail links can be opened from here"
 msgstr ""
 
 #: src-tauri/src/commands/settings.rs
+#: src-tauri/src/models/registry.rs
+msgid "There is no provider {0}."
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
+msgid "{0} is not a provider that can be added."
+msgstr ""
+
+#: src-tauri/src/commands/settings.rs
 msgid "Settings need Heyo to be restarted"
 msgstr ""
 
@@ -100,6 +109,7 @@ msgstr ""
 
 #: src-tauri/src/confirm.rs
 #: src-tauri/src/permissions.rs
+#: src-tauri/src/slint_windows/model.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
 #: src/RootSearch.tsx
@@ -135,55 +145,6 @@ msgstr ""
 msgid "Old Console: App ID and Access Token"
 msgstr ""
 
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Console"
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Which of Volcengine's consoles your key is from."
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-#: src-tauri/src/slint_windows/model.rs
-msgid "API Key"
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "From the new console."
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "App ID"
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "From the old console, with its Access Token."
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Access Token"
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "From the old console."
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Remove Filler Words"
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Doubao takes out filler words, stutters and repeated words."
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Doubao (Volcengine)"
-msgstr ""
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."
-msgstr ""
-
 #: src-tauri/src/dictation/listening.rs
 msgid "dictation is not running"
 msgstr ""
@@ -217,7 +178,7 @@ msgid "Streaming: the words come as you speak them, with punctuation."
 msgstr ""
 
 #: src-tauri/src/dictation/models.rs
-msgid "Chinese, Sichuanese"
+msgid "Sichuanese, Chinese"
 msgstr ""
 
 #: src-tauri/src/dictation/models.rs
@@ -257,7 +218,7 @@ msgid "Dictation failed"
 msgstr ""
 
 #: src-tauri/src/dictation.rs
-msgid "Dictation is not set up yet. Open Heyo Settings → Dictation to download it."
+msgid "Dictation is not set up yet. Open Heyo Settings → Models to download a speech model."
 msgstr ""
 
 #: src-tauri/src/dictation.rs
@@ -861,11 +822,11 @@ msgid "{0} --version failed"
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
-msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
+msgid "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
-msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Models."
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
@@ -889,7 +850,7 @@ msgid "Claude returned no text."
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
-msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
+msgid "Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)"
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
@@ -913,11 +874,11 @@ msgid "the server did not answer with a model list"
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
-msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Advanced."
+msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
-msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Advanced."
+msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Models."
 msgstr ""
 
 #: src-tauri/src/models/mod.rs
@@ -930,6 +891,143 @@ msgstr ""
 
 #: src-tauri/src/models/mod.rs
 msgid "{0} returned no text."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "No model is chosen for this. Choose one in Heyo Settings."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "The provider “{0}” this uses is no longer connected. Choose another model in Heyo Settings."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} cannot be used for this. Choose another model in Heyo Settings."
+msgstr ""
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} is not set up: {1} (Heyo Settings → Models)"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "API Key"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Server"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Only for a server that asks for one."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "More Models"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Models to offer besides the ones the server lists, separated by commas."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Executable"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Besides its default, opus, sonnet and haiku: a model's full name, separated by commas."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Besides its default: models to offer, separated by commas. Heyo runs Codex without your config.toml, so its model setting does not apply here."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Console"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Which of Volcengine's consoles your key is from."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "From the new console."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "App ID"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "From the old console, with its Access Token."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Access Token"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "From the old console."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Remove Filler Words"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Doubao takes out filler words, stutters and repeated words."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Claude API"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "OpenAI-Compatible Server"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Speech Models on This Computer"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "Doubao (Volcengine)"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "First Listed"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Default"
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "The server's address is missing."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "The key is missing."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "A provider needs a name."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "{0} has no setting {1}."
+msgstr ""
+
+#: src-tauri/src/models/registry.rs
+msgid "{0} cannot be removed."
 msgstr ""
 
 #: src-tauri/src/ocr.rs
@@ -1502,6 +1600,10 @@ msgid "Screenshots"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+msgid "Models"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
 msgid "Advanced"
 msgstr ""
 
@@ -1546,7 +1648,7 @@ msgid "Clean Up"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
+msgid "When you finish, the model removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1554,23 +1656,7 @@ msgid "Translate to English"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "When you finish, Claude cleans up what you said and pastes it in English."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Claude"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Local Model"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Claude Code (CLI)"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Codex (CLI)"
+msgid "When you finish, the model cleans up what you said and pastes it in English."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1817,24 +1903,7 @@ msgid "Speech Recognition"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "SenseVoice is installed. Audio never leaves this computer."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A one-time download of about 270 MB (SenseVoice speech model)."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/store.tsx
-msgid "Installed"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Downloading…"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Download"
+msgid "Models on this computer keep your audio here; a service is sent it. Download speech models in Models."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1909,11 +1978,7 @@ msgid "Mode"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Claude API Key"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Polishing needs a Claude API key or a local model. Set either in Advanced."
+msgid "Model"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -1953,35 +2018,12 @@ msgid "Text Recognition"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Connected, but the server lists no models."
+#: runtime/src/builtins/store.tsx
+msgid "Installed"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Connected: {}"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Checking…"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Text stays on this computer."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This is not an http or https address."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This address is not this computer: the text you select, ask about and dictate is sent to {0}."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer."
+msgid "Download"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -2023,65 +2065,27 @@ msgid "How the palette and what else the web view draws is drawn. Automatic keep
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Model"
+msgid "Answers Ask AI, AI Chat, Selected Text Actions and extensions."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Answers Selected Text Actions and polishes dictation."
+msgid "Clipboard Search Cases"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Using {0} at {1}."
+msgid "Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "{0} answers with the account it is signed in to ({1}); no API key is needed."
+msgid "Providers"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "What you select, ask about and dictate is sent to {0} through it."
+msgid "Connect Claude, servers such as Ollama, Claude Code, Codex and speech services, and download speech models."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Executable"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "{0} (from PATH)"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty for Codex's default model. Heyo runs Codex without your config.toml, so its model setting does not apply here."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty for Claude Code's default model, or name one: an alias such as opus or sonnet, or a model's full name."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Model Name"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Server"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty to use the first model the server offers."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Saved — type a new key to replace it"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: src/raycast/FormView.tsx
-#: runtime/src/builtins/store.tsx
-msgid "Remove"
+msgid "Open Models"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -2099,6 +2103,168 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Settings File"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not reachable: {0}."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} is not downloaded yet. Download it in Models."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Speech to text."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text, and pictures with it."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Runs on this computer: what it is given stays here."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Runs on this computer, and sends what it is given to Anthropic."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Runs on this computer, and sends what it is given to OpenAI."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "What it is given is sent to Anthropic."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Type the server's address: any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected, but the server lists no models."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected: {}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Checking…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text stays on this computer."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This is not an http or https address."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This address is not this computer: the text you select, ask about and dictate is sent to {0}."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected with an API key."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "No API key saved: Heyo uses ANTHROPIC_API_KEY or an `ant auth login` profile, if there is one."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Using {0} at {1}."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} answers with the account it is signed in to ({1}); no API key is needed."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Downloaded and run by Heyo itself."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} MB"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "In Use"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Delete…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Delete"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Use"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Status"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Remove…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Remove"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+#: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Name"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Saved — type a new key to replace it"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+#: src/raycast/FormView.tsx
+#: runtime/src/builtins/store.tsx
+msgid "Remove"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connect the services and programs that run models. Each feature then uses one of their models, chosen where the feature is set up: AI answers in Advanced, speech recognition and polishing in Dictation."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Add a Provider"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Several of one kind can be added, two servers for instance."
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Add Provider…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
@@ -2331,16 +2497,7 @@ msgid "Uninstall"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Click Again to Remove"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Click Again to Uninstall"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/pill/model.rs
-msgid "Starting…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pill/model.rs
@@ -2357,6 +2514,10 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pill/model.rs
 msgid "Didn't catch anything"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Starting…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pill/model.rs
@@ -2501,13 +2662,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Copy Diagnostics"
-msgstr ""
-
-#: src-tauri/src/slint_windows/ui/settings.slint
-#: runtime/src/api/quicklook.tsx
-#: runtime/src/builtins/library.tsx
-#: runtime/src/builtins/selection.tsx
-msgid "Name"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/settings.slint

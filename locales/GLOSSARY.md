@@ -54,6 +54,8 @@ for it. A translation uses these and no synonym; change a term here and in
 | Vocabulary | 词汇表 | A list of words, not a dictionary (“词典”). |
 | Speech Recognition | 语音识别 | Standard. |
 | Speech model (one of those dictation can recognize with) | 语音识别模型 | As the download's step already says it; 模型 alone could be the AI model. |
+| Provider (where models are reached: a service, a server, a tool, the speech models of this computer) | 提供商 | What model services call themselves in Chinese; “提供方” reads legal. |
+| Models (the page) | 模型 | The page where providers are connected; a feature’s own picker is 模型 too. |
 | Streaming (a speech model that recognizes as it hears) | 流式 | The field's word; what it does for the user is said beside it (边说边出字). |
 | Punctuation | 标点 | Short for 标点符号, as a model's note has room for. |
 | Engine (what is downloaded to recognize speech or text, or to find by meaning) | 引擎 | Standard; the speech engine is 语音识别引擎, as Speech Recognition says. |

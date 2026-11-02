@@ -81,6 +81,15 @@ msgid "only web and mail links can be opened from here"
 msgstr "这里只能打开网页和邮件链接"
 
 #: src-tauri/src/commands/settings.rs
+#: src-tauri/src/models/registry.rs
+msgid "There is no provider {0}."
+msgstr "没有提供商 {0}。"
+
+#: src-tauri/src/commands/settings.rs
+msgid "{0} is not a provider that can be added."
+msgstr "{0} 不是可以添加的提供商。"
+
+#: src-tauri/src/commands/settings.rs
 msgid "Settings need Heyo to be restarted"
 msgstr "需要重启 Heyo 才能打开设置"
 
@@ -103,6 +112,7 @@ msgstr "快捷键需要 GNOME。请改为在桌面环境中把快捷键绑定到
 
 #: src-tauri/src/confirm.rs
 #: src-tauri/src/permissions.rs
+#: src-tauri/src/slint_windows/model.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
 #: src/RootSearch.tsx
@@ -138,55 +148,6 @@ msgstr "新版控制台：API 密钥"
 msgid "Old Console: App ID and Access Token"
 msgstr "旧版控制台：APP ID 与 Access Token"
 
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Console"
-msgstr "控制台"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Which of Volcengine's consoles your key is from."
-msgstr "你的密钥来自火山引擎的哪一版控制台。"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-#: src-tauri/src/slint_windows/model.rs
-msgid "API Key"
-msgstr "API 密钥"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "From the new console."
-msgstr "在新版控制台获取。"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "App ID"
-msgstr "APP ID"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "From the old console, with its Access Token."
-msgstr "在旧版控制台获取，与 Access Token 一起使用。"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Access Token"
-msgstr "Access Token"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "From the old console."
-msgstr "在旧版控制台获取。"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Remove Filler Words"
-msgstr "去除语气词"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Doubao takes out filler words, stutters and repeated words."
-msgstr "由豆包删除语气词、口吃和重复的词（语义顺滑）。"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Doubao (Volcengine)"
-msgstr "豆包（火山引擎）"
-
-#: src-tauri/src/dictation/engine/doubao.rs
-msgid "Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."
-msgstr "听写时，你的音频会发送到火山引擎（字节跳动），在那里识别。"
-
 #: src-tauri/src/dictation/listening.rs
 msgid "dictation is not running"
 msgstr "听写未在运行"
@@ -220,8 +181,8 @@ msgid "Streaming: the words come as you speak them, with punctuation."
 msgstr "流式识别：边说边出字，带标点。"
 
 #: src-tauri/src/dictation/models.rs
-msgid "Chinese, Sichuanese"
-msgstr "中文、四川话"
+msgid "Sichuanese, Chinese"
+msgstr "四川话、中文"
 
 #: src-tauri/src/dictation/models.rs
 msgid "Fast, made for Sichuanese. No punctuation, little English."
@@ -260,8 +221,8 @@ msgid "Dictation failed"
 msgstr "听写失败"
 
 #: src-tauri/src/dictation.rs
-msgid "Dictation is not set up yet. Open Heyo Settings → Dictation to download it."
-msgstr "听写尚未设置。请打开“Heyo 设置”→“听写”进行下载。"
+msgid "Dictation is not set up yet. Open Heyo Settings → Models to download a speech model."
+msgstr "听写尚未设置。请打开“Heyo 设置”→“模型”，下载一个语音识别模型。"
 
 #: src-tauri/src/dictation.rs
 msgid "There is no speech model {0}"
@@ -864,12 +825,12 @@ msgid "{0} --version failed"
 msgstr "{0} --version 运行失败"
 
 #: src-tauri/src/models/mod.rs
-msgid "AI is not set up. Add an Anthropic API key, or choose a local model, in Heyo Settings → Advanced."
-msgstr "尚未设置 AI。请在“Heyo 设置”→“高级”中添加 Anthropic API 密钥，或选择本地模型。"
+msgid "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."
+msgstr "Claude 尚未设置。请在“Heyo 设置”→“模型”中添加 Anthropic API 密钥，或选择其他模型。"
 
 #: src-tauri/src/models/mod.rs
-msgid "The Claude API key is invalid. Check it in Heyo Settings → Advanced."
-msgstr "Claude API 密钥无效。请在“Heyo 设置”→“高级”中检查。"
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Models."
+msgstr "Claude API 密钥无效。请在“Heyo 设置”→“模型”中检查。"
 
 #: src-tauri/src/models/mod.rs
 msgid "Claude's rate limit was reached. Try again shortly."
@@ -892,8 +853,8 @@ msgid "Claude returned no text."
 msgstr "Claude 没有返回任何文字。"
 
 #: src-tauri/src/models/mod.rs
-msgid "Could not reach the local model at {0}. Is it running? (Heyo Settings → Advanced)"
-msgstr "无法连接位于 {0} 的本地模型。它在运行吗？（“Heyo 设置”→“高级”）"
+msgid "Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)"
+msgstr "无法连接 {0} 上的模型服务器。它在运行吗？（“Heyo 设置”→“模型”）"
 
 #: src-tauri/src/models/mod.rs
 msgid "The local model answered with an error ({0}): {1}"
@@ -916,12 +877,12 @@ msgid "the server did not answer with a model list"
 msgstr "服务器没有返回模型列表"
 
 #: src-tauri/src/models/mod.rs
-msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Advanced."
-msgstr "{0} 未安装，或 Heyo 找不到它。请安装它，或在 Heyo 设置 → 高级中填写其可执行文件。"
+msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."
+msgstr "{0} 未安装，或 Heyo 找不到它。请安装它，或在“Heyo 设置”→“模型”中指定它的可执行文件。"
 
 #: src-tauri/src/models/mod.rs
-msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Advanced."
-msgstr "在 {1} 未找到 {0}。请在 Heyo 设置 → 高级中检查其可执行文件。"
+msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Models."
+msgstr "在 {1} 找不到 {0}。请在“Heyo 设置”→“模型”中检查它的可执行文件。"
 
 #: src-tauri/src/models/mod.rs
 msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
@@ -934,6 +895,143 @@ msgstr "{0} 出错停止：{1}"
 #: src-tauri/src/models/mod.rs
 msgid "{0} returned no text."
 msgstr "{0} 没有返回任何文字。"
+
+#: src-tauri/src/models/mod.rs
+msgid "No model is chosen for this. Choose one in Heyo Settings."
+msgstr "这里还没有选择模型。请在“Heyo 设置”中选择一个。"
+
+#: src-tauri/src/models/mod.rs
+msgid "The provider “{0}” this uses is no longer connected. Choose another model in Heyo Settings."
+msgstr "这里使用的提供商“{0}”已不再连接。请在“Heyo 设置”中选择其他模型。"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} cannot be used for this. Choose another model in Heyo Settings."
+msgstr "{0} 不能用于这里。请在“Heyo 设置”中选择其他模型。"
+
+#: src-tauri/src/models/mod.rs
+msgid "{0} is not set up: {1} (Heyo Settings → Models)"
+msgstr "{0} 尚未设置：{1}（“Heyo 设置”→“模型”）"
+
+#: src-tauri/src/models/registry.rs
+msgid "API Key"
+msgstr "API 密钥"
+
+#: src-tauri/src/models/registry.rs
+msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
+msgstr "留空则使用 ANTHROPIC_API_KEY 或 `ant auth login` 的配置。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Server"
+msgstr "服务器"
+
+#: src-tauri/src/models/registry.rs
+msgid "Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr "任何兼容 OpenAI 的服务器都可以（vLLM、LM Studio、Ollama）。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Only for a server that asks for one."
+msgstr "仅在服务器要求时填写。"
+
+#: src-tauri/src/models/registry.rs
+msgid "More Models"
+msgstr "更多模型"
+
+#: src-tauri/src/models/registry.rs
+msgid "Models to offer besides the ones the server lists, separated by commas."
+msgstr "除服务器列出的模型外，还要提供的模型，用逗号分隔。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Executable"
+msgstr "可执行文件"
+
+#: src-tauri/src/models/registry.rs
+msgid "Besides its default, opus, sonnet and haiku: a model's full name, separated by commas."
+msgstr "除默认模型及 opus、sonnet、haiku 外的模型全名，用逗号分隔。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Besides its default: models to offer, separated by commas. Heyo runs Codex without your config.toml, so its model setting does not apply here."
+msgstr "除默认模型外还要提供的模型，用逗号分隔。Heyo 运行 Codex 时不读取你的 config.toml，因此其中的模型设置在这里不起作用。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Console"
+msgstr "控制台"
+
+#: src-tauri/src/models/registry.rs
+msgid "Which of Volcengine's consoles your key is from."
+msgstr "你的密钥来自火山引擎的哪一版控制台。"
+
+#: src-tauri/src/models/registry.rs
+msgid "From the new console."
+msgstr "在新版控制台获取。"
+
+#: src-tauri/src/models/registry.rs
+msgid "App ID"
+msgstr "APP ID"
+
+#: src-tauri/src/models/registry.rs
+msgid "From the old console, with its Access Token."
+msgstr "在旧版控制台获取，与 Access Token 一起使用。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Access Token"
+msgstr "Access Token"
+
+#: src-tauri/src/models/registry.rs
+msgid "From the old console."
+msgstr "在旧版控制台获取。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Remove Filler Words"
+msgstr "去除语气词"
+
+#: src-tauri/src/models/registry.rs
+msgid "Doubao takes out filler words, stutters and repeated words."
+msgstr "由豆包删除语气词、口吃和重复的词（语义顺滑）。"
+
+#: src-tauri/src/models/registry.rs
+msgid "Claude API"
+msgstr "Claude API"
+
+#: src-tauri/src/models/registry.rs
+msgid "OpenAI-Compatible Server"
+msgstr "兼容 OpenAI 的服务器"
+
+#: src-tauri/src/models/registry.rs
+msgid "Speech Models on This Computer"
+msgstr "本机语音识别模型"
+
+#: src-tauri/src/models/registry.rs
+msgid "Doubao (Volcengine)"
+msgstr "豆包（火山引擎）"
+
+#: src-tauri/src/models/registry.rs
+msgid "First Listed"
+msgstr "列出的第一个"
+
+#: src-tauri/src/models/registry.rs
+#: src-tauri/src/slint_windows/model.rs
+msgid "Default"
+msgstr "默认"
+
+#: src-tauri/src/models/registry.rs
+msgid "The server's address is missing."
+msgstr "缺少服务器地址。"
+
+#: src-tauri/src/models/registry.rs
+msgid "The key is missing."
+msgstr "缺少密钥。"
+
+#: src-tauri/src/models/registry.rs
+msgid "A provider needs a name."
+msgstr "提供商需要一个名称。"
+
+#: src-tauri/src/models/registry.rs
+msgid "{0} has no setting {1}."
+msgstr "{0} 没有设置项 {1}。"
+
+#: src-tauri/src/models/registry.rs
+msgid "{0} cannot be removed."
+msgstr "{0} 无法移除。"
 
 #: src-tauri/src/ocr.rs
 msgid "failed to run text recognition: {0}"
@@ -1504,6 +1602,10 @@ msgid "Screenshots"
 msgstr "截图"
 
 #: src-tauri/src/slint_windows/model.rs
+msgid "Models"
+msgstr "模型"
+
+#: src-tauri/src/slint_windows/model.rs
 msgid "Advanced"
 msgstr "高级"
 
@@ -1548,32 +1650,16 @@ msgid "Clean Up"
 msgstr "整理"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
-msgstr "说完后，Claude 会去掉口头语、按你的更正修改并修正标点，然后粘贴结果。"
+msgid "When you finish, the model removes filler words, applies your corrections and fixes punctuation, then the result is pasted."
+msgstr "说完后，模型会去掉口头禅、按你的改口修正内容并整理标点，然后粘贴结果。"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Translate to English"
 msgstr "翻译成英语"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "When you finish, Claude cleans up what you said and pastes it in English."
-msgstr "说完后，Claude 会整理你说的话，并以英语粘贴。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Claude"
-msgstr "Claude"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Local Model"
-msgstr "本地模型"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Claude Code (CLI)"
-msgstr "Claude Code（命令行）"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Codex (CLI)"
-msgstr "Codex（命令行）"
+msgid "When you finish, the model cleans up what you said and pastes it in English."
+msgstr "说完后，模型会整理你说的话，并以英文粘贴。"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "1 Day"
@@ -1819,25 +1905,8 @@ msgid "Speech Recognition"
 msgstr "语音识别"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "SenseVoice is installed. Audio never leaves this computer."
-msgstr "SenseVoice 已安装。音频不会离开这台电脑。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "A one-time download of about 270 MB (SenseVoice speech model)."
-msgstr "需要一次性下载约 270 MB（SenseVoice 语音模型）。"
-
-#: src-tauri/src/slint_windows/model.rs
-#: runtime/src/builtins/store.tsx
-msgid "Installed"
-msgstr "已安装"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Downloading…"
-msgstr "正在下载…"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Download"
-msgstr "下载"
+msgid "Models on this computer keep your audio here; a service is sent it. Download speech models in Models."
+msgstr "本机模型的音频留在这台电脑上；服务会收到你的音频。语音识别模型在“模型”中下载。"
 
 #: src-tauri/src/slint_windows/model.rs
 #: src-tauri/src/slint_windows/ui/settings.slint
@@ -1911,12 +1980,8 @@ msgid "Mode"
 msgstr "模式"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Claude API Key"
-msgstr "Claude API 密钥"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Polishing needs a Claude API key or a local model. Set either in Advanced."
-msgstr "润色需要 Claude API 密钥或本地模型。请在“高级”中设置其一。"
+msgid "Model"
+msgstr "模型"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Polish with AI"
@@ -1955,36 +2020,13 @@ msgid "Text Recognition"
 msgstr "文字识别"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Connected, but the server lists no models."
-msgstr "已连接，但服务器没有列出任何模型。"
+#: runtime/src/builtins/store.tsx
+msgid "Installed"
+msgstr "已安装"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Connected: {}"
-msgstr "已连接：{}"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
-msgstr "无法连接：{0}。任何兼容 OpenAI 的服务器都可以使用（vLLM、LM Studio、Ollama）。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Checking…"
-msgstr "正在检查…"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Text stays on this computer."
-msgstr "文字不会离开这台电脑。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This is not an http or https address."
-msgstr "这不是 http 或 https 地址。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This address is not this computer: the text you select, ask about and dictate is sent to {0}."
-msgstr "此地址不是这台电脑：你选中、提问和听写的文字会发送到 {0}。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer."
-msgstr "此地址不是这台电脑，而且连接未加密：你选中、提问和听写的文字会通过明文 http 发送到 {0}，途经网络上的任何人都能读到。请使用 https，或使用这台电脑上的服务器。"
+msgid "Download"
+msgstr "下载"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Using {0}."
@@ -2025,66 +2067,28 @@ msgid "How the palette and what else the web view draws is drawn. Automatic keep
 msgstr "命令面板以及网页视图绘制的其他内容的绘制方式。“自动”在未启用 modesetting 的 NVIDIA 驱动上使用 CPU（那里 GPU 无法共享帧），其他情况由 WebKit 选择；“GPU，共享内存”在 GPU 上绘制并复制每一帧，在 200% 缩放下更快，并保留所有 CSS 效果。下次启动 Heyo 时生效。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Model"
-msgstr "模型"
+msgid "Answers Ask AI, AI Chat, Selected Text Actions and extensions."
+msgstr "回答问 AI、AI 对话、选中文本操作和扩展的请求。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Answers Selected Text Actions and polishes dictation."
-msgstr "用于回答“选中文本操作”并润色听写。"
+msgid "Clipboard Search Cases"
+msgstr "剪贴板搜索用例"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Using {0} at {1}."
-msgstr "正在使用 {1} 处的 {0}。"
+msgid "Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."
+msgstr "根据你复制的内容编写衡量剪贴板搜索的用例：只提供把内容留在这台电脑上的模型。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "{0} answers with the account it is signed in to ({1}); no API key is needed."
-msgstr "{0} 使用它已登录的账户回答（{1}），无需 API 密钥。"
+msgid "Providers"
+msgstr "提供商"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "What you select, ask about and dictate is sent to {0} through it."
-msgstr "你选中、提问和听写的内容会经由它发送给 {0}。"
+msgid "Connect Claude, servers such as Ollama, Claude Code, Codex and speech services, and download speech models."
+msgstr "连接 Claude、Ollama 等服务器、Claude Code、Codex 和语音服务，并下载语音识别模型。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Executable"
-msgstr "可执行文件"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "{0} (from PATH)"
-msgstr "{0}（来自 PATH）"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty for Codex's default model. Heyo runs Codex without your config.toml, so its model setting does not apply here."
-msgstr "留空则使用 Codex 的默认模型。Heyo 运行 Codex 时不读取你的 config.toml，因此其中的模型设置在这里不起作用。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty for Claude Code's default model, or name one: an alias such as opus or sonnet, or a model's full name."
-msgstr "留空则使用 Claude Code 的默认模型，也可以指定一个：opus、sonnet 等别名，或模型的完整名称。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Model Name"
-msgstr "模型名称"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Server"
-msgstr "服务器"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty to use the first model the server offers."
-msgstr "留空则使用服务器提供的第一个模型。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile."
-msgstr "留空则使用 ANTHROPIC_API_KEY 或 `ant auth login` 的配置。"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Saved — type a new key to replace it"
-msgstr "已保存 — 输入新密钥即可替换"
-
-#: src-tauri/src/slint_windows/model.rs
-#: src/raycast/FormView.tsx
-#: runtime/src/builtins/store.tsx
-msgid "Remove"
-msgstr "移除"
+msgid "Open Models"
+msgstr "打开模型"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Ask Before Pasting Several Lines into a Terminal"
@@ -2102,6 +2106,168 @@ msgstr "数据"
 #: src-tauri/src/slint_windows/model.rs
 msgid "Settings File"
 msgstr "设置文件"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not reachable: {0}."
+msgstr "无法连接：{0}。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} is not downloaded yet. Download it in Models."
+msgstr "{0} 尚未下载。请在“模型”中下载。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Speech to text."
+msgstr "语音转文字。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text, and pictures with it."
+msgstr "文字，也可附带图片。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text."
+msgstr "文字。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Runs on this computer: what it is given stays here."
+msgstr "在这台电脑上运行：交给它的内容不会离开。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Runs on this computer, and sends what it is given to Anthropic."
+msgstr "在这台电脑上运行，并把交给它的内容发送给 Anthropic。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Runs on this computer, and sends what it is given to OpenAI."
+msgstr "在这台电脑上运行，并把交给它的内容发送给 OpenAI。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "What it is given is sent to Anthropic."
+msgstr "交给它的内容会发送给 Anthropic。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Type the server's address: any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr "请输入服务器地址：任何兼容 OpenAI 的服务器都可以（vLLM、LM Studio、Ollama）。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected, but the server lists no models."
+msgstr "已连接，但服务器没有列出任何模型。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected: {}"
+msgstr "已连接：{}"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
+msgstr "无法连接：{0}。任何兼容 OpenAI 的服务器都可以使用（vLLM、LM Studio、Ollama）。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Checking…"
+msgstr "正在检查…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Text stays on this computer."
+msgstr "文字不会离开这台电脑。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This is not an http or https address."
+msgstr "这不是 http 或 https 地址。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This address is not this computer: the text you select, ask about and dictate is sent to {0}."
+msgstr "此地址不是这台电脑：你选中、提问和听写的文字会发送到 {0}。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer."
+msgstr "此地址不是这台电脑，而且连接未加密：你选中、提问和听写的文字会通过明文 http 发送到 {0}，途经网络上的任何人都能读到。请使用 https，或使用这台电脑上的服务器。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connected with an API key."
+msgstr "已用 API 密钥连接。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "No API key saved: Heyo uses ANTHROPIC_API_KEY or an `ant auth login` profile, if there is one."
+msgstr "未保存 API 密钥：Heyo 会使用 ANTHROPIC_API_KEY 或 `ant auth login` 的登录配置（如果有）。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Using {0} at {1}."
+msgstr "正在使用 {1} 处的 {0}。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} answers with the account it is signed in to ({1}); no API key is needed."
+msgstr "{0} 使用它已登录的账户回答（{1}），无需 API 密钥。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Downloaded and run by Heyo itself."
+msgstr "由 Heyo 自己下载和运行。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."
+msgstr "听写时，你的音频会发送到火山引擎（字节跳动），在那里识别。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} MB"
+msgstr "{0} MB"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "In Use"
+msgstr "使用中"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Delete…"
+msgstr "删除…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Delete"
+msgstr "再次点击以删除"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Use"
+msgstr "使用"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Status"
+msgstr "状态"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Remove…"
+msgstr "移除…"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Click Again to Remove"
+msgstr "再次点击以移除"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+#: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Name"
+msgstr "名称"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Saved — type a new key to replace it"
+msgstr "已保存 — 输入新密钥即可替换"
+
+#: src-tauri/src/slint_windows/model.rs
+#: src/raycast/FormView.tsx
+#: runtime/src/builtins/store.tsx
+msgid "Remove"
+msgstr "移除"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Connect the services and programs that run models. Each feature then uses one of their models, chosen where the feature is set up: AI answers in Advanced, speech recognition and polishing in Dictation."
+msgstr "在这里连接运行模型的服务和程序。各项功能再从中选用模型，在各自的设置处选择：AI 回答在“高级”中，语音识别和润色在“听写”中。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Add a Provider"
+msgstr "添加提供商"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Several of one kind can be added, two servers for instance."
+msgstr "同一类可以添加多个，例如两台服务器。"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "Add Provider…"
+msgstr "添加提供商…"
 
 #: src-tauri/src/slint_windows/model.rs
 #: runtime/src/builtins/store.tsx
@@ -2331,17 +2497,8 @@ msgid "Uninstall"
 msgstr "卸载"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Click Again to Remove"
-msgstr "再次点击以移除"
-
-#: src-tauri/src/slint_windows/model.rs
 msgid "Click Again to Uninstall"
 msgstr "再次点击以卸载"
-
-#: src-tauri/src/slint_windows/model.rs
-#: src-tauri/src/slint_windows/pill/model.rs
-msgid "Starting…"
-msgstr "正在启动…"
 
 #: src-tauri/src/slint_windows/pill/model.rs
 msgid "Not polished: {0}"
@@ -2358,6 +2515,10 @@ msgstr "已取消"
 #: src-tauri/src/slint_windows/pill/model.rs
 msgid "Didn't catch anything"
 msgstr "没有听到内容"
+
+#: src-tauri/src/slint_windows/pill/model.rs
+msgid "Starting…"
+msgstr "正在启动…"
 
 #: src-tauri/src/slint_windows/pill/model.rs
 msgid "Listening"
@@ -2502,13 +2663,6 @@ msgstr "已复制"
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Copy Diagnostics"
 msgstr "复制诊断信息"
-
-#: src-tauri/src/slint_windows/ui/settings.slint
-#: runtime/src/api/quicklook.tsx
-#: runtime/src/builtins/library.tsx
-#: runtime/src/builtins/selection.tsx
-msgid "Name"
-msgstr "名称"
 
 #: src-tauri/src/slint_windows/ui/settings.slint
 msgid "Alias"
