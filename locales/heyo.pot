@@ -117,6 +117,28 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+#: src-tauri/src/connections/accounts.rs
+#: src-tauri/src/models/registry.rs
+msgid "{0} has no setting {1}."
+msgstr ""
+
+#: src-tauri/src/connections/accounts.rs
+msgid "{0} needs {1}."
+msgstr ""
+
+#: src-tauri/src/connections/accounts.rs
+msgid "{0} is not a value {1} takes."
+msgstr ""
+
+#: src-tauri/src/connections/accounts.rs
+#: src-tauri/src/connections/shell.rs
+msgid "There is no connection {0}."
+msgstr ""
+
+#: src-tauri/src/connections/accounts.rs
+msgid "A connection needs a name."
+msgstr ""
+
 #: src-tauri/src/dictation/composed.rs
 msgid "part of it had become the application's text as it was heard"
 msgstr ""
@@ -1269,10 +1291,6 @@ msgid "A provider needs a name."
 msgstr ""
 
 #: src-tauri/src/models/registry.rs
-msgid "{0} has no setting {1}."
-msgstr ""
-
-#: src-tauri/src/models/registry.rs
 msgid "{0} cannot be removed."
 msgstr ""
 
@@ -1382,6 +1400,10 @@ msgstr ""
 
 #: src-tauri/src/permissions.rs
 msgid "show what it is doing in Heyo's In Progress section, and tell you when it is done"
+msgstr ""
+
+#: src-tauri/src/permissions.rs
+msgid "sign in to the accounts you connect with it, and keep what it finds there in Heyo for you to search"
 msgstr ""
 
 #: src-tauri/src/permissions.rs

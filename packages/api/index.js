@@ -18,6 +18,14 @@ class HeyoError extends Error {
   }
 }
 
+class ConnectorError extends Error {
+  constructor(kind, message) {
+    super(message || "The connector failed.");
+    this.name = "ConnectorError";
+    this.kind = ["auth", "unavailable", "failed"].includes(kind) ? kind : "failed";
+  }
+}
+
 const notHere = (name) => new HeyoError("unsupported", `${name} is only available in Heyo.`);
 const refuses = (name) => () => Promise.reject(notHere(name));
 
@@ -102,6 +110,7 @@ const heyo = {
   isHeyo: false,
   has: () => false,
   HeyoError,
+  ConnectorError,
   environment,
   AI,
   Clipboard,

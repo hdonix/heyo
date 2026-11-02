@@ -71,3 +71,9 @@ export const activityContent: Parameters<Provided["LiveActivity"]["start"]>[1] =
 export const activityEvent: Parameters<Parameters<Provided["LiveActivity"]["onEvent"]>[0]>[0] = {} as declared.LiveActivity.Event;
 // And back: what the runtime gives a listener is what is declared.
 export const declaredEvent: declared.LiveActivity.Event = {} as Parameters<Parameters<Provided["LiveActivity"]["onEvent"]>[0]>[0];
+
+// A connector written against the package is one the connections runtime
+// runs, and the other way round; and so are its items.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+export const sameConnector: Same<declared.Connector, import("./connector").Connector> = true;
+export const sameItem: Same<declared.Item, import("./connector").Item> = true;

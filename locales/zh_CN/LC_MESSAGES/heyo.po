@@ -120,6 +120,28 @@ msgstr "快捷键需要 GNOME。请改为在桌面环境中把快捷键绑定到
 msgid "Cancel"
 msgstr "取消"
 
+#: src-tauri/src/connections/accounts.rs
+#: src-tauri/src/models/registry.rs
+msgid "{0} has no setting {1}."
+msgstr "{0} 没有设置项 {1}。"
+
+#: src-tauri/src/connections/accounts.rs
+msgid "{0} needs {1}."
+msgstr "{0} 需要填写{1}。"
+
+#: src-tauri/src/connections/accounts.rs
+msgid "{0} is not a value {1} takes."
+msgstr "{0} 不是{1}可接受的值。"
+
+#: src-tauri/src/connections/accounts.rs
+#: src-tauri/src/connections/shell.rs
+msgid "There is no connection {0}."
+msgstr "没有名为 {0} 的连接。"
+
+#: src-tauri/src/connections/accounts.rs
+msgid "A connection needs a name."
+msgstr "连接需要一个名称。"
+
 #: src-tauri/src/dictation/composed.rs
 msgid "part of it had become the application's text as it was heard"
 msgstr "其中一部分已按听到的内容写入应用程序"
@@ -1268,10 +1290,6 @@ msgid "A provider needs a name."
 msgstr "提供商需要一个名称。"
 
 #: src-tauri/src/models/registry.rs
-msgid "{0} has no setting {1}."
-msgstr "{0} 没有设置项 {1}。"
-
-#: src-tauri/src/models/registry.rs
 msgid "{0} cannot be removed."
 msgstr "{0} 无法移除。"
 
@@ -1381,6 +1399,10 @@ msgstr "查看你在主搜索中输入的内容并向其中添加结果"
 #: src-tauri/src/permissions.rs
 msgid "show what it is doing in Heyo's In Progress section, and tell you when it is done"
 msgstr "在 Heyo 的“进行中”部分显示它正在做的事，并在完成时通知你"
+
+#: src-tauri/src/permissions.rs
+msgid "sign in to the accounts you connect with it, and keep what it finds there in Heyo for you to search"
+msgstr "登录你通过它连接的账户，并把在那里找到的内容保存在 Heyo 中供你搜索"
 
 #: src-tauri/src/permissions.rs
 msgid "{0} was written for a newer Heyo (this one provides version {1} of the extension API)."

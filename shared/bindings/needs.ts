@@ -1,7 +1,7 @@
 // Generated from src-tauri/src/permissions.rs by `cargo test`. Do not edit.
 
 /** The permissions there are, as a manifest lists them. */
-export const permissions = ["windows", "screen.capture", "screen.text", "microphone", "clipboard.history", "memory.read", "memory.write", "files.search", "system", "input.paste", "ai", "search.provider", "activity"] as const;
+export const permissions = ["windows", "screen.capture", "screen.text", "microphone", "clipboard.history", "memory.read", "memory.write", "files.search", "system", "input.paste", "ai", "search.provider", "activity", "connector"] as const;
 
 /**
  * What each request of an extension's needs before it is answered: the

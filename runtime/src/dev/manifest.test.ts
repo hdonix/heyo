@@ -52,8 +52,8 @@ describe("a manifest", () => {
   it("must use modes Heyo knows", () => {
     const odd = { ...good, commands: [{ name: "today", title: "Today", mode: "widget" }, { name: "refresh", title: "Refresh" }] };
     expect(errors(odd, present)).toEqual([
-      'command "today" has the mode "widget", which Heyo does not know (view, no-view, menu-bar)',
-      'command "refresh" has no "mode" (view, no-view, menu-bar)',
+      'command "today" has the mode "widget", which Heyo does not know (view, no-view, menu-bar, connector)',
+      'command "refresh" has no "mode" (view, no-view, menu-bar, connector)',
     ]);
   });
 
@@ -97,6 +97,36 @@ describe("a manifest", () => {
     // Every permission the host has is one a manifest may list.
     expect(permissions.length).toBeGreaterThan(10);
     expect(validateManifest({ ...good, heyo: { apiVersion: 1, permissions: [...permissions] } }, present).problems).toEqual([]);
+  });
+
+  it("has a connector's fields, presets and syncing checked", () => {
+    const connector = (heyo: unknown) => ({
+      ...good,
+      heyo: { apiVersion: 1, permissions: ["connector"] },
+      commands: [{ name: "imap", title: "IMAP", mode: "connector", heyo }],
+    });
+    const there = files("assets/icon.png", "src/imap.ts");
+    const fields = [
+      { name: "host", title: "Server", type: "text", required: true },
+      { name: "port", title: "Port", type: "number", default: 993 },
+      { name: "security", title: "Security", type: "choice", default: "tls", choices: [{ title: "TLS", value: "tls" }] },
+      { name: "password", title: "Password", type: "secret" },
+    ];
+    const whole = { items: ["email"], fields, presets: [{ title: "Gmail", values: { host: "imap.gmail.com" } }], sync: { every: "15m", watch: true } };
+    expect(validateManifest(connector(whole), there).problems).toEqual([]);
+    expect(validateManifest(connector(undefined), there).problems).toEqual([]);
+    // Without the permission.
+    expect(errors({ ...connector(whole), heyo: { apiVersion: 1 } }, there)).toEqual(['a command of mode "connector" needs the "connector" permission: add it to "heyo.permissions"']);
+    const wrong = (heyo: unknown) => errors(connector(heyo), there);
+    expect(wrong({ items: ["tweet"] })[0]).toContain('"tweet"');
+    expect(wrong({ fields: [{ name: "x", title: "X", type: "colour" }] })[0]).toContain('"colour"');
+    expect(wrong({ fields: [{ name: "x", title: "X", type: "choice" }] })[0]).toContain('needs "choices"');
+    expect(wrong({ fields: [{ name: "x", title: "X", type: "number", default: "1" }] })[0]).toContain("default");
+    expect(wrong({ fields: [{ name: "x", title: "X", type: "secret", default: "pw" }] })[0]).toContain("no default");
+    expect(wrong({ fields, presets: [{ title: "Leak", values: { password: "pw" } }] })[0]).toContain('sets the secret "password"');
+    expect(wrong({ fields, presets: [{ title: "Odd", values: { colour: "red" } }] })[0]).toContain("not a field");
+    expect(wrong({ sync: { every: "often" } })[0]).toContain("15m");
+    expect(wrong({ sync: { watch: "yes" } })[0]).toContain("true or false");
   });
 });
 

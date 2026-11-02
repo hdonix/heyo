@@ -212,9 +212,12 @@ this field cannot use the parts of the API that need a permission.
 
 ### 3.3 Command modes
 
-`view`, `no-view` and `menu-bar` stay as they are, and one is added:
+`view`, `no-view` and `menu-bar` stay as they are, and two are added:
 
 - `provider`: contributes results to the root search (see 7.10).
+- `connector`: syncs the accounts the user connects with it into Heyo's
+  store, to be found from the palette (see 7.11). It is not in the root
+  search.
 
 ---
 
@@ -256,6 +259,7 @@ if (has("Screen.recognizeText")) { /* … */ }
 | `input.paste` | Pasting text into the frontmost application | Not asked (the same as Raycast's `Clipboard.paste`) |
 | `ai` | Using the model the user has configured | Not asked (the same as Raycast's `AI.ask`). Changed: the ways of calling it that Raycast already has need no manifest; to use the options Heyo adds (`system`, `messages`, `images`, `material`) or `AI.provider()`, the manifest must list `ai`, otherwise the call fails with `denied` |
 | `search.provider` | Contributing results to the root search, and so seeing every query the user types | Asked at install time |
+| `connector` | New: syncing the accounts the user connects with a connector of the extension (7.11) into Heyo's store, and being given their secrets | Asked when the user first adds an account of one of its connectors (before anything of the extension runs for it); the extension's manifest must list it for its connectors to be offered at all |
 | `activity` | Changed, new: showing what the extension is doing in the palette's "In Progress" section, and telling the user when it is done (7.9) | Not asked; the settings have a switch for each extension and one for all, and when it is off the call fails with `denied`. Only a command the user ran can start a new activity |
 
 ### 5.2 Asking and storing
@@ -1024,7 +1028,106 @@ The constraints, all of them so as not to slow the root search down:
   wanted). It cannot be an arbitrary function, because the result has to be
   passed across processes to the interface.
 
-### 7.11 Later (not in v1)
+### 7.11 Connectors (v1.1, permission `connector`)
+
+New: an extension can bring what the user has elsewhere (mail, calendar
+events, messages, documents, tasks) into Heyo, where it is kept on this
+computer and found from the palette. The user connects an account in the
+settings; the extension's connector syncs it.
+
+The manifest declares a command of mode `connector`, and says what its
+accounts have to be given:
+
+```json
+{
+  "name": "imap", "title": "IMAP Mail", "mode": "connector",
+  "heyo": {
+    "items": ["email"],
+    "fields": [
+      { "name": "host", "title": "Server", "type": "text", "required": true },
+      { "name": "port", "title": "Port", "type": "number", "default": 993 },
+      { "name": "folders", "title": "Folders", "type": "list", "default": ["INBOX"] },
+      { "name": "security", "title": "Security", "type": "choice", "default": "tls",
+        "choices": [{ "title": "TLS", "value": "tls" }, { "title": "STARTTLS", "value": "starttls" }] },
+      { "name": "unreadOnly", "title": "Unread Only", "type": "switch", "default": false },
+      { "name": "password", "title": "Password", "type": "secret", "required": true }
+    ],
+    "presets": [{ "title": "Gmail", "values": { "host": "imap.gmail.com", "port": 993 } }],
+    "sync": { "every": "15m", "watch": true }
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `items` | What it brings: `email`, `event`, `message`, `document`, `task`. |
+| `fields` | What an account is given, each `text`, `number`, `list` (of text), `choice` (of `choices`), `switch` or `secret`, with a `default` and `required` where wanted. A secret is kept apart from the settings, never shown again once saved, never sent to a window, and handed to the connector only when it asks for it. |
+| `presets` | Ways of filling the fields in for services the connector knows; never a secret. |
+| `sync` | `every`: how often an account is synced (15 minutes when left out; a minute at the least). `watch`: the connector has a `watch` that tells Heyo of changes as they happen. |
+
+The extension's manifest lists the `connector` permission. `heyo ext
+check` checks all of this.
+
+The command file's default export is a `Connector`:
+
+```ts
+import { ConnectorError, type Connector } from "@heyo/api";
+
+const imap: Connector = {
+  async check(account) {
+    const password = await account.secret("password");
+    if (!(await signIn(account.config.host as string, password))) throw new ConnectorError("auth", "The server refused the password.");
+  },
+  async sync(account, cursor, { put, remove, progress, signal }) {
+    const changes = await fetchSince(account, cursor, signal);
+    progress(0.5, "Reading the inbox");
+    await put(changes.added.map((mail) => ({ id: mail.uid, kind: "email", title: mail.subject, time: mail.date, people: [{ address: mail.from, role: "from" }], text: mail.preview, folder: "INBOX" })));
+    await remove(changes.deleted);
+    return changes.next; // the cursor to go on from
+  },
+  async watch(account, { changed, signal }) {
+    await idle(account, changed, signal); // until signal aborts
+  },
+};
+export default imap;
+```
+
+- `Account` is `{ id, name, config, secret(name) }`: `config` holds the
+  values of the fields that are not secrets; `secret` resolves with the
+  value of a `secret` field, or `undefined`.
+- An `Item` is `{ id, kind, title, time }` (ISO 8601), and as much of
+  `people` (`{ name?, address?, role }`, the role `from`, `to`, `cc`,
+  `organizer` or `attendee`), `end`, `text`, `url`, `location`,
+  `attachments` (`{ name, size?, type? }`), `folder` and `flags` as there
+  is. An item of an id the account already has takes its place.
+- `sync` is given the cursor its last sync resolved with (`undefined` the
+  first time, and after the account was edited) and resolves with the
+  next. `put` and `remove` resolve once Heyo has written what they were
+  given (sent 200 at a time); Heyo keeps the cursor only once everything
+  is written, so a sync that fails or is stopped is done again from the
+  cursor before. A sync from no cursor brings everything: what it does not
+  bring is dropped from the store when it finishes.
+- What a connector throws decides what comes next: a `ConnectorError` of
+  kind `auth` waits for the user (the account is marked, and nothing is
+  tried again until they edit it or ask for a sync); `unavailable`,
+  `failed` and anything else are tried again after 1, 5, 15 and then
+  every 60 minutes.
+
+The constraints:
+
+- Connectors run in a process of their own, apart from the palette's
+  commands and the background ones; only `ConnectorError` (and the types)
+  of `@heyo/api` are there, not the modules that need a command.
+- An account is synced every `sync.every`, when its watch says something
+  changed (at most once a minute), and when the user asks. At most three
+  accounts sync at once, an account one sync at a time.
+- A sync may take 10 minutes, `check` and each request to Heyo a minute;
+  then it is stopped (`signal` aborts) and counts as failed. Editing or
+  removing the account stops it too. What a sync puts after it was
+  stopped is refused.
+- Removing an account removes its items and its secrets.
+
+### 7.12 Later (not in v1)
 
 | Interface | Use | Depends on |
 |---|---|---|

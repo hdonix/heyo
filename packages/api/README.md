@@ -70,6 +70,7 @@ an extension can ask before it uses anything:
 | `System` | `system` | `run` an action (lock, sleep, volume, …), `appearance`, `notify`, `audioDevices`, `useAudioDevice` |
 | `Clipboard.paste(…, { restoreClipboard })` | `input.paste` | puts back what was on the clipboard |
 | `AI.provider()`, `AI.ask(…, { system, messages, images, material, onText })` | `ai` | which model answers; a system prompt; the conversation so far; pictures; text to work on; the answer as it grows |
+| A command of mode `connector` | `connector` | syncs the accounts the user connects with it (mail, calendars, …) into Heyo, to be found from the palette: its file exports a `Connector` (`check`, `sync` from a cursor, `watch`), and fails with a `ConnectorError` (`auth`, `unavailable`, `failed`) |
 | `LiveActivity` | `activity` | `start` something in progress that Heyo shows while the command is away (timers and timed progress counted by Heyo); the handle it gives can `update` and `end` it; `list`, `get`, `presentation`; events through `onEvent` or a command marked `"heyo": { "handles": "activity" }` |
 
 Also `environment.heyoVersion`, `apiVersion`, `platform`, `session` and
@@ -95,6 +96,9 @@ asked about: listing them is enough. For `activity` the user has a switch
 per extension in Heyo's settings instead, and only a command the user ran
 (or the handler of a button they chose) can start an activity; one run on
 a schedule can update what it has.
+
+`connector` is asked when the user first adds an account of one of the
+extension's connectors.
 
 A call that needs a permission the manifest does not list fails with
 `denied`, and says which: `LiveActivity.start needs the "activity"

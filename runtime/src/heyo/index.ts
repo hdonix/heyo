@@ -14,6 +14,7 @@ import { REFUSING } from "../api/shortfalls";
 import { LiveActivity } from "./activity";
 import { AI } from "./ai";
 import { Clipboard } from "./clipboard";
+import { ConnectorError } from "./connector";
 import { Dictation } from "./dictation";
 import { HeyoError } from "./error";
 import { ClipboardHistory, Files, Memory, System, Windows } from "./plain";
@@ -65,6 +66,7 @@ const api = {
   isHeyo: true as const,
   has,
   HeyoError,
+  ConnectorError,
   Windows,
   Screen,
   Dictation,

@@ -66,10 +66,14 @@ pub enum Permission {
     /// enough, and the user has a switch per extension in the settings.
     #[serde(rename = "activity")]
     Activity,
+    /// Syncing accounts of the user's into Heyo's store (connectors,
+    /// `connections`): asked when an account of one is first added.
+    #[serde(rename = "connector")]
+    Connector,
 }
 
 impl Permission {
-    pub const ALL: [Permission; 13] = [
+    pub const ALL: [Permission; 14] = [
         Permission::Windows,
         Permission::ScreenCapture,
         Permission::ScreenText,
@@ -83,6 +87,7 @@ impl Permission {
         Permission::Ai,
         Permission::SearchProvider,
         Permission::Activity,
+        Permission::Connector,
     ];
 
     /// As manifests and the file of grants write it.
@@ -101,6 +106,7 @@ impl Permission {
             Permission::Ai => "ai",
             Permission::SearchProvider => "search.provider",
             Permission::Activity => "activity",
+            Permission::Connector => "connector",
         }
     }
 
@@ -138,6 +144,7 @@ impl Permission {
             Permission::Ai => t("use the AI model set up in Heyo"),
             Permission::SearchProvider => t("see what you type in the root search and add results to it"),
             Permission::Activity => t("show what it is doing in Heyo's In Progress section, and tell you when it is done"),
+            Permission::Connector => t("sign in to the accounts you connect with it, and keep what it finds there in Heyo for you to search"),
         }
     }
 }

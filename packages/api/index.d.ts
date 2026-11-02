@@ -442,6 +442,81 @@ export declare const LiveActivity: {
   onEvent(listener: (event: LiveActivity.Event) => void): Promise<() => void>;
 };
 
+// --- Connectors (command mode "connector", permission "connector") ----------------
+
+/** What an item is. */
+export type ItemKind = "email" | "event" | "message" | "document" | "task";
+
+/** One thing a connector brings into Heyo: a mail, an event, a message, a document, a task. */
+export interface Item {
+  /** The connector's own, unique within the account: an item of the same id takes its place. */
+  id: string;
+  kind: ItemKind;
+  title: string;
+  people?: { name?: string; address?: string; role: "from" | "to" | "cc" | "organizer" | "attendee" }[];
+  /** When it was sent, begins or was changed: ISO 8601. */
+  time: string;
+  /** When it ends (an event): ISO 8601. */
+  end?: string;
+  /** Its text, or as much of it as it should be found by. */
+  text?: string;
+  /** Where it is opened. */
+  url?: string;
+  location?: string;
+  attachments?: { name: string; size?: number; type?: string }[];
+  /** The mailbox, calendar, channel or folder it is in. */
+  folder?: string;
+  /** The connector's words: `unread`, `flagged`, `done`… */
+  flags?: string[];
+}
+
+/** An account, as its connector is given it. */
+export interface Account {
+  id: string;
+  /** As the user calls it. */
+  name: string;
+  /** The values of the connector's fields (`heyo.fields`) that are not secrets. */
+  config: Record<string, unknown>;
+  /** The value of a field of type `secret`, if the user set one. */
+  secret(name: string): Promise<string | undefined>;
+}
+
+/** What a connector command's file exports by default. */
+export interface Connector {
+  /** Resolves if the account works as it is set up; throws a `ConnectorError` if not. */
+  check(account: Account): Promise<void>;
+  /**
+   * Brings what changed since `cursor` (everything, without one) and
+   * resolves with the cursor to go on from next time. Heyo keeps that
+   * cursor only once everything put is written.
+   */
+  sync(
+    account: Account,
+    cursor: string | undefined,
+    io: {
+      /** Writes items, at most 200 at a time are sent; resolves once they are written. */
+      put(items: Item[]): Promise<void>;
+      remove(ids: string[]): Promise<void>;
+      /** How far it is, from 0 to 1, and what it is doing. */
+      progress(fraction: number, text?: string): void;
+      /** Aborted when Heyo stops the sync. */
+      signal: AbortSignal;
+    },
+  ): Promise<string>;
+  /** Watches the account until `io.signal` is aborted, calling `changed()` when something changes. */
+  watch?(account: Account, io: { changed(): void; signal: AbortSignal }): Promise<void>;
+}
+
+/**
+ * How a connector fails: `auth` waits for the user to see to the
+ * credentials; `unavailable` and `failed` are tried again after 1, 5, 15
+ * and then every 60 minutes. Anything else thrown counts as `failed`.
+ */
+export declare class ConnectorError extends Error {
+  kind: "auth" | "unavailable" | "failed";
+  constructor(kind: "auth" | "unavailable" | "failed", message?: string);
+}
+
 // --- What Raycast's own modules gain ---------------------------------------------
 
 /** Raycast's `Clipboard`; `paste` can put back what was on the clipboard (permission "input.paste"). */

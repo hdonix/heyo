@@ -8,7 +8,11 @@ export const API_MODULES = ["@raycast/api", "@heyo/api"];
 /// What a built command leaves for the runtime to provide (`runtime.ts`).
 export const PROVIDED = [...API_MODULES, "react", "react/jsx-runtime", "react/jsx-dev-runtime"];
 
-export const MODES = ["view", "no-view", "menu-bar"];
+export const MODES = ["view", "no-view", "menu-bar", "connector"];
+/// What a connector brings (`heyo.items`), and the types of its fields
+/// (`heyo.fields`): `src-tauri/src/connections/`.
+export const ITEM_KINDS = ["email", "event", "message", "document", "task"];
+export const FIELD_TYPES = ["text", "number", "list", "choice", "switch", "secret"];
 /// Raycast's convention: a command is `src/<name>` with one of these endings.
 export const ENTRY_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js"];
 /// The major version of the Heyo API this Heyo provides.
@@ -94,10 +98,16 @@ export function validateManifest(manifest: unknown, exists: (file: string) => bo
       }
     }
 
+    if (command.mode === "connector") checkConnector(at, command.heyo, error, warning);
+
     const entry = ENTRY_EXTENSIONS.map((ending) => `src/${name}${ending}`).find(exists);
     if (!entry) return error(`${at} has no source: expected src/${name}.tsx (or .ts, .jsx, .js)`);
     commands.push({ name, entry });
   });
+
+  const connectors = manifest.commands.filter((command: unknown) => isRecord(command) && command.mode === "connector");
+  const permissions = isRecord(manifest.heyo) && Array.isArray(manifest.heyo.permissions) ? manifest.heyo.permissions : [];
+  if (connectors.length > 0 && !permissions.includes("connector")) error(`a command of mode "connector" needs the "connector" permission: add it to "heyo.permissions"`);
 
   if (manifest.heyo !== undefined) {
     if (!isRecord(manifest.heyo)) error(`"heyo" must be an object`);
@@ -113,4 +123,78 @@ export function validateManifest(manifest: unknown, exists: (file: string) => bo
     }
   }
   return { problems, commands };
+}
+
+/// The `heyo` field of a command of mode `connector` (docs/extension-api.md, 7.11).
+function checkConnector(at: string, heyo: unknown, error: (message: string) => void, warning: (message: string) => void) {
+  if (heyo === undefined) return;
+  if (!isRecord(heyo)) return error(`${at}: "heyo" must be an object`);
+  const { items, fields, presets, sync } = heyo;
+  if (items !== undefined) {
+    if (!Array.isArray(items)) error(`${at}: "heyo.items" must be a list of ${ITEM_KINDS.join(", ")}`);
+    else for (const kind of items) if (!ITEM_KINDS.includes(String(kind))) error(`${at}: "heyo.items" names "${String(kind)}", which is not one of ${ITEM_KINDS.join(", ")}`);
+  }
+  const types = new Map<string, string>();
+  if (fields !== undefined && !Array.isArray(fields)) error(`${at}: "heyo.fields" must be a list`);
+  for (const field of Array.isArray(fields) ? fields : []) {
+    if (!isRecord(field) || !isText(field.name)) {
+      error(`${at}: a field of "heyo.fields" has no "name"`);
+      continue;
+    }
+    const of = `${at}: field "${field.name}"`;
+    if (types.has(field.name)) error(`${of} is declared twice`);
+    if (!isText(field.title)) error(`${of} has no "title"`);
+    const type = String(field.type);
+    if (!FIELD_TYPES.includes(type)) {
+      error(`${of} has the type "${type}", which is not one of ${FIELD_TYPES.join(", ")}`);
+      continue;
+    }
+    types.set(field.name, type);
+    const choices = Array.isArray(field.choices) ? field.choices : [];
+    if (type === "choice" && (choices.length === 0 || !choices.every((choice) => isRecord(choice) && isText(choice.title) && typeof choice.value === "string"))) {
+      error(`${of}: a "choice" needs "choices", each with a "title" and a "value"`);
+    }
+    if (field.default !== undefined) {
+      if (type === "secret") error(`${of}: a secret has no default`);
+      else if (!fits(type, field.default, choices)) error(`${of}: the default is not a value of type "${type}"`);
+    }
+  }
+  if (presets !== undefined && !Array.isArray(presets)) error(`${at}: "heyo.presets" must be a list`);
+  for (const preset of Array.isArray(presets) ? presets : []) {
+    if (!isRecord(preset) || !isText(preset.title) || !isRecord(preset.values)) {
+      error(`${at}: a preset needs a "title" and "values"`);
+      continue;
+    }
+    for (const [name, value] of Object.entries(preset.values)) {
+      const type = types.get(name);
+      if (!type) error(`${at}: preset "${preset.title}" sets "${name}", which is not a field`);
+      else if (type === "secret") error(`${at}: preset "${preset.title}" sets the secret "${name}"`);
+      else if (!fits(type, value, [])) warning(`${at}: preset "${preset.title}" sets "${name}" to a value that is not of type "${type}"`);
+    }
+  }
+  if (sync !== undefined) {
+    if (!isRecord(sync)) error(`${at}: "heyo.sync" must be an object`);
+    else {
+      if (sync.every !== undefined && (!isText(sync.every) || !/^\d+[smhd]$/.test(sync.every.trim()))) error(`${at}: "heyo.sync.every" should look like 15m, 1h or 1d`);
+      if (sync.watch !== undefined && typeof sync.watch !== "boolean") error(`${at}: "heyo.sync.watch" is true or false`);
+    }
+  }
+}
+
+/// Whether `value` is one a field of `type` holds.
+function fits(type: string, value: unknown, choices: unknown[]): boolean {
+  switch (type) {
+    case "text":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number";
+    case "switch":
+      return typeof value === "boolean";
+    case "list":
+      return Array.isArray(value) && value.every((each) => typeof each === "string");
+    case "choice":
+      return typeof value === "string" && (choices.length === 0 || choices.some((choice) => isRecord(choice) && choice.value === value));
+    default:
+      return false;
+  }
 }
