@@ -6,14 +6,20 @@
 #
 # Which they are is read from the program (the DLLs it imports, as
 # `llvm-objdump -p` lists them), not from how it was said to be built.
-# They are those of Microsoft's Visual C++ runtime: a Heyo with Skia in it
-# imports the C++ library, one without imports none of them (vcruntime.sh,
-# which fetches them, says why). What the program imports is taken, and
-# what those import in turn: msvcp140.dll wants vcruntime140.dll, which
-# heyo.exe itself has linked in.
+# They are of two kinds:
 #
-# OUT-DIR is one that is used build after build: a DLL of the runtime left
-# there that this program does not ask for is removed.
+# - those of Microsoft's Visual C++ runtime: a Heyo with Skia in it imports
+#   the C++ library, one without imports none of them (vcruntime.sh, which
+#   fetches them, says why);
+# - those that were built beside the program, in its own directory: the
+#   speech recognizer's (sherpa-onnx-c-api.dll, which asks for
+#   onnxruntime.dll), which sherpa-onnx-sys's build script puts there.
+#
+# What the program imports is taken, and what those import in turn:
+# msvcp140.dll wants vcruntime140.dll, which heyo.exe itself has linked in.
+#
+# OUT-DIR is one that is used build after build: a DLL left there that this
+# program does not ask for is removed.
 set -eu
 [ $# -eq 2 ] || { sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 PROGRAM=$1; OUT=$2
@@ -43,27 +49,36 @@ esac
 
 FETCHED=$(mktemp -d)
 trap 'rm -rf "$FETCHED"' EXIT
+BUILT=$(dirname "$PROGRAM")
+# Each DLL taken, a line each: its name, then the file it comes from.
+TAKEN=$FETCHED/.taken
+: > "$TAKEN"
 NEEDED=
 ASKED=$(imports "$PROGRAM")
 while [ -n "$ASKED" ]; do
   NEXT=
   for dll in $ASKED; do
-    of_runtime "$dll" || continue
     case " $NEEDED " in *" $dll "*) continue ;; esac
-    [ -n "$NEEDED" ] || "$HERE/vcruntime.sh" "$ARCH" "$FETCHED" >&2
-    [ -f "$FETCHED/$dll" ] || { echo "$0: $dll is asked for, and scripts/package/vcruntime.sh has none for $ARCH" >&2; exit 1; }
+    beside=$(find "$BUILT" -maxdepth 1 -iname "$dll" | head -1)
+    if of_runtime "$dll"; then
+      [ -f "$FETCHED/.runtime" ] || { "$HERE/vcruntime.sh" "$ARCH" "$FETCHED" >&2; touch "$FETCHED/.runtime"; }
+      [ -f "$FETCHED/$dll" ] || { echo "$0: $dll is asked for, and scripts/package/vcruntime.sh has none for $ARCH" >&2; exit 1; }
+      file=$FETCHED/$dll
+    elif [ -n "$beside" ]; then
+      file=$beside
+    else
+      continue
+    fi
     NEEDED="$NEEDED $dll"
-    NEXT="$NEXT $(imports "$FETCHED/$dll" | tr '\n' ' ')"
+    echo "$dll $file" >> "$TAKEN"
+    NEXT="$NEXT $(imports "$file" | tr '\n' ' ')"
   done
   ASKED=$NEXT
 done
 
 mkdir -p "$OUT"
-for old in "$OUT"/*.dll; do
-  [ -f "$old" ] || continue
-  if of_runtime "$(basename "$old")"; then rm -f "$old"; fi
-done
-for dll in $NEEDED; do
-  cp "$FETCHED/$dll" "$OUT/$dll"
+rm -f "$OUT"/*.dll
+while read -r dll file; do
+  cp "$file" "$OUT/$dll"
   echo "$dll"
-done
+done < "$TAKEN"

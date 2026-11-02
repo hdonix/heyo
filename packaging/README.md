@@ -29,8 +29,8 @@ builds of the same version are not told apart.
 
 ### Node.js
 
-Extensions, dictation and text recognition need Node.js 22 or newer; the
-rest of the launcher works without. Heyo uses, in order: `HEYO_NODE`, the
+Extensions and text recognition need Node.js 22 or newer; the rest of the
+launcher, dictation included, works without. Heyo uses, in order: `HEYO_NODE`, the
 path in its settings, a `node` beside its own executable, `node` on `PATH`
 (`settings.rs`), and its settings page says when what it found is missing
 or too old.
@@ -150,6 +150,21 @@ that fetches Microsoft's sets `XWIN_ACCEPT_LICENSE`, and says there whose
 acceptance of the terms that is: somebody who runs the workflow in a fork
 accepts them for themselves by it.
 
+The speech recognizer for dictation, sherpa-onnx with ONNX Runtime, is
+fetched prebuilt while compiling too, by the build script of
+`sherpa-onnx-sys` (k2-fsa's own Rust bindings, at the version
+`src-tauri/Cargo.toml` pins), from that version's release of
+`k2-fsa/sherpa-onnx` on GitHub: one archive a target. That script checks
+no hash; Heyo's `build.rs` checks the archive it left against
+`src-tauri/sherpa-onnx.sha256` (the digests GitHub lists for the release's
+files) and stops the build if it is another. On Linux the libraries are
+static and linked into the program, which then needs nothing new beside
+it (`libstdc++.so.6`, which Skia asks for already; the newest symbols they
+want are `GLIBC_2.34` and `GLIBCXX_3.4.30`, both in Ubuntu 22.04). On
+Windows they are DLLs (below), because the static ones are built against
+the C runtime linked in (`/MT`) and Skia against the one in a DLL (`/MD`),
+which one program cannot mix: the linker refuses it.
+
 Skia's prebuilt library is fetched while compiling, by the build script of
 the crate that binds it, with `curl`, from a release of
 `rust-skia/skia-binaries` on GitHub named by the crate's version, the
@@ -189,7 +204,9 @@ Dependencies: Tauri adds `libwebkit2gtk-4.1-0`, `libgtk-3-0` and
 itself. `tauri.conf.json` adds `xdg-utils` (opening things, registering the
 sign-in link handler), and recommends, besides Node.js: `libnotify-bin`
 (`notify-send`), `curl` (listing a local model server's models) and
-`pulseaudio-utils` (`pactl`, choosing a microphone).
+`pulseaudio-utils` (`pactl`, for the volume commands and switching the
+audio device). Dictation records through the sound server's own protocol
+and needs no program of it.
 
 With Skia compiled in, the program is linked with three libraries more:
 `libstdc++.so.6`, `libfontconfig.so.1` and `libfreetype.so.6`. No package
@@ -305,6 +322,13 @@ scripts) and what the scripts here fetch and name to it:
 - **`node.exe`**, always (`packaging/windows/installer.conf.json`, merged
   in only for this step because the file exists only once
   `scripts/package/node.mjs` has fetched it).
+- **The speech recognizer's DLLs**: `sherpa-onnx-c-api.dll` (4.6 MB),
+  which `heyo.exe` imports, and `onnxruntime.dll` (18 MB), which that
+  imports; both have their C runtime linked in and import only Windows'
+  own DLLs. The build leaves them beside the program, and `dlls.sh`
+  takes from there what the program asks for. (Windows 11 has an
+  `onnxruntime.dll` of its own in `System32`; the one beside the program
+  is found first.)
 - **The DLLs of Microsoft's Visual C++ runtime that this `heyo.exe` asks
   for**: `msvcp140.dll` and `vcruntime140.dll`, and for x86_64
   `vcruntime140_1.dll` as well, when Skia is compiled in; none when it is
