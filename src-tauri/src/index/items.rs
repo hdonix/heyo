@@ -524,6 +524,13 @@ impl Items {
         self.delete_where("account = ?", vec![Value::Text(account.to_owned())]).map(|_| ())
     }
 
+    /// Deletes the items of an account that were last written before
+    /// `since`: what a sync that brings everything did not bring. Returns
+    /// how many.
+    pub(crate) fn drop_unwritten(&self, account: &str, since: DateTime<Utc>) -> rusqlite::Result<usize> {
+        self.delete_where("account = ? AND updated < ?", vec![Value::Text(account.to_owned()), Value::Integer(since.timestamp_millis())])
+    }
+
     /// Deletes the items of an account that were over (or sent) before
     /// `older_than`. Returns how many.
     pub(crate) fn prune(&self, account: &str, older_than: DateTime<Utc>) -> rusqlite::Result<usize> {

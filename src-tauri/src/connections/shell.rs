@@ -508,8 +508,8 @@ impl Shell {
         if inner.scheduler.syncing(account) {
             if full {
                 let _writing = self.writing.lock().unwrap_or_else(|e| e.into_inner());
-                if let Err(e) = self.items.prune(account, started) {
-                    eprintln!("heyo: could not prune the items of {account}: {e}");
+                if let Err(e) = self.items.drop_unwritten(account, started) {
+                    eprintln!("heyo: could not drop what the sync of {account} did not bring: {e}");
                 }
             }
             let kept = inner.kept.accounts.entry(account.into()).or_default();

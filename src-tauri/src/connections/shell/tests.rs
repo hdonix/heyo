@@ -146,6 +146,23 @@ fn an_account_is_checked_synced_watched_synced_again_and_removed_with_everything
 }
 
 #[test]
+fn a_sync_that_brings_everything_keeps_what_it_brought_however_old_and_drops_the_rest() {
+    let test = Test::quick("full");
+    let old = |id: &str, title: &str| json!({ "id": id, "kind": "email", "title": title, "time": "2020-01-02T09:00:00Z" });
+    test.says(json!({ "version": 1, "password": "pw", "items": [old("1", "Old letter"), old("2", "Older letter")] }));
+    let id = test.add("pw");
+    until("the first sync", || test.shell.state(&id).last_sync.is_some());
+    assert_eq!(test.shell.state(&id).items, 2);
+    // Edited, it brings everything again: what it no longer brings goes.
+    test.says(json!({ "version": 1, "password": "pw", "items": [old("2", "Older letter")] }));
+    let values = json!({ "password": "pw" }).as_object().unwrap().clone();
+    accounts::edit(&mut test.settings.lock().unwrap(), &test.kind, &id, None, &values).unwrap();
+    test.shell.edited(&id, test.kind.plan());
+    until("the sync after the edit", || test.shell.state(&id).items == 1);
+    assert_eq!(test.titles("letter"), ["Older letter"]);
+}
+
+#[test]
 fn refused_credentials_are_said_and_wait_for_the_user() {
     let test = Test::quick("auth");
     test.says(json!({ "version": 1, "password": "right", "items": [mail("1", "Invoice")] }));
