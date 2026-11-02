@@ -1033,6 +1033,10 @@ msgstr "{0} 没有设置项 {1}。"
 msgid "{0} cannot be removed."
 msgstr "{0} 无法移除。"
 
+#: src-tauri/src/models/registry.rs
+msgid "This Computer"
+msgstr "本机"
+
 #: src-tauri/src/ocr.rs
 msgid "failed to run text recognition: {0}"
 msgstr "无法运行文字识别：{0}"
@@ -1897,8 +1901,8 @@ msgid "Not available in this desktop session. Each sentence is pasted when it is
 msgstr "在此桌面会话中不可用。每句话会在说完后粘贴。"
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer."
-msgstr "按住快捷键说话，说完松开；或者按一下开始，再按一下结束：你说的话会输入到当前使用的窗口中。语音在这台电脑上识别。"
+msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in."
+msgstr "按住快捷键说话，说完松开；或者按一下开始，再按一下结束：你说的话会输入到当前使用的窗口中。"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Speech Recognition"

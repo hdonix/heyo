@@ -466,7 +466,9 @@ pub fn offered(providers: &[Provider], need: Use, listed: &BTreeMap<String, Vec<
                 models.push(name.clone());
             }
         }
-        offered.extend(models.into_iter().map(|model| (ModelRef::to(&provider.id, &model), format!("{} · {}", provider.name, provider.model_title(&model)))));
+        // The speech models of this computer are said short: there is one such provider.
+        let name = if provider.kind == Kind::LocalSpeech { crate::i18n::t("This Computer") } else { provider.name.as_str() };
+        offered.extend(models.into_iter().map(|model| (ModelRef::to(&provider.id, &model), format!("{name} · {}", provider.model_title(&model)))));
     }
     offered
 }

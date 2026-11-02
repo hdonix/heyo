@@ -660,7 +660,7 @@ impl Model {
 
     fn dictation_page(&self) -> Vec<Line> {
         let mut page = Page::default();
-        page.note(t("Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer."));
+        page.note(t("Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in."));
         // Speech models are downloaded on the Models page.
         let engine = vec![self.picker(Use::DictationRecognition, t("Speech Recognition"), t("Models on this computer keep your audio here; a service is sent it. Download speech models in Models."), None)];
         let hotkey = Line::row("", t("Hotkey"));
@@ -1771,7 +1771,7 @@ mod tests {
         let lines = model.lines();
         // Recognition: the speech models that can be used, the one chosen not downloaded yet; no download here.
         let recognition = row(&lines, "Speech Recognition");
-        assert_eq!(&titles(recognition)[..3], ["Speech Models on This Computer · Default", "Speech Models on This Computer · SenseVoice Small", "Speech Models on This Computer · SenseVoice (Cantonese)"]);
+        assert_eq!(&titles(recognition)[..3], ["This Computer · Default", "This Computer · SenseVoice Small", "This Computer · SenseVoice (Cantonese)"]);
         assert!(recognition.danger && recognition.description.starts_with("X-ASR Streaming is not downloaded yet. Download it in Models."), "{}", recognition.description);
         assert!(!lines.iter().any(|line| line.control == "button"));
         assert_eq!(titles(row(&lines, "Hold-to-Talk Key")), ["None", "Right Ctrl"]);
@@ -1786,7 +1786,7 @@ mod tests {
         // Polishing: the text models, of every provider that answers in text.
         let polishing = row(&lines, "Model");
         assert_eq!(polishing.value, ids::choice("claude", "claude-opus-5-5"));
-        assert!(titles(polishing).contains(&"Claude · claude-opus-5-5") && titles(polishing).contains(&"Codex · Default") && !titles(polishing).iter().any(|title| title.contains("Speech Models")));
+        assert!(titles(polishing).contains(&"Claude · claude-opus-5-5") && titles(polishing).contains(&"Codex · Default") && !titles(polishing).iter().any(|title| title.contains("This Computer")));
         assert!(!polishing.danger);
         assert_eq!(model.entered().iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["dictation_status", "speech_models", "provider_models", "provider_models"]);
         // One that is downloaded: nothing to say.

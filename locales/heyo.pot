@@ -1030,6 +1030,10 @@ msgstr ""
 msgid "{0} cannot be removed."
 msgstr ""
 
+#: src-tauri/src/models/registry.rs
+msgid "This Computer"
+msgstr ""
+
 #: src-tauri/src/ocr.rs
 msgid "failed to run text recognition: {0}"
 msgstr ""
@@ -1895,7 +1899,7 @@ msgid "Not available in this desktop session. Each sentence is pasted when it is
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
-msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer."
+msgid "Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in."
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
