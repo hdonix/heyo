@@ -40,9 +40,9 @@ impl Field {
     }
 }
 
-fn preset(title: &str, values: Value, description: &str) -> Preset {
+fn preset(title: &str, values: Value, description: &str, web: Option<&str>) -> Preset {
     let values: Map<String, Value> = values.as_object().cloned().unwrap_or_default();
-    Preset { title: title.into(), values, description: Some(description.into()) }
+    Preset { title: title.into(), values, description: Some(description.into()), web: web.map(Into::into) }
 }
 
 fn kind(command: &str, title: &str, icon: &str, items: Vec<ItemKind>, fields: Vec<Field>, presets: Vec<Preset>, sync: Sync) -> Kind {
@@ -70,7 +70,7 @@ fn password() -> Field {
 }
 
 fn imap() -> Kind {
-    let server = |title: &str, host: &str, note: &str| preset(title, json!({ "host": host, "port": 993, "security": "tls" }), note);
+    let server = |title: &str, host: &str, note: &str, web: &str| preset(title, json!({ "host": host, "port": 993, "security": "tls" }), note, Some(web));
     let netease = t("Turn on IMAP in the mailbox's settings on the web, and use the authorization code it gives as the password.");
     kind(
         "imap",
@@ -87,14 +87,14 @@ fn imap() -> Kind {
             field("days", t("Days to Bring First"), FieldType::Number).default(json!(90)).description(t("How far back the first sync of a folder goes; later syncs bring everything new.")),
         ],
         vec![
-            server(t("QQ Mail"), "imap.qq.com", t("Turn on IMAP in QQ Mail's settings on the web, and use the authorization code it gives as the password, not the QQ password.")),
-            server(t("NetEase 163 Mail"), "imap.163.com", netease),
-            server(t("NetEase 126 Mail"), "imap.126.com", netease),
-            server(t("Alibaba Enterprise Mail"), "imap.qiye.aliyun.com", t("Use the whole address as the user name; with secure login on, a client password made in the mailbox's settings.")),
-            server(t("Tencent Enterprise Mail"), "imap.exmail.qq.com", t("Use the whole address as the user name; with WeChat secure login on, a client password made in the mailbox's settings.")),
-            server("Gmail", "imap.gmail.com", t("Needs 2-Step Verification on the Google account, and an app password made for Heyo.")),
-            server("iCloud", "imap.mail.me.com", t("Use the name before @icloud.com as the user name, and an app-specific password made in the Apple Account's settings.")),
-            server("Outlook", "outlook.office365.com", t("Microsoft wants most accounts to sign in through its own page (OAuth), which Heyo cannot do yet: an app password works only where the account still allows one.")),
+            server(t("QQ Mail"), "imap.qq.com", t("Turn on IMAP in QQ Mail's settings on the web, and use the authorization code it gives as the password, not the QQ password."), "https://mail.qq.com"),
+            server(t("NetEase 163 Mail"), "imap.163.com", netease, "https://mail.163.com"),
+            server(t("NetEase 126 Mail"), "imap.126.com", netease, "https://mail.126.com"),
+            server(t("Alibaba Enterprise Mail"), "imap.qiye.aliyun.com", t("Use the whole address as the user name; with secure login on, a client password made in the mailbox's settings."), "https://qiye.aliyun.com"),
+            server(t("Tencent Enterprise Mail"), "imap.exmail.qq.com", t("Use the whole address as the user name; with WeChat secure login on, a client password made in the mailbox's settings."), "https://exmail.qq.com"),
+            server("Gmail", "imap.gmail.com", t("Needs 2-Step Verification on the Google account, and an app password made for Heyo."), "https://mail.google.com"),
+            server("iCloud", "imap.mail.me.com", t("Use the name before @icloud.com as the user name, and an app-specific password made in the Apple Account's settings."), "https://www.icloud.com/mail"),
+            server("Outlook", "outlook.office365.com", t("Microsoft wants most accounts to sign in through its own page (OAuth), which Heyo cannot do yet: an app password works only where the account still allows one."), "https://outlook.live.com/mail"),
         ],
         Sync { every: Some("15m".into()), watch: true },
     )
@@ -150,6 +150,7 @@ mod tests {
         let account = &settings.connections[0];
         assert_eq!((id.as_str(), account.connector.as_str()), ("imap", "@heyo:imap"));
         assert_eq!(account.config["host"], "imap.qq.com");
+        assert!(imap.presets.iter().all(|preset| preset.web.as_deref().is_some_and(|web| web.starts_with("https://"))));
         assert_eq!(account.config["folders"], json!(["INBOX"]));
         assert!(account.config.get("password").is_none());
     }
