@@ -876,7 +876,7 @@ pub enum ConnectorRequest {
     /// `ITEMS_AT_ONCE`: answered once they are written, and only while the
     /// account is being synced.
     #[serde(rename = "host.items.put")]
-    ItemsPut { account: String, items: Vec<crate::connections::items::Item> },
+    ItemsPut { account: String, items: Vec<crate::index::items::Item> },
     #[serde(rename = "host.items.remove")]
     ItemsRemove { account: String, ids: Vec<String> },
     /// A secret field of the account, or null when it is not set.

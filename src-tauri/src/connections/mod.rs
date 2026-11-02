@@ -9,14 +9,15 @@
 //! - `shell.rs`: what carries that out: the connections runtime's process
 //!   (`runtime/src/connections/`, its conversation typed in `wire.rs`),
 //!   the store, the timeouts.
-//! - `items.rs`: the items, and the store they are kept in.
+//!
+//! The items are kept and searched in the index shared with the clipboard
+//! history (`index::items`, `connections.db`).
 //!
 //! This file is the shell as the running application has it
 //! ([`Connections`], from `Live`), and what the settings and the palette
 //! ask of it.
 
 pub mod accounts;
-pub mod items;
 pub mod scheduler;
 pub mod shell;
 
@@ -85,7 +86,7 @@ impl Place for Live {
 /// Starts the connections: the accounts there are are scheduled from where
 /// they were left. Nothing runs until there is an account.
 pub fn start(app: &AppHandle) {
-    let items = match items::Items::open(&crate::paths::data().join("connections.db")) {
+    let items = match crate::index::items::Items::open(&crate::index::items::Items::path()) {
         Ok(items) => Arc::new(items),
         Err(e) => return eprintln!("heyo: connections are off: the store could not be opened: {e}"),
     };

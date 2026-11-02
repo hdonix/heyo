@@ -4,11 +4,11 @@
 //! their accounts and writes what they bring into Heyo's store.
 
 import type { ConnectorErrorKind } from "../../../shared/bindings/ConnectorErrorKind";
-import type { ConnectorItem } from "../../../shared/bindings/ConnectorItem";
+import type { ConnectionItem } from "../../../shared/bindings/ConnectionItem";
 
 /// One thing a connector brings: a mail, an event, a message, a document,
 /// a task.
-export type Item = ConnectorItem;
+export type Item = ConnectionItem;
 
 /// An account, as its connector is given it.
 export interface Account {

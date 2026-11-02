@@ -61,7 +61,7 @@ impl Test {
         std::fs::create_dir_all(&dir).unwrap();
         let kind = kinds_in(Path::new(FIXTURE)).pop().expect("the fake connector");
         let settings = Arc::new(Mutex::new(Settings::default()));
-        let items = Arc::new(Items::default());
+        let items = Arc::new(Items::in_memory());
         let shell = Shell::start(Bench { settings: settings.clone(), kind: kind.clone() }, items.clone(), setup);
         Test { shell, items, settings, kind, dir }
     }
@@ -110,6 +110,10 @@ fn until(what: &str, mut holds: impl FnMut() -> bool) {
         assert!(start.elapsed() < Duration::from_secs(10), "waited in vain for {what}");
         std::thread::sleep(Duration::from_millis(20));
     }
+}
+
+fn item(id: &str, title: &str) -> crate::index::items::Item {
+    serde_json::from_value(json!({ "id": id, "kind": "email", "title": title, "time": "2026-11-03T09:00:00Z" })).unwrap()
 }
 
 fn mail(id: &str, title: &str) -> Value {
@@ -175,7 +179,7 @@ fn a_sync_that_is_stopped_is_no_failure_and_writes_nothing_after() {
     assert_eq!(test.shell.state(&id).error, None);
     // A put for an account that is not being synced is refused.
     let generation = test.shell.lock().generations;
-    let put = ConnectorRequest::ItemsPut { account: id.clone(), items: vec![crate::connections::items::item("9", "Late")] };
+    let put = ConnectorRequest::ItemsPut { account: id.clone(), items: vec![item("9", "Late")] };
     assert!(test.shell.answer(generation, put).unwrap_err().contains("not being synced"));
     let many = ConnectorRequest::ItemsRemove { account: id, ids: vec!["x".into(); ITEMS_AT_ONCE + 1] };
     assert!(test.shell.answer(generation, many).unwrap_err().contains("at most 200"));
@@ -221,7 +225,7 @@ fn a_failing_sync_is_tried_again_and_a_crash_restarts_the_watch() {
 #[test]
 fn a_search_answers_within_its_budget() {
     let test = Test::quick("search");
-    test.items.put("work", &[crate::connections::items::item("1", "Quarterly invoice")]).unwrap();
+    test.items.put("work", &[item("1", "Quarterly invoice")]).unwrap();
     let searched = test.shell.search("invoice", 10);
     assert!(searched.complete);
     assert_eq!(searched.found[0].item.title, "Quarterly invoice");

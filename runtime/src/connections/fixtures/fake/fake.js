@@ -2,7 +2,7 @@
 // A connector for tests, as an extension's build would leave it. What it
 // syncs is what the file `config.source` says:
 //
-//   { "version": 2, "password": "…", "items": [ConnectorItem…], "removed": ["id"…],
+//   { "version": 2, "password": "…", "items": [ConnectionItem…], "removed": ["id"…],
 //     "fail": "auth" | "unavailable" | "failed", "hang": true | "deaf" }
 //
 // Its cursor is the version: a sync from the version there is brings

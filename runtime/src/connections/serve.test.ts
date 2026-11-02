@@ -2,13 +2,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConnectorAccount } from "../../../shared/bindings/ConnectorAccount";
-import type { ConnectorItem } from "../../../shared/bindings/ConnectorItem";
+import type { ConnectionItem } from "../../../shared/bindings/ConnectionItem";
 import { ConnectorError, type Connector } from "../heyo/connector";
 import { pair } from "../transport";
 import { loader } from "./load";
 import { limits, serve } from "./serve";
 
-const item = (id: number): ConnectorItem => ({ id: String(id), kind: "email", title: `Mail ${id}`, time: "2026-11-03T09:00:00Z" });
+const item = (id: number): ConnectionItem => ({ id: String(id), kind: "email", title: `Mail ${id}`, time: "2026-11-03T09:00:00Z" });
 
 const account: ConnectorAccount = { id: "work", name: "Work", connector: { extension: "@heyo", command: "test" }, config: { host: "h" } };
 

@@ -35,7 +35,7 @@ use serde_json::Value;
 use ts_rs::TS;
 
 use super::accounts::{Kept, Kind, Synced, Trouble};
-use super::items::{Found, Items};
+use crate::index::items::{Found, Items};
 use super::scheduler::{Effect, ErrorKind, Input, Limits, Phase, Plan, Scheduler, Time};
 use crate::helper::Helper;
 use crate::wire::{ConnectorAccount, ConnectorCall, ConnectorError, ConnectorRequest, ITEMS_AT_ONCE};
@@ -292,7 +292,7 @@ impl Shell {
         let (told, answer) = mpsc::channel();
         let (items, query) = (self.items.clone(), query.to_owned());
         std::thread::spawn(move || {
-            let _ = told.send(items.search(&query, limit, chrono::Local::now()));
+            let _ = told.send(items.search(&query, limit, chrono::Local::now()).map_err(|e| e.to_string()));
         });
         match answer.recv_timeout(SEARCH_BUDGET) {
             Ok(Ok(found)) => Searched { found, complete: true },
@@ -519,8 +519,9 @@ impl Shell {
     /// Answers a request of the runtime's.
     fn answer(self: &Arc<Self>, generation: u64, request: ConnectorRequest) -> Result<Value, String> {
         match request {
-            ConnectorRequest::ItemsPut { account, items } => self.write(generation, &account, items.len(), || self.items.put(&account, &items)),
-            ConnectorRequest::ItemsRemove { account, ids } => self.write(generation, &account, ids.len(), || self.items.remove(&account, &ids)),
+            // An item the store cannot read (a time that is none) refuses the batch: nothing of it is written.
+            ConnectorRequest::ItemsPut { account, items } => self.write(generation, &account, items.len(), || self.items.put(&account, &items).map_err(|e| e.to_string())),
+            ConnectorRequest::ItemsRemove { account, ids } => self.write(generation, &account, ids.len(), || self.items.remove(&account, &ids).map_err(|e| e.to_string())),
             ConnectorRequest::Secret { account, name } => {
                 let (_, kind) = self.place.account(&account).ok_or_else(|| format!("there is no connection {account}"))?;
                 if !kind.secret(&name) {

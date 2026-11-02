@@ -171,7 +171,7 @@ pub struct Item {
 }
 
 /// An item a search found.
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/", rename = "ConnectionFound")]
 pub struct Found {

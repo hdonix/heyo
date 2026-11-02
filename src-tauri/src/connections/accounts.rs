@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ts_rs::TS;
 
-use super::items::ItemKind;
+use crate::index::items::ItemKind;
 use super::scheduler::{ErrorKind, Plan, Past, Time};
 use crate::extensions::Choice;
 use crate::i18n::{t, tf};
