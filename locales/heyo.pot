@@ -159,6 +159,7 @@ msgstr ""
 
 #: src-tauri/src/connections/builtins.rs
 #: src-tauri/src/models/kinds/openai.rs
+#: runtime/src/connections/builtin/calendar.ts
 #: runtime/src/connections/builtin/imap.ts
 msgid "Server"
 msgstr ""
@@ -180,6 +181,7 @@ msgid "None"
 msgstr ""
 
 #: src-tauri/src/connections/builtins.rs
+#: runtime/src/connections/builtin/calendar.ts
 #: runtime/src/connections/builtin/imap.ts
 msgid "User Name"
 msgstr ""
@@ -238,6 +240,47 @@ msgstr ""
 
 #: src-tauri/src/connections/builtins.rs
 msgid "Microsoft wants most accounts to sign in through its own page (OAuth), which Heyo cannot do yet: an app password works only where the account still allows one."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "CalDAV Calendar"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Calendars"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "The names of the calendars to bring; all of them when left empty."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the Apple Account's address as the user name, and an app-specific password made in its settings."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the whole address as the user name, and an app password with calendar access."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Feishu"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "In Feishu's calendar settings, turn on CalDAV sync: it shows the user name and password to use."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Calendar Subscription"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+#: runtime/src/connections/builtin/calendar.ts
+msgid "Address"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "A calendar's address in iCalendar format (.ics), such as Google Calendar's secret address in iCal format."
 msgstr ""
 
 #: src-tauri/src/connections/commands.rs
@@ -5197,6 +5240,26 @@ msgstr ""
 msgid "The Speedtest download does not match the expected file; not using it."
 msgstr ""
 
+#: runtime/src/connections/builtin/calendar.ts
+msgid "The server has no calendars."
+msgstr ""
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "No calendar is named {0}."
+msgstr ""
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "{0} is not an address."
+msgstr ""
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "The address answered {0}."
+msgstr ""
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "The address did not answer with a calendar: {0}"
+msgstr ""
+
 #: runtime/src/connections/builtin/common.ts
 msgid "{0} is not set."
 msgstr ""
@@ -5211,6 +5274,10 @@ msgstr ""
 
 #: runtime/src/connections/builtin/common.ts
 msgid "The server could not be reached: {0}"
+msgstr ""
+
+#: runtime/src/connections/builtin/events.ts
+msgid "(no title)"
 msgstr ""
 
 #: runtime/src/connections/builtin/imap.ts

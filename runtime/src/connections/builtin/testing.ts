@@ -10,6 +10,12 @@ import net from "node:net";
 
 import type { Item, SyncIo, Tool } from "../../heyo/connector";
 
+/// The time the calendar tests are run at.
+export const now = new Date("2026-11-03T12:00:00Z");
+
+/// iCalendar of these lines, as servers write it: joined by CRLF.
+export const calendar = (...lines: string[]) => ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Heyo//Test//EN", ...lines, "END:VCALENDAR"].join("\r\n");
+
 /// A sync's `io`, keeping what it put, removed and said of its tools.
 export function recorder(signal = new AbortController().signal) {
   const put: Item[] = [];
@@ -42,10 +48,11 @@ export interface Container {
 
 /// Starts `image` with `args` after it, its `ports` published on random
 /// loopback ports, and waits until the first of them takes connections.
-export async function start(command: string, image: string, ports: number[], options: { env?: Record<string, string>; args?: string[]; probe?: string } = {}): Promise<Container> {
+export async function start(command: string, image: string, ports: number[], options: { env?: Record<string, string>; volumes?: string[]; args?: string[]; probe?: string } = {}): Promise<Container> {
   const env = Object.entries(options.env ?? {}).flatMap(([name, value]) => ["-e", `${name}=${value}`]);
   const published = ports.flatMap((port) => ["-p", `127.0.0.1::${port}`]);
-  const id = execFileSync(command, ["run", "-d", "--rm", ...env, ...published, image, ...(options.args ?? [])], { encoding: "utf8" }).trim();
+  const volumes = (options.volumes ?? []).flatMap((volume) => ["-v", volume]);
+  const id = execFileSync(command, ["run", "-d", "--rm", ...env, ...volumes, ...published, image, ...(options.args ?? [])], { encoding: "utf8" }).trim();
   const mapped = new Map<number, number>();
   for (const port of ports) {
     const line = execFileSync(command, ["port", id, String(port)], { encoding: "utf8" }).trim().split("\n")[0];

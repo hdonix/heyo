@@ -162,6 +162,7 @@ msgstr "IMAP 邮件"
 
 #: src-tauri/src/connections/builtins.rs
 #: src-tauri/src/models/kinds/openai.rs
+#: runtime/src/connections/builtin/calendar.ts
 #: runtime/src/connections/builtin/imap.ts
 msgid "Server"
 msgstr "服务器"
@@ -183,6 +184,7 @@ msgid "None"
 msgstr "无"
 
 #: src-tauri/src/connections/builtins.rs
+#: runtime/src/connections/builtin/calendar.ts
 #: runtime/src/connections/builtin/imap.ts
 msgid "User Name"
 msgstr "用户名"
@@ -242,6 +244,47 @@ msgstr "用户名填 @icloud.com 前面的部分，密码填在 Apple 账户设�
 #: src-tauri/src/connections/builtins.rs
 msgid "Microsoft wants most accounts to sign in through its own page (OAuth), which Heyo cannot do yet: an app password works only where the account still allows one."
 msgstr "微软要求大多数账户通过它自己的页面（OAuth）登录，Heyo 暂时还做不到：只有账户仍然允许时，应用专用密码才能用。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "CalDAV Calendar"
+msgstr "CalDAV 日历"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Calendars"
+msgstr "日历"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "The names of the calendars to bring; all of them when left empty."
+msgstr "要同步的日历的名称；留空则同步全部日历。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the Apple Account's address as the user name, and an app-specific password made in its settings."
+msgstr "用户名填 Apple 账户的邮箱地址，密码填在账户设置里生成的应用专用密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the whole address as the user name, and an app password with calendar access."
+msgstr "用户名填完整的邮箱地址，密码填一个有日历权限的应用专用密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Feishu"
+msgstr "飞书"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "In Feishu's calendar settings, turn on CalDAV sync: it shows the user name and password to use."
+msgstr "在飞书的日历设置里开启 CalDAV 同步，它会给出要填的用户名和密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Calendar Subscription"
+msgstr "日历订阅"
+
+#: src-tauri/src/connections/builtins.rs
+#: runtime/src/connections/builtin/calendar.ts
+msgid "Address"
+msgstr "地址"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "A calendar's address in iCalendar format (.ics), such as Google Calendar's secret address in iCal format."
+msgstr "iCalendar 格式（.ics）的日历地址，例如 Google 日历的“iCal 格式的私密地址”。"
 
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
@@ -5186,6 +5229,26 @@ msgstr "无法下载 Speedtest（{0}）。"
 msgid "The Speedtest download does not match the expected file; not using it."
 msgstr "下载的 Speedtest 与预期的文件不符，不会使用它。"
 
+#: runtime/src/connections/builtin/calendar.ts
+msgid "The server has no calendars."
+msgstr "服务器上没有日历。"
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "No calendar is named {0}."
+msgstr "没有名为 {0} 的日历。"
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "{0} is not an address."
+msgstr "{0} 不是一个地址。"
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "The address answered {0}."
+msgstr "这个地址返回了 {0}。"
+
+#: runtime/src/connections/builtin/calendar.ts
+msgid "The address did not answer with a calendar: {0}"
+msgstr "这个地址返回的不是日历：{0}"
+
 #: runtime/src/connections/builtin/common.ts
 msgid "{0} is not set."
 msgstr "没有设置{0}。"
@@ -5201,6 +5264,10 @@ msgstr "服务器拒绝了登录凭据：{0}"
 #: runtime/src/connections/builtin/common.ts
 msgid "The server could not be reached: {0}"
 msgstr "无法连接服务器：{0}"
+
+#: runtime/src/connections/builtin/events.ts
+msgid "(no title)"
+msgstr "（无标题）"
 
 #: runtime/src/connections/builtin/imap.ts
 msgid "(no subject)"

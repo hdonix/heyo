@@ -100,9 +100,46 @@ fn imap() -> Kind {
     )
 }
 
+fn caldav() -> Kind {
+    let server = |title: &str, url: &str, note: &str, web: Option<&str>| preset(title, json!({ "url": url }), note, web);
+    kind(
+        "caldav",
+        t("CalDAV Calendar"),
+        "calendar-16",
+        vec![ItemKind::Event],
+        vec![
+            field("url", t("Server"), FieldType::Text).required().placeholder("https://caldav.example.com/"),
+            field("username", t("User Name"), FieldType::Text).required(),
+            password(),
+            field("calendars", t("Calendars"), FieldType::List).description(t("The names of the calendars to bring; all of them when left empty.")),
+        ],
+        vec![
+            server("iCloud", "https://caldav.icloud.com/", t("Use the Apple Account's address as the user name, and an app-specific password made in its settings."), Some("https://www.icloud.com/calendar")),
+            server("Fastmail", "https://caldav.fastmail.com/", t("Use the whole address as the user name, and an app password with calendar access."), Some("https://app.fastmail.com/calendar")),
+            server(t("Feishu"), "https://caldav.feishu.cn/", t("In Feishu's calendar settings, turn on CalDAV sync: it shows the user name and password to use."), None),
+        ],
+        Sync { every: Some("30m".into()), watch: false },
+    )
+}
+
+fn ics() -> Kind {
+    kind(
+        "ics",
+        t("Calendar Subscription"),
+        "calendar-16",
+        vec![ItemKind::Event],
+        vec![field("url", t("Address"), FieldType::Text)
+            .required()
+            .placeholder("https://example.com/calendar.ics")
+            .description(t("A calendar's address in iCalendar format (.ics), such as Google Calendar's secret address in iCal format."))],
+        Vec::new(),
+        Sync { every: Some("30m".into()), watch: false },
+    )
+}
+
 /// Heyo's own connectors.
 pub fn kinds() -> Vec<Kind> {
-    vec![imap()]
+    vec![imap(), caldav(), ics()]
 }
 
 #[cfg(test)]
