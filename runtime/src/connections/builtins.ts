@@ -6,5 +6,6 @@
 import type { Connector } from "../heyo/connector";
 import { caldav, ics } from "./builtin/calendar";
 import { imap } from "./builtin/imap";
+import { mcp } from "./builtin/mcp";
 
-export const builtinConnectors: Record<string, Connector> = { imap, caldav, ics };
+export const builtinConnectors: Record<string, Connector> = { imap, caldav, ics, mcp };

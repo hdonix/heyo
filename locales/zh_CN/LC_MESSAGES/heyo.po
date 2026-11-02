@@ -286,6 +286,64 @@ msgstr "地址"
 msgid "A calendar's address in iCalendar format (.ics), such as Google Calendar's secret address in iCal format."
 msgstr "iCalendar 格式（.ics）的日历地址，例如 Google 日历的“iCal 格式的私密地址”。"
 
+#: src-tauri/src/connections/builtins.rs
+msgid "MCP Server"
+msgstr "MCP 服务器"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Runs"
+msgstr "运行位置"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "On This Computer"
+msgstr "在本机"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "At an Address"
+msgstr "在远程地址"
+
+#: src-tauri/src/connections/builtins.rs
+#: src/rows.ts
+msgid "Command"
+msgstr "命令"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "The program that starts the server, for one on this computer."
+msgstr "启动服务器的程序，用于本机运行的服务器。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Arguments"
+msgstr "参数"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Environment"
+msgstr "环境变量"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Variables the server is started with, one NAME=value each; keys go in Secret Environment."
+msgstr "启动服务器时带上的变量，每项一个 NAME=value；密钥请填在“保密环境变量”里。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Secret Environment"
+msgstr "保密环境变量"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Variables kept with the secrets, NAME=value apart by spaces."
+msgstr "和密钥一起保存的变量，NAME=value，用空格分隔。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "The server's Streamable HTTP address, for one elsewhere."
+msgstr "服务器的 Streamable HTTP 地址，用于在别处运行的服务器。"
+
+#: src-tauri/src/connections/builtins.rs
+#: src-tauri/src/models/kinds/doubao.rs
+msgid "Access Token"
+msgstr "Access Token"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Sent as a bearer token, to a server at an address that asks for one."
+msgstr "作为 Bearer 令牌发送给需要它的远程服务器。"
+
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
 msgstr "{0} 不是已安装的连接器。"
@@ -1188,10 +1246,6 @@ msgstr "APP ID"
 #: src-tauri/src/models/kinds/doubao.rs
 msgid "From the old console, with its Access Token."
 msgstr "在旧版控制台获取，与 Access Token 一起使用。"
-
-#: src-tauri/src/models/kinds/doubao.rs
-msgid "Access Token"
-msgstr "Access Token"
 
 #: src-tauri/src/models/kinds/doubao.rs
 msgid "From the old console."
@@ -3756,10 +3810,6 @@ msgid "Application"
 msgstr "应用程序"
 
 #: src/rows.ts
-msgid "Command"
-msgstr "命令"
-
-#: src/rows.ts
 msgid "Quicklink"
 msgstr "快速链接"
 
@@ -5238,6 +5288,7 @@ msgid "No calendar is named {0}."
 msgstr "没有名为 {0} 的日历。"
 
 #: runtime/src/connections/builtin/calendar.ts
+#: runtime/src/connections/builtin/mcp.ts
 msgid "{0} is not an address."
 msgstr "{0} 不是一个地址。"
 
@@ -5276,6 +5327,18 @@ msgstr "（无主题）"
 #: runtime/src/connections/builtin/imap.ts
 msgid "Attachment"
 msgstr "附件"
+
+#: runtime/src/connections/builtin/mcp.ts
+msgid "A server elsewhere needs an address."
+msgstr "远程服务器需要一个地址。"
+
+#: runtime/src/connections/builtin/mcp.ts
+msgid "A server on this computer needs a command."
+msgstr "在本机运行的服务器需要一个命令。"
+
+#: runtime/src/connections/builtin/mcp.ts
+msgid "Reading the resources"
+msgstr "正在读取资源"
 
 #: runtime/src/session.ts
 msgid "Could not prepare {0} for Linux"

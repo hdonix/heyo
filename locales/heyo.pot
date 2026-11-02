@@ -283,6 +283,64 @@ msgstr ""
 msgid "A calendar's address in iCalendar format (.ics), such as Google Calendar's secret address in iCal format."
 msgstr ""
 
+#: src-tauri/src/connections/builtins.rs
+msgid "MCP Server"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Runs"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "On This Computer"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "At an Address"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+#: src/rows.ts
+msgid "Command"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "The program that starts the server, for one on this computer."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Arguments"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Environment"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Variables the server is started with, one NAME=value each; keys go in Secret Environment."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Secret Environment"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Variables kept with the secrets, NAME=value apart by spaces."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "The server's Streamable HTTP address, for one elsewhere."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+#: src-tauri/src/models/kinds/doubao.rs
+msgid "Access Token"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Sent as a bearer token, to a server at an address that asks for one."
+msgstr ""
+
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
 msgstr ""
@@ -1184,10 +1242,6 @@ msgstr ""
 
 #: src-tauri/src/models/kinds/doubao.rs
 msgid "From the old console, with its Access Token."
-msgstr ""
-
-#: src-tauri/src/models/kinds/doubao.rs
-msgid "Access Token"
 msgstr ""
 
 #: src-tauri/src/models/kinds/doubao.rs
@@ -3764,10 +3818,6 @@ msgid "Application"
 msgstr ""
 
 #: src/rows.ts
-msgid "Command"
-msgstr ""
-
-#: src/rows.ts
 msgid "Quicklink"
 msgstr ""
 
@@ -5249,6 +5299,7 @@ msgid "No calendar is named {0}."
 msgstr ""
 
 #: runtime/src/connections/builtin/calendar.ts
+#: runtime/src/connections/builtin/mcp.ts
 msgid "{0} is not an address."
 msgstr ""
 
@@ -5286,6 +5337,18 @@ msgstr ""
 
 #: runtime/src/connections/builtin/imap.ts
 msgid "Attachment"
+msgstr ""
+
+#: runtime/src/connections/builtin/mcp.ts
+msgid "A server elsewhere needs an address."
+msgstr ""
+
+#: runtime/src/connections/builtin/mcp.ts
+msgid "A server on this computer needs a command."
+msgstr ""
+
+#: runtime/src/connections/builtin/mcp.ts
+msgid "Reading the resources"
 msgstr ""
 
 #: runtime/src/session.ts

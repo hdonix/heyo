@@ -137,9 +137,29 @@ fn ics() -> Kind {
     )
 }
 
+fn mcp() -> Kind {
+    kind(
+        "mcp",
+        t("MCP Server"),
+        "plug-16",
+        vec![ItemKind::Document],
+        vec![
+            field("transport", t("Runs"), FieldType::Choice).default(json!("command")).choices(&[("command", t("On This Computer")), ("http", t("At an Address"))]),
+            field("command", t("Command"), FieldType::Text).placeholder("npx").description(t("The program that starts the server, for one on this computer.")),
+            field("args", t("Arguments"), FieldType::List).placeholder("-y"),
+            field("env", t("Environment"), FieldType::List).placeholder("NAME=value").description(t("Variables the server is started with, one NAME=value each; keys go in Secret Environment.")),
+            field("secretEnv", t("Secret Environment"), FieldType::Secret).placeholder("API_KEY=… TOKEN=…").description(t("Variables kept with the secrets, NAME=value apart by spaces.")),
+            field("url", t("Address"), FieldType::Text).placeholder("https://example.com/mcp").description(t("The server's Streamable HTTP address, for one elsewhere.")),
+            field("token", t("Access Token"), FieldType::Secret).description(t("Sent as a bearer token, to a server at an address that asks for one.")),
+        ],
+        Vec::new(),
+        Sync { every: Some("1h".into()), watch: true },
+    )
+}
+
 /// Heyo's own connectors.
 pub fn kinds() -> Vec<Kind> {
-    vec![imap(), caldav(), ics()]
+    vec![imap(), caldav(), ics(), mcp()]
 }
 
 #[cfg(test)]

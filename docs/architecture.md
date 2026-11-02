@@ -402,7 +402,14 @@ and keeps the list of applications current. The rest, by what it is for:
   Heyo's own that the root search does not list
   (`runtime/src/builtins/connection.tsx`). Its tests run the
   built runtime with a fake connector
-  (`runtime/src/connections/fixtures/fake`).
+  (`runtime/src/connections/fixtures/fake`). Heyo's own connectors are
+  declared in `builtins.rs` and run from `runtime/src/connections/
+  builtin/`: IMAP mail (imapflow, mailparser), CalDAV calendars (tsdav)
+  and iCalendar subscriptions (both parsed by ical.js, `events.ts`), and
+  MCP servers' resources (the MCP SDK; their tools are listed, never
+  called). What they share is `common.ts`. Their tests against real
+  servers (GreenMail, Radicale) run in containers with
+  `HEYO_CONTAINER_TESTS=1`.
 
 **Keeping the house.**
 
