@@ -5,7 +5,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { download, Failure, type Lock, manifest, type PinnedFile, said, sha256 } from "./install";
-import dictationLock from "./locks/dictation.json";
 import esbuildLock from "./locks/esbuild.json";
 import ocrLock from "./locks/ocr.json";
 
@@ -103,7 +102,6 @@ describe("what a helper says went wrong", () => {
 
 describe("the engines' lockfiles", () => {
   const locks: [string, Lock, string, string][] = [
-    ["dictation", dictationLock, "sherpa-onnx-node", "1.13.8"],
     ["ocr", ocrLock, "@gutenye/ocr-node", "1.4.9"],
     ["esbuild", esbuildLock, "esbuild", "0.28.2"],
   ];

@@ -77,7 +77,7 @@
     "licenseFile": "../LICENSE",
     "homepage": "https://github.com/hdonix/heyo",
     "shortDescription": "Command palette launcher that runs Raycast extensions",
-    "longDescription": "Heyo is a keyboard-driven launcher: it opens applications, files and links,\ncalculates, keeps a clipboard history, takes dictation, and runs extensions\nwritten for Raycast.\n\nExtensions, dictation and text recognition run in Node.js 22 or newer,\nwhich Heyo finds on PATH or at the path given in its settings.",
+    "longDescription": "Heyo is a keyboard-driven launcher: it opens applications, files and links,\ncalculates, keeps a clipboard history, takes dictation, and runs extensions\nwritten for Raycast.\n\nExtensions and text recognition run in Node.js 22 or newer,\nwhich Heyo finds on PATH or at the path given in its settings.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -88,7 +88,6 @@
     ],
     "resources": {
       "../runtime/dist/heyo-runtime.cjs": "heyo-runtime.cjs",
-      "../runtime/dist/heyo-dictation.cjs": "heyo-dictation.cjs",
       "../runtime/dist/heyo-ocr.cjs": "heyo-ocr.cjs",
       "../runtime/dist/heyo-dev.cjs": "heyo-dev.cjs",
       "../runtime/dist/heyo-embed.cjs": "heyo-embed.cjs"

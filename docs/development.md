@@ -249,8 +249,15 @@ tried by hand there.
 - **The web view** of a debug build has its inspector, as Tauri's debug
   builds do: right-click, Inspect Element.
 - **A script of your own in place of a helper**: `HEYO_RUNTIME`,
-  `HEYO_DICTATION`, `HEYO_OCR`, `HEYO_EMBED` and `HEYO_DEV` each name a
-  file to run instead of the bundled `heyo-*.cjs`.
+  `HEYO_OCR`, `HEYO_EMBED` and `HEYO_DEV` each name a file to run instead
+  of the bundled `heyo-*.cjs`.
+- **Dictation without a microphone or the network**: `HEYO_DICTATION_WAV`
+  names a WAV file (16 kHz mono 16-bit, as `scripts/gui-test/say.py`
+  writes) that is heard in place of the microphone, at the pace of speech;
+  `HEYO_DICTATION_MIRROR` names a server the speech models are downloaded
+  from instead of their own addresses, by their file names
+  (`model.int8.onnx`, `tokens.txt`, `silero_vad.onnx`), still checked
+  against their hashes.
 
 ## Installing your build
 

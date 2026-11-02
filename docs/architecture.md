@@ -15,14 +15,14 @@ flowchart LR
     palette["Palette: root search, a command's view"]
   end
   subgraph host["Host: src-tauri/ (Rust, Tauri)"]
-    core["Index, settings, clipboard history, permissions, live activities"]
+    core["Index, settings, clipboard history, permissions, live activities, dictation"]
     settings["Settings, dictation pill, screenshot overlay, pinned captures: slint_windows/ (Slint)"]
     platform["platform/: trait Desktop"]
   end
   subgraph node["Node.js: runtime/"]
     runtime["Extension runtime: @raycast/api, @heyo/api, Heyo's own commands"]
     background["Background runtime: menu bar and background commands"]
-    helpers["Helpers: dictation, text recognition, embeddings"]
+    helpers["Helpers: text recognition, embeddings"]
   end
   desktop["The desktop: X11, GNOME Shell extension over D-Bus, Win32"]
 
@@ -61,10 +61,12 @@ flowchart LR
 The runtime is started when a command first needs it, and there may be two
 of it: the one whose command is in the palette, and a second for menu bar
 and background commands (`runtime/src/background.ts`), so that those never
-disturb the command on screen. Dictation, text recognition and the
-embedding model are further Node.js programs of their own (their engines
-are native packages installed on demand), started the same way
-(`src-tauri/src/helper.rs`). The launcher itself works without Node.js.
+disturb the command on screen. Text recognition and the embedding model
+are further Node.js programs of their own (their engines are native
+packages installed on demand), started the same way
+(`src-tauri/src/helper.rs`). Dictation is the host's own, its speech
+recognizer linked into the program. The launcher itself works without
+Node.js.
 
 ## How the parts talk
 
@@ -291,7 +293,19 @@ and keeps the list of applications current. The rest, by what it is for:
 - `screenshot.rs`, `ocr.rs` and `dictation.rs` are those features: the
   capture and what becomes of the part selected (`screenshot/selecting.rs`
   is the overlay's rules, which know no toolkit), the text-recognition
-  helper, the dictation helper with its progress window.
+  helper, dictation with its progress window.
+- A recording (`dictation/listening.rs`) records the microphone
+  (`dictation/microphone.rs`: the PulseAudio protocol on Linux, which
+  PipeWire speaks too, cpal elsewhere; or a WAV file at the pace of speech,
+  `HEYO_DICTATION_WAV`) and feeds a `Recognizer` (`dictation/engine.rs`),
+  which says the sentence in progress and each finished one. The one there
+  is, `engine/sense_voice.rs`, is SenseVoice with Silero's voice-activity
+  detector through sherpa-onnx's Rust API, from model files downloaded on
+  demand (`dictation/models.rs`: exact revisions, checked against hashes
+  written in the source); `engine/sentences.rs` is one recording as a
+  recognizer that is not a streaming one hears it, apart from the engine
+  so that a test can play the recognizer. A recognizer that streams, or
+  one that sends the audio to a service, takes the same place.
 - A recording's words reach the application one of two ways, which
   `dictation.rs` chooses when the recording starts (`Way`, with a thread
   of the recording's own to go it). Each has a module that is told what
@@ -528,12 +542,9 @@ Windows it registers them itself.
 - `dev/` is the developer tools, bundled separately as `heyo-dev.cjs` and
   started by `heyo build`, `dev`, `migrate` and `ext check`
   ([developing-extensions.md](developing-extensions.md)).
-- `dictation.ts`, `ocr.ts` and `embed.ts` are the helpers, each a program
-  of its own. `sentences.ts` is one recording as the dictation helper
-  hears it (the sentence in progress, each finished sentence), apart from
-  the program so that a test can play the recognizer. `install.ts`
-  fetches the helpers' engines and models: exact revisions, checked
-  against hashes written in the source.
+- `ocr.ts` and `embed.ts` are the helpers, each a program of its own.
+  `install.ts` fetches the helpers' engines and models: exact revisions,
+  checked against hashes written in the source.
 - `compat.ts` helps extensions written with only macOS in mind, where
   something can be done, and says so clearly where not.
 

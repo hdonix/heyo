@@ -445,11 +445,11 @@ named.
 
 | Program | For |
 |---|---|
-| Node.js 22 or newer (`node` on `PATH`, or its path in Settings → Advanced) | extensions and Heyo's own view commands, dictation, text recognition |
+| Node.js 22 or newer (`node` on `PATH`, or its path in Settings → Advanced) | extensions and Heyo's own view commands, text recognition |
 | `xdotool` | the paste keystroke on X11: Clipboard History, snippets, emoji, dictation |
 | `wtype` or `ydotool` | the same on Wayland, where Heyo's GNOME Shell extension is not there to do it |
-| `parec` (PulseAudio or PipeWire) or `arecord` | recording, for dictation |
-| `pactl` | the volume commands, Switch Audio Device, choosing the microphone |
+| PipeWire or PulseAudio, or else `arecord` | recording, for dictation |
+| `pactl` | the volume commands, Switch Audio Device |
 | `notify-send` | notifications |
 | `gnome-screenshot` | capturing, where Heyo cannot read the screen itself |
 | `npm` | installing the text-recognition engine |

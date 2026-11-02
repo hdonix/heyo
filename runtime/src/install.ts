@@ -1,5 +1,5 @@
-//! Fetching what Heyo installs on demand (the speech and text-recognition
-//! engines and their models), so that what runs is what was chosen when
+//! Fetching what Heyo installs on demand (the text-recognition and
+//! embedding engines and their models), so that what runs is what was chosen when
 //! Heyo was built and not whatever the network hands over that day.
 //!
 //! What a helper has to say to the user it says as a code and its

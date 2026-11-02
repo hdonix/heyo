@@ -1,11 +1,13 @@
-// Stands in for Heyo's helpers (heyo-dictation.cjs, heyo-ocr.cjs,
-// heyo-embed.cjs) when a download is tried in the sandbox: it fetches
+// Stands in for Heyo's helpers (heyo-ocr.cjs, heyo-embed.cjs) when a download is tried in the sandbox: it fetches
 // nothing. Asked to install, it reports progress for a few seconds, as an
 // installer does, leaves the empty files Heyo takes for the thing being
 // there, and says it is installed; with HEYO_INSTALL_STUB=fail it says
 // what went wrong instead. Asked anything else, it ends without a word.
 //
-//   HEYO_DICTATION=…/install-stub.cjs HEYO_OCR=… HEYO_EMBED=… heyo
+//   HEYO_OCR=…/install-stub.cjs HEYO_EMBED=… heyo
+//
+// (Dictation's models are fetched by Heyo itself: HEYO_DICTATION_MIRROR
+// names a server to fetch them from instead.)
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -14,11 +16,10 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Which helper this is run as: by the directories Heyo names for it.
 const places = {
-  dictation: [process.env.HEYO_DICTATION_DIR, ["node_modules/sherpa-onnx-node/", "models/sense-voice/model.int8.onnx", "models/sense-voice/tokens.txt", "models/silero_vad.onnx"]],
   embed: [process.env.HEYO_EMBED_DIR, ["node_modules/onnxruntime-node/", "model/model_quantized.onnx", "model/tokenizer.json"]],
   ocr: [process.env.HEYO_OCR_DIR, ["node_modules/@gutenye/ocr-node/"]],
 };
-const kind = places.dictation[0] ? "dictation" : places.embed[0] ? "embed" : "ocr";
+const kind = places.embed[0] ? "embed" : "ocr";
 
 (async () => {
   if (process.argv[2] !== "install") return;
