@@ -251,7 +251,8 @@ pub fn run() {
             activities::activities,
             activities::activity_action,
             activities::activity_dismiss,
-            connections::commands::search_connections
+            connections::commands::search_connections,
+            connections::commands::preview_connection
         ]))
         .setup(move |app| {
             // Extension icons and assets.

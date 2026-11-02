@@ -112,7 +112,7 @@ describe("a manifest", () => {
       { name: "security", title: "Security", type: "choice", default: "tls", choices: [{ title: "TLS", value: "tls" }] },
       { name: "password", title: "Password", type: "secret" },
     ];
-    const whole = { items: ["email"], fields, presets: [{ title: "Gmail", values: { host: "imap.gmail.com" } }], sync: { every: "15m", watch: true } };
+    const whole = { items: ["email"], fields, presets: [{ title: "Gmail", values: { host: "imap.gmail.com" }, web: "https://mail.google.com" }], sync: { every: "15m", watch: true } };
     expect(validateManifest(connector(whole), there).problems).toEqual([]);
     expect(validateManifest(connector(undefined), there).problems).toEqual([]);
     // Without the permission.
@@ -125,6 +125,7 @@ describe("a manifest", () => {
     expect(wrong({ fields: [{ name: "x", title: "X", type: "secret", default: "pw" }] })[0]).toContain("no default");
     expect(wrong({ fields, presets: [{ title: "Leak", values: { password: "pw" } }] })[0]).toContain('sets the secret "password"');
     expect(wrong({ fields, presets: [{ title: "Odd", values: { colour: "red" } }] })[0]).toContain("not a field");
+    expect(wrong({ fields, presets: [{ title: "Web", values: {}, web: "mail.example.com" }] })[0]).toContain("not an http(s) address");
     expect(wrong({ sync: { every: "often" } })[0]).toContain("15m");
     expect(wrong({ sync: { watch: "yes" } })[0]).toContain("true or false");
   });

@@ -165,6 +165,7 @@ function checkConnector(at: string, heyo: unknown, error: (message: string) => v
       error(`${at}: a preset needs a "title" and "values"`);
       continue;
     }
+    if (preset.web !== undefined && !(isText(preset.web) && /^https?:\/\//.test(preset.web))) error(`${at}: preset "${preset.title}" has a "web" that is not an http(s) address`);
     for (const [name, value] of Object.entries(preset.values)) {
       const type = types.get(name);
       if (!type) error(`${at}: preset "${preset.title}" sets "${name}", which is not a field`);

@@ -98,6 +98,11 @@ pub struct Preset {
     pub title: String,
     #[ts(type = "Record<string, unknown>")]
     pub values: Map<String, Value>,
+    /// Where the service is read in a browser (`https://mail.google.com`):
+    /// what an item of an account set up so is opened in from the palette.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub web: Option<String>,
 }
 
 /// How its accounts are synced (`heyo.sync`).
@@ -156,6 +161,12 @@ impl Kind {
 
     pub fn builtin(&self) -> bool {
         self.extension == crate::extensions::BUILTIN
+    }
+
+    /// The web address of the preset an account set up with `config` is of:
+    /// the first with one whose values are all the account's.
+    pub fn web(&self, config: &Map<String, Value>) -> Option<&str> {
+        self.presets.iter().find(|preset| preset.web.is_some() && preset.values.iter().all(|(name, value)| config.get(name) == Some(value))).and_then(|preset| preset.web.as_deref())
     }
 }
 
@@ -275,6 +286,12 @@ fn checked(kind: &Kind, given: &Map<String, Value>, partial: bool) -> Result<(Ma
         config.insert(field.name.clone(), value);
     }
     Ok((config, secrets))
+}
+
+/// The values of `kind`'s fields `given` names, as an account added with
+/// them would have them, its secrets apart: what is tried before it is.
+pub fn trial(kind: &Kind, given: &Map<String, Value>) -> Result<(Map<String, Value>, BTreeMap<String, String>), String> {
+    checked(kind, given, false)
 }
 
 /// An id for a new account of the connector `command`: the command's

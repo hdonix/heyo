@@ -63,6 +63,12 @@ export type Commands = {
   activity_dismiss: { args: { key: string }; result: null };
   /** The palette's search of what connectors synced. */
   search_connections: { args: { query: string }; result: ConnectionsFound };
+  /**
+   * Shows an item that was found in the palette, by Heyo's own command
+   * that previews one (`connection-item`, which the root search does not
+   * list): it is given the item, and the name of its account.
+   */
+  preview_connection: { args: { account: string; id: string }; result: null };
 };
 
 /** The commands that answer nothing: a host played in a test answers them unasked. */
@@ -83,6 +89,7 @@ export const answersNothing = [
   "snippet_expanded",
   "activity_action",
   "activity_dismiss",
+  "preview_connection",
 ] as const satisfies ReadonlyArray<keyof Commands>;
 
 /** What each of the host's events (`event` in ./events) carries. */

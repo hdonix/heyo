@@ -112,6 +112,9 @@ pub(crate) enum Command {
     RemoveConnection(String),
     /// Whether the account works as it is set up, by its id. Slow.
     CheckConnection(String),
+    /// Whether an account of this connector would work set up so, before
+    /// it is added; or, `of` an account there is, as it would be changed. Slow.
+    TryConnection { connector: String, of: Option<String>, config: Map<String, Value>, secrets: std::collections::BTreeMap<String, String> },
     /// Syncs the account now, by its id.
     SyncConnection(String),
     /// What connectors synced that this finds.
@@ -121,7 +124,7 @@ pub(crate) enum Command {
 impl Command {
     /// Whether it may take seconds: a service asked over the network.
     pub(crate) fn slow(&self) -> bool {
-        matches!(self, Command::CheckProvider(_) | Command::ProviderModels(_) | Command::CheckConnection(_))
+        matches!(self, Command::CheckProvider(_) | Command::ProviderModels(_) | Command::CheckConnection(_) | Command::TryConnection { .. })
     }
 
     /// What the host calls it: the name `invoke` knows it by where a web
@@ -170,6 +173,7 @@ impl Command {
             Command::EditConnection { .. } => "edit_connection",
             Command::RemoveConnection(_) => "remove_connection",
             Command::CheckConnection(_) => "check_connection",
+            Command::TryConnection { .. } => "try_connection",
             Command::SyncConnection(_) => "sync_connection",
             Command::SearchConnections(_) => "search_connections",
         }
@@ -230,6 +234,7 @@ impl Host for Running {
             Command::EditConnection { id, name, config, secrets } => Answer::Connections(connections::edit(&app, id, name, config, secrets)?),
             Command::RemoveConnection(id) => Answer::Connections(connections::remove(&app, id)?),
             Command::CheckConnection(id) => connections::check(&app, id).map(|()| Answer::Done)?,
+            Command::TryConnection { connector, of, config, secrets } => connections::try_out(&app, connector, of, config, secrets).map(|()| Answer::Done)?,
             Command::SyncConnection(id) => connections::sync_now(&app, id).map(|()| Answer::Done)?,
             Command::SearchConnections(query) => Answer::Found(connections::search(&app, &query)),
         })
@@ -302,6 +307,7 @@ mod tests {
             Command::RemoveConnection(none()),
             Command::SyncConnection(none()),
             Command::CheckConnection(none()),
+            Command::TryConnection { connector: none(), of: None, config: Map::new(), secrets: Default::default() },
         ];
         for command in changing {
             assert!(!registered.iter().any(|known| known == command.name()), "{}", command.name());

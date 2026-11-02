@@ -4,4 +4,9 @@
  * A way of filling the fields in, for a service the connector knows
  * (`Gmail`, with its server's address).
  */
-export type ConnectorPreset = { title: string, values: Record<string, unknown>, };
+export type ConnectorPreset = { title: string, values: Record<string, unknown>, 
+/**
+ * Where the service is read in a browser (`https://mail.google.com`):
+ * what an item of an account set up so is opened in from the palette.
+ */
+web?: string, };

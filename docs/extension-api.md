@@ -1052,7 +1052,7 @@ accounts have to be given:
       { "name": "unreadOnly", "title": "Unread Only", "type": "switch", "default": false },
       { "name": "password", "title": "Password", "type": "secret", "required": true }
     ],
-    "presets": [{ "title": "Gmail", "values": { "host": "imap.gmail.com", "port": 993 } }],
+    "presets": [{ "title": "Gmail", "values": { "host": "imap.gmail.com", "port": 993 }, "web": "https://mail.google.com" }],
     "sync": { "every": "15m", "watch": true }
   }
 }
@@ -1062,7 +1062,7 @@ accounts have to be given:
 |---|---|
 | `items` | What it brings: `email`, `event`, `message`, `document`, `task`. |
 | `fields` | What an account is given, each `text`, `number`, `list` (of text), `choice` (of `choices`), `switch` or `secret`, with a `default` and `required` where wanted. A secret is kept apart from the settings, never shown again once saved, never sent to a window, and handed to the connector only when it asks for it. |
-| `presets` | Ways of filling the fields in for services the connector knows; never a secret. |
+| `presets` | Ways of filling the fields in for services the connector knows; never a secret. A preset's `web` is where the service is read in a browser: the root search offers to open it for an item of an account set up so. |
 | `sync` | `every`: how often an account is synced (15 minutes when left out; a minute at the least). `watch`: the connector has a `watch` that tells Heyo of changes as they happen. |
 
 The extension's manifest lists the `connector` permission. `heyo ext

@@ -35,7 +35,7 @@ use serde_json::Value;
 use ts_rs::TS;
 
 use super::accounts::{Kept, Kind, Synced, Trouble};
-use crate::index::items::{Found, Items};
+use crate::index::items::{Found, ItemKind, Items};
 use super::scheduler::{Effect, ErrorKind, Input, Limits, Phase, Plan, Scheduler, Time};
 use crate::helper::Helper;
 use crate::wire::{ConnectorAccount, ConnectorCall, ConnectorError, ConnectorRequest, ITEMS_AT_ONCE};
@@ -126,6 +126,41 @@ pub struct Progress {
 pub struct Searched {
     pub found: Vec<Found>,
     pub complete: bool,
+    /// The kind of item the query asked for ("邮件", "meetings"), when
+    /// what was found is of it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub kind: Option<ItemKind>,
+    /// The accounts of what was found, by their ids.
+    #[serde(default)]
+    pub accounts: BTreeMap<String, FoundAccount>,
+}
+
+/// An account something was found in, as the palette shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, TS)]
+#[ts(export, export_to = "../../shared/bindings/", rename = "ConnectionsFoundAccount")]
+pub struct FoundAccount {
+    pub name: String,
+    /// Where its service is read in a browser, when it was set up from a
+    /// preset that says (`Preset::web`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub web: Option<String>,
+}
+
+impl Searched {
+    pub fn nothing() -> Searched {
+        Searched { found: Vec::new(), complete: true, kind: None, accounts: BTreeMap::new() }
+    }
+}
+
+/// An account being tried before it is added or changed: its connector,
+/// its secrets as they would be, and the account it would change, whose
+/// secrets stand for those not given.
+struct Trial {
+    kind: Kind,
+    secrets: BTreeMap<String, String>,
+    of: Option<String>,
 }
 
 /// What a request of the host's waits for.
@@ -159,6 +194,8 @@ struct Inner {
     pending: BTreeMap<u64, Pending>,
     wake_at: Option<Time>,
     progress: BTreeMap<String, Progress>,
+    /// The accounts being tried, by the ids they are tried under.
+    trials: BTreeMap<String, Trial>,
     over: bool,
 }
 
@@ -191,6 +228,7 @@ impl Shell {
             pending: BTreeMap::new(),
             wake_at: None,
             progress: BTreeMap::new(),
+            trials: BTreeMap::new(),
             over: false,
         };
         let shell = Arc::new(Shell { place: Box::new(place), items, setup, inner: Mutex::new(inner), woken: Condvar::new(), writing: Mutex::new(()) });
@@ -254,16 +292,43 @@ impl Shell {
     /// Whether the account works as it is set up, as its connector says.
     /// Blocks until it has said, or for as long as a request may take.
     pub fn check(self: &Arc<Self>, account: &str) -> Result<(), ConnectorError> {
+        let Some((account, _)) = self.place.account(account) else {
+            return Err(ConnectorError::new(ErrorKind::Failed, crate::i18n::tf("There is no connection {0}.", &[&account])));
+        };
+        self.checked(account)
+    }
+
+    /// Whether an account set up as `account` is, with `secrets`, would
+    /// work, before it is added (or, `of` an account there is, changed):
+    /// its connector is asked as it would be for one that is there, under
+    /// an id of the trial's own. A secret not given is the account's.
+    pub fn try_out(self: &Arc<Self>, mut account: ConnectorAccount, kind: Kind, secrets: BTreeMap<String, String>, of: Option<String>) -> Result<(), ConnectorError> {
+        let id = {
+            let mut inner = self.lock();
+            inner.requests += 1;
+            let id = format!("trial-{}", inner.requests);
+            inner.trials.insert(id.clone(), Trial { kind, secrets, of });
+            id
+        };
+        account.id = id.clone();
+        let result = self.checked(account);
+        self.lock().trials.remove(&id);
+        result
+    }
+
+    fn checked(self: &Arc<Self>, account: ConnectorAccount) -> Result<(), ConnectorError> {
         let (told, answer) = mpsc::channel();
         {
             let mut inner = self.lock();
-            let Some((account, _)) = self.place.account(account) else {
-                return Err(ConnectorError::new(ErrorKind::Failed, crate::i18n::tf("There is no connection {0}.", &[&account])));
-            };
             let deadline = Instant::now() + self.setup.request_timeout;
             self.ask(&mut inner, ConnectorCall::Check { account }, Waiting::Check(told), Some(deadline)).map_err(|why| ConnectorError::new(ErrorKind::Failed, why))?;
         }
         answer.recv_timeout(self.setup.request_timeout + Duration::from_secs(1)).unwrap_or_else(|_| Err(timed_out("check")))
+    }
+
+    /// An item of an account, by its id.
+    pub fn item(&self, account: &str, id: &str) -> Option<crate::index::items::Item> {
+        self.items.get(account, id).map_err(|e| eprintln!("heyo: reading an item of {account}: {e}")).ok().flatten()
     }
 
     /// What a window is told of the account's syncing.
@@ -295,15 +360,21 @@ impl Shell {
         let (told, answer) = mpsc::channel();
         let (items, query) = (self.items.clone(), query.to_owned());
         std::thread::spawn(move || {
-            let _ = told.send(items.search(&query, limit, chrono::Local::now()).map_err(|e| e.to_string()));
+            let now = chrono::Local::now();
+            let found = items.search(&query, limit, now).map(|found| {
+                // Asked for, unless it was taken back for finding nothing.
+                let kind = items.reading(&query, now).kind.filter(|kind| !found.is_empty() && found.iter().all(|found| found.item.kind == *kind));
+                (found, kind)
+            });
+            let _ = told.send(found.map_err(|e| e.to_string()));
         });
         match answer.recv_timeout(self.setup.search_budget) {
-            Ok(Ok(found)) => Searched { found, complete: true },
+            Ok(Ok((found, kind))) => Searched { found, kind, ..Searched::nothing() },
             Ok(Err(e)) => {
                 eprintln!("heyo: searching the connections: {e}");
-                Searched { found: Vec::new(), complete: true }
+                Searched::nothing()
             }
-            Err(_) => Searched { found: Vec::new(), complete: false },
+            Err(_) => Searched { complete: false, ..Searched::nothing() },
         }
     }
 
@@ -526,6 +597,13 @@ impl Shell {
             ConnectorRequest::ItemsPut { account, items } => self.write(generation, &account, items.len(), || self.items.put(&account, &items).map_err(|e| e.to_string())),
             ConnectorRequest::ItemsRemove { account, ids } => self.write(generation, &account, ids.len(), || self.items.remove(&account, &ids).map_err(|e| e.to_string())),
             ConnectorRequest::Secret { account, name } => {
+                if let Some(trial) = self.lock().trials.get(&account) {
+                    if !trial.kind.secret(&name) {
+                        return Err(format!("{name} is not a secret field of {}", trial.kind.title));
+                    }
+                    let given = trial.secrets.get(&name).filter(|value| !value.is_empty()).cloned();
+                    return Ok(given.or_else(|| trial.of.as_ref().and_then(|of| self.place.secret(of, &name))).map_or(Value::Null, Value::from));
+                }
                 let (_, kind) = self.place.account(&account).ok_or_else(|| format!("there is no connection {account}"))?;
                 if !kind.secret(&name) {
                     return Err(format!("{name} is not a secret field of {}", kind.title));

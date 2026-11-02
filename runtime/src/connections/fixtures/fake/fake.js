@@ -3,7 +3,10 @@
 // syncs is what the file `config.source` says:
 //
 //   { "version": 2, "password": "…", "items": [ConnectionItem…], "removed": ["id"…],
-//     "fail": "auth" | "unavailable" | "failed", "hang": true | "deaf" }
+//     "fail": "auth" | "unavailable" | "failed", "hang": true | "deaf",
+//     "progress": 0.42, "doing": "…" }
+//
+// `progress` is said as soon as a sync begins (before it hangs).
 //
 // Its cursor is the version: a sync from the version there is brings
 // nothing. `hang` makes a sync wait until it is stopped (`"deaf"`: wait
@@ -27,6 +30,7 @@ module.exports.default = {
 
   async sync(account, cursor, io) {
     const source = read(account);
+    if (source.progress !== undefined) io.progress(source.progress, source.doing);
     if (source.hang === "deaf") await new Promise(() => {});
     if (source.hang) {
       await new Promise((_, stopped) => io.signal.addEventListener("abort", () => stopped(io.signal.reason)));

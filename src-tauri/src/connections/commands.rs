@@ -3,7 +3,8 @@
 //! changing, removing, checking and syncing an account, and searching
 //! what was synced. The settings window asks through its `Command`s
 //! (`slint_windows/host.rs`); the palette searches with the
-//! `search_connections` command.
+//! `search_connections` command, and shows what it found with
+//! `preview_connection`.
 
 use std::collections::BTreeMap;
 
@@ -13,7 +14,7 @@ use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
 use super::accounts::{self, Kind};
-use super::shell::{Searched, State};
+use super::shell::{FoundAccount, Searched, State};
 use super::Connections;
 use crate::i18n::tf;
 use crate::permissions::{self, Need, Permission};
@@ -148,12 +149,35 @@ pub(crate) fn sync_now(app: &AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// What `query` finds among the synced items, within 50 ms.
+/// Whether an account of `connector`, set up with these fields and secrets,
+/// would work, before it is added; or, `of` an account there is, as it
+/// would be changed (a secret not given is the account's). Blocks, up to a
+/// minute.
+pub(crate) fn try_out(app: &AppHandle, connector: String, of: Option<String>, config: Map<String, Value>, secrets: BTreeMap<String, String>) -> Result<(), String> {
+    let kind = kind(&connector)?;
+    let saved = of.as_ref().and_then(|id| app.state::<crate::SettingsState>().0.read().unwrap().connections.iter().find(|account| &account.id == id).cloned());
+    // A change is tried on what the account has, with what changes.
+    let mut values = saved.as_ref().map(|account| account.config.clone()).unwrap_or_default();
+    values.extend(config);
+    let (config, tried) = accounts::trial(&kind, &self::values(values, secrets))?;
+    let name = saved.as_ref().map_or_else(|| kind.title.clone(), |account| account.name.clone());
+    let account = super::given(&accounts::Account { id: String::new(), connector: kind.id.clone(), name, config }, &kind);
+    shell(app)?.try_out(account, kind, tried, saved.map(|account| account.id)).map_err(|error| error.message)
+}
+
+/// What `query` finds among the synced items, within 50 ms, with the
+/// accounts they are of.
 pub(crate) fn search(app: &AppHandle, query: &str) -> Searched {
-    match app.state::<Connections>().shell() {
-        Some(shell) => shell.search(query, FOUND),
-        None => Searched { found: Vec::new(), complete: true },
+    let Some(shell) = app.state::<Connections>().shell().cloned() else { return Searched::nothing() };
+    let mut searched = shell.search(query, FOUND);
+    let settings = app.state::<crate::SettingsState>().0.read().unwrap().connections.clone();
+    let kinds = accounts::kinds();
+    for found in &searched.found {
+        let Some(account) = settings.iter().find(|account| account.id == found.account) else { continue };
+        let web = kinds.iter().find(|kind| kind.id == account.connector).and_then(|kind| kind.web(&account.config)).map(str::to_owned);
+        searched.accounts.entry(account.id.clone()).or_insert_with(|| FoundAccount { name: account.name.clone(), web });
     }
+    searched
 }
 
 /// The palette's search of what connectors synced.
@@ -161,3 +185,18 @@ pub(crate) fn search(app: &AppHandle, query: &str) -> Searched {
 pub(crate) fn search_connections(query: String, app: AppHandle) -> Searched {
     search(&app, &query)
 }
+
+/// Shows an item that was found in the palette, by Heyo's own command
+/// that previews one (`connection-item`, which the root search does not
+/// list): it is given the item, and the name of its account.
+#[tauri::command]
+pub(crate) fn preview_connection(account: String, id: String, app: AppHandle) -> Result<(), String> {
+    let item = shell(&app)?.item(&account, &id).ok_or_else(|| tf("There is no item {0}.", &[&id]))?;
+    let name = app.state::<crate::SettingsState>().0.read().unwrap().connections.iter().find(|known| known.id == account).map_or(account.clone(), |known| known.name.clone());
+    let arguments = serde_json::json!({ "item": serde_json::to_string(&item).expect("plain data"), "account": name });
+    let launch = crate::wire::HostMessage::Launch { extension: crate::extensions::BUILTIN.into(), command: PREVIEW.into(), fallback_text: None, arguments: Some(arguments), launch_context: None };
+    app.state::<crate::Runtime>().send(&app, &launch.json())
+}
+
+/// The command of Heyo's own that previews an item (`runtime/src/builtins`).
+pub(crate) const PREVIEW: &str = "connection-item";

@@ -247,7 +247,36 @@ fn a_search_answers_within_its_budget_or_without() {
     let searched = test.shell.search("invoice", 10);
     assert!(searched.complete);
     assert_eq!(searched.found[0].item.title, "Quarterly invoice");
+    // The kind asked for is said when what was found is of it.
+    assert_eq!(test.shell.search("invoice", 10).kind, None);
+    assert_eq!(test.shell.search("emails invoice", 10).kind, Some(ItemKind::Email));
+    assert_eq!(test.shell.item("work", "1").map(|item| item.title), Some("Quarterly invoice".to_owned()));
+    assert_eq!(test.shell.item("home", "1"), None);
     let hurried = Test::new("hurried", Setup { search_budget: Duration::ZERO, ..Setup::default() });
     hurried.items.put("work", &[item("1", "Quarterly invoice")]).unwrap();
-    assert_eq!(hurried.shell.search("invoice", 10), Searched { found: Vec::new(), complete: false });
+    assert_eq!(hurried.shell.search("invoice", 10), Searched { complete: false, ..Searched::nothing() });
+}
+
+#[test]
+fn an_account_is_tried_before_it_is_added_and_with_its_own_secrets_before_it_is_changed() {
+    let test = Test::quick("trial");
+    test.says(json!({ "version": 1, "password": "right", "items": [mail("1", "Invoice")] }));
+    let values: Map<String, Value> = json!({ "source": test.source().to_string_lossy(), "password": "right" }).as_object().unwrap().clone();
+    let (config, secrets) = accounts::trial(&test.kind, &values).unwrap();
+    let account = || ConnectorAccount {
+        id: String::new(),
+        name: "Fake".into(),
+        connector: crate::wire::ConnectorCommand { extension: test.kind.extension.clone(), command: test.kind.command.clone() },
+        config: config.clone(),
+    };
+    assert_eq!(test.shell.try_out(account(), test.kind.clone(), secrets, None), Ok(()));
+    let wrong = BTreeMap::from([("password".to_owned(), "wrong".to_owned())]);
+    assert_eq!(test.shell.try_out(account(), test.kind.clone(), wrong, None).unwrap_err().kind, ErrorKind::Auth);
+    // Nothing of a trial stays, and nothing of it is synced.
+    assert!(test.shell.lock().trials.is_empty());
+    assert!(test.settings.lock().unwrap().connections.is_empty());
+    // A change tried: a secret not given is the account's.
+    let id = test.add("right");
+    assert_eq!(test.shell.try_out(account(), test.kind.clone(), BTreeMap::new(), Some(id)), Ok(()));
+    assert_eq!(test.shell.try_out(account(), test.kind.clone(), BTreeMap::new(), None).unwrap_err().kind, ErrorKind::Auth);
 }

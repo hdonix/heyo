@@ -541,6 +541,12 @@ impl Items {
         self.db.lock().unwrap().query_row("SELECT count(*) FROM items WHERE account = ?1", [account], |row| row.get::<_, i64>(0)).map(|n| n as usize)
     }
 
+    /// The item of an account with this id.
+    pub(crate) fn get(&self, account: &str, id: &str) -> rusqlite::Result<Option<Item>> {
+        let db = self.db.lock().unwrap();
+        db.query_row(&format!("SELECT {COLUMNS} FROM items WHERE account = ?1 AND item_id = ?2"), [account, id], row).optional().map(|found| found.map(|(_, _, item)| item))
+    }
+
     /// How a query is read at `now`.
     pub(crate) fn reading(&self, text: &str, now: DateTime<Local>) -> Query {
         let db = self.db.lock().unwrap();

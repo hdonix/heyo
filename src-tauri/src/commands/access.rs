@@ -54,6 +54,7 @@ const TABLE: &[(&str, &[Caller])] = &[
     ("activity_dismiss", &[Palette]),
     // What connectors synced, searched from the palette.
     ("search_connections", &[Palette]),
+    ("preview_connection", &[Palette]),
     // Both read the settings (the palette for its appearance and layout),
     // and both bind a hotkey to an item.
     ("get_settings", &[Palette]),
