@@ -68,6 +68,8 @@ struct State {
     recording: bool,
     /// The hotkey that started the recording has not been released yet.
     holding: bool,
+    /// When a hotkey held to talk was let go and so finished the recording.
+    let_go: Option<std::time::Instant>,
     /// Counts recordings, so a hold watcher can tell its own has ended.
     session: u64,
     /// Where what is heard goes to be written into the application: the
@@ -822,20 +824,33 @@ fn watch_hold(app: AppHandle, keys: [u8; 32], session: u64) {
             return;
         }
         state.holding = false;
+        let held = started.elapsed() >= HOLD;
+        if held {
+            state.let_go = Some(std::time::Instant::now());
+        }
         drop(state);
-        if started.elapsed() >= HOLD {
+        if held {
             finish(&app);
         }
     });
 }
 
+/// How long after a hotkey held to talk is let go a press of it is taken
+/// for one of its repeats: they can reach Heyo (as `heyo --dictate`, each a
+/// process of its own) after the release, and even after the recording it
+/// finished is over, where one would start another.
+const REPEATS_FOR: Duration = Duration::from_secs(1);
+
 /// Starts dictating, or finishes if a recording is in progress.
 pub fn toggle(app: &AppHandle) {
-    let (recording, holding) = {
+    let (recording, holding, let_go) = {
         let state = app.state::<Dictation>();
         let state = state.0.lock().unwrap();
-        (state.recording, state.holding)
+        (state.recording, state.holding, state.let_go)
     };
+    if !recording && let_go.is_some_and(|at| at.elapsed() < REPEATS_FOR) {
+        return;
+    }
     if !recording {
         begin(app, true);
     } else if !holding {
