@@ -9,6 +9,7 @@
 
 pub(crate) mod about;
 pub(crate) mod advanced;
+pub(crate) mod connections;
 pub(crate) mod dictation;
 pub(crate) mod extensions;
 pub(crate) mod general;
@@ -73,6 +74,7 @@ pub(crate) fn all() -> Vec<Box<dyn Page>> {
         Box::new(dictation::Dictation),
         Box::new(screenshots::Screenshots),
         Box::new(models::Models::default()),
+        Box::new(connections::Connections::default()),
         Box::new(advanced::Advanced),
         Box::new(about::About::default()),
         Box::new(extensions::Extensions),
@@ -147,6 +149,10 @@ pub(crate) struct Known {
     pub copied: bool,
     /// What is typed into the field above a page's lines.
     pub find: String,
+    /// The connected accounts, with how their syncing goes; and the
+    /// connectors accounts can be added of.
+    pub connections: Vec<crate::connections::commands::View>,
+    pub connectors: Vec<crate::connections::accounts::Kind>,
 }
 
 impl Known {
@@ -165,8 +171,9 @@ impl Known {
             Answer::Ocr(ocr) => self.ocr = ocr,
             Answer::Meaning(meaning) => self.meaning = Some(meaning),
             Answer::Sources(sources) => self.sources = sources,
-            // The connections have no page yet: what they answer is not kept.
-            Answer::Permissions(_) | Answer::Models(_) | Answer::Checked(_) | Answer::Update(_) | Answer::Connections(_) | Answer::ConnectorKinds(_) | Answer::Found(_) | Answer::Done => {}
+            Answer::Connections(connections) => self.connections = connections,
+            Answer::ConnectorKinds(connectors) => self.connectors = connectors,
+            Answer::Permissions(_) | Answer::Models(_) | Answer::Checked(_) | Answer::Update(_) | Answer::Found(_) | Answer::Done => {}
         }
     }
 

@@ -35,9 +35,13 @@ pub(crate) enum Act {
     OpenModels,
     /// Adds the provider whose form is filled in.
     SaveProvider,
+    /// Tries the connection whose form is filled in.
+    TryConnection,
+    /// Adds the connection whose form is filled in, once it was tried.
+    SaveConnection,
 }
 
-const ACTS: [(Act, &str); 9] = [
+const ACTS: [(Act, &str); 11] = [
     (Act::InstallShellExtension, "install-shell-extension"),
     (Act::InstallOcr, "install-ocr"),
     (Act::InstallMeaning, "install-meaning"),
@@ -47,6 +51,8 @@ const ACTS: [(Act, &str); 9] = [
     (Act::Update, "update"),
     (Act::OpenModels, "open-models"),
     (Act::SaveProvider, "save-provider"),
+    (Act::TryConnection, "try-connection"),
+    (Act::SaveConnection, "save-connection"),
 ];
 
 /// A setting a control of the window changes by itself: a switch, a
@@ -140,9 +146,16 @@ pub(crate) enum PageId {
     /// An extension's page, by its id: `@heyo`, `@applications`, or the
     /// directory it is in.
     Extension(String),
+    /// Choosing the connector of a connection to add.
+    AddConnection,
+    /// The form of the connection being added.
+    NewConnection,
+    /// A connection's page, by its id.
+    Connection(String),
 }
 
 const PROVIDER: &str = "provider:";
+const CONNECTION: &str = "connection:";
 
 impl fmt::Display for PageId {
     fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -152,6 +165,9 @@ impl fmt::Display for PageId {
             PageId::NewProvider => write!(out, "{PROVIDER}new"),
             PageId::Provider(id) => write!(out, "{PROVIDER}{id}"),
             PageId::Extension(id) => write!(out, "{id}"),
+            PageId::AddConnection => write!(out, "{CONNECTION}add"),
+            PageId::NewConnection => write!(out, "{CONNECTION}new"),
+            PageId::Connection(id) => write!(out, "{CONNECTION}{id}"),
         }
     }
 }
@@ -166,6 +182,12 @@ impl PageId {
     /// The page `page` names. An extension is named by `@` and a word, or
     /// by a whole path; a page of the sidebar's own by a word.
     pub(crate) fn parse(page: &str) -> PageId {
+        match page.strip_prefix(CONNECTION) {
+            Some("add") => return PageId::AddConnection,
+            Some("new") => return PageId::NewConnection,
+            Some(id) => return PageId::Connection(id.to_string()),
+            None => {}
+        }
         match page.strip_prefix(PROVIDER) {
             Some("add") => PageId::AddProvider,
             Some("new") => PageId::NewProvider,
@@ -223,6 +245,21 @@ pub(crate) enum Id {
     NewProvider(String),
     /// A field of that new provider's form, or its `name`.
     DraftField(String),
+    /// A field of a connection, by its connector's name for it; its name
+    /// when that is empty (no field is named so).
+    ConnectionField { account: String, field: String },
+    RemoveConnection(String),
+    /// Checks whether a connection works as it is set up, by its id.
+    CheckConnection(String),
+    /// Syncs a connection now, by its id.
+    SyncConnection(String),
+    /// A new connection of this connector (`<extension>:<command>`), whose
+    /// form is then shown.
+    NewConnection(String),
+    /// A field of that new connection's form; its name when empty.
+    ConnectionDraft(String),
+    /// The preset that new connection's form is filled in from.
+    ConnectionPreset,
     /// Shows that page.
     Go(PageId),
     /// A speech model of this computer, by its id: downloaded, its
@@ -264,6 +301,13 @@ impl fmt::Display for Id {
             Id::CheckProvider(provider) => write!(out, "check-provider:{provider}"),
             Id::NewProvider(kind) => write!(out, "new-provider:{kind}"),
             Id::DraftField(field) => write!(out, "draft:{field}"),
+            Id::ConnectionField { account, field } => write!(out, "{CONNECTION}{account}{SEP}{field}"),
+            Id::RemoveConnection(account) => write!(out, "remove-connection:{account}"),
+            Id::CheckConnection(account) => write!(out, "check-connection:{account}"),
+            Id::SyncConnection(account) => write!(out, "sync-connection:{account}"),
+            Id::NewConnection(connector) => write!(out, "new-connection:{connector}"),
+            Id::ConnectionDraft(field) => write!(out, "connection-draft:{field}"),
+            Id::ConnectionPreset => write!(out, "connection-preset"),
             Id::Go(page) => write!(out, "go:{page}"),
             Id::RemoveProvider(provider) => write!(out, "remove-provider:{provider}"),
             Id::SpeechDownload(id) => write!(out, "speech-download:{id}"),
@@ -292,6 +336,7 @@ impl Id {
             "words" => return Id::Words,
             "ignore:add" => return Id::IgnoreAdd,
             "expand:add" => return Id::ExpandAdd,
+            "connection-preset" => return Id::ConnectionPreset,
             _ => {}
         }
         if let Some(act) = id.strip_prefix("act:").and_then(|name| named(&ACTS, name)) {
@@ -314,6 +359,9 @@ impl Id {
         if let Some((provider, field)) = id.strip_prefix("provider:").and_then(|rest| rest.split_once(SEP)) {
             return Id::ProviderField { provider: own(provider), field: own(field) };
         }
+        if let Some((account, field)) = id.strip_prefix(CONNECTION).and_then(|rest| rest.split_once(SEP)) {
+            return Id::ConnectionField { account: own(account), field: own(field) };
+        }
         if let Some((provider, field)) = id.strip_prefix("forget:").and_then(|rest| rest.split_once(SEP)) {
             return Id::ForgetSecret { provider: own(provider), field: own(field) };
         }
@@ -321,7 +369,7 @@ impl Id {
             return Id::Go(PageId::parse(page));
         }
         // The longer of two that begin alike first.
-        let forms: [(&str, fn(String) -> Id); 18] = [
+        let forms: [(&str, fn(String) -> Id); 23] = [
             ("alias:", Id::Alias),
             ("enable-all:", Id::EnableAll),
             ("enable:", Id::Enable),
@@ -340,6 +388,11 @@ impl Id {
             ("speech-cancel:", Id::SpeechCancel),
             ("speech-delete:", Id::SpeechDelete),
             ("speech-use:", Id::SpeechUse),
+            ("remove-connection:", Id::RemoveConnection),
+            ("check-connection:", Id::CheckConnection),
+            ("sync-connection:", Id::SyncConnection),
+            ("new-connection:", Id::NewConnection),
+            ("connection-draft:", Id::ConnectionDraft),
         ];
         forms.iter().find_map(|(prefix, form)| id.strip_prefix(prefix).map(|rest| form(own(rest)))).unwrap_or_else(|| Id::Named(own(id)))
     }
@@ -406,6 +459,16 @@ mod tests {
             Id::SpeechCancel(s("parakeet-tdt-0.6b-v3")),
             Id::SpeechDelete(s("x-asr-2026-06-05")),
             Id::SpeechUse(s("sense-voice-2024-07-17")),
+            Id::ConnectionField { account: s("imap-2"), field: s("host") },
+            Id::ConnectionField { account: s("imap"), field: s("") },
+            Id::RemoveConnection(s("imap")),
+            Id::CheckConnection(s("imap")),
+            Id::SyncConnection(s("imap")),
+            Id::NewConnection(s("@heyo:imap")),
+            Id::NewConnection(s("fake-connector:fake")),
+            Id::ConnectionDraft(s("password")),
+            Id::ConnectionDraft(s("")),
+            Id::ConnectionPreset,
             Id::Modification(s("hotkey")),
             Id::Category(s("applications")),
             Id::Named(s("cmd:zeta:one")),
@@ -432,6 +495,9 @@ mod tests {
             PageId::Extension(s("@heyo")),
             PageId::Extension(s("@applications")),
             PageId::Extension(s("/data/zeta")),
+            PageId::AddConnection,
+            PageId::NewConnection,
+            PageId::Connection(s("imap-2")),
         ]
     }
 

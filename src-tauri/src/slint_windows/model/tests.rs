@@ -668,11 +668,11 @@ fn with_extensions() -> Model {
 fn the_sidebar_lists_pages_then_extensions_in_their_order() {
     let mut model = with_extensions();
     let (entries, pages) = model.nav();
-    assert_eq!(pages, 7);
-    assert_eq!(entries.iter().map(|entry| entry.title.as_str()).collect::<Vec<_>>(), ["General", "Shortcuts", "Dictation", "Screenshots", "Models", "Advanced", "About", "Applications", "Heyo Commands", "alpha Notes", "Zeta Tools"]);
+    assert_eq!(pages, 8);
+    assert_eq!(entries.iter().map(|entry| entry.title.as_str()).collect::<Vec<_>>(), ["General", "Shortcuts", "Dictation", "Screenshots", "Models", "Connections", "Advanced", "About", "Applications", "Heyo Commands", "alpha Notes", "Zeta Tools"]);
     // A page's symbol, a symbol the host named, a file of the extension's own.
-    assert_eq!((entries[0].icon.as_deref(), entries[8].icon.as_deref(), entries[10].icon.as_deref()), (Some("cog-16"), Some("store-16"), Some("/data/zeta/assets/icon.png")));
-    assert!(entries[10].extension && !entries[0].extension);
+    assert_eq!((entries[0].icon.as_deref(), entries[9].icon.as_deref(), entries[11].icon.as_deref()), (Some("cog-16"), Some("store-16"), Some("/data/zeta/assets/icon.png")));
+    assert!(entries[11].extension && !entries[0].extension);
     // An extension is found by a command of its own; the applications
     // only by their name.
     model.nav_search = "dict".into();
@@ -852,7 +852,7 @@ fn what_changes_elsewhere_is_read_again() {
     assert_eq!(names(&model.heard(event::INDEX_READY, &Value::Null)), ["list_extensions", "list_applications", "item_hotkeys"]);
     assert_eq!(names(&model.opened()), ["get_settings", "get_hotkeys", "get_capabilities", "list_extensions", "list_applications", "item_hotkeys"]);
     model.answered(Then::Known, Ok(Answer::Extensions(Vec::new())));
-    assert_eq!(model.nav().0.len(), 8);
+    assert_eq!(model.nav().0.len(), 9);
 }
 
 #[test]
