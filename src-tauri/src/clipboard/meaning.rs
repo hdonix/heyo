@@ -11,7 +11,7 @@
 
 use crate::i18n::t;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use chrono::Local;
@@ -40,7 +40,9 @@ const NAP: Duration = Duration::from_secs(60);
 #[derive(Default)]
 pub struct Meaning {
     /// There from `start` on: running the helper takes a running Heyo.
-    model: OnceLock<embed::Model>,
+    /// The connections' items are found by meaning with the same one
+    /// (`model`), so that one helper runs.
+    model: OnceLock<Arc<embed::Model>>,
     /// The vectors, in memory while the search is on.
     index: Mutex<Option<Index>>,
     /// Entries were deleted since the vectors were read.
@@ -110,7 +112,7 @@ impl Meaning {
     /// Makes the vectors of the queries asked for, one at a time, for as
     /// long as Heyo runs.
     fn answer_queries(&self) {
-        self.queries.answer(|| self.model.get().map(|model| model as &dyn embed::Embed));
+        self.queries.answer(|| self.model.get().map(|model| model.as_ref() as &dyn embed::Embed));
     }
 
     /// Stops everything that takes memory: the model, the vectors.
@@ -121,6 +123,19 @@ impl Meaning {
         *self.index.lock().unwrap() = None;
         self.queries.clear();
     }
+}
+
+/// The embedding model, one for all that finds by meaning: the clipboard's
+/// entries and the connections' items.
+pub fn model(app: &AppHandle) -> Arc<embed::Model> {
+    let helper = app.clone();
+    app.state::<ClipboardHistory>().meaning.model.get_or_init(|| Arc::new(embed::Model::new(move || embed::command(&helper)))).clone()
+}
+
+/// Whether finding by meaning is on: the setting, and the model there.
+/// The connections' items follow the same setting, whatever the history.
+pub fn wanted(app: &AppHandle) -> bool {
+    app.state::<SettingsState>().0.read().unwrap().clipboard_meaning && embed::installed()
 }
 
 fn enabled(app: &AppHandle) -> bool {
@@ -164,7 +179,7 @@ fn index_entries(app: &AppHandle) {
                 continue;
             }
             let started = Instant::now();
-            let done = step(&history.store, model, BATCH, |id, language, vector| {
+            let done = step(&history.store, model.as_ref(), BATCH, |id, language, vector| {
                 if let Some(index) = &mut *meaning.index.lock().unwrap() {
                     index.push(id, language, vector);
                 }
@@ -191,8 +206,7 @@ fn index_entries(app: &AppHandle) {
 /// Starts the background work. It does nothing until the setting is on and
 /// the model is there.
 pub fn start(app: &AppHandle) {
-    let helper = app.clone();
-    let _ = app.state::<ClipboardHistory>().meaning.model.set(embed::Model::new(move || embed::command(&helper)));
+    model(app);
     for work in [index_entries as fn(&AppHandle), |app| app.state::<ClipboardHistory>().meaning.answer_queries()] {
         let app = app.clone();
         std::thread::spawn(move || work(&app));

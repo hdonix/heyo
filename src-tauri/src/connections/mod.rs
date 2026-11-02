@@ -91,6 +91,9 @@ pub fn start(app: &AppHandle) {
         Err(e) => return eprintln!("heyo: connections are off: the store could not be opened: {e}"),
     };
     let setup = Setup { kept: Some(crate::paths::data().join("connections.json")), ..Setup::default() };
+    // Found by meaning with the clipboard's model, while its setting is on.
+    let settings = app.clone();
+    items.start_meaning(crate::clipboard::meaning::model(app), move || crate::clipboard::meaning::wanted(&settings));
     let shell = Shell::start(Live(app.clone()), items, setup);
     let kinds = accounts::kinds();
     let settings = app.state::<crate::SettingsState>().0.read().unwrap().connections.clone();
