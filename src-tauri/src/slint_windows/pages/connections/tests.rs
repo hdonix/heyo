@@ -11,12 +11,12 @@ use crate::slint_windows::model::Model;
 
 fn imap() -> Kind {
     let mut kind = mail();
-    kind.presets = vec![Preset { title: "Gmail".into(), values: json!({ "host": "imap.gmail.com" }).as_object().unwrap().clone(), web: Some("https://mail.google.com".into()) }];
+    kind.presets = vec![Preset { title: "Gmail".into(), values: json!({ "host": "imap.gmail.com" }).as_object().unwrap().clone(), description: None, web: Some("https://mail.google.com".into()) }];
     kind
 }
 
 fn idle() -> State {
-    State { phase: "idle".into(), since: None, next: None, last_sync: None, error: None, items: 0, progress: None }
+    State { phase: "idle".into(), since: None, next: None, last_sync: None, error: None, items: 0, progress: None, tools: Default::default() }
 }
 
 fn view(id: &str, name: &str, state: State) -> View {
