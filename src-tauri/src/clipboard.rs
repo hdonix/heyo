@@ -8,7 +8,6 @@
 //! `images/`).
 
 pub mod cases;
-pub mod embed;
 pub mod eval;
 pub mod fusion;
 pub mod meaning;
@@ -115,17 +114,6 @@ pub(crate) fn ignored_app(app: Option<&str>) -> bool {
         let app = app.to_lowercase();
         IGNORED_APPS.iter().any(|ignored| app.contains(ignored))
     })
-}
-
-/// Makes a file or directory readable by the user only: the history holds
-/// whatever was copied.
-#[cfg_attr(not(unix), allow(unused_variables))]
-fn private(path: &Path, mode: u32) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
-    }
 }
 
 fn hash_of(data: &[u8]) -> u64 {
@@ -242,7 +230,7 @@ impl ClipboardHistory {
                 eprintln!("heyo: failed to save clipboard image: {e}");
                 return None;
             }
-            private(&path, 0o600);
+            crate::index::private(&path, 0o600);
             let time = now();
             Some(Entry {
                 id,

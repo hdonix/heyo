@@ -50,10 +50,11 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::cases::{self, CaseEntry};
-use super::embed::{self, Embed, Role};
+use crate::index::embed::{self, Embed, Role};
 use super::fusion::{self, Tuning};
 use super::store::Store;
-use super::vectors::{self, Index};
+use super::vectors;
+use crate::index::vectors::Index;
 use super::{query, Entry, Kind};
 
 #[derive(Deserialize)]
@@ -349,10 +350,10 @@ fn generate(store: &Store, count: usize) -> Result<i32, String> {
 
     let dir = super::dir().join("eval");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    super::private(&dir, 0o700);
+    crate::index::private(&dir, 0o700);
     let path = dir.join("cases.jsonl");
     let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    super::private(&path, 0o600);
+    crate::index::private(&path, 0o600);
     let (mut written, mut failure) = (BTreeMap::<String, usize>::new(), None);
     for entry in &entries {
         let asked = CaseEntry { text: entry.text.clone().unwrap_or_default(), app: entry.app.clone(), copied: said(now - entry.copied_at as i64) };

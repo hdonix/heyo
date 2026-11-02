@@ -2,16 +2,14 @@
 //! finds an `ssh` line), in Chinese and English alike. Off unless the user
 //! turns it on (`Settings::clipboard_meaning`) and downloads the model.
 //!
-//! Two things happen in the background, and nothing waits for either:
-//! entries get their vectors, a few at a time, the most recent first
-//! (what is waiting is whatever has none yet, so it carries on where it
-//! stopped); and the query being typed gets its vector, the latest query
-//! only. The search by words answers at once as it always did; the one by
-//! meaning is asked for separately, and says "not yet" until the vector is there.
+//! Two things happen in the background, and nothing waits for either
+//! (`index::meaning`): entries get their vectors, and the query being typed
+//! gets its own. The search by words answers at once as it always did; the
+//! one by meaning is asked for separately, and says "not yet" until the
+//! vector is there.
 //! Whenever anything is missing or fails, the search by words is all there is.
 
 use crate::i18n::t;
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -20,11 +18,13 @@ use chrono::Local;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::embed::{self, Embed, Role};
 use super::fusion::{self, Tuning};
 use super::store::{Found, Store};
-use super::vectors::{self, Index};
+use super::vectors;
 use super::{ClipboardHistory, Kind};
+use crate::index::embed;
+use crate::index::meaning::{Queries, Vector, Vectored, Waiting};
+use crate::index::vectors::{language, Index};
 use crate::helper::InstallProgress;
 use crate::wire::event;
 use crate::SettingsState;
@@ -32,26 +32,10 @@ use crate::SettingsState;
 /// How many entries are given their vectors in one go. Few: the history's
 /// lock is taken between goes, and a query is answered between entries.
 const BATCH: usize = 8;
-/// How many queries' vectors are remembered: going back over what was
-/// typed, or asking again, costs nothing.
-const REMEMBERED: usize = 32;
-/// Entries wait while someone is typing a query.
-const TYPING: Duration = Duration::from_millis(1500);
 /// While finding by meaning is on, how long the indexer sleeps when nothing
 /// wakes it (a copy, the settings page, a finished download do). It is what
 /// tries again after a failure, and then it grows.
 const NAP: Duration = Duration::from_secs(60);
-
-#[derive(Default)]
-struct Asked {
-    /// The query to make a vector for next. A newer one replaces it: the
-    /// one before is no longer what is being asked.
-    next: Option<String>,
-    /// The vectors made, or why one could not be, the most recent last.
-    known: VecDeque<(String, Result<Vec<f32>, String>)>,
-    /// When a query last came.
-    at: Option<Instant>,
-}
 
 #[derive(Default)]
 pub struct Meaning {
@@ -61,8 +45,7 @@ pub struct Meaning {
     index: Mutex<Option<Index>>,
     /// Entries were deleted since the vectors were read.
     stale: AtomicBool,
-    asked: Mutex<Asked>,
-    asked_signal: Condvar,
+    queries: Queries,
     /// Whether there may be something for the indexer to do.
     work: Mutex<bool>,
     work_signal: Condvar,
@@ -94,39 +77,21 @@ pub struct Progress {
     pub waiting: usize,
 }
 
-/// The vector of a query.
-enum Vector {
-    Ready(Vec<f32>),
-    /// Being made; ask again.
-    Coming,
-    Failed(String),
-}
+pub use crate::index::meaning::step;
 
-/// Gives the next entries that have none their vectors, the most recent
-/// first, or notes that there is nothing in them to find by meaning.
-/// `added` hears of each new vector. Returns how many entries it dealt
-/// with: none means all are done. On failure nothing is noted, and the same
-/// entries are next again.
-pub fn step(store: &Mutex<Store>, model: &dyn Embed, count: usize, mut added: impl FnMut(u64, &str, &[f32])) -> Result<usize, String> {
-    let waiting = store.lock().unwrap().without_vector(model.model(), count).map_err(|e| e.to_string())?;
-    let texts: Vec<String> = waiting.iter().filter_map(|(_, kind, text)| vectors::worth(*kind, text)).map(str::to_owned).collect();
-    // Not while the history is locked: this is the slow part.
-    let made = if texts.is_empty() { Vec::new() } else { model.embed(Role::Passage, &texts)? };
-    if made.len() != texts.len() {
-        return Err(format!("asked for {} vectors and was given {}", texts.len(), made.len()));
+impl Vectored for Mutex<Store> {
+    fn waiting(&self, model: &str, count: usize) -> Result<Vec<Waiting>, String> {
+        let waiting = self.lock().unwrap().without_vector(model, count).map_err(|e| e.to_string())?;
+        Ok(waiting
+            .into_iter()
+            .map(|(id, kind, text)| Waiting { id, read: vectors::worth(kind, &text).map(str::to_owned), language: language(&text) })
+            .collect())
     }
-    let store = store.lock().unwrap();
-    let mut made = made.iter();
-    for (id, kind, text) in &waiting {
-        let vector = vectors::worth(*kind, text).and_then(|_| made.next());
-        // An entry deleted meanwhile takes no vector, and none is announced.
-        if store.set_vector(*id, model.model(), vector.map(Vec::as_slice)).map_err(|e| e.to_string())? {
-            if let Some(vector) = vector {
-                added(*id, text, vector);
-            }
-        }
+
+    fn note(&self, model: &str, made: &[(u64, Option<&[f32]>)]) -> Result<Vec<bool>, String> {
+        let store = self.lock().unwrap();
+        made.iter().map(|(id, vector)| store.set_vector(*id, model, *vector).map_err(|e| e.to_string())).collect()
     }
-    Ok(waiting.len())
 }
 
 impl Meaning {
@@ -142,47 +107,10 @@ impl Meaning {
         self.stale.store(true, Ordering::Relaxed);
     }
 
-    fn typing(&self) -> bool {
-        self.asked.lock().unwrap().at.is_some_and(|at| at.elapsed() < TYPING)
-    }
-
-    /// The vector of a query if it is known, and otherwise asks for it.
-    fn vector(&self, text: &str) -> Vector {
-        let mut asked = self.asked.lock().unwrap();
-        asked.at = Some(Instant::now());
-        if let Some(at) = asked.known.iter().position(|(known, _)| known == text) {
-            return match &asked.known[at].1 {
-                Ok(vector) => Vector::Ready(vector.clone()),
-                // Forgotten, so that asking again tries again.
-                Err(_) => Vector::Failed(asked.known.remove(at).and_then(|(_, result)| result.err()).unwrap_or_default()),
-            };
-        }
-        asked.next = Some(text.to_owned());
-        self.asked_signal.notify_all();
-        Vector::Coming
-    }
-
     /// Makes the vectors of the queries asked for, one at a time, for as
     /// long as Heyo runs.
     fn answer_queries(&self) {
-        loop {
-            let text = {
-                let mut asked = self.asked.lock().unwrap();
-                loop {
-                    match asked.next.take() {
-                        Some(text) => break text,
-                        None => asked = self.asked_signal.wait(asked).unwrap(),
-                    }
-                }
-            };
-            let Some(model) = self.model.get() else { continue };
-            let result = model.embed(Role::Query, std::slice::from_ref(&text)).and_then(|mut vectors| vectors.pop().ok_or_else(|| "no vector".to_owned()));
-            let mut asked = self.asked.lock().unwrap();
-            asked.known.push_back((text, result));
-            if asked.known.len() > REMEMBERED {
-                asked.known.pop_front();
-            }
-        }
+        self.queries.answer(|| self.model.get().map(|model| model as &dyn embed::Embed));
     }
 
     /// Stops everything that takes memory: the model, the vectors.
@@ -191,7 +119,7 @@ impl Meaning {
             model.stop();
         }
         *self.index.lock().unwrap() = None;
-        self.asked.lock().unwrap().known.clear();
+        self.queries.clear();
     }
 }
 
@@ -231,14 +159,14 @@ fn index_entries(app: &AppHandle) {
             if !enabled(app) {
                 break;
             }
-            if meaning.typing() {
+            if meaning.queries.typing() {
                 std::thread::sleep(Duration::from_millis(250));
                 continue;
             }
             let started = Instant::now();
-            let done = step(&history.store, model, BATCH, |id, text, vector| {
+            let done = step(&history.store, model, BATCH, |id, language, vector| {
                 if let Some(index) = &mut *meaning.index.lock().unwrap() {
-                    index.push(id, vectors::language(text), vector);
+                    index.push(id, language, vector);
                 }
             });
             *meaning.problem.lock().unwrap() = done.as_ref().err().cloned();
@@ -346,7 +274,7 @@ pub fn search(app: &AppHandle, text: &str, kind: Option<Kind>, limit: usize) -> 
     let now = Local::now();
     let asked = history.store.lock().unwrap().reading(text, now).ok().and_then(|query| fusion::asked(&query, &tuning));
     let Some(asked) = asked else { return Answer::Nothing };
-    let vector = match meaning.vector(&asked) {
+    let vector = match meaning.queries.vector(&asked) {
         Vector::Ready(vector) => vector,
         Vector::Coming => return Answer::Coming,
         Vector::Failed(e) => {
@@ -374,6 +302,7 @@ pub fn search(app: &AppHandle, text: &str, kind: Option<Kind>, limit: usize) -> 
 mod tests {
     use super::super::vectors::tests::{add, unit};
     use super::*;
+    use crate::index::embed::{Embed, Role};
     use std::sync::atomic::AtomicUsize;
 
     /// Gives each text a vector along the axis of its length, and can be
@@ -493,21 +422,5 @@ mod tests {
         assert_eq!(step(&store, &Deleting(&store, ids[4]), 2, |id, _, _| heard.push(id)), Ok(2));
         assert_eq!(heard, [ids[3]]);
         assert_eq!(store.lock().unwrap().vectors("m").unwrap().len(), 1);
-    }
-
-    #[test]
-    fn a_query_is_asked_for_once_and_then_known() {
-        let meaning = Meaning::default();
-        assert!(matches!(meaning.vector("server login"), Vector::Coming));
-        // A newer query replaces one not started on.
-        assert!(matches!(meaning.vector("server login command"), Vector::Coming));
-        assert_eq!(meaning.asked.lock().unwrap().next.as_deref(), Some("server login command"));
-        assert!(meaning.typing());
-        meaning.asked.lock().unwrap().known.push_back(("server login command".into(), Ok(vec![1.0])));
-        assert!(matches!(meaning.vector("server login command"), Vector::Ready(v) if v == [1.0]));
-        // A failure is told once; asking again tries again.
-        meaning.asked.lock().unwrap().known.push_back(("发票".into(), Err("no model".into())));
-        assert!(matches!(meaning.vector("发票"), Vector::Failed(e) if e == "no model"));
-        assert!(matches!(meaning.vector("发票"), Vector::Coming));
     }
 }

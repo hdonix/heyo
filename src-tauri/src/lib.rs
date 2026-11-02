@@ -9,6 +9,7 @@ mod files;
 mod helper;
 mod host;
 mod i18n;
+mod index;
 mod links;
 mod menubar;
 mod models;

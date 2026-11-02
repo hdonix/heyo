@@ -1,9 +1,5 @@
-//! Where the clipboard history is kept: one SQLite file, with two full-text
-//! indexes over the text of the entries.
-//!
-//! `words` finds words and, for Chinese, any run of characters (see
-//! `query::words`). `grams` finds any substring of three characters or more,
-//! which is what a piece of a URL, a path or an identifier needs.
+//! Where the clipboard history is kept: one SQLite file, with the two
+//! full-text indexes of `index::text` over the text of the entries.
 //!
 //! `vectors` holds what finding by meaning goes by (`vectors.rs`).
 
@@ -14,7 +10,8 @@ use rusqlite::types::Value;
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row};
 use serde::Serialize;
 
-use super::query::{self, Lookup, Query};
+use super::query::{self, Query};
+use crate::index::{private, text};
 use super::{Entry, Kind};
 
 /// Unpinned entries beyond this many are dropped, oldest first. How long
@@ -84,12 +81,12 @@ impl Store {
     /// of the JSON file that came before.
     pub fn open(dir: &Path) -> rusqlite::Result<Store> {
         let _ = std::fs::create_dir_all(dir);
-        super::private(dir, 0o700);
+        private(dir, 0o700);
         let path = dir.join("history.db");
         let store = Store::with(Connection::open(&path)?)?;
         // The history holds whatever was copied: the user's alone.
         for suffix in ["", "-wal", "-shm"] {
-            super::private(&dir.join(format!("history.db{suffix}")), 0o600);
+            private(&dir.join(format!("history.db{suffix}")), 0o600);
         }
         Ok(store)
     }
@@ -120,14 +117,13 @@ impl Store {
              );
              CREATE INDEX IF NOT EXISTS entries_copied_at ON entries (copied_at);
              CREATE INDEX IF NOT EXISTS entries_hash ON entries (hash);
-             CREATE VIRTUAL TABLE IF NOT EXISTS words USING fts5 (tokens, content = '', contentless_delete = 1, tokenize = 'unicode61');
-             CREATE VIRTUAL TABLE IF NOT EXISTS grams USING fts5 (text, content = '', contentless_delete = 1, tokenize = 'trigram');
              -- Which entry was chosen for which search: what search quality is measured by.
              CREATE TABLE IF NOT EXISTS choices (at INTEGER NOT NULL, query TEXT NOT NULL, entry INTEGER NOT NULL, rank INTEGER NOT NULL);
              -- What an entry means, as the model named saw it: 32-bit floats, or nothing
              -- for an entry that was looked at and has nothing to find by meaning.
              CREATE TABLE IF NOT EXISTS vectors (entry INTEGER PRIMARY KEY, model TEXT NOT NULL, vector BLOB NOT NULL);",
         )?;
+        db.execute_batch(text::SCHEMA)?;
         Ok(Store { db })
     }
 
@@ -150,8 +146,7 @@ impl Store {
             ],
         )?;
         if let Some(text) = &entry.text {
-            self.db.execute("INSERT INTO words (rowid, tokens) VALUES (?1, ?2)", params![entry.id as i64, query::words(text)])?;
-            self.db.execute("INSERT INTO grams (rowid, text) VALUES (?1, ?2)", params![entry.id as i64, text])?;
+            text::add(&self.db, entry.id as i64, text)?;
         }
         Ok(())
     }
@@ -236,23 +231,7 @@ impl Store {
 
     pub(super) fn run(&self, query: &Query, kind: Option<Kind>, limit: usize) -> rusqlite::Result<Vec<Entry>> {
         let (mut conditions, mut values) = Store::filters(query, kind);
-        let (mut words, mut grams) = (Vec::new(), Vec::new());
-        for term in &query.terms {
-            match query::lookup(term) {
-                Lookup::Words(phrase) => words.push(phrase),
-                Lookup::Substring(phrase) => grams.push(phrase),
-                Lookup::Scan(text) => {
-                    conditions.push("instr(text, ?) > 0".to_owned());
-                    values.push(Value::Text(text));
-                }
-            }
-        }
-        for (table, phrases) in [("words", words), ("grams", grams)] {
-            if !phrases.is_empty() {
-                conditions.push(format!("id IN (SELECT rowid FROM {table} WHERE {table} MATCH ?)"));
-                values.push(Value::Text(phrases.join(" AND ")));
-            }
-        }
+        text::matching(&query.terms, "id", "text", &mut conditions, &mut values);
         self.select(&conditions, values, limit)
     }
 
@@ -303,9 +282,9 @@ impl Store {
         self.db.execute_batch("BEGIN")?;
         for (id, image) in &doomed {
             // The vector too: it is the text, in another form.
-            for (table, key) in [("entries", "id"), ("words", "rowid"), ("grams", "rowid"), ("vectors", "entry")] {
-                self.db.execute(&format!("DELETE FROM {table} WHERE {key} = ?1"), [id])?;
-            }
+            self.db.execute("DELETE FROM entries WHERE id = ?1", [id])?;
+            text::remove(&self.db, *id)?;
+            self.db.execute("DELETE FROM vectors WHERE entry = ?1", [id])?;
             // What it was found by says what it was.
             self.db.execute("DELETE FROM choices WHERE entry = ?1", [id])?;
             if let Some(path) = image {

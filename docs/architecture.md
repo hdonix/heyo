@@ -296,12 +296,17 @@ and keeps the list of applications current. The rest, by what it is for:
   takes the place of what stands before the cursor (a snippet's keyword,
   dictated words being corrected) is on loan too: Backspaces and a paste,
   pressed by `platform::typed`.
-- `clipboard.rs` and `clipboard/` are the clipboard history: what is
-  recorded and what is not (`sources.rs`), where it is kept (one SQLite
-  file with two full-text indexes, `store.rs`), how a query is read
-  (`query.rs`: when, from where, what kind), and the optional search by
-  meaning with a model on the computer (`meaning.rs`, `vectors.rs`,
-  `fusion.rs`). `eval.rs` measures the search.
+- `index.rs` and `index/` are what finding one's own things is built from,
+  whatever is searched: the two full-text indexes (`text.rs`), the time a
+  query names (`when.rs`), vectors and the model that makes them
+  (`vectors.rs`, `embed.rs`, `meaning.rs`), and putting what the words and
+  the meaning found in one order (`fusion.rs`).
+- `clipboard.rs` and `clipboard/` are the clipboard history, on top of
+  `index/`: what is recorded and what is not (`sources.rs`), where it is
+  kept (one SQLite file, `store.rs`), how a query is read (`query.rs`: when,
+  from where, what kind), and the optional search by meaning with a model
+  on the computer (`meaning.rs`, `vectors.rs`, `fusion.rs`). `eval.rs`
+  measures the search.
 - `activities.rs` is the live activities (things in progress, shown in the
   palette's "In Progress" section and as notifications). The table
   (`Table`) is plain data with the time passed in; what a change calls for

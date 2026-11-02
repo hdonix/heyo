@@ -206,7 +206,7 @@ mod tests {
 
     /// The real model, where it has been downloaded (Heyo Settings, or
     /// `HEYO_EMBED_DIR=$XDG_DATA_HOME/heyo/embed node runtime/dist/heyo-embed.cjs install`):
-    /// `cargo test clipboard::embed::tests::the_real_model -- --ignored --nocapture`
+    /// `cargo test index::embed::tests::the_real_model -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn the_real_model_tells_meanings_apart() {
