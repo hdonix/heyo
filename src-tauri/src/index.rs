@@ -8,11 +8,16 @@
 //! - `vectors`, `embed`, `meaning`: what texts mean, the model that says so,
 //!   and making the vectors in the background.
 //! - `fusion`: putting what the words and the meaning found in one order.
+//! - `items`: the connections' items (`connections.db`) and their search.
 //!
-//! Each store keeps its own rows on top of these (`clipboard/store.rs`).
+//! Each store keeps its own rows on top of these (`clipboard/store.rs`,
+//! `items.rs`).
 
 pub mod embed;
 pub mod fusion;
+// Used by the connections, which are written beside this.
+#[cfg_attr(not(test), allow(dead_code))]
+pub mod items;
 pub mod meaning;
 pub mod text;
 pub mod vectors;

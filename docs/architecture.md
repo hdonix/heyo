@@ -300,7 +300,10 @@ and keeps the list of applications current. The rest, by what it is for:
   whatever is searched: the two full-text indexes (`text.rs`), the time a
   query names (`when.rs`), vectors and the model that makes them
   (`vectors.rs`, `embed.rs`, `meaning.rs`), and putting what the words and
-  the meaning found in one order (`fusion.rs`).
+  the meaning found in one order (`fusion.rs`). `items.rs` keeps what the
+  connections sync (mail, events, messages, documents, tasks) in
+  `connections.db` and searches it; `items/query.rs` reads a person, a
+  kind and days to come out of a query as well.
 - `clipboard.rs` and `clipboard/` are the clipboard history, on top of
   `index/`: what is recorded and what is not (`sources.rs`), where it is
   kept (one SQLite file, `store.rs`), how a query is read (`query.rs`: when,

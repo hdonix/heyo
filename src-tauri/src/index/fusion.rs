@@ -81,6 +81,11 @@ pub fn asked(terms: &[String], tuning: &Tuning) -> Option<String> {
 /// down it is, and the places in `meaning` for `weight` times as much.
 /// With each entry, whether the meaning alone brought it.
 pub fn fuse(words: &[u64], meaning: &[u64], weight: f32) -> Vec<(u64, bool)> {
+    scored(words, meaning, weight).into_iter().map(|(id, _, alone)| (id, alone)).collect()
+}
+
+/// `fuse`, with each entry's score: what its places in the two lists add up to.
+pub fn scored(words: &[u64], meaning: &[u64], weight: f32) -> Vec<(u64, f32, bool)> {
     let mut scores: HashMap<u64, f32> = HashMap::new();
     let mut order: Vec<u64> = Vec::new();
     for (list, counts) in [(words, 1.0), (meaning, weight)] {
@@ -95,7 +100,7 @@ pub fn fuse(words: &[u64], meaning: &[u64], weight: f32) -> Vec<(u64, bool)> {
     let by_words: HashSet<u64> = words.iter().copied().collect();
     // Stable: of two that score alike, the one the words found comes first.
     order.sort_by(|a, b| scores[b].total_cmp(&scores[a]));
-    order.into_iter().map(|id| (id, !by_words.contains(&id))).collect()
+    order.into_iter().map(|id| (id, scores[&id], !by_words.contains(&id))).collect()
 }
 
 /// The entries near enough to the query (a text in `language`) to be what was meant.

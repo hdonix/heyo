@@ -1,4 +1,5 @@
-//! When a query asks about: "昨天下午", "last week", "3天前", "周三". Taken
+//! When a query asks about: "昨天下午", "last week", "3天前", "周三", and,
+//! for what has days still to come (a calendar), "明天", "next week". Taken
 //! out of the query by rule, so it is instant and predictable.
 
 use std::sync::LazyLock;
@@ -56,11 +57,63 @@ fn weekday(text: &str) -> Option<i64> {
 
 const N: &str = r"(\d{1,3}|[零一二两三四五六七八九十]{1,3})";
 
+type Rule = (Regex, fn(&regex::Captures, Local_) -> Option<(Local_, Local_)>);
+
+fn rule(pattern: &str, f: fn(&regex::Captures, Local_) -> Option<(Local_, Local_)>) -> Rule {
+    (Regex::new(&format!("(?i){pattern}")).unwrap(), f)
+}
+
+/// Whether a query may name days still to come: a copy is never made
+/// tomorrow, a meeting may be.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Reach {
+    Past,
+    Ahead,
+}
+
+/// The days ahead a query names, before the rules for days gone by.
+static AHEAD: LazyLock<Vec<Rule>> = LazyLock::new(|| {
+    vec![
+        rule(r"大后天", |_, now| Some(days(now.date_naive() + Duration::days(3), 1))),
+        rule(r"后天|\bthe day after tomorrow\b", |_, now| Some(days(now.date_naive() + Duration::days(2), 1))),
+        rule(r"明[天日早晚]|\btomorrow\b", |_, now| Some(days(now.date_naive() + Duration::days(1), 1))),
+        rule(&format!(r"{N}天后|\bin (\d{{1,3}}) days?\b"), |c, now| {
+            let n = number(c.get(1).or(c.get(2))?.as_str())?;
+            Some(days(now.date_naive() + Duration::days(n), 1))
+        }),
+        rule(&format!(r"(?:未来|接下来){N}天|\b(?:next|coming) (\d{{1,3}}) days\b"), |c, now| {
+            let n = number(c.get(1).or(c.get(2))?.as_str())?;
+            Some((now - Duration::seconds(1), midnight(now.date_naive() + Duration::days(n + 1))))
+        }),
+        // "下周三", "next Tuesday": that day of next week. "下周": all of it.
+        rule(r"(下下|下)(?:周|星期|礼拜)([一二三四五六日天])?|\bnext (week|mon|tue|wed|thu|fri|sat|sun)[a-z]*\b", |c, now| {
+            let monday = now.date_naive() - Duration::days(now.weekday().num_days_from_monday() as i64);
+            if let Some(english) = c.get(3) {
+                if english.as_str().eq_ignore_ascii_case("week") {
+                    return Some(days(monday + Duration::days(7), 7));
+                }
+                return Some(days(monday + Duration::days(7 + weekday(english.as_str())?), 1));
+            }
+            let weeks = if &c[1] == "下下" { 2 } else { 1 };
+            let start = monday + Duration::days(7 * weeks);
+            match c.get(2) {
+                Some(day) => Some(days(start + Duration::days(weekday(day.as_str())?), 1)),
+                None => Some(days(start, 7)),
+            }
+        }),
+        rule(r"下个?月|\bnext month\b", |_, now| {
+            let next = (now.date_naive().with_day(1)? + Duration::days(32)).with_day(1)?;
+            let after = (next + Duration::days(32)).with_day(1)?;
+            Some((midnight(next), midnight(after)))
+        }),
+        // A date of this year, whether gone by or to come.
+        rule(&format!(r"{N}月{N}[日号]"), |c, now| Some(days(NaiveDate::from_ymd_opt(now.year(), number(&c[1])? as u32, number(&c[2])? as u32)?, 1))),
+    ]
+});
+
 /// The day or days a query names, with the words that named them.
-fn day_span(query: &str, now: Local_) -> Option<(std::ops::Range<usize>, Local_, Local_)> {
-    type Rule = (Regex, fn(&regex::Captures, Local_) -> Option<(Local_, Local_)>);
+fn day_span(query: &str, now: Local_, reach: Reach) -> Option<(std::ops::Range<usize>, Local_, Local_)> {
     static RULES: LazyLock<Vec<Rule>> = LazyLock::new(|| {
-        let rule = |pattern: &str, f: fn(&regex::Captures, Local_) -> Option<(Local_, Local_)>| (Regex::new(&format!("(?i){pattern}")).unwrap(), f);
         vec![
             rule(r"刚才|刚刚|\bjust now\b", |_, now| Some((now - Duration::minutes(15), now + Duration::seconds(1)))),
             rule(&format!(r"(?:最近|过去|近|这){N}个?小时|\b(?:last|past) (\d{{1,3}}) hours?\b"), |c, now| {
@@ -136,7 +189,8 @@ fn day_span(query: &str, now: Local_) -> Option<(std::ops::Range<usize>, Local_,
             rule(r"最近|近期|\brecent(?:ly)?\b", |_, now| Some((midnight(now.date_naive() - Duration::days(6)), now + Duration::seconds(1)))),
         ]
     });
-    RULES.iter().find_map(|(pattern, range)| {
+    let ahead = if reach == Reach::Ahead { &AHEAD[..] } else { &[] };
+    ahead.iter().chain(RULES.iter()).find_map(|(pattern, range)| {
         let captures = pattern.captures(query)?;
         let found = captures.get(0)?.range();
         if !stands_alone(query, &found) {
@@ -179,10 +233,16 @@ fn part_of_day(query: &str) -> Option<(std::ops::Range<usize>, u32, u32)> {
     })
 }
 
-/// Takes the time expression out of the query.
+/// Takes the time expression out of the query, of days gone by.
 pub fn take_time(query: &mut String, now: Local_) -> Option<Span> {
+    take_time_within(query, now, Reach::Past)
+}
+
+/// Takes the time expression out of the query, of days gone by and, if
+/// `reach` says so, of days to come.
+pub fn take_time_within(query: &mut String, now: Local_, reach: Reach) -> Option<Span> {
     let part = part_of_day(query);
-    let day = day_span(query, now);
+    let day = day_span(query, now, reach);
     let (mut start, mut end) = match (&day, &part) {
         (Some((_, start, end)), _) => (*start, *end),
         // "下午" alone: this afternoon.
@@ -285,6 +345,30 @@ mod tests {
         assert_eq!(span("上周"), (at(9, 29, 0), at(10, 6, 0)));
         let recent = read("刚才复制的").0.unwrap();
         assert_eq!(recent.end - recent.start, 15 * 60_000 + 1000);
+    }
+
+    #[test]
+    fn days_to_come_where_there_are_any() {
+        let ahead = |query: &str| {
+            let time = take_time_within(&mut query.to_owned(), now(), Reach::Ahead).unwrap_or_else(|| panic!("no time in {query:?}"));
+            (time.start, time.end)
+        };
+        assert_eq!(ahead("明天的会议"), (at(10, 9, 0), at(10, 10, 0)));
+        assert_eq!(ahead("tomorrow"), (at(10, 9, 0), at(10, 10, 0)));
+        assert_eq!(ahead("明天下午"), (at(10, 9, 12), at(10, 9, 18)));
+        assert_eq!(ahead("后天"), (at(10, 10, 0), at(10, 11, 0)));
+        assert_eq!(ahead("下周"), (at(10, 13, 0), at(10, 20, 0)));
+        assert_eq!(ahead("next week"), (at(10, 13, 0), at(10, 20, 0)));
+        assert_eq!(ahead("下周三"), (at(10, 15, 0), at(10, 16, 0)));
+        assert_eq!(ahead("next friday"), (at(10, 17, 0), at(10, 18, 0)));
+        assert_eq!(ahead("下个月"), (at(11, 1, 0), at(12, 1, 0)));
+        assert_eq!(ahead("12月25日"), (at(12, 25, 0), at(12, 26, 0)));
+        // Days gone by are read as ever.
+        assert_eq!(ahead("昨天"), (at(10, 7, 0), at(10, 8, 0)));
+        assert_eq!(ahead("last week"), (at(9, 29, 0), at(10, 6, 0)));
+        // Looking back only, there is no tomorrow.
+        assert_eq!(read("明天").0, None);
+        assert_eq!(read("12月25日").0.unwrap().start, Local.with_ymd_and_hms(2024, 12, 25, 0, 0, 0).unwrap().timestamp_millis());
     }
 
     #[test]
