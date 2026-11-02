@@ -1816,7 +1816,7 @@ mod tests {
         let lines = model.lines();
         let speech = card(&lines, "Speech Models on This Computer");
         // Its status, then one row a model: downloaded but not used, downloading, not downloaded.
-        assert!(speech[0].control.is_empty() && speech[0].description.contains("stays here"), "{:?}", speech[0]);
+        assert!(speech[0].label == "Status" && speech[0].control.is_empty() && speech[0].description.contains("stays here"), "{:?}", speech[0]);
         let downloaded = row(speech, "SenseVoice Small");
         assert_eq!((downloaded.control, downloaded.value.as_str(), downloaded.more.as_str()), ("confirm", "Delete…", "Use"));
         assert_eq!(downloaded.description, "Chinese, English · 240 MB. Fast.");

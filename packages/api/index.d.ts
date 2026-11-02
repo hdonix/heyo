@@ -456,8 +456,8 @@ export declare namespace Clipboard {
 
 /** Raycast's `AI`, answered by the model set up in Heyo (permission "ai" for what is added). */
 export declare const AI: Omit<typeof raycast.AI, "ask"> & {
-  /** Which model answers and whether what is asked stays on this computer. */
-  provider(): Promise<{ kind: "claude" | "local" | "claude-code" | "codex"; model: string; local: boolean }>;
+  /** Which model answers and whether what is asked stays on this computer; `none` when none is chosen in Heyo, or the one chosen cannot answer. */
+  provider(): Promise<{ kind: "claude" | "local" | "claude-code" | "codex" | "none"; model: string; local: boolean }>;
   /**
    * As Raycast's. `model` is accepted and the model set up in Heyo answers;
    * `creativity` is the temperature of a local model. Fails with a
