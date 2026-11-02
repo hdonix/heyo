@@ -11,7 +11,7 @@ use crate::slint_windows::model::Model;
 
 fn imap() -> Kind {
     let mut kind = mail();
-    kind.presets = vec![Preset { title: "Gmail".into(), values: json!({ "host": "imap.gmail.com" }).as_object().unwrap().clone(), description: None, web: Some("https://mail.google.com".into()) }];
+    kind.presets = vec![Preset { title: "Gmail".into(), values: json!({ "host": "imap.gmail.com" }).as_object().unwrap().clone(), description: Some("Use an app password.".into()), web: Some("https://mail.google.com".into()) }];
     kind
 }
 
@@ -72,9 +72,12 @@ fn a_connection_is_added_from_a_preset_only_once_it_was_tried_and_works() {
     // The defaults are filled in; a preset fills in the rest, and names it.
     assert_eq!(row(&lines, "Port").value, "993");
     assert_eq!(row(&lines, "Folders").value, "INBOX");
+    assert_eq!(row(&model.lines(), "Service").description, "Fills in the server and the rest for a service it knows.");
     assert!(model.acted("connection-preset", "0").is_empty());
     let lines = model.lines();
     assert_eq!((row(&lines, "Server").value.as_str(), row(&lines, "Name").value.as_str(), row(&lines, "Service").value.as_str()), ("imap.gmail.com", "Gmail", "0"));
+    // What to know of the service chosen is said under the choice.
+    assert_eq!(row(&lines, "Service").description, "Use an app password.");
     // Not added before it is tried.
     assert!(row(&lines, "Add This Connection").busy);
     assert!(model.acted("act:save-connection", "").is_empty());
@@ -151,6 +154,21 @@ fn a_connections_page_syncs_checks_edits_and_removes_it() {
     assert_eq!(remove.control, "confirm");
     assert_eq!(asked(&model.acted(&remove.id, "")), Command::RemoveConnection("imap".into()));
     assert_eq!(model.page, PageId::own(PAGE));
+}
+
+#[test]
+fn the_tools_a_server_offers_are_listed_when_it_has_any() {
+    let tool = |name: &str, title: Option<&str>, description: Option<&str>| crate::wire::ConnectorTool { name: name.into(), title: title.map(Into::into), description: description.map(Into::into) };
+    let mut model = told(vec![view("imap", "Work", idle()), view("mcp", "Files", State { tools: vec![tool("echo", Some("Echo"), Some("Says it back")), tool("search", None, None)], ..idle() })]);
+    model.show("connection:imap");
+    assert!(!model.lines().iter().any(|line| line.kind == "heading" && line.label == "Tools"));
+    model.show("connection:mcp");
+    let lines = model.lines();
+    assert!(lines.iter().any(|line| line.kind == "heading" && line.label == "Tools"));
+    let echo = row(&lines, "Echo");
+    assert_eq!((echo.description.as_str(), echo.value.as_str(), echo.id.as_str()), ("Says it back", "echo", ""));
+    assert_eq!(row(&lines, "search").value, "");
+    assert!(lines.iter().any(|line| line.kind == "note" && line.label.contains("does not call them")));
 }
 
 #[test]

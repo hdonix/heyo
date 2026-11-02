@@ -260,7 +260,10 @@ impl Connections {
         if !kind.presets.is_empty() {
             let mut choices = vec![(String::new(), t("Other (Fill In Yourself)").to_string())];
             choices.extend(kind.presets.iter().enumerate().map(|(at, preset)| (at.to_string(), preset.title.clone())));
-            let mut service = Line::row(Id::ConnectionPreset, t("Service")).says(t("Fills in the server and the rest for a service it knows."));
+            // Once one is chosen, what to know of it: that it wants an app
+            // password, where IMAP is turned on.
+            let note = draft.preset.and_then(|at| kind.presets[at].description.clone()).unwrap_or_else(|| t("Fills in the server and the rest for a service it knows.").into());
+            let mut service = Line::row(Id::ConnectionPreset, t("Service")).says(note);
             (service.control, service.value, service.choices) = ("select", draft.preset.map(|at| at.to_string()).unwrap_or_default(), choices);
             page.card("", vec![service]);
         }
@@ -321,6 +324,20 @@ impl Connections {
                 field_row(field, id(&field.name), view.config.get(&field.name), set)
             }));
             page.card(t("Settings"), rows);
+        }
+        // What an MCP server offers besides what is synced: listed, not called.
+        let tools: Vec<Line> = view
+            .state
+            .tools
+            .iter()
+            .map(|tool| {
+                let row = Line::row("", tool.title.clone().unwrap_or_else(|| tool.name.clone())).says(tool.description.clone().unwrap_or_default());
+                if tool.title.as_ref().is_some_and(|title| *title != tool.name) { row.text(tool.name.clone()) } else { row }
+            })
+            .collect();
+        if !tools.is_empty() {
+            page.card(t("Tools"), tools);
+            page.note(t("What the server can do besides what is synced. Heyo lists its tools and does not call them yet."));
         }
         page.card("", vec![Line::row(Id::RemoveConnection(view.id.clone()), t("Remove Connection")).says(t("Its items and its password are deleted from this computer.")).confirm(t("Remove…"), t("Click Again to Remove"))]);
         page.done()

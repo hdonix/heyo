@@ -2348,11 +2348,11 @@ msgid "Other (Fill In Yourself)"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/connections.rs
-msgid "Service"
+msgid "Fills in the server and the rest for a service it knows."
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/connections.rs
-msgid "Fills in the server and the rest for a service it knows."
+msgid "Service"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/connections.rs
@@ -2426,6 +2426,15 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pages/connections.rs
 msgid "Saved — type a new one to replace it"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/ui/screenshot.slint
+msgid "Tools"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "What the server can do besides what is synced. Heyo lists its tools and does not call them yet."
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/connections.rs
@@ -3263,10 +3272,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint
 msgid "Selection"
-msgstr ""
-
-#: src-tauri/src/slint_windows/ui/screenshot.slint
-msgid "Tools"
 msgstr ""
 
 #: src-tauri/src/slint_windows/ui/screenshot.slint
