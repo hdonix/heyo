@@ -250,7 +250,8 @@ pub fn run() {
             expand::snippet_expanded,
             activities::activities,
             activities::activity_action,
-            activities::activity_dismiss
+            activities::activity_dismiss,
+            connections::commands::search_connections
         ]))
         .setup(move |app| {
             // Extension icons and assets.

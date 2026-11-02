@@ -380,6 +380,23 @@ and keeps the list of applications current. The rest, by what it is for:
   when a keyword counts as typed.
 - `library.rs` reads quicklinks and snippets; `files.rs` is the in-memory
   file search.
+- `connections/` brings what the user has elsewhere (mail, calendars, …)
+  into the index. An account is a setting (`accounts.rs`, its secrets
+  with the secrets) of a connector, a command of mode `connector` that
+  an extension declares with its fields, presets and how often it is
+  synced (docs/extension-api.md, 7.11). When each account is synced and
+  watched is `scheduler.rs`, in the manner of `activities.rs`: plain data
+  with the time passed in (every 15 minutes or as the connector says,
+  changes at most once a minute, 1/5/15/60 minutes after a failure,
+  refused credentials waiting for the user, three at once). `shell.rs`
+  carries it out: the connectors run in a Node.js process of their own
+  (`runtime/src/connections/`, its conversation typed in `wire.rs`,
+  `ConnectorCall` one way and `ConnectorRequest` the other), whose
+  writes to the index are answered once written, so that a cursor kept
+  in `connections.json` never runs ahead of the items. `commands.rs` is
+  what the settings window and the palette ask of it. Its tests run the
+  built runtime with a fake connector
+  (`runtime/src/connections/fixtures/fake`).
 
 **Keeping the house.**
 

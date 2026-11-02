@@ -50,6 +50,12 @@ pub(crate) enum Answer {
     Models(Vec<String>),
     /// What checking a provider came to.
     Checked(Checked),
+    /// The connected accounts, with how their syncing goes.
+    Connections(Vec<crate::connections::commands::View>),
+    /// The connectors accounts can be added of.
+    ConnectorKinds(Vec<crate::connections::accounts::Kind>),
+    /// What a search of the synced items found.
+    Found(crate::connections::shell::Searched),
     /// A newer version, by its number; none if this is the newest.
     Update(Option<String>),
     /// Done, with nothing to say.

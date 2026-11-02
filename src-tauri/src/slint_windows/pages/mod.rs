@@ -165,7 +165,8 @@ impl Known {
             Answer::Ocr(ocr) => self.ocr = ocr,
             Answer::Meaning(meaning) => self.meaning = Some(meaning),
             Answer::Sources(sources) => self.sources = sources,
-            Answer::Permissions(_) | Answer::Models(_) | Answer::Checked(_) | Answer::Update(_) | Answer::Done => {}
+            // The connections have no page yet: what they answer is not kept.
+            Answer::Permissions(_) | Answer::Models(_) | Answer::Checked(_) | Answer::Update(_) | Answer::Connections(_) | Answer::ConnectorKinds(_) | Answer::Found(_) | Answer::Done => {}
         }
     }
 

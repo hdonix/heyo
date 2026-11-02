@@ -3,6 +3,7 @@ import type { ConnectionFound } from "./ConnectionFound";
 
 /**
  * What a search found, and whether it is all it would have found: a
- * search that took longer than [`SEARCH_BUDGET`] is answered without.
+ * search that took longer than its budget ([`SEARCH_BUDGET`]) is
+ * answered without.
  */
 export type ConnectionsFound = { found: Array<ConnectionFound>, complete: boolean, };

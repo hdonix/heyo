@@ -223,10 +223,14 @@ fn a_failing_sync_is_tried_again_and_a_crash_restarts_the_watch() {
 }
 
 #[test]
-fn a_search_answers_within_its_budget() {
-    let test = Test::quick("search");
+fn a_search_answers_within_its_budget_or_without() {
+    // A test machine busy with the others is given time; Heyo gives 50 ms.
+    let test = Test::new("search", Setup { search_budget: Duration::from_secs(5), ..Setup::default() });
     test.items.put("work", &[item("1", "Quarterly invoice")]).unwrap();
     let searched = test.shell.search("invoice", 10);
     assert!(searched.complete);
     assert_eq!(searched.found[0].item.title, "Quarterly invoice");
+    let hurried = Test::new("hurried", Setup { search_budget: Duration::ZERO, ..Setup::default() });
+    hurried.items.put("work", &[item("1", "Quarterly invoice")]).unwrap();
+    assert_eq!(hurried.shell.search("invoice", 10), Searched { found: Vec::new(), complete: false });
 }

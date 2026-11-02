@@ -49,6 +49,7 @@ commands! {
     activities() -> Vec<ActivityView>;
     activity_action(key: String, button: Option<usize>);
     activity_dismiss(key: String);
+    search_connections(query: String) -> crate::connections::shell::Searched;
 }
 
 events! {

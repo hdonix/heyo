@@ -1,5 +1,6 @@
 // Generated from src-tauri/src/commands/bindings.rs by `cargo test`. Do not edit.
 import type { ActivityView } from "./ActivityView";
+import type { ConnectionsFound } from "./ConnectionsFound";
 import type { ExpandSnippet } from "./ExpandSnippet";
 import type { InstallProgress } from "./InstallProgress";
 import type { Item } from "./Item";
@@ -60,6 +61,8 @@ export type Commands = {
   activity_action: { args: { key: string; button?: number | null }; result: null };
   /** The user ended an activity. */
   activity_dismiss: { args: { key: string }; result: null };
+  /** The palette's search of what connectors synced. */
+  search_connections: { args: { query: string }; result: ConnectionsFound };
 };
 
 /** The commands that answer nothing: a host played in a test answers them unasked. */

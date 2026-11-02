@@ -134,6 +134,7 @@ msgid "{0} is not a value {1} takes."
 msgstr "{0} 不是{1}可接受的值。"
 
 #: src-tauri/src/connections/accounts.rs
+#: src-tauri/src/connections/commands.rs
 #: src-tauri/src/connections/shell.rs
 msgid "There is no connection {0}."
 msgstr "没有名为 {0} 的连接。"
@@ -141,6 +142,10 @@ msgstr "没有名为 {0} 的连接。"
 #: src-tauri/src/connections/accounts.rs
 msgid "A connection needs a name."
 msgstr "连接需要一个名称。"
+
+#: src-tauri/src/connections/commands.rs
+msgid "{0} is not a connector that is installed."
+msgstr "{0} 不是已安装的连接器。"
 
 #: src-tauri/src/dictation/composed.rs
 msgid "part of it had become the application's text as it was heard"

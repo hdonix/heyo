@@ -18,6 +18,7 @@
 //! ask of it.
 
 pub mod accounts;
+pub mod commands;
 pub mod scheduler;
 pub mod shell;
 

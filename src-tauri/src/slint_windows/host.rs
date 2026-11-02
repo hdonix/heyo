@@ -19,6 +19,7 @@ use tauri::{AppHandle, Listener, Manager};
 
 use super::answer::{self, Answer};
 use crate::commands::{media, root, settings};
+use crate::connections::commands as connections;
 use crate::extensions::PreferenceValues;
 use crate::{clipboard, permissions, updates};
 use crate::wire::event;
@@ -97,12 +98,30 @@ pub(crate) enum Command {
     /// By the extension's id.
     ExtensionPermissions(String),
     RevokeExtensionPermission { extension: String, permission: permissions::Permission },
+    /// The connected accounts, with how their syncing goes.
+    Connections,
+    /// The connectors there are, with their fields and presets.
+    ConnectorKinds,
+    /// An account of this connector (`<extension>:<command>`), named so,
+    /// with the values of its fields and its secrets, by name.
+    AddConnection { connector: String, name: String, config: Map<String, Value>, secrets: std::collections::BTreeMap<String, String> },
+    /// What changes of an account: its name if given, the fields and the
+    /// secrets given (an empty secret is one removed).
+    EditConnection { id: String, name: Option<String>, config: Map<String, Value>, secrets: std::collections::BTreeMap<String, String> },
+    /// By its id: it goes with its secrets and its items.
+    RemoveConnection(String),
+    /// Whether the account works as it is set up, by its id. Slow.
+    CheckConnection(String),
+    /// Syncs the account now, by its id.
+    SyncConnection(String),
+    /// What connectors synced that this finds.
+    SearchConnections(String),
 }
 
 impl Command {
     /// Whether it may take seconds: a service asked over the network.
     pub(crate) fn slow(&self) -> bool {
-        matches!(self, Command::CheckProvider(_) | Command::ProviderModels(_))
+        matches!(self, Command::CheckProvider(_) | Command::ProviderModels(_) | Command::CheckConnection(_))
     }
 
     /// What the host calls it: the name `invoke` knows it by where a web
@@ -145,6 +164,14 @@ impl Command {
             Command::ClipboardMeaningInstall => "clipboard_meaning_install",
             Command::ExtensionPermissions(_) => "extension_permissions",
             Command::RevokeExtensionPermission { .. } => "revoke_extension_permission",
+            Command::Connections => "connections",
+            Command::ConnectorKinds => "connector_kinds",
+            Command::AddConnection { .. } => "add_connection",
+            Command::EditConnection { .. } => "edit_connection",
+            Command::RemoveConnection(_) => "remove_connection",
+            Command::CheckConnection(_) => "check_connection",
+            Command::SyncConnection(_) => "sync_connection",
+            Command::SearchConnections(_) => "search_connections",
         }
     }
 }
@@ -197,6 +224,14 @@ impl Host for Running {
             Command::ClipboardMeaningInstall => clipboard::clipboard_meaning_install(app).map(|()| Answer::Done)?,
             Command::ExtensionPermissions(id) => Answer::Permissions(permissions::extension_permissions(id)),
             Command::RevokeExtensionPermission { extension, permission } => permissions::revoke_extension_permission(extension, permission).map(|()| Answer::Done)?,
+            Command::Connections => Answer::Connections(connections::list(&app)),
+            Command::ConnectorKinds => Answer::ConnectorKinds(connections::kinds()),
+            Command::AddConnection { connector, name, config, secrets } => Answer::Connections(connections::add(&app, connector, name, config, secrets)?),
+            Command::EditConnection { id, name, config, secrets } => Answer::Connections(connections::edit(&app, id, name, config, secrets)?),
+            Command::RemoveConnection(id) => Answer::Connections(connections::remove(&app, id)?),
+            Command::CheckConnection(id) => connections::check(&app, id).map(|()| Answer::Done)?,
+            Command::SyncConnection(id) => connections::sync_now(&app, id).map(|()| Answer::Done)?,
+            Command::SearchConnections(query) => Answer::Found(connections::search(&app, &query)),
         })
     }
 
@@ -262,6 +297,11 @@ mod tests {
             Command::UninstallExtension(none()),
             Command::RevokeExtensionPermission { extension: none(), permission: permissions::Permission::Windows },
             Command::InstallUpdate,
+            Command::AddConnection { connector: none(), name: none(), config: Map::new(), secrets: Default::default() },
+            Command::EditConnection { id: none(), name: None, config: Map::new(), secrets: Default::default() },
+            Command::RemoveConnection(none()),
+            Command::SyncConnection(none()),
+            Command::CheckConnection(none()),
         ];
         for command in changing {
             assert!(!registered.iter().any(|known| known == command.name()), "{}", command.name());

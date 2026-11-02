@@ -59,11 +59,13 @@ pub struct Setup {
     pub request_timeout: Duration,
     /// `connections.json`; none for a test that keeps nothing.
     pub kept: Option<PathBuf>,
+    /// How long a search may take before the palette is answered without it.
+    pub search_budget: Duration,
 }
 
 impl Default for Setup {
     fn default() -> Setup {
-        Setup { limits: Limits::default(), sync_timeout: Duration::from_secs(600), request_timeout: Duration::from_secs(60), kept: None }
+        Setup { limits: Limits::default(), sync_timeout: Duration::from_secs(600), request_timeout: Duration::from_secs(60), kept: None, search_budget: SEARCH_BUDGET }
     }
 }
 
@@ -117,7 +119,8 @@ pub struct Progress {
 }
 
 /// What a search found, and whether it is all it would have found: a
-/// search that took longer than [`SEARCH_BUDGET`] is answered without.
+/// search that took longer than its budget ([`SEARCH_BUDGET`]) is
+/// answered without.
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, TS)]
 #[ts(export, export_to = "../../shared/bindings/", rename = "ConnectionsFound")]
 pub struct Searched {
@@ -287,14 +290,14 @@ impl Shell {
         }
     }
 
-    /// The items `query` finds, within [`SEARCH_BUDGET`].
+    /// The items `query` finds, within the search's budget.
     pub fn search(&self, query: &str, limit: usize) -> Searched {
         let (told, answer) = mpsc::channel();
         let (items, query) = (self.items.clone(), query.to_owned());
         std::thread::spawn(move || {
             let _ = told.send(items.search(&query, limit, chrono::Local::now()).map_err(|e| e.to_string()));
         });
-        match answer.recv_timeout(SEARCH_BUDGET) {
+        match answer.recv_timeout(self.setup.search_budget) {
             Ok(Ok(found)) => Searched { found, complete: true },
             Ok(Err(e)) => {
                 eprintln!("heyo: searching the connections: {e}");

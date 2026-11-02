@@ -100,6 +100,17 @@ fn changing() -> std::sync::MutexGuard<'static, ()> {
     CHANGING.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// Changes the settings as `change` does, if it can, and says what it
+/// answered: one change of several of the settings (a connection, with
+/// its secrets).
+pub(crate) fn change_with<T>(app: &AppHandle, change: impl FnOnce(&mut Settings) -> Result<T, String>) -> Result<T, String> {
+    let _changing = changing();
+    let mut next = app.state::<SettingsState>().0.read().unwrap().clone();
+    let answer = change(&mut next)?;
+    commit(app, next)?;
+    Ok(answer)
+}
+
 /// Changes the settings from within Heyo (favorites and aliases, from the
 /// palette).
 pub(crate) fn update_settings(app: &AppHandle, change: impl FnOnce(&mut Settings)) -> Result<(), String> {
