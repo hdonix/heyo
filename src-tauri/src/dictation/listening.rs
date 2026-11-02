@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use super::engine::{self, doubao, Chosen, Doubao, Failure, Recognized, Recognizer};
+use super::engine::{Failure, Opener, Recognized, Recognizer};
 use super::microphone::{self, Taker};
 
 /// How long a recognizer is kept without a recording: it holds a few
@@ -52,17 +52,18 @@ impl Listening {
 
 /// The recognizer kept between recordings, and when the last one ended.
 struct Kept {
-    /// And what it was loaded as.
-    recognizer: Option<(Chosen, Box<dyn Recognizer>)>,
+    /// And what it was opened as: the model (`Opener::kept`) and language.
+    recognizer: Option<((String, String), Box<dyn Recognizer>)>,
     idle_since: Option<Instant>,
 }
 
 static KEPT: Mutex<Kept> = Mutex::new(Kept { recognizer: None, idle_since: None });
 
 /// Starts a recording from `source` (empty: the system's default
-/// microphone), heard by the model on this computer `chosen` names, from
-/// the files in `dir`, or by Doubao where `cloud` says how.
-pub(crate) fn listen(dir: std::path::PathBuf, source: &str, chosen: Chosen, cloud: Option<doubao::Config>, tell: Tell) -> Result<Listening, String> {
+/// microphone), heard by what `opener` opens, told `language` if it takes
+/// one.
+pub(crate) fn listen(source: &str, opener: Box<dyn Opener>, language: &str, tell: Tell) -> Result<Listening, String> {
+    let language = if opener.languages().contains(&language) { language.to_owned() } else { String::new() };
     let (tx, rx) = mpsc::channel();
     let (audio, failing, refused) = (tx.clone(), tx.clone(), tx.clone());
     // Record first, load second: nothing said during the load is lost.
@@ -78,7 +79,7 @@ pub(crate) fn listen(dir: std::path::PathBuf, source: &str, chosen: Chosen, clou
         .spawn(move || {
             // Whatever becomes of it, a recording that is waited for ends
             // with a word on how.
-            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&dir, &chosen, cloud, recording, (refused, rx), &tell)));
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(opener.as_ref(), &language, recording, (refused, rx), &tell)));
             match ran {
                 Ok(Some(last)) => tell(last),
                 // Nobody waits for it any more.
@@ -99,25 +100,28 @@ fn error(failure: &Failure) -> Value {
 /// The recording, until it ends: what it heard is told as it is heard,
 /// and its last word returned.
 /// A recognizer that fails says so where the microphone does (`tx`).
-fn run(dir: &std::path::Path, chosen: &Chosen, cloud: Option<doubao::Config>, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Value> {
+fn run(opener: &dyn Opener, language: &str, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Value> {
     let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     kept.idle_since = None;
-    // A connection is a recording's own: nothing is kept of it.
-    let mut doubao = cloud.map(Doubao::new);
-    if doubao.is_none() && kept.recognizer.as_ref().is_none_or(|(loaded, _)| loaded != chosen) {
-        // The one before goes first: two models need not fit at once.
-        kept.recognizer = None;
-        match engine::load(dir, chosen) {
-            Ok(recognizer) => kept.recognizer = Some((chosen.clone(), recognizer)),
-            Err(failure) => {
-                drop(recording);
-                return Some(error(&failure));
-            }
+    let key = opener.kept().map(|model| (model.to_owned(), language.to_owned()));
+    // One that is a recording's own (a connection): nothing is kept of it.
+    let mut own = None;
+    let opened = match &key {
+        Some(key) if kept.recognizer.as_ref().is_some_and(|(loaded, _)| loaded == key) => Ok(()),
+        Some(key) => {
+            // The one before goes first: two models need not fit at once.
+            kept.recognizer = None;
+            opener.open(language).map(|recognizer| kept.recognizer = Some((key.clone(), recognizer)))
         }
+        None => opener.open(language).map(|recognizer| own = Some(recognizer)),
+    };
+    if let Err(failure) = opened {
+        drop(recording);
+        return Some(error(&failure));
     }
-    let recognizer: &mut dyn Recognizer = match doubao.as_mut() {
-        Some(doubao) => doubao,
-        None => kept.recognizer.as_mut().expect("loaded above").1.as_mut(),
+    let recognizer: &mut dyn Recognizer = match own.as_mut() {
+        Some(own) => own.as_mut(),
+        None => kept.recognizer.as_mut().expect("opened above").1.as_mut(),
     };
     let heard = tell.clone();
     recognizer.begin(Box::new(move |recognized| match recognized {
@@ -150,7 +154,7 @@ fn run(dir: &std::path::Path, chosen: &Chosen, cloud: Option<doubao::Config>, re
     };
     drop(recording);
     // A connection still open is closed.
-    drop(doubao);
+    drop(own);
     // What was heard but not finished is forgotten when the next begins.
     kept.idle_since = Some(Instant::now());
     drop(kept);
@@ -223,8 +227,8 @@ mod tests {
             std::env::set_var("HEYO_DICTATION_WAV", &wav);
             let (tx, rx) = mpsc::channel();
             let tx = Mutex::new(tx);
-            let chosen = Chosen { model: model.into(), language: "en".into() };
-            let listening = listen(dir.clone(), "", chosen, None, Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
+            let opener = Box::new(crate::dictation::engine::ThisComputer::of(&dir, model));
+            let listening = listen("", opener, "en", Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
             std::env::remove_var("HEYO_DICTATION_WAV");
             let mut events = Vec::new();
             while events.iter().filter(|event: &&Value| event["type"] == "segment").count() < 2 {

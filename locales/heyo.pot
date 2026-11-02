@@ -145,6 +145,30 @@ msgstr ""
 msgid "Old Console: App ID and Access Token"
 msgstr ""
 
+#: src-tauri/src/dictation/engine.rs
+msgid "Detect Automatically"
+msgstr ""
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Chinese (Mandarin)"
+msgstr ""
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Cantonese"
+msgstr ""
+
+#: src-tauri/src/dictation/engine.rs
+msgid "English"
+msgstr ""
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Japanese"
+msgstr ""
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Korean"
+msgstr ""
+
 #: src-tauri/src/dictation/listening.rs
 msgid "dictation is not running"
 msgstr ""
@@ -1832,30 +1856,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "About"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Detect Automatically"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Chinese (Mandarin)"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Cantonese"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "English"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Japanese"
-msgstr ""
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Korean"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs

@@ -7,11 +7,15 @@
 //! voice-activity detector finds where sentences end, and the sentence
 //! being spoken is simply recognized again every 300 ms or so
 //! (`sentences`). A streaming model (`streaming`) hears the audio as it
-//! comes and says itself where a sentence ends. Which of them a recording
-//! gets is decided in one place, `load`.
+//! comes and says itself where a sentence ends. Which of them a model
+//! gets is decided in one place, `open`.
 //!
 //! The other sends the audio to a service: Doubao's streaming recognition,
 //! at Volcengine (`doubao`), where the user chose it and gave it a key.
+//!
+//! Which a recording is heard with is an [`Opener`], which the kind of the
+//! provider the settings name gives (`models::kinds`): it opens the
+//! recognizer and says what the rest of dictation needs to know of it.
 
 pub(crate) mod doubao;
 mod offline;
@@ -19,48 +23,97 @@ mod sentences;
 mod streaming;
 
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
-pub(crate) use doubao::Doubao;
 pub(crate) use offline::Offline;
 pub(crate) use streaming::Streaming;
 
 use super::models::{self, Kind};
+use crate::i18n::marked;
 
-/// The model on this computer a recording is to be heard with: the
-/// `dictationModel` setting (with no provider) and `dictationLanguage` as
-/// they were when it began, the model resolved (`models::chosen`). A
-/// recognizer that was loaded for the same is used again.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Chosen {
-    /// An entry of the catalogue, by its id.
-    pub model: String,
-    pub language: String,
+/// The languages a recognizer can be told, with their names (`marked`):
+/// the `dictationLanguage` setting, and what an extension may ask for.
+/// `auto` has the recognizer find it.
+pub(crate) const LANGUAGES: &[(&str, &str)] = &[("auto", marked("Detect Automatically")), ("zh", marked("Chinese (Mandarin)")), ("yue", marked("Cantonese")), ("en", marked("English")), ("ja", marked("Japanese")), ("ko", marked("Korean"))];
+
+/// The codes of `LANGUAGES`.
+const CODES: &[&str] = &["auto", "zh", "yue", "en", "ja", "ko"];
+
+/// Whether a recognizer can be told `language`.
+pub(crate) fn known(language: &str) -> bool {
+    CODES.contains(&language)
 }
 
-impl Chosen {
-    /// The setting's model, as a recording is heard with it: one that is
-    /// not named, or not known, is the one `models::chosen` picks.
-    pub fn of(dir: &Path, model: &str, language: &str) -> Chosen {
-        Chosen { model: models::chosen(dir, model).id.to_owned(), language: language.to_owned() }
-    }
+/// What a recording is heard with, as the settings choose it: the kind of
+/// the provider they name opens one (`ProviderKind::recognizer`), and a
+/// recording opens its recognizer from it. All that dictation needs to
+/// know of the choice is asked here, so that another way of hearing speech
+/// is a kind's file and an implementation of this.
+pub(crate) trait Opener: Send + Sync + fmt::Debug {
+    /// Opens a recognizer for one recording, told `language` (one of
+    /// `languages`) where it takes one.
+    fn open(&self, language: &str) -> Result<Box<dyn Recognizer>, Failure>;
 
-    /// Whether it can be loaded without a download first.
-    pub fn ready(&self, dir: &Path) -> bool {
-        models::find(&self.model).is_some_and(|model| model.installed(dir))
+    /// The model it loads into Heyo, by its id in the catalogue: a
+    /// recognizer opened for the same model and language is kept from one
+    /// recording to the next and used again. None for one that a recording
+    /// opens for itself (a connection to a service), let go with it.
+    fn kept(&self) -> Option<&str>;
+
+    /// Whether it can be opened without a download first.
+    fn ready(&self) -> bool;
+
+    /// Whether the audio leaves this computer to be recognized.
+    fn sends_audio(&self) -> bool;
+
+    /// The languages it is told (of `LANGUAGES`); none where it finds the
+    /// language by itself.
+    fn languages(&self) -> &'static [&'static str];
+}
+
+/// A model of the catalogue, run by Heyo from its files in the dictation
+/// directory.
+#[derive(Debug, Clone)]
+pub(crate) struct ThisComputer {
+    dir: PathBuf,
+    model: &'static models::Model,
+}
+
+impl ThisComputer {
+    /// The `dictationModel` setting's model of this computer, from the
+    /// files in `dir`: one that is not named, or not known, is the one
+    /// `models::chosen` picks.
+    pub fn of(dir: &Path, model: &str) -> ThisComputer {
+        ThisComputer { dir: dir.to_owned(), model: models::chosen(dir, model) }
     }
 }
 
-/// Opens the recognizer `chosen` names, from its files in the dictation
-/// directory `dir`.
-pub(crate) fn load(dir: &Path, chosen: &Chosen) -> Result<Box<dyn Recognizer>, Failure> {
-    open(dir, &chosen.model, &chosen.language)
+impl Opener for ThisComputer {
+    fn open(&self, language: &str) -> Result<Box<dyn Recognizer>, Failure> {
+        open(&self.dir, self.model.id, language)
+    }
+
+    fn kept(&self) -> Option<&str> {
+        Some(self.model.id)
+    }
+
+    fn ready(&self) -> bool {
+        self.model.installed(&self.dir)
+    }
+
+    fn sends_audio(&self) -> bool {
+        false
+    }
+
+    fn languages(&self) -> &'static [&'static str] {
+        if self.model.language { CODES } else { &[] }
+    }
 }
 
 /// Opens the recognizer of the catalogue's entry `id`, in `language`
-/// where the model is told one (`dictation::LANGUAGES`).
+/// where the model is told one.
 pub(crate) fn open(dir: &Path, id: &str, language: &str) -> Result<Box<dyn Recognizer>, Failure> {
     let Some(model) = models::find(id) else {
         return Err(Failure::failed(format!("there is no speech model {id}")));
@@ -157,6 +210,23 @@ impl fmt::Display for Failure {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_languages_are_named_once() {
+        assert_eq!(LANGUAGES.iter().map(|(code, _)| *code).collect::<Vec<_>>(), CODES);
+        assert!(known("yue") && !known("de"));
+    }
+
+    #[test]
+    fn a_model_of_this_computer_is_kept_and_told_a_language_if_it_takes_one() {
+        let dir = std::env::temp_dir().join(format!("heyo-opener-{}", std::process::id()));
+        let sense_voice = ThisComputer::of(&dir, "sense-voice-2024-07-17");
+        assert_eq!((sense_voice.kept(), sense_voice.ready(), sense_voice.sends_audio()), (Some("sense-voice-2024-07-17"), false, false));
+        assert_eq!(sense_voice.languages(), CODES);
+        assert!(ThisComputer::of(&dir, "x-asr-2026-06-05").languages().is_empty());
+        // None named, and none downloaded: the default.
+        assert_eq!(ThisComputer::of(&dir, "").kept(), Some(models::DEFAULT));
+    }
 
     #[test]
     fn a_failure_is_said_as_its_code_and_particulars() {

@@ -55,6 +55,8 @@ use crate::platform::typed::{self, Lost, Writing};
 use crate::models::registry;
 use crate::{pasting, SettingsState};
 use composed::{Composed, Tell};
+use engine::Opener;
+pub(crate) use engine::LANGUAGES;
 use onscreen::{OnScreen, Shortfall, Standing, Step};
 use vocabulary::{Corrector, Vocabulary};
 
@@ -175,24 +177,15 @@ fn heard(event: &Value) -> Option<Heard> {
 /// configuration, its models, checking it.
 pub(crate) use engine::doubao;
 
-/// Whether the settings choose a model of this computer's to recognize
-/// dictation with (`dictationModel`, of the provider `registry::LOCAL_SPEECH`).
-fn on_this_computer(settings: &crate::settings::Settings) -> bool {
-    settings.dictation_model.provider == registry::LOCAL_SPEECH
-}
-
-/// What recognizes dictation, as the settings choose it (`dictationModel`,
+/// What hears dictation, as the settings choose it (`dictationModel`,
 /// resolved through the providers and opened by the provider's kind: the
-/// one place it is chosen): none for a model on this computer, or how
-/// Doubao is to. A reference to what cannot recognize speech, or Doubao
-/// without a key, is what to say instead.
-fn cloud(settings: &crate::settings::Settings) -> Result<Option<doubao::Config>, String> {
-    use crate::models::kinds::{self, Recognizer};
+/// one place it is chosen). A reference to what cannot recognize speech,
+/// or a provider that is not set up (Doubao without a key), is what to say
+/// instead.
+fn opener(settings: &crate::settings::Settings) -> Result<Box<dyn Opener>, String> {
     let (provider, model) = registry::resolve(&settings.providers, &settings.dictation_model, registry::Use::DictationRecognition).map_err(|why| crate::models::ModelError::Unusable(why).message())?;
     match provider.kind().recognizer(provider, model, &vocabulary::parse(&settings.dictation_vocabulary)) {
-        Some(Ok(Recognizer::ThisComputer)) => Ok(None),
-        Some(Ok(Recognizer::Doubao(config))) => Ok(Some(config)),
-        Some(Err(failure)) => Err(kinds::worded(&failure)),
+        Some(opened) => opened.map_err(|failure| crate::models::kinds::worded(&failure)),
         None => Err(crate::models::ModelError::Unusable(registry::Unusable::Cannot(provider.name.clone())).message()),
     }
 }
@@ -201,28 +194,19 @@ pub fn dir() -> PathBuf {
     crate::paths::data().join("dictation")
 }
 
-/// The model on this computer the settings choose (`dictationModel` of
-/// the speech models of this computer: the model is an entry of the catalogue, or none for the
-/// default or the one that is installed), as a recording in `language`,
-/// or the one they set, is heard with it. Where they choose another
-/// provider, what would be heard with on this computer without it.
-fn local(settings: &crate::settings::Settings, language: Option<String>) -> engine::Chosen {
-    let model = if on_this_computer(settings) { settings.dictation_model.model.as_str() } else { "" };
-    engine::Chosen::of(&dir(), model, language.as_deref().unwrap_or(&settings.dictation_language))
-}
-
 /// Whether what `settings` choose to hear with can be used without a
-/// download first.
+/// download first. What cannot be used at all needs no download: starting
+/// says what it does need.
 pub fn ready(settings: &crate::settings::Settings) -> bool {
-    !on_this_computer(settings) || local(settings, None).ready(&dir())
+    opener(settings).map_or(true, |opener| opener.ready())
 }
 
-/// The entry of the catalogue in use, if the settings choose a model on
-/// this computer.
+/// The entry of the catalogue in use: the model the settings choose, if
+/// it is one Heyo loads itself.
 fn in_use(app: &AppHandle) -> Option<String> {
     let settings = app.state::<SettingsState>();
     let settings = settings.0.read().unwrap();
-    on_this_computer(&settings).then(|| local(&settings, None).model)
+    opener(&settings).ok()?.kept().map(str::to_owned)
 }
 
 /// What the dictation window is told of a recording: the recording's account
@@ -295,12 +279,11 @@ fn hide_window_after(app: &AppHandle, delay: Duration) {
     });
 }
 
-/// Starts recording from `source`, heard by the model on this computer
-/// `chosen` names, or by Doubao where `cloud` says how: what is heard
-/// comes to `handle`.
-fn start(app: &AppHandle, chosen: engine::Chosen, source: &str, cloud: Option<doubao::Config>) -> Result<listening::Listening, String> {
+/// Starts recording from `source`, heard by what `opener` opens, in
+/// `language`: what is heard comes to `handle`.
+fn start(app: &AppHandle, opener: Box<dyn Opener>, source: &str, language: &str) -> Result<listening::Listening, String> {
     let receiver = app.clone();
-    listening::listen(dir(), source, chosen, cloud, Arc::new(move |event| handle(&receiver, said(event))))
+    listening::listen(source, opener, language, Arc::new(move |event| handle(&receiver, said(event))))
 }
 
 /// What the thread that writes is told, in the order it was heard.
@@ -955,27 +938,27 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     if state.recording {
         return;
     }
-    let (chosen, source, polish, vocabulary, live, cloud) = {
+    let (opener, source, language, polish, vocabulary, live) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (local(&settings, None), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live, cloud(&settings))
+        (opener(&settings), settings.dictation_source.clone(), settings.dictation_language.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live)
     };
-    let cloud = match cloud {
-        Ok(cloud) => cloud,
+    let opener = match opener {
+        Ok(opener) => opener,
         Err(e) => {
             drop(state);
             return fail(app, e);
         }
     };
-    if cloud.is_none() && !chosen.ready(&dir()) {
+    if !opener.ready() {
         drop(state);
         return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Models to download a speech model.").into());
     }
     // Before the recording starts: a recognizer that is kept answers at
     // once, and the window must not hear that it is ready before it hears
     // that a recording begins.
-    emit(app, json!({ "type": "start", "polish": polish, "cloud": cloud.is_some() }));
-    match start(app, chosen, &source, cloud) {
+    emit(app, json!({ "type": "start", "polish": polish, "cloud": opener.sends_audio() }));
+    match start(app, opener, &source, &language) {
         Ok(listening) => {
             state.listening = Some(listening);
             // Kept for the whole recording, polishing included.
@@ -1004,9 +987,6 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     }
 }
 
-/// The languages the speech model takes.
-pub(crate) const LANGUAGES: &[&str] = &["auto", "zh", "en", "ja", "ko", "yue"];
-
 /// Starts a recording for an extension: `listener` is given each sentence
 /// and, at the end, all of it; nothing is pasted. The recording ends like
 /// any other (`finish`, the hotkey, the window's buttons) or is discarded
@@ -1017,17 +997,17 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
     if state.recording {
         return Err(NotListening::Busy);
     }
-    let (chosen, source, vocabulary, cloud) = {
+    let (opener, source, language, vocabulary) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (local(&settings, language), settings.dictation_source.clone(), settings.dictation_vocabulary.clone(), cloud(&settings))
+        (opener(&settings), settings.dictation_source.clone(), language.unwrap_or_else(|| settings.dictation_language.clone()), settings.dictation_vocabulary.clone())
     };
-    let cloud = cloud.map_err(NotListening::Failed)?;
-    if cloud.is_none() && !chosen.ready(&dir()) {
+    let opener = opener.map_err(NotListening::Failed)?;
+    if !opener.ready() {
         return Err(NotListening::NotInstalled);
     }
-    let in_cloud = cloud.is_some();
-    state.listening = Some(start(app, chosen, &source, cloud).map_err(NotListening::Failed)?);
+    let in_cloud = opener.sends_audio();
+    state.listening = Some(start(app, opener, &source, &language).map_err(NotListening::Failed)?);
     state.words = Words::of(&vocabulary);
     state.polish = "off".into();
     state.recording = true;

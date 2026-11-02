@@ -148,6 +148,30 @@ msgstr "新版控制台：API 密钥"
 msgid "Old Console: App ID and Access Token"
 msgstr "旧版控制台：APP ID 与 Access Token"
 
+#: src-tauri/src/dictation/engine.rs
+msgid "Detect Automatically"
+msgstr "自动检测"
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Chinese (Mandarin)"
+msgstr "中文（普通话）"
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Cantonese"
+msgstr "粤语"
+
+#: src-tauri/src/dictation/engine.rs
+msgid "English"
+msgstr "英语"
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Japanese"
+msgstr "日语"
+
+#: src-tauri/src/dictation/engine.rs
+msgid "Korean"
+msgstr "韩语"
+
 #: src-tauri/src/dictation/listening.rs
 msgid "dictation is not running"
 msgstr "听写未在运行"
@@ -1831,30 +1855,6 @@ msgstr "高级"
 #: src-tauri/src/slint_windows/model.rs
 msgid "About"
 msgstr "关于"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Detect Automatically"
-msgstr "自动检测"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Chinese (Mandarin)"
-msgstr "中文（普通话）"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Cantonese"
-msgstr "粤语"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "English"
-msgstr "英语"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Japanese"
-msgstr "日语"
-
-#: src-tauri/src/slint_windows/model.rs
-msgid "Korean"
-msgstr "韩语"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "Off"

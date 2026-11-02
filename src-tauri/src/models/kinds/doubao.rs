@@ -5,7 +5,7 @@ use crate::dictation::doubao::{self, Config, ACCESS_TOKEN, API_KEY, APP_ID, CONS
 use crate::i18n::{marked, t, translate};
 use crate::models::registry::{field, when, Can, Entry, Field, Provider};
 
-use super::{Checked, Known, Missing, ProviderKind, Recognizer, Status};
+use super::{Checked, Known, Missing, Opener, ProviderKind, Status};
 
 pub(crate) const WORD: &str = "doubao";
 
@@ -59,7 +59,7 @@ impl ProviderKind for Doubao {
         doubao::check(&config).map_err(|failure| super::worded(&failure))?;
         Ok(Checked { said: t("Volcengine takes the key.").into(), models: None })
     }
-    fn recognizer(&self, provider: &Provider, model: &str, vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Option<Result<Recognizer, crate::dictation::engine::Failure>> {
-        Some(Config::of(provider, model, vocabulary).map(Recognizer::Doubao))
+    fn recognizer(&self, provider: &Provider, model: &str, vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Option<Result<Box<dyn Opener>, crate::dictation::engine::Failure>> {
+        Some(Config::of(provider, model, vocabulary).map(|config| Box::new(config) as Box<dyn Opener>))
     }
 }

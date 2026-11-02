@@ -108,12 +108,7 @@ pub(crate) struct Checked {
 }
 
 /// What hears dictation, as a provider of speech opens it.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Recognizer {
-    /// A model of the catalogue, on this computer (`dictation::engine`).
-    ThisComputer,
-    Doubao(crate::dictation::doubao::Config),
-}
+pub(crate) use crate::dictation::engine::Opener;
 
 /// The words of what a provider can do, as the chips beside it say it.
 pub(crate) const ABILITIES: &[(Can, &str)] = &[(Can::Text, marked("Text")), (Can::Images, marked("Images")), (Can::Speech, marked("Speech")), (Can::Streaming, marked("Streaming")), (Can::Private, marked("Private"))];
@@ -181,7 +176,7 @@ pub(crate) trait ProviderKind: Sync {
     }
     /// What hears dictation with `model` of it, with the words of
     /// `vocabulary`; none if it does not recognize speech.
-    fn recognizer(&self, _provider: &Provider, _model: &str, _vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Option<Result<Recognizer, Failure>> {
+    fn recognizer(&self, _provider: &Provider, _model: &str, _vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Option<Result<Box<dyn Opener>, Failure>> {
         None
     }
     /// What extensions are told answers `AI.ask` when one of its models does.

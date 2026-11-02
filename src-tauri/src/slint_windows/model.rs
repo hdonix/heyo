@@ -22,7 +22,7 @@ use super::pages::{self, Known, Page, Reaction, To};
 use crate::i18n::{marked, t};
 
 /// The languages dictation can be told to hear.
-pub(crate) const DICTATION_LANGUAGES: &[(&str, &str)] = &[("auto", marked("Detect Automatically")), ("zh", marked("Chinese (Mandarin)")), ("yue", marked("Cantonese")), ("en", marked("English")), ("ja", marked("Japanese")), ("ko", marked("Korean"))];
+pub(crate) use crate::dictation::LANGUAGES as DICTATION_LANGUAGES;
 
 /// One line of a page, as `ui/settings.slint` draws it (see `Line` there).
 /// `icon` is a file, or the name of a symbol.

@@ -5,7 +5,9 @@ use crate::dictation::models::{find, CATALOGUE};
 use crate::i18n::{marked, t, tn};
 use crate::models::registry::{Can, Provider};
 
-use super::{Checked, ProviderKind, Recognizer, Source};
+use crate::dictation::engine::ThisComputer;
+
+use super::{Checked, Opener, ProviderKind, Source};
 
 pub(crate) const WORD: &str = "local-speech";
 
@@ -53,7 +55,9 @@ impl ProviderKind for LocalSpeech {
             n => Ok(Checked { said: tn("{0} model is downloaded and ready.", "{0} models are downloaded and ready.", n as u64, &[&n]), models: None }),
         }
     }
-    fn recognizer(&self, _provider: &Provider, _model: &str, _vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Option<Result<Recognizer, crate::dictation::engine::Failure>> {
-        Some(Ok(Recognizer::ThisComputer))
+    /// The model of the catalogue `model` names, or the default (or the
+    /// one downloaded) for none.
+    fn recognizer(&self, _provider: &Provider, model: &str, _vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Option<Result<Box<dyn Opener>, crate::dictation::engine::Failure>> {
+        Some(Ok(Box::new(ThisComputer::of(&crate::dictation::dir(), model))))
     }
 }

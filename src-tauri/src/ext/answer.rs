@@ -281,7 +281,7 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
 
         DictationInstalled => return Ok(dictation::ready(&world.settings.read().unwrap()).into()),
         DictationListen { language, indicator } => {
-            if let Some(language) = language.as_deref().filter(|language| !dictation::LANGUAGES.contains(language)) {
+            if let Some(language) = language.as_deref().filter(|language| !dictation::engine::known(language)) {
                 return Err(ExtError::invalid(format!("Dictation does not know the language {language:?}.")));
             }
             // Open before the recording starts: what is heard at once has

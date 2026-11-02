@@ -639,6 +639,30 @@ impl Recognizer for Doubao {
 // Dropping the connection's sender is what closes it: a recording that is
 // discarded is let go without `finish`.
 
+/// How a provider of Doubao's hears a recording: over a connection of the
+/// recording's own, to Volcengine, which finds the language itself.
+impl super::Opener for Config {
+    fn open(&self, _language: &str) -> Result<Box<dyn Recognizer>, Failure> {
+        Ok(Box::new(Doubao::new(self.clone())))
+    }
+
+    fn kept(&self) -> Option<&str> {
+        None
+    }
+
+    fn ready(&self) -> bool {
+        true
+    }
+
+    fn sends_audio(&self) -> bool {
+        true
+    }
+
+    fn languages(&self) -> &'static [&'static str] {
+        &[]
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod mock;
 
