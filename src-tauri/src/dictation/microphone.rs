@@ -110,6 +110,9 @@ mod system {
 
     type Reader = BufReader<UnixStream>;
 
+    /// The length of the cookie a client authenticates with.
+    const COOKIE: usize = 256;
+
     /// Asks the server what it is asked, and reads its answer.
     fn ask<T: protocol::CommandReply>(socket: &mut Reader, seq: u32, command: protocol::Command, version: u16) -> Result<T, protocol::ProtocolError> {
         protocol::write_command_message(socket.get_mut(), seq, &command, version)?;
@@ -121,7 +124,10 @@ mod system {
     fn connect() -> Result<(Reader, u16), String> {
         let path = pulseaudio::socket_path_from_env().ok_or("no sound server")?;
         let mut socket = BufReader::new(UnixStream::connect(&path).map_err(|e| format!("{}: {e}", path.display()))?);
-        let cookie = pulseaudio::cookie_path_from_env().and_then(|path| std::fs::read(path).ok()).unwrap_or_default();
+        // A server that checks it wants the session's cookie; one that does
+        // not still wants one of the right length, as libpulse always sends
+        // (PipeWire refuses an empty one as invalid).
+        let cookie = pulseaudio::cookie_path_from_env().and_then(|path| std::fs::read(path).ok()).filter(|cookie| cookie.len() == COOKIE).unwrap_or_else(|| vec![0; COOKIE]);
         let auth = protocol::AuthParams { version: protocol::MAX_VERSION, supports_shm: false, supports_memfd: false, cookie };
         let reply: protocol::AuthReply = ask(&mut socket, 0, protocol::Command::Auth(auth), protocol::MAX_VERSION).map_err(|e| e.to_string())?;
         let version = protocol::MAX_VERSION.min(reply.version);
