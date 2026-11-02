@@ -6,11 +6,11 @@ use tauri::AppHandle;
 use crate::*;
 
 /// Whether text recognition can be used, for the settings page.
-#[derive(Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) struct OcrStatus {
-    installed: bool,
-    installing: bool,
+    pub installed: bool,
+    pub installing: bool,
 }
 
 pub(crate) fn ocr_status() -> OcrStatus {

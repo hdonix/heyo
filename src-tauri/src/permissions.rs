@@ -16,6 +16,7 @@
 //! nothing the user is shown, may say otherwise.
 
 use crate::i18n::{t, tf};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Mutex};
@@ -551,17 +552,17 @@ impl Granted {
 // --- For the settings ---------------------------------------------------------
 
 /// A permission of an extension, as its page in the settings shows it.
-#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../shared/bindings/", rename = "PermissionRow")]
 pub struct Row {
     pub permission: Permission,
     /// What it lets the extension do, after "allow it to".
     #[ts(type = "string")]
-    pub allows: &'static str,
+    pub allows: Cow<'static, str>,
     /// `allowed` by the user (and theirs to take back), `asks` when first
     /// used, or `free`: listing it is enough.
     #[ts(type = "\"allowed\" | \"asks\" | \"free\"")]
-    pub state: &'static str,
+    pub state: Cow<'static, str>,
 }
 
 /// What an extension lists and what it was allowed.
@@ -572,12 +573,13 @@ fn rows(heyo: Option<&Heyo>, granted: &BTreeSet<Permission>) -> Vec<Row> {
         .filter(|permission| declared.contains(permission) || granted.contains(permission))
         .map(|permission| Row {
             permission,
-            allows: permission.allows(),
+            allows: permission.allows().into(),
             state: match () {
                 _ if granted.contains(&permission) => "allowed",
                 _ if permission.asks() => "asks",
                 _ => "free",
-            },
+            }
+            .into(),
         })
         .collect()
 }
@@ -963,7 +965,7 @@ mod tests {
     fn the_settings_show_what_is_listed_and_what_was_allowed() {
         let manifest = heyo(&["windows", "screen.text", "microphone"]);
         let shown = rows(Some(&manifest), &BTreeSet::from([Windows]));
-        let states: Vec<(Permission, &str)> = shown.iter().map(|row| (row.permission, row.state)).collect();
+        let states: Vec<(Permission, &str)> = shown.iter().map(|row| (row.permission, &*row.state)).collect();
         assert_eq!(states, [(Windows, "allowed"), (ScreenText, "free"), (Microphone, "asks")]);
         // A store extension shows what it was allowed through Raycast's API.
         assert_eq!(rows(None, &BTreeSet::from([Windows])).len(), 1);

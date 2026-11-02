@@ -26,6 +26,7 @@ use slint::{ComponentHandle, ModelNotify, ModelRc, ModelTracker, SharedString, V
 
 use super::keys::{self, Held};
 use super::host::Command;
+use super::answer::Answer;
 use super::model::{changes, Ask, Changes, Line, Model, Then};
 use super::thread::{self, Job};
 use super::life::{self, Life, Lives, Slot, Slotted};
@@ -250,7 +251,7 @@ impl Live {
         }
     }
 
-    fn answered(&mut self, then: Then, answer: Result<Value, String>) {
+    fn answered(&mut self, then: Then, answer: Result<Answer, String>) {
         let copied = then == Then::Copied && answer.is_ok();
         let more = self.model.answered(then, answer);
         self.ask(more);

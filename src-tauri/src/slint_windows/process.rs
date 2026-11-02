@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::AppHandle;
 
+use super::answer::Answer;
 use super::host::{Command, Host, Running};
 
 pub(super) const ARGUMENT: &str = "--heyo-slint-ui";
@@ -23,7 +24,7 @@ enum FromChild {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 enum ToChild {
-    Answer { id: u64, result: Result<Value, String> },
+    Answer { id: u64, result: Result<Answer, String> },
     Event { name: String, payload: Value },
     ShowSettings { system_dark: bool },
 }
@@ -106,7 +107,7 @@ type Listener = Arc<dyn Fn(&str, Value) + Send + Sync>;
 struct Remote {
     output: Mutex<std::io::Stdout>,
     next: AtomicU64,
-    pending: Mutex<HashMap<u64, mpsc::Sender<Result<Value, String>>>>,
+    pending: Mutex<HashMap<u64, mpsc::Sender<Result<Answer, String>>>>,
     listener: Mutex<Option<Listener>>,
     dark: AtomicBool,
     show_on_start: AtomicBool,
@@ -156,7 +157,7 @@ impl Remote {
 }
 
 impl Host for Remote {
-    fn call(&self, command: Command) -> Result<Value, String> {
+    fn call(&self, command: Command) -> Result<Answer, String> {
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         let (sent, received) = mpsc::channel();
         self.pending.lock().unwrap().insert(id, sent);

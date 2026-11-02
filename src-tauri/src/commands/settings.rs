@@ -3,7 +3,7 @@
 use crate::i18n::{t, tf};
 use std::collections::HashMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -110,35 +110,76 @@ pub(crate) fn update_settings(app: &AppHandle, change: impl FnOnce(&mut Settings
 }
 
 /// What the settings window is told of a provider besides its settings.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) struct ProviderState {
     /// Which of its secret fields hold something. What they hold never
     /// goes to a window: there they are empty.
-    secrets_set: Vec<String>,
+    pub secrets_set: Vec<String>,
     /// For a command-line tool: where it is and its version, or why there
     /// is none to run.
-    cli_found: Option<Result<crate::models::cli::Found, String>>,
+    #[serde(default, with = "found")]
+    #[ts(as = "Option<Result<crate::models::cli::Found, String>>")]
+    pub cli_found: Option<Result<crate::models::cli::Found, String>>,
+}
+
+/// A tool's `cli_found` as it is written, and as a window reads it back
+/// (the macOS settings window, a process of its own, is sent the view as
+/// JSON).
+mod found {
+    use crate::models::cli::Found;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(found: &Option<Result<Found, String>>, to: S) -> Result<S::Ok, S::Error> {
+        found.serialize(to)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(from: D) -> Result<Option<Result<Found, String>>, D::Error> {
+        #[derive(Deserialize)]
+        struct Read {
+            path: String,
+            version: String,
+        }
+        let found: Option<Result<Read, String>> = Deserialize::deserialize(from)?;
+        Ok(found.map(|found| found.map(|Read { path, version }| Found { path, version })))
+    }
 }
 
 /// Settings plus derived, read-only state for the settings page.
-#[derive(Clone, Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) struct SettingsView {
     #[serde(flatten)]
-    settings: Settings,
+    pub settings: Settings,
     /// Each provider's, by its id.
-    provider_states: std::collections::BTreeMap<String, ProviderState>,
-    launch_at_login: bool,
-    node_version: Result<String, String>,
-    node_overridden: bool,
-    extensions_dir: String,
-    settings_path: String,
-    version: String,
+    pub provider_states: std::collections::BTreeMap<String, ProviderState>,
+    pub launch_at_login: bool,
+    pub node_version: Result<String, String>,
+    pub node_overridden: bool,
+    pub extensions_dir: String,
+    pub settings_path: String,
+    pub version: String,
     /// Whether this copy of Heyo can look for and install a newer version.
-    can_update: bool,
+    pub can_update: bool,
+}
+
+/// Nothing told yet: the settings as they are when none are saved.
+impl Default for SettingsView {
+    fn default() -> SettingsView {
+        SettingsView {
+            settings: Settings::default(),
+            provider_states: Default::default(),
+            launch_at_login: false,
+            node_version: Err(String::new()),
+            node_overridden: false,
+            extensions_dir: String::new(),
+            settings_path: String::new(),
+            version: String::new(),
+            can_update: false,
+        }
+    }
 }
 
 impl SettingsView {
@@ -299,13 +340,13 @@ pub(crate) async fn open_settings(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub(crate) struct Hotkeys {
-    supported: bool,
-    toggle: Option<String>,
-    clipboard: Option<String>,
-    dictation: Option<String>,
+    pub supported: bool,
+    pub toggle: Option<String>,
+    pub clipboard: Option<String>,
+    pub dictation: Option<String>,
 }
 
 // Async so the `gsettings` calls stay off the main thread.

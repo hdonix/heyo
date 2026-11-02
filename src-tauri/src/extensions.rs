@@ -569,7 +569,7 @@ fn stop_developing(entry: &Development) -> Result<(), String> {
 
 /// An extension as the settings window shows it: the manifest's metadata,
 /// preference definitions and the saved preference values.
-#[derive(serde::Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct ExtensionInfo {
@@ -582,7 +582,7 @@ pub struct ExtensionInfo {
     pub icon: Option<String>,
     pub builtin: bool,
     /// The source directory, for an extension being developed (`heyo dev`).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub development: Option<String>,
     pub commands: Vec<CommandInfo>,
@@ -591,7 +591,7 @@ pub struct ExtensionInfo {
     pub values: PreferenceValues,
 }
 
-#[derive(serde::Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct CommandInfo {

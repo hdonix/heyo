@@ -175,11 +175,11 @@ pub struct Index {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct Item {
-    id: String,
-    title: String,
-    subtitle: Option<String>,
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) subtitle: Option<String>,
     /// A file path, URL, or Raycast icon name.
-    icon: Option<String>,
+    pub(crate) icon: Option<String>,
     #[ts(type = "\"Application\" | \"Command\" | \"Quicklink\" | \"Snippet\"")]
     kind: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]

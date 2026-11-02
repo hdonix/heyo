@@ -72,7 +72,7 @@ pub struct Meaning {
 }
 
 /// Where finding by meaning stands, for the settings page.
-#[derive(Debug, Clone, PartialEq, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/", rename = "ClipboardMeaningStatus")]
 pub struct Status {

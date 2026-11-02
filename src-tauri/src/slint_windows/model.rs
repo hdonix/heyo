@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{json, Map, Value};
 
+use super::answer::Answer;
 use super::host::Command;
 use crate::i18n::{self, marked, t, tf, tn, translate};
 use crate::models::kinds::{self, Known, Source};
@@ -1406,6 +1407,7 @@ impl Model {
                 } else {
                     values["commands"][command.as_str()][name.as_str()] = value;
                 }
+                let Ok(values) = serde_json::from_value(values) else { return Vec::new() };
                 vec![ask(Command::SetExtensionPreferences { extension, values }, Then::Reload)]
             }
             Id::Revoke { extension, permission } => {
@@ -1581,7 +1583,13 @@ impl Model {
     }
 
     /// The host answered: what is known changes, and more may be asked.
-    pub(crate) fn answered(&mut self, then: Then, answer: Result<Value, String>) -> Vec<Ask> {
+    pub(crate) fn answered(&mut self, then: Then, answer: Result<Answer, String>) -> Vec<Ask> {
+        // Read as it is written for now.
+        let answer = answer.and_then(|answer| Ok(serde_json::to_value(answer).map_err(|e| e.to_string())?["data"].take()));
+        self.answered_value(then, answer)
+    }
+
+    fn answered_value(&mut self, then: Then, answer: Result<Value, String>) -> Vec<Ask> {
         let answer = match answer {
             Ok(answer) => answer,
             Err(message) => {
@@ -1758,7 +1766,7 @@ mod tests {
     /// The preferences the one thing asked of the host saves, and whose.
     fn saved(asks: &[Ask]) -> (String, Value) {
         match asked(asks) {
-            Command::SetExtensionPreferences { extension, values } => (extension, values),
+            Command::SetExtensionPreferences { extension, values } => (extension, serde_json::to_value(values).unwrap()),
             other => panic!("{other:?} saves no preferences"),
         }
     }
@@ -1844,9 +1852,9 @@ mod tests {
         assert_eq!(patch(&model.acted("set:appearance", "light")), json!({ "appearance": "light" }));
         // The host's answer is what is then so; its refusal is said, and
         // the settings are read again.
-        assert!(model.answered(Then::Settings, Ok(json!({ "compactMode": false, "appearance": "dark" }))).is_empty());
+        assert!(model.answered_value(Then::Settings, Ok(json!({ "compactMode": false, "appearance": "dark" }))).is_empty());
         assert!(!row(&model.lines(), "Compact Mode").on);
-        assert_eq!(asked(&model.answered(Then::Settings, Err("no".into()))).name(), "get_settings");
+        assert_eq!(asked(&model.answered_value(Then::Settings, Err("no".into()))).name(), "get_settings");
         assert_eq!(model.error, "no");
     }
 
@@ -1879,9 +1887,9 @@ mod tests {
         assert_eq!(asked(&model.bind("app:files.desktop", "<Super>e")), Command::SetItemHotkey { id: "app:files.desktop".into(), title: "Files".into(), accelerator: "<Super>e".into() });
         assert_eq!(asked(&model.bind("heyo:screenshot", "")), Command::SetItemHotkey { id: "heyo:screenshot".into(), title: "Capture Screenshot".into(), accelerator: String::new() });
         assert!(model.bind("app:gone.desktop", "<Super>g").is_empty());
-        model.answered(Then::Bound("app:files.desktop".into(), "<Super>e".into()), Ok(Value::Null));
+        model.answered_value(Then::Bound("app:files.desktop".into(), "<Super>e".into()), Ok(Value::Null));
         assert_eq!(model.item_hotkeys["app:files.desktop"], "<Super>e");
-        model.answered(Then::Bound("app:files.desktop".into(), String::new()), Ok(Value::Null));
+        model.answered_value(Then::Bound("app:files.desktop".into(), String::new()), Ok(Value::Null));
         assert!(model.item_hotkeys.is_empty());
     }
 
@@ -1981,7 +1989,7 @@ mod tests {
     fn a_speech_model_is_downloaded_used_and_deleted_on_the_models_page() {
         let mut model = told(providers(), json!({}));
         model.show("provider:local-speech");
-        model.answered(Then::Speech, Ok(json!(speech())));
+        model.answered_value(Then::Speech, Ok(json!(speech())));
         let lines = model.lines();
         // Always there: no name to change, nothing to remove.
         assert!(!has(&lines, "Name") && !has(&lines, "Remove Provider"));
@@ -2009,7 +2017,7 @@ mod tests {
         // In use: said, and no delete.
         let mut used = self::speech();
         used[0]["inUse"] = json!(true);
-        model.answered(Then::Speech, Ok(json!(used)));
+        model.answered_value(Then::Speech, Ok(json!(used)));
         let lines = model.lines();
         assert_eq!(row(card(&lines, "Models"), "SenseVoice Small").control, "badge");
     }
@@ -2033,7 +2041,7 @@ mod tests {
         assert_eq!(asked(&model.acted("act:install-ocr", "")).name(), "ocr_install");
         assert_eq!(row(&model.lines(), "Recognition Engine").value, "Downloading…");
         assert_eq!(asked(&model.heard(crate::wire::event::OCR_INSTALL, &json!({ "type": "installed" }))).name(), "ocr_status");
-        model.answered(Then::Ocr, Ok(json!({ "installed": true, "installing": false })));
+        model.answered_value(Then::Ocr, Ok(json!({ "installed": true, "installing": false })));
         assert_eq!(row(&model.lines(), "Recognition Engine").control, "badge");
     }
 
@@ -2064,9 +2072,9 @@ mod tests {
         assert_eq!(row(listed, "Ollama").chips, ["Text", "Streaming", "Private"]);
         assert_eq!(row(listed, "Claude Code").description, "Set up");
         assert!(row(listed, "Codex").danger && row(listed, "Codex").description == "Not found");
-        model.answered(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
-        model.answered(Then::Models("lan".into()), Err("connection refused".into()));
-        model.answered(Then::Speech, Ok(json!(speech())));
+        model.answered_value(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
+        model.answered_value(Then::Models("lan".into()), Err("connection refused".into()));
+        model.answered_value(Then::Speech, Ok(json!(speech())));
         let lines = model.lines();
         let listed = card(&lines, "Providers");
         assert_eq!(row(listed, "Ollama").description, "OpenAI-Compatible Server · 2 models");
@@ -2110,7 +2118,7 @@ mod tests {
         // Added: its own page, where it can be checked.
         let mut added = providers();
         added["providers"].as_array_mut().unwrap().push(json!({ "id": "openai-compatible", "kind": "openai-compatible", "name": "Lab", "config": { "url": "http://127.0.0.1:8080/v1" } }));
-        let asks = model.answered(asks[0].then.clone(), Ok(added));
+        let asks = model.answered_value(asks[0].then.clone(), Ok(added));
         assert_eq!((model.page.as_str(), model.draft.is_none()), ("provider:openai-compatible", true));
         assert!(asks.iter().any(|ask| ask.command == Command::ProviderModels("openai-compatible".into())));
         assert_eq!(head(&model.lines()).label, "Lab");
@@ -2138,11 +2146,11 @@ mod tests {
         assert!(Command::CheckProvider("claude".into()).slow());
         assert!(model.acted(&status.id, "").is_empty());
         assert!(row(&model.lines(), "Status").busy);
-        model.answered(Then::ProviderChecked("claude".into()), Err("The Claude API key is invalid.".into()));
+        model.answered_value(Then::ProviderChecked("claude".into()), Err("The Claude API key is invalid.".into()));
         let failed = row(&model.lines(), "Connection Failed").clone();
         assert!(failed.danger && failed.description == "The Claude API key is invalid." && model.error.is_empty());
         model.acted(&status.id, "");
-        model.answered(Then::ProviderChecked("claude".into()), Ok(json!({ "said": "Claude's API takes the key.", "models": null })));
+        model.answered_value(Then::ProviderChecked("claude".into()), Ok(json!({ "said": "Claude's API takes the key.", "models": null })));
         assert!(!row(&model.lines(), "Connection Works").danger);
         // The model it has, and what uses it.
         assert_eq!(row(card(&model.lines(), "Models"), "claude-opus-5-5").value, "Used for Polish");
@@ -2160,7 +2168,7 @@ mod tests {
         assert!(row(&model.lines(), "Status").description.starts_with("Checking… Text stays on this computer."));
         // A check lists its models too.
         model.acted("check-provider:ollama", "");
-        model.answered(Then::ProviderChecked("ollama".into()), Ok(json!({ "said": "The server answers and lists 2 models.", "models": ["qwen3", "llama3"] })));
+        model.answered_value(Then::ProviderChecked("ollama".into()), Ok(json!({ "said": "The server answers and lists 2 models.", "models": ["qwen3", "llama3"] })));
         let lines = model.lines();
         assert!(row(&lines, "Status").description.starts_with("Connected: qwen3, llama3. Text stays on this computer.") && !row(&lines, "Status").danger);
         assert_eq!(row(&lines, "Connection Works").description, "The server answers and lists 2 models.");
@@ -2175,7 +2183,7 @@ mod tests {
         assert!(!has(&model.lines(), "Connection Works"));
         // One elsewhere, over plain http, that does not answer.
         model.show("provider:lan");
-        model.answered(Then::Models("lan".into()), Err("connection refused".into()));
+        model.answered_value(Then::Models("lan".into()), Err("connection refused".into()));
         let status = row(&model.lines(), "Status").clone();
         assert!(status.danger && status.description.starts_with("Not reachable: connection refused.") && status.description.contains("sent to 10.0.0.5:8000 over plain http"));
         assert_eq!(row(card(&model.lines(), "Models"), "Not reachable").description, "connection refused");
@@ -2229,7 +2237,7 @@ mod tests {
     fn a_picker_offers_what_can_be_used_and_says_what_cannot() {
         let mut model = told(providers(), json!({}));
         model.page = "advanced".into();
-        model.answered(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
+        model.answered_value(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
         let lines = model.lines();
         let answers = row(&lines, "Model");
         assert_eq!(answers.value, ids::choice("ollama", "qwen3"));
@@ -2265,15 +2273,15 @@ mod tests {
         assert_eq!(about(&model).more, "Check for Updates");
         assert_eq!(asked(&model.acted("act:update", "")).name(), "check_for_update");
         assert!(about(&model).busy && model.acted("act:update", "").is_empty());
-        model.answered(Then::Checked, Ok(Value::Null));
+        model.answered_value(Then::Checked, Ok(Value::Null));
         assert_eq!(about(&model).more, "Heyo Is Up to Date");
         model.acted("act:update", "");
-        model.answered(Then::Checked, Ok(json!("0.2.0")));
+        model.answered_value(Then::Checked, Ok(json!("0.2.0")));
         assert_eq!(about(&model).more, "Install Heyo 0.2.0 and Restart");
         assert_eq!(asked(&model.acted("act:update", "")).name(), "install_update");
-        model.answered(Then::Installed, Err("no network".into()));
+        model.answered_value(Then::Installed, Err("no network".into()));
         assert_eq!((about(&model).more.as_str(), model.error.as_str()), ("Install Heyo 0.2.0 and Restart", "no network"));
-        model.answered(Then::Copied, Ok(Value::Null));
+        model.answered_value(Then::Copied, Ok(Value::Null));
         assert!(about(&model).on);
     }
 
@@ -2335,7 +2343,7 @@ mod tests {
     fn an_extension_has_its_preferences_commands_permissions_and_removal() {
         let mut model = with_extensions();
         assert_eq!(asked(&model.show("/data/zeta")), Command::ExtensionPermissions("/data/zeta".into()));
-        model.answered(Then::Permissions("/data/zeta".into()), Ok(json!([{ "permission": "windows", "allows": "see and move windows", "state": "allowed" }, { "permission": "ai", "allows": "ask the model", "state": "asks" }, { "permission": "activity", "allows": "show live activities", "state": "free" }])));
+        model.answered_value(Then::Permissions("/data/zeta".into()), Ok(json!([{ "permission": "windows", "allows": "see and move windows", "state": "allowed" }, { "permission": "ai", "allows": "ask the model", "state": "asks" }, { "permission": "activity", "allows": "show live activities", "state": "free" }])));
         let lines = model.lines();
         assert_eq!((lines[0].label.as_str(), lines[0].description.as_str(), lines[1].kind, lines[1].label.as_str()), ("Zeta Tools", "by someone", "note", "Tools."));
         // Preferences, of each kind the API has; a value stored, else the default.
@@ -2362,7 +2370,7 @@ mod tests {
         // Removal, after which the window is elsewhere.
         assert_eq!((row(&lines, "Uninstall Extension").control, row(&lines, "Uninstall Extension").placeholder.as_str()), ("confirm", "Click Again to Uninstall"));
         assert_eq!(asked(&model.acted("uninstall:/data/zeta", "")), Command::UninstallExtension("/data/zeta".into()));
-        assert_eq!(model.answered(Then::Uninstalled, Ok(Value::Null)).len(), 3);
+        assert_eq!(model.answered_value(Then::Uninstalled, Ok(Value::Null)).len(), 3);
         assert_eq!(model.page, "general");
         model.page = "/src/alpha".into();
         assert!(has(&model.lines(), "Stop Developing") && model.lines()[0].description == "In development from /src/alpha");
@@ -2471,8 +2479,8 @@ mod tests {
         assert_eq!(model.heard(event::INDEX_READY, &Value::Null).iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["list_extensions", "list_applications", "item_hotkeys"]);
         assert_eq!(model.opened().iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["get_settings", "get_hotkeys", "get_capabilities", "list_extensions", "list_applications", "item_hotkeys"]);
         // A preference that was saved: the extensions are read again.
-        assert_eq!(model.answered(Then::Reload, Ok(Value::Null)).len(), 3);
-        model.answered(Then::Extensions, Ok(json!([])));
+        assert_eq!(model.answered_value(Then::Reload, Ok(Value::Null)).len(), 3);
+        model.answered_value(Then::Extensions, Ok(json!([])));
         assert_eq!(model.nav().0.len(), PAGES.len() + 1);
     }
 }

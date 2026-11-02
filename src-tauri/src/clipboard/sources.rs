@@ -51,7 +51,7 @@ pub fn ignored(source: &str, listed: &[String], apps: &[App]) -> bool {
 }
 
 /// An application that can be named as one not to record from.
-#[derive(Debug, PartialEq, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/", rename = "ClipboardSource")]
 pub struct Source {

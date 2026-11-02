@@ -9,6 +9,7 @@
 //! `capabilities` reports, so features can be hidden rather than fail.
 
 use crate::i18n::{tf, translate};
+use std::borrow::Cow;
 use std::sync::OnceLock;
 
 pub mod capture;
@@ -67,7 +68,7 @@ pub fn session() -> Session {
 }
 
 /// How well the session supports something.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, ts_rs::TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub enum Support {
@@ -78,17 +79,17 @@ pub enum Support {
 }
 
 /// A key that can be held to talk.
-#[derive(serde::Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct HoldKey {
     #[ts(type = "string")]
-    value: &'static str,
+    pub value: Cow<'static, str>,
     #[ts(type = "string")]
-    title: &'static str,
+    pub title: Cow<'static, str>,
 }
 
 /// A way for dictated words to reach the application.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, ts_rs::TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../../shared/bindings/", rename = "DictationWords")]
 pub enum Words {
@@ -104,12 +105,12 @@ pub enum Words {
 
 /// What the running session can do, so features that cannot work are
 /// hidden or explained instead of failing when used.
-#[derive(serde::Serialize, ts_rs::TS)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct Capabilities {
     #[ts(type = "\"x11\" | \"wayland\" | \"macos\" | \"windows\" | \"unknown\"")]
-    pub session: &'static str,
+    pub session: Cow<'static, str>,
     /// Listing, switching and moving other applications' windows.
     pub windows: Support,
     /// Sending the paste keystroke to the focused application.
@@ -139,7 +140,7 @@ pub struct Capabilities {
     /// serves if it is running), "pending" (in place; loaded at the next
     /// login) or "active".
     #[ts(type = "\"none\" | \"missing\" | \"outdated\" | \"pending\" | \"active\"")]
-    pub extension: &'static str,
+    pub extension: Cow<'static, str>,
 }
 
 /// Installs Heyo's GNOME Shell extension for this user.
@@ -161,7 +162,8 @@ pub fn capabilities() -> Capabilities {
             Session::X11 => "x11",
             Session::Wayland => "wayland",
             Session::Unknown => "unknown",
-        },
+        }
+        .into(),
         windows: supported.windows,
         paste: supported.paste,
         selection: supported.selection,
@@ -172,11 +174,11 @@ pub fn capabilities() -> Capabilities {
         overlay: supported.overlay,
         snippet_expansion: if typed::supported() { supported.typing } else { Support::None },
         dictation_words: [(composing::supported(), Words::Composed), (typed::rewriting(), Words::Rewritten), (true, Words::Pasted)].into_iter().filter_map(|(here, way)| here.then_some(way)).collect(),
-        hold_keys: offered.into_iter().map(|(value, title)| HoldKey { value, title }).collect(),
+        hold_keys: offered.into_iter().map(|(value, title)| HoldKey { value: value.into(), title: title.into() }).collect(),
         #[cfg(target_os = "linux")]
-        extension: gnome::extension::state().name(),
+        extension: gnome::extension::state().name().into(),
         #[cfg(not(target_os = "linux"))]
-        extension: "none",
+        extension: "none".into(),
     }
 }
 

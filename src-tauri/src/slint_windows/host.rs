@@ -1,7 +1,8 @@
 //! What the settings window asks of Heyo.
 //!
 //! The window is in the host's own process, but asks as a web view would:
-//! a command by its name, arguments and an answer as JSON, and the events
+//! a command with its arguments, an answer (`answer::Answer`, typed; JSON
+//! only where it crosses to the macOS window's process), and the events
 //! the host emits. So what it may do is a list one can read (`Command`:
 //! each thing it may ask, with what it says in asking, written once),
 //! the model that decides what to ask needs no host to be tested, and
@@ -16,14 +17,16 @@ use serde_json::{Map, Value};
 use tauri::async_runtime::block_on;
 use tauri::{AppHandle, Listener, Manager};
 
+use super::answer::{self, Answer};
 use crate::commands::{media, root, settings};
+use crate::extensions::PreferenceValues;
 use crate::{clipboard, permissions, updates};
 use crate::wire::event;
 
 /// The host, as a settings window that is not a web view sees it.
 pub(crate) trait Host: Send + Sync + 'static {
     /// Asks the host for one of the things this window may ask.
-    fn call(&self, command: Command) -> Result<Value, String>;
+    fn call(&self, command: Command) -> Result<Answer, String>;
     /// Hears the events the host emits to its windows, by their names.
     fn listen(&self, hear: Box<dyn Fn(&str, Value) + Send + Sync>);
     /// Whether the desktop shows applications dark.
@@ -77,7 +80,7 @@ pub(crate) enum Command {
     RemoveProvider(String),
     OpenExtensionsFolder,
     /// All the preferences of the extension of that name, as they are to be.
-    SetExtensionPreferences { extension: String, values: Value },
+    SetExtensionPreferences { extension: String, values: PreferenceValues },
     /// By the extension's id.
     UninstallExtension(String),
     ClearClipboardHistory,
@@ -152,52 +155,49 @@ const EVENTS: &[&str] = &[event::SETTINGS_CHANGED, event::INDEX_READY, event::DI
 /// Heyo itself.
 pub(crate) struct Running(pub AppHandle);
 
-/// A command's answer, as a window sees it.
-fn answer(value: impl Serialize) -> Result<Value, String> {
-    serde_json::to_value(value).map_err(|e| e.to_string())
-}
-
 impl Host for Running {
-    fn call(&self, command: Command) -> Result<Value, String> {
+    fn call(&self, command: Command) -> Result<Answer, String> {
         let app = self.0.clone();
-        match command {
-            Command::GetSettings => answer(settings::settings_for_its_window(&app)),
-            Command::ChangeSettings(changes) => answer(settings::change_settings(changes, app)?),
-            Command::GetHotkeys => answer(block_on(settings::get_hotkeys())),
-            Command::SetHotkey { name, accelerator } => answer(block_on(settings::set_hotkey(name, accelerator))?),
-            Command::SetItemHotkey { id, title, accelerator } => answer(block_on(settings::set_item_hotkey(id, title, accelerator, app))?),
-            Command::ItemHotkeys => answer(settings::item_hotkeys(app.state())),
-            Command::ListExtensions => answer(settings::list_extensions()),
-            Command::ListApplications => answer(root::list_applications(app)),
-            Command::GetCapabilities => answer(settings::get_capabilities()),
-            Command::InstallShellExtension => answer(settings::install_shell_extension()?),
-            Command::DictationStatus => answer(media::dictation_status(app)),
-            Command::SpeechModels => answer(crate::dictation::models(&app)),
-            Command::DownloadSpeechModel(id) => answer(crate::dictation::download(&app, &id)?),
-            Command::CancelSpeechDownload(id) => answer(crate::dictation::cancel_download(&app, &id)?),
-            Command::DeleteSpeechModel(id) => answer(crate::dictation::delete(&app, &id)?),
-            Command::CopyDiagnostics => answer(settings::copy_diagnostics(app)?),
-            Command::CheckForUpdate => answer(block_on(updates::check_for_update(app))?),
-            Command::InstallUpdate => answer(block_on(updates::install_update(app))?),
-            Command::AddProvider { kind, name, config } => answer(settings::add_provider(kind, name, config, app)?),
-            Command::SetProviderField { provider, field, value } => answer(settings::set_provider_field(provider, field, value, app)?),
-            Command::RemoveProvider(id) => answer(settings::remove_provider(id, app)?),
-            Command::OpenExtensionsFolder => answer(settings::open_extensions_folder()?),
-            // The preferences are the host's own shape, which the model
-            // was given and hands back with one of them changed.
-            Command::SetExtensionPreferences { extension, values } => answer(settings::set_extension_preferences(extension, serde_json::from_value(values).map_err(|e| format!("values: {e}"))?)?),
-            Command::UninstallExtension(id) => answer(settings::uninstall_extension(id, app)?),
-            Command::ClearClipboardHistory => answer(settings::clear_clipboard_history(app.state())),
-            Command::ProviderModels(id) => answer(settings::provider_models(id, app)?),
-            Command::CheckProvider(id) => answer(settings::check_provider(id, app)?),
-            Command::OcrStatus => answer(media::ocr_status()),
-            Command::OcrInstall => answer(media::ocr_install(app)?),
-            Command::ClipboardSources => answer(clipboard::clipboard_sources(app)),
-            Command::ClipboardMeaningStatus => answer(clipboard::clipboard_meaning_status(app)),
-            Command::ClipboardMeaningInstall => answer(clipboard::clipboard_meaning_install(app)?),
-            Command::ExtensionPermissions(id) => answer(permissions::extension_permissions(id)),
-            Command::RevokeExtensionPermission { extension, permission } => answer(permissions::revoke_extension_permission(extension, permission)?),
-        }
+        let settings = |view: settings::SettingsView| Answer::Settings(Box::new(view));
+        Ok(match command {
+            Command::GetSettings => settings(settings::settings_for_its_window(&app)),
+            Command::ChangeSettings(changes) => settings(settings::change_settings(changes, app)?),
+            Command::GetHotkeys => Answer::Hotkeys(block_on(settings::get_hotkeys())),
+            Command::SetHotkey { name, accelerator } => Answer::Hotkeys(block_on(settings::set_hotkey(name, accelerator))?),
+            Command::SetItemHotkey { id, title, accelerator } => block_on(settings::set_item_hotkey(id, title, accelerator, app)).map(|()| Answer::Done)?,
+            Command::ItemHotkeys => Answer::ItemHotkeys(settings::item_hotkeys(app.state()).into_iter().collect()),
+            Command::ListExtensions => Answer::Extensions(settings::list_extensions()),
+            Command::ListApplications => Answer::Applications(root::list_applications(app).into_iter().map(Into::into).collect()),
+            Command::GetCapabilities => Answer::Capabilities(settings::get_capabilities()),
+            Command::InstallShellExtension => Answer::Capabilities(settings::install_shell_extension()?),
+            Command::DictationStatus => Answer::Dictation(answer::read(media::dictation_status(app))?),
+            Command::SpeechModels => Answer::Speech(answer::read(crate::dictation::models(&app))?),
+            Command::DownloadSpeechModel(id) => crate::dictation::download(&app, &id).map(|()| Answer::Done)?,
+            Command::CancelSpeechDownload(id) => crate::dictation::cancel_download(&app, &id).map(|()| Answer::Done)?,
+            Command::DeleteSpeechModel(id) => crate::dictation::delete(&app, &id).map(|()| Answer::Done)?,
+            Command::CopyDiagnostics => settings::copy_diagnostics(app).map(|()| Answer::Done)?,
+            Command::CheckForUpdate => Answer::Update(block_on(updates::check_for_update(app))?),
+            Command::InstallUpdate => block_on(updates::install_update(app)).map(|()| Answer::Done)?,
+            Command::AddProvider { kind, name, config } => settings(settings::add_provider(kind, name, config, app)?),
+            Command::SetProviderField { provider, field, value } => settings(settings::set_provider_field(provider, field, value, app)?),
+            Command::RemoveProvider(id) => settings(settings::remove_provider(id, app)?),
+            Command::OpenExtensionsFolder => settings::open_extensions_folder().map(|()| Answer::Done)?,
+            Command::SetExtensionPreferences { extension, values } => settings::set_extension_preferences(extension, values).map(|()| Answer::Done)?,
+            Command::UninstallExtension(id) => settings::uninstall_extension(id, app).map(|()| Answer::Done)?,
+            Command::ClearClipboardHistory => {
+                settings::clear_clipboard_history(app.state());
+                Answer::Done
+            }
+            Command::ProviderModels(id) => Answer::Models(settings::provider_models(id, app)?),
+            Command::CheckProvider(id) => Answer::Checked(settings::check_provider(id, app)?),
+            Command::OcrStatus => Answer::Ocr(media::ocr_status()),
+            Command::OcrInstall => media::ocr_install(app).map(|()| Answer::Done)?,
+            Command::ClipboardSources => Answer::Sources(clipboard::clipboard_sources(app)),
+            Command::ClipboardMeaningStatus => Answer::Meaning(clipboard::clipboard_meaning_status(app)),
+            Command::ClipboardMeaningInstall => clipboard::clipboard_meaning_install(app).map(|()| Answer::Done)?,
+            Command::ExtensionPermissions(id) => Answer::Permissions(permissions::extension_permissions(id)),
+            Command::RevokeExtensionPermission { extension, permission } => permissions::revoke_extension_permission(extension, permission).map(|()| Answer::Done)?,
+        })
     }
 
     fn listen(&self, hear: Box<dyn Fn(&str, Value) + Send + Sync>) {
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn what_changes_settings_is_no_command_of_a_web_view() {
         let registered = crate::commands::bindings::registered();
-        let (none, nothing) = (String::new, Value::Null);
+        let (none, nothing) = (String::new, PreferenceValues::default());
         let changing = [
             Command::ChangeSettings(Map::new()),
             Command::AddProvider { kind: none(), name: none(), config: Default::default() },

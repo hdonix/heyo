@@ -11,7 +11,8 @@
 //! - `model` works out what the settings show from what the host's
 //!   commands answer, and what to ask of the host when a control is used.
 //! - `icons` are the symbols drawn for the host's icon names.
-//! - `host` is how those commands are called, and the list of them.
+//! - `host` is how those commands are called, and the list of them;
+//!   `answer` is what they answer, typed.
 //! - `window` is the settings window: it puts the two together.
 //! - `pill` is the dictation pill: what it shows, and its window.
 //! - `screenshot` is the screenshot overlay and the pinned captures.
@@ -31,6 +32,7 @@
 //! - `fonts` gives Slint the fonts Heyo carries.
 //! - `guard` keeps a panic on Slint's thread from ending Heyo.
 
+mod answer;
 mod fonts;
 mod guard;
 mod host;
