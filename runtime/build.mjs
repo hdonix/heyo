@@ -24,3 +24,4 @@ await build({ ...common, entryPoints: ["runtime/src/main.ts"], outfile: "runtime
 await build({ ...common, entryPoints: ["runtime/src/ocr.ts"], outfile: "runtime/dist/heyo-ocr.cjs" });
 await build({ ...common, entryPoints: ["runtime/src/dev/main.ts"], outfile: "runtime/dist/heyo-dev.cjs" });
 await build({ ...common, entryPoints: ["runtime/src/embed.ts"], outfile: "runtime/dist/heyo-embed.cjs" });
+await build({ ...common, entryPoints: ["runtime/src/connections/main.ts"], outfile: "runtime/dist/heyo-connections.cjs" });

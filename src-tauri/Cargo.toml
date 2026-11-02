@@ -42,7 +42,7 @@ shlex = "1"
 walkdir = "2"
 ignore = "0.4"
 rusqlite = { version = "0.37", features = ["bundled"] }
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 tauri-plugin-clipboard-manager = "2"
 image = { version = "0.25", default-features = false, features = ["png"] }

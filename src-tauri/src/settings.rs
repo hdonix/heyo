@@ -121,6 +121,9 @@ pub struct Settings {
     /// The secrets of the providers and the connections (`secrets`): for
     /// the host alone. A window is told only which are set
     /// (`ProviderState::secrets_set`), and never has them to send back.
+    /// The accounts of services whose items connectors sync
+    /// (`connections`). Their secrets are not here but in `secrets`.
+    pub connections: Vec<crate::connections::accounts::Account>,
     #[serde(skip_serializing_if = "Secrets::is_empty")]
     #[ts(skip)]
     pub secrets: Secrets,
@@ -184,6 +187,7 @@ impl Default for Settings {
             renderer: crate::renderer::Renderer::Auto,
             live_activities: true,
             activities_off: Vec::new(),
+            connections: Vec::new(),
             secrets: Secrets::default(),
         }
     }
@@ -463,6 +467,7 @@ mod tests {
                 all.push(json!({ "id": "ollama", "kind": "openai-compatible", "name": "Ollama", "config": { "url": "http://127.0.0.1:11434/v1" } }));
                 json!(all)
             }
+            serde_json::Value::Array(_) if name == "connections" => json!([{ "id": "imap", "connector": "mail:imap", "name": "Work", "config": { "host": "imap.example.com" } }]),
             serde_json::Value::Array(_) => json!(["x"]),
             serde_json::Value::Object(reference) if reference.contains_key("provider") => json!({ "provider": "ollama", "model": "qwen3" }),
             serde_json::Value::Object(_) => json!({ "x": "y" }),

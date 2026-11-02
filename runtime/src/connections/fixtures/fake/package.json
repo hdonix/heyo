@@ -1,0 +1,22 @@
+{
+  "name": "fake-connector",
+  "title": "Fake Connector",
+  "description": "A connector for tests: syncs what a JSON file says, and watches the file.",
+  "heyo": { "apiVersion": 1, "permissions": ["connector"] },
+  "commands": [
+    {
+      "name": "fake",
+      "title": "Fake",
+      "mode": "connector",
+      "heyo": {
+        "items": ["email", "event"],
+        "fields": [
+          { "name": "source", "title": "Source File", "type": "text", "required": true },
+          { "name": "password", "title": "Password", "type": "secret", "required": true }
+        ],
+        "presets": [{ "title": "Empty", "values": { "source": "/dev/null" } }],
+        "sync": { "every": "15m", "watch": true }
+      }
+    }
+  ]
+}

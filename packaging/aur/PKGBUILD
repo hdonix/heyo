@@ -58,7 +58,7 @@ package() {
   cd "$pkgname-$pkgver"
   install -Dm755 src-tauri/target/release/heyo "$pkgdir/usr/bin/heyo"
   # Where a Tauri program in /usr/bin looks for its resources.
-  install -Dm644 -t "$pkgdir/usr/lib/Heyo" runtime/dist/heyo-runtime.cjs runtime/dist/heyo-ocr.cjs runtime/dist/heyo-dev.cjs runtime/dist/heyo-embed.cjs
+  install -Dm644 -t "$pkgdir/usr/lib/Heyo" runtime/dist/heyo-runtime.cjs runtime/dist/heyo-ocr.cjs runtime/dist/heyo-dev.cjs runtime/dist/heyo-embed.cjs runtime/dist/heyo-connections.cjs
   sed -e 's|{{name}}|Heyo|' -e 's|{{exec}}|heyo|' -e 's|{{icon}}|heyo|' packaging/linux/heyo.desktop |
     install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/heyo.desktop"
   install -Dm644 src-tauri/icons/32x32.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/heyo.png"

@@ -803,6 +803,113 @@ impl ExtRequest {
     }
 }
 
+// --- Connections ---------------------------------------------------------------
+//
+// The host and the connections runtime (`runtime/src/connections/`), a
+// process of its own beside the extension runtime, both ask and both
+// answer: `{ type: "request", id, method, params }`, answered by
+// `{ type: "reply", id, result }` or `{ type: "reply", id, error }`, each
+// side numbering its own. What the host asks fails with a
+// `ConnectorError`; what the runtime asks, with a sentence.
+
+/// The most items one `host.items.put` or `host.items.remove` carries.
+pub const ITEMS_AT_ONCE: usize = 200;
+
+/// The connector command an account is synced by: where its extension is
+/// (`@heyo` for Heyo's own) and the command's name.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct ConnectorCommand {
+    pub extension: String,
+    pub command: String,
+}
+
+/// An account as its connector is given it. Its secrets are not among it:
+/// the connector asks for each when it needs it (`host.connector.secret`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct ConnectorAccount {
+    pub id: String,
+    pub name: String,
+    pub connector: ConnectorCommand,
+    #[ts(type = "Record<string, unknown>")]
+    pub config: serde_json::Map<String, Value>,
+}
+
+/// What the host asks the connections runtime.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "method", content = "params")]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub enum ConnectorCall {
+    /// Whether the account works as it is set up: answered with nothing.
+    #[serde(rename = "connector.check")]
+    Check { account: ConnectorAccount },
+    /// Syncs what changed since `cursor` (everything, without one), putting
+    /// and removing items as it goes: answered with the cursor it came to
+    /// (`{ cursor }`), once every item is written.
+    #[serde(rename = "connector.sync")]
+    Sync {
+        account: ConnectorAccount,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        cursor: Option<String>,
+    },
+    /// Watches the account, telling `host.connector.changed` when something
+    /// changes: answered when the watch ends.
+    #[serde(rename = "connector.watch")]
+    Watch { account: ConnectorAccount },
+    /// Stops a sync or a watch the host asked for, by the request's number:
+    /// that request is answered as `cancelled`.
+    #[serde(rename = "connector.stop")]
+    Stop {
+        #[ts(type = "number")]
+        request: u64,
+    },
+}
+
+/// What the connections runtime asks the host.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "method", content = "params")]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub enum ConnectorRequest {
+    /// Writes items into the account's part of the store, at most
+    /// `ITEMS_AT_ONCE`: answered once they are written, and only while the
+    /// account is being synced.
+    #[serde(rename = "host.items.put")]
+    ItemsPut { account: String, items: Vec<crate::connections::items::Item> },
+    #[serde(rename = "host.items.remove")]
+    ItemsRemove { account: String, ids: Vec<String> },
+    /// A secret field of the account, or null when it is not set.
+    #[serde(rename = "host.connector.secret")]
+    Secret { account: String, name: String },
+    /// Its watch saw something change.
+    #[serde(rename = "host.connector.changed")]
+    Changed { account: String },
+    /// How far its sync is, from 0 to 1, and what it is doing.
+    #[serde(rename = "host.connector.progress")]
+    Progress {
+        account: String,
+        fraction: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        text: Option<String>,
+    },
+}
+
+/// Why something the host asked a connector failed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub struct ConnectorError {
+    pub kind: crate::connections::scheduler::ErrorKind,
+    pub message: String,
+}
+
+impl ConnectorError {
+    pub fn new(kind: crate::connections::scheduler::ErrorKind, message: impl Into<String>) -> ConnectorError {
+        ConnectorError { kind, message: message.into() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1104,6 +1211,35 @@ mod tests {
         let event = HostMessage::Event { subscription: 7, data: json!({ "kind": "segment", "text": "Hello." }) };
         assert_eq!(event.json(), json!({ "type": "event", "subscription": 7, "data": { "kind": "segment", "text": "Hello." } }));
         assert_eq!(serde_json::to_value(Subscription { subscription: 7 }).unwrap(), json!({ "subscription": 7 }));
+    }
+
+    #[test]
+    fn the_host_and_the_connections_runtime_ask_each_other() {
+        let account = ConnectorAccount {
+            id: "work".into(),
+            name: "Work".into(),
+            connector: ConnectorCommand { extension: "/x/mail".into(), command: "imap".into() },
+            config: json!({ "host": "imap.example.com" }).as_object().unwrap().clone(),
+        };
+        let sync = ConnectorCall::Sync { account: account.clone(), cursor: None };
+        assert_eq!(
+            serde_json::to_value(&sync).unwrap(),
+            json!({ "method": "connector.sync", "params": { "account": { "id": "work", "name": "Work", "connector": { "extension": "/x/mail", "command": "imap" }, "config": { "host": "imap.example.com" } } } })
+        );
+        assert_eq!(serde_json::to_value(ConnectorCall::Stop { request: 4 }).unwrap(), json!({ "method": "connector.stop", "params": { "request": 4 } }));
+        let asked = |value: Value| serde_json::from_value::<ConnectorRequest>(value);
+        let put = asked(json!({ "type": "request", "id": 1, "method": "host.items.put", "params": { "account": "work", "items": [{ "id": "1", "kind": "email", "title": "Hi", "time": "2026-11-03T09:00:00Z" }] } })).unwrap();
+        assert!(matches!(put, ConnectorRequest::ItemsPut { ref items, .. } if items[0].title == "Hi"));
+        assert_eq!(
+            asked(json!({ "method": "host.connector.progress", "params": { "account": "work", "fraction": 0.5 } })).unwrap(),
+            ConnectorRequest::Progress { account: "work".into(), fraction: 0.5, text: None }
+        );
+        assert_eq!(asked(json!({ "method": "host.connector.secret", "params": { "account": "work", "name": "password" } })).unwrap(), ConnectorRequest::Secret { account: "work".into(), name: "password".into() });
+        // Nothing of the extension runtime's is asked here, nor the other way.
+        assert!(asked(json!({ "method": "host.hide" })).is_err());
+        assert!(request(json!({ "method": "host.items.put", "params": { "account": "work", "items": [] } })).is_err());
+        let error = ConnectorError::new(crate::connections::scheduler::ErrorKind::Auth, "The password was refused.");
+        assert_eq!(serde_json::to_value(error).unwrap(), json!({ "kind": "auth", "message": "The password was refused." }));
     }
 
     /// Writes the event names for the webview, next to the generated types.

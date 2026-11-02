@@ -90,7 +90,8 @@
       "../runtime/dist/heyo-runtime.cjs": "heyo-runtime.cjs",
       "../runtime/dist/heyo-ocr.cjs": "heyo-ocr.cjs",
       "../runtime/dist/heyo-dev.cjs": "heyo-dev.cjs",
-      "../runtime/dist/heyo-embed.cjs": "heyo-embed.cjs"
+      "../runtime/dist/heyo-embed.cjs": "heyo-embed.cjs",
+      "../runtime/dist/heyo-connections.cjs": "heyo-connections.cjs"
     },
     "linux": {
       "deb": {

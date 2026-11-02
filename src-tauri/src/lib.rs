@@ -222,6 +222,7 @@ pub fn run() {
         .manage(menubar::MenuBar::default())
         .manage(runtime::Background::default())
         .manage(activities::Activities::default())
+        .manage(connections::Connections::default())
         .on_menu_event(|app, event| {
             menubar::clicked(app, event.id().as_ref());
         })
@@ -273,6 +274,7 @@ pub fn run() {
             menubar::start(app.handle());
             updates::start(app.handle());
             expand::start(app.handle());
+            connections::start(app.handle());
             // Slint's thread, ahead of the first window it draws: the
             // dictation pill is wanted at once when it is wanted. Started
             // by the first recording instead it was 40 ms later, that once.

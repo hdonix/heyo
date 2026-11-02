@@ -386,7 +386,7 @@ mod tests {
     fn built_scripts_carry_this_version() {
         let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         let version = config["version"].as_str().unwrap();
-        for file in ["heyo-runtime.cjs", "heyo-ocr.cjs", "heyo-dev.cjs", "heyo-embed.cjs"] {
+        for file in ["heyo-runtime.cjs", "heyo-ocr.cjs", "heyo-dev.cjs", "heyo-embed.cjs", "heyo-connections.cjs"] {
             let script = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../runtime/dist")).join(file);
             if script.exists() {
                 assert_eq!(check(&script, version), Ok(()), "{file}: run pnpm build:runtime");

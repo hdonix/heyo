@@ -249,7 +249,7 @@ pub(crate) fn get_settings(app: AppHandle, window: tauri::WebviewWindow) -> Sett
 pub(crate) fn change_settings(mut changes: serde_json::Map<String, Value>, app: AppHandle) -> Result<SettingsView, String> {
     // The providers have commands of their own: a window never has their
     // secrets to send back.
-    for own in ["providers", "secrets"] {
+    for own in ["providers", "connections", "secrets"] {
         if changes.contains_key(own) {
             return Err(format!("the {own} are not changed this way"));
         }

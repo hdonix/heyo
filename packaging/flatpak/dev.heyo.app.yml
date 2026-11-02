@@ -72,7 +72,7 @@ modules:
       - tar -xf data.tar.gz
       - install -Dm755 usr/bin/heyo /app/bin/heyo
       # Beside ../lib/Heyo is where the program looks for its scripts.
-      - install -Dm644 -t /app/lib/Heyo usr/lib/Heyo/heyo-runtime.cjs usr/lib/Heyo/heyo-ocr.cjs usr/lib/Heyo/heyo-dev.cjs usr/lib/Heyo/heyo-embed.cjs
+      - install -Dm644 -t /app/lib/Heyo usr/lib/Heyo/heyo-runtime.cjs usr/lib/Heyo/heyo-ocr.cjs usr/lib/Heyo/heyo-dev.cjs usr/lib/Heyo/heyo-embed.cjs usr/lib/Heyo/heyo-connections.cjs
       # Flatpak exports only files named after the application.
       - install -Dm644 usr/share/icons/hicolor/32x32/apps/heyo.png /app/share/icons/hicolor/32x32/apps/dev.heyo.app.png
       - install -Dm644 usr/share/icons/hicolor/128x128/apps/heyo.png /app/share/icons/hicolor/128x128/apps/dev.heyo.app.png

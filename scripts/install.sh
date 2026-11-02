@@ -23,7 +23,7 @@ BIN=$PREFIX/bin
 LIB=$PREFIX/lib/Heyo
 APPLICATIONS=$PREFIX/share/applications
 ICONS=$PREFIX/share/icons/hicolor
-SCRIPTS="heyo-runtime.cjs heyo-ocr.cjs heyo-dev.cjs heyo-embed.cjs"
+SCRIPTS="heyo-runtime.cjs heyo-ocr.cjs heyo-dev.cjs heyo-embed.cjs heyo-connections.cjs"
 # The size each icon file is installed as.
 ICON_FILES="32x32:32x32.png 128x128:128x128.png 256x256:128x128@2x.png 512x512:icon.png"
 

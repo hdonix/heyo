@@ -459,6 +459,8 @@ fn load(dir: &Path) -> Option<Vec<Command>> {
         // Commands disabled by default need enabling in Raycast too.
         .filter(|c| !c.disabled_by_default)
         .filter(|c| dir.join(format!("{}.js", c.name)).is_file())
+        // A connector is not run from the palette: it syncs accounts (`connections`).
+        .filter(|c| c.mode != "connector")
         .map(|c| Command {
             extension: dir.to_string_lossy().into_owned(),
             icon: c.icon.as_deref().and_then(|i| asset(dir, i)).or_else(|| extension_icon.clone()),
@@ -486,6 +488,12 @@ fn installed() -> Vec<PathBuf> {
         .collect();
     dirs.sort();
     dirs
+}
+
+/// The directories of every extension: the installed ones, then those
+/// being developed.
+pub fn extension_dirs() -> Vec<PathBuf> {
+    installed().into_iter().chain(development().into_iter().map(|entry| PathBuf::from(entry.dir))).collect()
 }
 
 pub fn discover() -> Vec<Command> {
