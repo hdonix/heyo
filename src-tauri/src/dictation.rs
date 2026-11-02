@@ -75,7 +75,8 @@ struct State {
     /// Where what is heard goes to be written into the application: the
     /// recording's own thread takes it from there.
     writing: Option<Arc<Mailbox>>,
-    installing: bool,
+    /// The speech models being downloaded, by their ids.
+    downloads: std::collections::BTreeMap<&'static str, Downloading>,
     /// Who is given the text of this recording instead of the focused
     /// window: an extension that asked to listen.
     listener: Option<Listener>,
@@ -188,9 +189,28 @@ pub fn dir() -> PathBuf {
     crate::paths::data().join("dictation")
 }
 
-/// Whether the speech models have been downloaded.
-pub fn installed() -> bool {
-    models::installed(&dir())
+/// The model on this computer the settings choose (`dictationModel` with
+/// no provider: the model is an entry of the catalogue, or none for the
+/// default or the one that is installed), as a recording in `language`,
+/// or the one they set, is heard with it. Where they choose another
+/// provider, what would be heard with on this computer without it.
+fn local(settings: &crate::settings::Settings, language: Option<String>) -> engine::Chosen {
+    let model = if settings.dictation_model.provider.is_empty() { settings.dictation_model.model.as_str() } else { "" };
+    engine::Chosen::of(&dir(), model, language.as_deref().unwrap_or(&settings.dictation_language))
+}
+
+/// Whether what `settings` choose to hear with can be used without a
+/// download first.
+pub fn ready(settings: &crate::settings::Settings) -> bool {
+    !settings.dictation_model.provider.is_empty() || local(settings, None).ready(&dir())
+}
+
+/// The entry of the catalogue in use, if the settings choose a model on
+/// this computer.
+fn in_use(app: &AppHandle) -> Option<String> {
+    let settings = app.state::<SettingsState>();
+    let settings = settings.0.read().unwrap();
+    settings.dictation_model.provider.is_empty().then(|| local(&settings, None).model)
 }
 
 /// What the dictation window is told of a recording: the recording's account
@@ -263,11 +283,12 @@ fn hide_window_after(app: &AppHandle, delay: Duration) {
     });
 }
 
-/// Starts recording, in `language` from `source`: what is heard comes to
-/// `handle`.
-fn start(app: &AppHandle, language: &str, source: &str, cloud: Option<doubao::Config>) -> Result<listening::Listening, String> {
+/// Starts recording from `source`, heard by the model on this computer
+/// `chosen` names, or by Doubao where `cloud` says how: what is heard
+/// comes to `handle`.
+fn start(app: &AppHandle, chosen: engine::Chosen, source: &str, cloud: Option<doubao::Config>) -> Result<listening::Listening, String> {
     let receiver = app.clone();
-    listening::listen(dir(), source, language, cloud, Arc::new(move |event| handle(&receiver, said(event))))
+    listening::listen(dir(), source, chosen, cloud, Arc::new(move |event| handle(&receiver, said(event))))
 }
 
 /// What the thread that writes is told, in the order it was heard.
@@ -919,10 +940,10 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     if state.recording {
         return;
     }
-    let (language, source, polish, vocabulary, live, cloud) = {
+    let (chosen, source, polish, vocabulary, live, cloud) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live, cloud(&settings))
+        (local(&settings, None), settings.dictation_source.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live, cloud(&settings))
     };
     let cloud = match cloud {
         Ok(cloud) => cloud,
@@ -931,7 +952,7 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
             return fail(app, e);
         }
     };
-    if cloud.is_none() && !installed() {
+    if cloud.is_none() && !chosen.ready(&dir()) {
         drop(state);
         return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Dictation to download it.").into());
     }
@@ -939,7 +960,7 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     // once, and the window must not hear that it is ready before it hears
     // that a recording begins.
     emit(app, json!({ "type": "start", "polish": polish, "cloud": cloud.is_some() }));
-    match start(app, &language, &source, cloud) {
+    match start(app, chosen, &source, cloud) {
         Ok(listening) => {
             state.listening = Some(listening);
             // Kept for the whole recording, polishing included.
@@ -981,18 +1002,17 @@ pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool,
     if state.recording {
         return Err(NotListening::Busy);
     }
-    let (set_language, source, vocabulary, cloud) = {
+    let (chosen, source, vocabulary, cloud) = {
         let settings = app.state::<SettingsState>();
         let settings = settings.0.read().unwrap();
-        (settings.dictation_language.clone(), settings.dictation_source.clone(), settings.dictation_vocabulary.clone(), cloud(&settings))
+        (local(&settings, language), settings.dictation_source.clone(), settings.dictation_vocabulary.clone(), cloud(&settings))
     };
     let cloud = cloud.map_err(NotListening::Failed)?;
-    if cloud.is_none() && !installed() {
+    if cloud.is_none() && !chosen.ready(&dir()) {
         return Err(NotListening::NotInstalled);
     }
     let in_cloud = cloud.is_some();
-    let language = language.unwrap_or(set_language);
-    state.listening = Some(start(app, &language, &source, cloud).map_err(NotListening::Failed)?);
+    state.listening = Some(start(app, chosen, &source, cloud).map_err(NotListening::Failed)?);
     state.words = Words::of(&vocabulary);
     state.polish = "off".into();
     state.recording = true;
@@ -1072,37 +1092,171 @@ pub struct Status {
 
 pub fn status(app: &AppHandle) -> Status {
     Status {
-        installed: installed(),
-        installing: app.state::<Dictation>().0.lock().unwrap().installing,
+        installed: ready(&app.state::<SettingsState>().0.read().unwrap()),
+        installing: !app.state::<Dictation>().0.lock().unwrap().downloads.is_empty(),
         microphones: microphone::microphones(),
     }
 }
 
-/// Downloads the speech models, reporting progress to the settings window
-/// as `heyo://dictation-install` events.
-pub fn install(app: &AppHandle) -> Result<(), String> {
-    if std::mem::replace(&mut app.state::<Dictation>().0.lock().unwrap().installing, true) {
-        return Ok(());
-    }
-    let window = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let report = |message: Value| match InstallProgress::of(message) {
-            Ok(progress) => drop(window.emit(crate::wire::event::DICTATION_INSTALL, progress)),
-            Err(e) => eprintln!("heyo: dictation: not the progress of an installation: {e}"),
-        };
-        let progress = |step: &str, received: u64, total: u64| report(json!({ "type": "progress", "step": step, "received": received, "total": total }));
-        let done = models::install(&dir(), &progress).await;
-        window.state::<Dictation>().0.lock().unwrap().installing = false;
-        match done {
-            Ok(()) => report(json!({ "type": "installed" })),
-            Err(failure) => {
-                let mut said = failure.said();
-                said["type"] = "error".into();
-                report(said)
-            }
+/// A speech model being downloaded: how far it is, and what stops it.
+struct Downloading {
+    /// A step of the installation (`helper::step`), and bytes `received`
+    /// of `total` (0 where that is not known).
+    step: String,
+    received: u64,
+    total: u64,
+    cancel: Arc<std::sync::atomic::AtomicBool>,
+}
+
+/// A model of the catalogue as the settings page lists it.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+// The settings' Models page lists, downloads and deletes the speech
+// models with these; it is not there yet.
+#[allow(dead_code)]
+pub(crate) struct ModelState {
+    id: &'static str,
+    name: &'static str,
+    /// In the user's language, as `note`.
+    languages: &'static str,
+    note: &'static str,
+    megabytes: u32,
+    installed: bool,
+    /// Whether recordings are heard with it.
+    in_use: bool,
+    /// Whether the `dictationLanguage` setting is given to it.
+    takes_language: bool,
+    /// How far its download is, while it runs.
+    downloading: Option<Progress>,
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+// The settings' Models page lists, downloads and deletes the speech
+// models with these; it is not there yet.
+#[allow(dead_code)]
+pub(crate) struct Progress {
+    /// A step of the installation, by its code (`helper::step`).
+    step: String,
+    received: u64,
+    total: u64,
+}
+
+/// The speech models, and what each is to this installation.
+// The settings' Models page lists, downloads and deletes the speech
+// models with these; it is not there yet.
+#[allow(dead_code)]
+pub(crate) fn models(app: &AppHandle) -> Vec<ModelState> {
+    let in_use = in_use(app).unwrap_or_default();
+    let state = app.state::<Dictation>();
+    let state = state.0.lock().unwrap();
+    let dir = dir();
+    models::CATALOGUE
+        .iter()
+        .map(|model| ModelState {
+            id: model.id,
+            name: model.name,
+            languages: translate(model.languages),
+            note: translate(model.note),
+            megabytes: model.megabytes,
+            installed: model.installed(&dir),
+            in_use: model.id == in_use,
+            takes_language: model.language,
+            downloading: state.downloads.get(model.id).map(|going| Progress { step: going.step.clone(), received: going.received, total: going.total }),
+        })
+        .collect()
+}
+
+fn model(id: &str) -> Result<&'static models::Model, String> {
+    models::find(id).ok_or_else(|| crate::i18n::tf("There is no speech model {0}", &[&id]))
+}
+
+/// Downloads a speech model on a thread of its own, which goes on while
+/// no window is there to show it. How far it is the settings window reads
+/// in `models`, when the `heyo://dictation-install` events say it changed.
+pub(crate) fn download(app: &AppHandle, id: &str) -> Result<(), String> {
+    let model = model(id)?;
+    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let state = app.state::<Dictation>();
+        let mut state = state.0.lock().unwrap();
+        if state.downloads.contains_key(model.id) {
+            return Ok(());
         }
-    });
+        state.downloads.insert(model.id, Downloading { step: "speech-model".into(), received: 0, total: 0, cancel: cancel.clone() });
+    }
+    let app = app.clone();
+    let report = move |app: &AppHandle, message: Value| match InstallProgress::of(message) {
+        Ok(progress) => drop(app.emit(crate::wire::event::DICTATION_INSTALL, progress)),
+        Err(e) => eprintln!("heyo: dictation: not the progress of an installation: {e}"),
+    };
+    std::thread::Builder::new()
+        .name("dictation-download".into())
+        .spawn(move || {
+            let progress = |step: &str, received: u64, total: u64| {
+                if let Some(going) = app.state::<Dictation>().0.lock().unwrap().downloads.get_mut(model.id).filter(|going| Arc::ptr_eq(&going.cancel, &cancel)) {
+                    (going.step, going.received, going.total) = (step.to_owned(), received, total);
+                }
+                report(&app, json!({ "type": "progress", "step": step, "received": received, "total": total }));
+            };
+            let done = tauri::async_runtime::block_on(models::install(&dir(), model, &progress, &cancel));
+            {
+                let state = app.state::<Dictation>();
+                let mut state = state.0.lock().unwrap();
+                // Unless it was cancelled, and the same model is downloading again.
+                if state.downloads.get(model.id).is_some_and(|going| Arc::ptr_eq(&going.cancel, &cancel)) {
+                    state.downloads.remove(model.id);
+                }
+            }
+            match done {
+                Ok(()) => report(&app, json!({ "type": "installed" })),
+                // Whoever cancelled it knows.
+                Err(failure) if failure.code == "cancelled" => {}
+                Err(failure) => {
+                    let mut said = failure.said();
+                    said["type"] = "error".into();
+                    report(&app, said)
+                }
+            }
+        })
+        .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Downloads the model of this computer's that the settings choose, if
+/// they choose one.
+pub fn install(app: &AppHandle) -> Result<(), String> {
+    match in_use(app) {
+        Some(model) => download(app, &model),
+        None => Ok(()),
+    }
+}
+
+/// Stops a model's download; what it fetched so far is thrown away.
+// The settings' Models page lists, downloads and deletes the speech
+// models with these; it is not there yet.
+#[allow(dead_code)]
+pub(crate) fn cancel_download(app: &AppHandle, id: &str) -> Result<(), String> {
+    let model = model(id)?;
+    if let Some(going) = app.state::<Dictation>().0.lock().unwrap().downloads.remove(model.id) {
+        going.cancel.store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
+/// Deletes a model's files, unless recordings are heard with it: another
+/// is chosen first.
+// The settings' Models page lists, downloads and deletes the speech
+// models with these; it is not there yet.
+#[allow(dead_code)]
+pub(crate) fn delete(app: &AppHandle, id: &str) -> Result<(), String> {
+    let model = model(id)?;
+    if in_use(app).is_some_and(|in_use| in_use == model.id) {
+        return Err(t("The speech model in use cannot be deleted. Choose another first.").into());
+    }
+    if app.state::<Dictation>().0.lock().unwrap().downloads.contains_key(model.id) {
+        return Err(t("The speech model is being downloaded. Cancel the download first.").into());
+    }
+    models::delete(&dir(), model).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

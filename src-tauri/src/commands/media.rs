@@ -28,4 +28,3 @@ pub(crate) fn dictation_status(app: AppHandle) -> dictation::Status {
 pub(crate) fn dictation_install(app: AppHandle) -> Result<(), String> {
     dictation::install(&app)
 }
-

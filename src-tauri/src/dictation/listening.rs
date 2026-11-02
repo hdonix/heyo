@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use super::engine::{doubao, Doubao, Failure, Recognized, Recognizer, SenseVoice};
+use super::engine::{self, doubao, Chosen, Doubao, Failure, Recognized, Recognizer};
 use super::microphone::{self, Taker};
 
 /// How long a recognizer is kept without a recording: it holds a few
@@ -52,16 +52,17 @@ impl Listening {
 
 /// The recognizer kept between recordings, and when the last one ended.
 struct Kept {
-    recognizer: Option<SenseVoice>,
+    /// And what it was loaded as.
+    recognizer: Option<(Chosen, Box<dyn Recognizer>)>,
     idle_since: Option<Instant>,
 }
 
 static KEPT: Mutex<Kept> = Mutex::new(Kept { recognizer: None, idle_since: None });
 
 /// Starts a recording from `source` (empty: the system's default
-/// microphone), recognized in `language` from the files in `dir`, or by
-/// Doubao where `cloud` says how.
-pub(crate) fn listen(dir: std::path::PathBuf, source: &str, language: &str, cloud: Option<doubao::Config>, tell: Tell) -> Result<Listening, String> {
+/// microphone), heard by the model on this computer `chosen` names, from
+/// the files in `dir`, or by Doubao where `cloud` says how.
+pub(crate) fn listen(dir: std::path::PathBuf, source: &str, chosen: Chosen, cloud: Option<doubao::Config>, tell: Tell) -> Result<Listening, String> {
     let (tx, rx) = mpsc::channel();
     let (audio, failing, refused) = (tx.clone(), tx.clone(), tx.clone());
     // Record first, load second: nothing said during the load is lost.
@@ -72,13 +73,12 @@ pub(crate) fn listen(dir: std::path::PathBuf, source: &str, language: &str, clou
             failed: Box::new(move |failure| drop(failing.send(Input::Failed(failure)))),
         },
     );
-    let language = language.to_owned();
     std::thread::Builder::new()
         .name("dictation-listening".into())
         .spawn(move || {
             // Whatever becomes of it, a recording that is waited for ends
             // with a word on how.
-            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&dir, &language, cloud, recording, (refused, rx), &tell)));
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&dir, &chosen, cloud, recording, (refused, rx), &tell)));
             match ran {
                 Ok(Some(last)) => tell(last),
                 // Nobody waits for it any more.
@@ -99,15 +99,16 @@ fn error(failure: &Failure) -> Value {
 /// The recording, until it ends: what it heard is told as it is heard,
 /// and its last word returned.
 /// A recognizer that fails says so where the microphone does (`tx`).
-fn run(dir: &std::path::Path, language: &str, cloud: Option<doubao::Config>, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Value> {
+fn run(dir: &std::path::Path, chosen: &Chosen, cloud: Option<doubao::Config>, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Value> {
     let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     kept.idle_since = None;
     // A connection is a recording's own: nothing is kept of it.
     let mut doubao = cloud.map(Doubao::new);
-    if doubao.is_none() && kept.recognizer.as_ref().is_none_or(|recognizer| recognizer.language() != language) {
+    if doubao.is_none() && kept.recognizer.as_ref().is_none_or(|(loaded, _)| loaded != chosen) {
+        // The one before goes first: two models need not fit at once.
         kept.recognizer = None;
-        match SenseVoice::load(dir, language) {
-            Ok(recognizer) => kept.recognizer = Some(recognizer),
+        match engine::load(dir, chosen) {
+            Ok(recognizer) => kept.recognizer = Some((chosen.clone(), recognizer)),
             Err(failure) => {
                 drop(recording);
                 return Some(error(&failure));
@@ -116,7 +117,7 @@ fn run(dir: &std::path::Path, language: &str, cloud: Option<doubao::Config>, rec
     }
     let recognizer: &mut dyn Recognizer = match doubao.as_mut() {
         Some(doubao) => doubao,
-        None => kept.recognizer.as_mut().expect("loaded above"),
+        None => kept.recognizer.as_mut().expect("loaded above").1.as_mut(),
     };
     let heard = tell.clone();
     recognizer.begin(Box::new(move |recognized| match recognized {
@@ -200,36 +201,46 @@ mod tests {
     use super::*;
 
     /// A recording end to end, as Heyo makes one: the WAV file in place of
-    /// the microphone (`HEYO_DICTATION_WAV`), heard by SenseVoice with the
-    /// models of the Heyo installed on this computer (read, never written).
+    /// the microphone (`HEYO_DICTATION_WAV`), heard by each model of the
+    /// dictation directory of the Heyo installed on this computer (read,
+    /// never written; `HEYO_TEST_SPEECH` names another) that is one of a
+    /// SenseVoice and the streaming X-ASR. One after the other: the WAV is
+    /// named in the environment, and only one recognizer is kept.
     #[test]
     fn a_recording_says_it_is_ready_how_loud_it_is_what_it_hears_and_all_of_it() {
-        let dir = std::env::var_os("HEYO_TEST_SPEECH").map(Into::into).unwrap_or_else(|| crate::paths::home().join(".local/share/heyo/dictation"));
+        let dir: std::path::PathBuf = std::env::var_os("HEYO_TEST_SPEECH").map(Into::into).unwrap_or_else(|| crate::paths::home().join(".local/share/heyo/dictation"));
         let wav = std::env::temp_dir().join(format!("heyo-listening-{}.wav", std::process::id()));
         let say = concat!(env!("CARGO_MANIFEST_DIR"), "/../scripts/gui-test/say.py");
         let spoken = std::process::Command::new("python3").arg(say).arg(&wav).args(["Good morning.", "See you soon."]).status();
-        if !crate::dictation::models::installed(&dir) || !spoken.is_ok_and(|status| status.success()) {
-            return eprintln!("skipped: no speech models installed, or no Flite for say.py");
+        if !spoken.is_ok_and(|status| status.success()) {
+            return eprintln!("skipped: no Flite for say.py");
         }
-        std::env::set_var("HEYO_DICTATION_WAV", &wav);
-        let (tx, rx) = mpsc::channel();
-        let tx = Mutex::new(tx);
-        let listening = listen(dir, "", "en", None, Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
-        std::env::remove_var("HEYO_DICTATION_WAV");
-        let mut events = Vec::new();
-        while events.iter().filter(|event: &&Value| event["type"] == "segment").count() < 2 {
-            events.push(rx.recv_timeout(Duration::from_secs(20)).expect("the two sentences"));
+        for model in ["sense-voice-2024-07-17", "x-asr-2026-06-05"] {
+            if !crate::dictation::models::find(model).unwrap().installed(&dir) {
+                eprintln!("skipped {model}: not installed");
+                continue;
+            }
+            std::env::set_var("HEYO_DICTATION_WAV", &wav);
+            let (tx, rx) = mpsc::channel();
+            let tx = Mutex::new(tx);
+            let chosen = Chosen { model: model.into(), language: "en".into() };
+            let listening = listen(dir.clone(), "", chosen, None, Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
+            std::env::remove_var("HEYO_DICTATION_WAV");
+            let mut events = Vec::new();
+            while events.iter().filter(|event: &&Value| event["type"] == "segment").count() < 2 {
+                events.push(rx.recv_timeout(Duration::from_secs(20)).unwrap_or_else(|_| panic!("{model}: the two sentences: {:?}", events.iter().filter(|event| event["type"] != "level").collect::<Vec<_>>())));
+            }
+            listening.stop().unwrap();
+            let last = rx.iter().find(|event| event["type"] != "level").unwrap();
+            assert_eq!(events[0], json!({ "type": "ready" }), "{model}");
+            let levels: Vec<f64> = events.iter().filter_map(|event| event["value"].as_f64()).collect();
+            assert!(levels.len() > 20 && levels.iter().any(|level| *level > 0.1), "{model}: {levels:?}");
+            let segments: Vec<&str> = events.iter().filter(|event| event["type"] == "segment").filter_map(|event| event["text"].as_str()).collect();
+            assert_eq!(segments, ["Good morning.", " See you soon."], "{model}");
+            assert!(events.iter().any(|event| event["type"] == "partial"), "{model}: heard in progress, at the pace of speech");
+            assert_eq!(last, json!({ "type": "result", "text": "Good morning. See you soon.", "raw": "Good morning. See you soon.", "polished": false }), "{model}");
         }
-        listening.stop().unwrap();
-        let last = rx.iter().find(|event| event["type"] != "level").unwrap();
         let _ = std::fs::remove_file(&wav);
-        assert_eq!(events[0], json!({ "type": "ready" }));
-        let levels: Vec<f64> = events.iter().filter_map(|event| event["value"].as_f64()).collect();
-        assert!(levels.len() > 20 && levels.iter().any(|level| *level > 0.1), "{levels:?}");
-        let segments: Vec<&str> = events.iter().filter(|event| event["type"] == "segment").filter_map(|event| event["text"].as_str()).collect();
-        assert_eq!(segments, ["Good morning.", " See you soon."]);
-        assert!(events.iter().any(|event| event["type"] == "partial"), "heard in progress, at the pace of speech");
-        assert_eq!(last, json!({ "type": "result", "text": "Good morning. See you soon.", "raw": "Good morning. See you soon.", "polished": false }));
     }
 
     #[test]

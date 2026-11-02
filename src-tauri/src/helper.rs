@@ -224,6 +224,7 @@ pub fn step(code: &str) -> String {
         "speech-model" => t("Speech model").into(),
         "voice-detector" => t("Voice detector").into(),
         "vocabulary" => t("Vocabulary").into(),
+        "unpacking" => t("Unpacking").into(),
         "embedding-engine" => t("Engine").into(),
         "language-model" => t("Language model").into(),
         "ocr-engine" => t("Text recognition engine").into(),

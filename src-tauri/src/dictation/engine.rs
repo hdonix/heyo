@@ -2,27 +2,74 @@
 //! recording as it is recorded, says the sentence in progress and each
 //! finished one as it hears them.
 //!
-//! The one there is recognizes on this computer: SenseVoice, with Silero's
-//! voice-activity detector finding where sentences end, through sherpa-onnx
-//! (`sense_voice`). SenseVoice is not a streaming model, but it decodes
-//! seconds of audio in tens of milliseconds, so the sentence being spoken is
-//! simply recognized again every 300 ms (`sentences`). A recognizer that
-//! streams, or one that sends the audio to a service, is fed the same way
-//! and says the same things.
+//! The ones on this computer are models of the catalogue (`models`) run
+//! by sherpa-onnx. Most are not streaming models (`offline`): Silero's
+//! voice-activity detector finds where sentences end, and the sentence
+//! being spoken is simply recognized again every 300 ms or so
+//! (`sentences`). A streaming model (`streaming`) hears the audio as it
+//! comes and says itself where a sentence ends. Which of them a recording
+//! gets is decided in one place, `load`.
 //!
 //! The other sends the audio to a service: Doubao's streaming recognition,
 //! at Volcengine (`doubao`), where the user chose it and gave it a key.
 
 pub(crate) mod doubao;
-mod sense_voice;
+mod offline;
 mod sentences;
+mod streaming;
 
 use std::fmt;
+use std::path::Path;
 
 use serde_json::{json, Value};
 
 pub(crate) use doubao::Doubao;
-pub(crate) use sense_voice::SenseVoice;
+pub(crate) use offline::Offline;
+pub(crate) use streaming::Streaming;
+
+use super::models::{self, Kind};
+
+/// The model on this computer a recording is to be heard with: the
+/// `dictationModel` setting (with no provider) and `dictationLanguage` as
+/// they were when it began, the model resolved (`models::chosen`). A
+/// recognizer that was loaded for the same is used again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Chosen {
+    /// An entry of the catalogue, by its id.
+    pub model: String,
+    pub language: String,
+}
+
+impl Chosen {
+    /// The setting's model, as a recording is heard with it: one that is
+    /// not named, or not known, is the one `models::chosen` picks.
+    pub fn of(dir: &Path, model: &str, language: &str) -> Chosen {
+        Chosen { model: models::chosen(dir, model).id.to_owned(), language: language.to_owned() }
+    }
+
+    /// Whether it can be loaded without a download first.
+    pub fn ready(&self, dir: &Path) -> bool {
+        models::find(&self.model).is_some_and(|model| model.installed(dir))
+    }
+}
+
+/// Opens the recognizer `chosen` names, from its files in the dictation
+/// directory `dir`.
+pub(crate) fn load(dir: &Path, chosen: &Chosen) -> Result<Box<dyn Recognizer>, Failure> {
+    open(dir, &chosen.model, &chosen.language)
+}
+
+/// Opens the recognizer of the catalogue's entry `id`, in `language`
+/// where the model is told one (`dictation::LANGUAGES`).
+pub(crate) fn open(dir: &Path, id: &str, language: &str) -> Result<Box<dyn Recognizer>, Failure> {
+    let Some(model) = models::find(id) else {
+        return Err(Failure::failed(format!("there is no speech model {id}")));
+    };
+    Ok(match model.kind {
+        Kind::Streaming => Box::new(Streaming::load(dir, model)?),
+        _ => Box::new(Offline::load(dir, model, language)?),
+    })
+}
 
 /// Samples a second: what a recognizer is fed is 16 kHz mono, as `f32`
 /// from -1 to 1.
@@ -117,5 +164,40 @@ mod tests {
         assert_eq!(failure.said(), json!({ "code": "download", "step": "speech-model", "detail": "500 Nope" }));
         assert_eq!(crate::helper::worded(&failure.said(), "Dictation failed").full(), "Could not download: Speech model: 500 Nope");
         assert_eq!(Failure::failed("ENOSPC").said(), json!({ "code": "failed", "detail": "ENOSPC" }));
+    }
+
+    /// Every model of the catalogue in `HEYO_MEASURE_SPEECH` (a dictation
+    /// directory), on each of the WAV files `HEYO_MEASURE_CLIPS` names
+    /// (16 kHz mono 16-bit, separated by `:`): how long loading takes, how
+    /// fast it hears (time taken over the length of the audio, fed as fast
+    /// as it is taken), and what it heard. For choosing among them:
+    /// `cargo test --release measure_the_models -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn measure_the_models() {
+        let dir = std::path::PathBuf::from(std::env::var("HEYO_MEASURE_SPEECH").expect("HEYO_MEASURE_SPEECH"));
+        let clips: Vec<(String, Vec<f32>)> = std::env::var("HEYO_MEASURE_CLIPS")
+            .expect("HEYO_MEASURE_CLIPS")
+            .split(':')
+            .map(|path| {
+                let wav = std::fs::read(path).unwrap();
+                (path.rsplit('/').next().unwrap().to_owned(), wav[44..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect())
+            })
+            .collect();
+        let only = std::env::var("HEYO_MEASURE_ONLY").unwrap_or_default();
+        for model in models::CATALOGUE.iter().filter(|model| model.installed(&dir) && (only.is_empty() || only.split(',').any(|id| id == model.id))) {
+            let loading = std::time::Instant::now();
+            let mut recognizer = open(&dir, model.id, "auto").unwrap();
+            let loaded = loading.elapsed().as_secs_f64();
+            for (name, audio) in &clips {
+                // Once to warm up, then measured.
+                offline::tests::heard(recognizer.as_mut(), audio);
+                let hearing = std::time::Instant::now();
+                let (text, said) = offline::tests::heard(recognizer.as_mut(), audio);
+                let rtf = hearing.elapsed().as_secs_f64() / (audio.len() as f64 / SAMPLE_RATE as f64);
+                let partials = said.iter().filter(|said| matches!(said, Recognized::Partial(_))).count();
+                println!("{:32} {name:10} load {loaded:5.2}s  RTF {rtf:.3}  partials {partials:3}  {text}", model.id);
+            }
+        }
     }
 }

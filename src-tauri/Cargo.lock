@@ -790,6 +790,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bzip2"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3a53fac24f34a81bc9954b5d6cfce0c21e18ec6959f44f56e8e90e4bb7c346c"
+dependencies = [
+ "libbz2-rs-sys",
+]
+
+[[package]]
 name = "bzip2-sys"
 version = "0.1.13+1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2801,6 +2810,7 @@ version = "0.0.1"
 dependencies = [
  "arboard",
  "base64 0.22.1",
+ "bzip2 0.6.1",
  "chrono",
  "cpal",
  "flate2",
@@ -2832,6 +2842,7 @@ dependencies = [
  "slint-build",
  "smithay-client-toolkit",
  "sys-locale",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",
@@ -3911,6 +3922,12 @@ dependencies = [
  "libloading 0.7.4",
  "once_cell",
 ]
+
+[[package]]
+name = "libbz2-rs-sys"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32f454fd6831a29c0e827ed075bca2a15be201bd57f4168f0fd1041124eab17e"
 
 [[package]]
 name = "libc"

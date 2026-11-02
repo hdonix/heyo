@@ -279,7 +279,7 @@ fn carry_out(world: &World, caller: &Caller, request: ExtRequest, effects: &mut 
             return value(RecognizedText { text: world.running.recognize_text(image)? });
         }
 
-        DictationInstalled => return Ok(dictation::installed().into()),
+        DictationInstalled => return Ok(dictation::ready(&world.settings.read().unwrap()).into()),
         DictationListen { language, indicator } => {
             if let Some(language) = language.as_deref().filter(|language| !dictation::LANGUAGES.contains(language)) {
                 return Err(ExtError::invalid(format!("Dictation does not know the language {language:?}.")));

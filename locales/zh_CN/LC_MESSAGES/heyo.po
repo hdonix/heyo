@@ -195,6 +195,58 @@ msgstr "听写未在运行"
 msgid "failed to start dictation: {0}"
 msgstr "无法启动听写：{0}"
 
+#: src-tauri/src/dictation/models.rs
+msgid "Chinese, Cantonese, English, Japanese, Korean"
+msgstr "中文、粤语、英语、日语、韩语"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Fast, with punctuation."
+msgstr "速度快，带标点。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Cantonese, Chinese, English"
+msgstr "粤语、中文、英语"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Fast, made for Cantonese. No punctuation."
+msgstr "速度快，专为粤语训练。不带标点。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Chinese, English"
+msgstr "中文、英语"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Streaming: the words come as you speak them, with punctuation."
+msgstr "流式识别：边说边出字，带标点。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Chinese, Sichuanese"
+msgstr "中文、四川话"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Fast, made for Sichuanese. No punctuation, little English."
+msgstr "速度快，专为四川话训练。不带标点，英语识别较弱。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Accurate for Chinese and English, and slow. No punctuation."
+msgstr "中英文识别准确，但速度慢。不带标点。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "99 languages"
+msgstr "99 种语言"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Many languages, slow."
+msgstr "支持多种语言，速度慢。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "English and 24 other European languages"
+msgstr "英语及其他 24 种欧洲语言"
+
+#: src-tauri/src/dictation/models.rs
+msgid "Accurate and fast, with punctuation."
+msgstr "准确且速度快，带标点。"
+
 #: src-tauri/src/dictation/onscreen.rs
 msgid "there is too much text to replace where it stands"
 msgstr "文本太多，无法原地替换"
@@ -210,6 +262,18 @@ msgstr "听写失败"
 #: src-tauri/src/dictation.rs
 msgid "Dictation is not set up yet. Open Heyo Settings → Dictation to download it."
 msgstr "听写尚未设置。请打开“Heyo 设置”→“听写”进行下载。"
+
+#: src-tauri/src/dictation.rs
+msgid "There is no speech model {0}"
+msgstr "没有语音识别模型 {0}"
+
+#: src-tauri/src/dictation.rs
+msgid "The speech model in use cannot be deleted. Choose another first."
+msgstr "无法删除正在使用的语音识别模型。请先选择其他模型。"
+
+#: src-tauri/src/dictation.rs
+msgid "The speech model is being downloaded. Cancel the download first."
+msgstr "该语音识别模型正在下载。请先取消下载。"
 
 #: src-tauri/src/expand.rs
 msgid "Snippets cannot expand as you type here"
@@ -737,6 +801,10 @@ msgstr "人声检测器"
 #: src-tauri/src/slint_windows/model.rs
 msgid "Vocabulary"
 msgstr "词汇表"
+
+#: src-tauri/src/helper.rs
+msgid "Unpacking"
+msgstr "正在解压"
 
 #: src-tauri/src/helper.rs
 msgid "Engine"

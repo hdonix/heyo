@@ -53,6 +53,9 @@ for it. A translation uses these and no synonym; change a term here and in
 | Clean Up (a polish mode) | 整理 | Tidying without rewriting, which is what it does. |
 | Vocabulary | 词汇表 | A list of words, not a dictionary (“词典”). |
 | Speech Recognition | 语音识别 | Standard. |
+| Speech model (one of those dictation can recognize with) | 语音识别模型 | As the download's step already says it; 模型 alone could be the AI model. |
+| Streaming (a speech model that recognizes as it hears) | 流式 | The field's word; what it does for the user is said beside it (边说边出字). |
+| Punctuation | 标点 | Short for 标点符号, as a model's note has room for. |
 | Engine (what is downloaded to recognize speech or text, or to find by meaning) | 引擎 | Standard; the speech engine is 语音识别引擎, as Speech Recognition says. |
 | Audio recorder (the program dictation records with) | 录音程序 | A program to install, not the microphone (麦克风). |
 | Text Recognition (OCR) | 文字识别 | Standard; “文字” throughout for text in a picture. |

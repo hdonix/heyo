@@ -192,6 +192,58 @@ msgstr ""
 msgid "failed to start dictation: {0}"
 msgstr ""
 
+#: src-tauri/src/dictation/models.rs
+msgid "Chinese, Cantonese, English, Japanese, Korean"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Fast, with punctuation."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Cantonese, Chinese, English"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Fast, made for Cantonese. No punctuation."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Chinese, English"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Streaming: the words come as you speak them, with punctuation."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Chinese, Sichuanese"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Fast, made for Sichuanese. No punctuation, little English."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Accurate for Chinese and English, and slow. No punctuation."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "99 languages"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Many languages, slow."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "English and 24 other European languages"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "Accurate and fast, with punctuation."
+msgstr ""
+
 #: src-tauri/src/dictation/onscreen.rs
 msgid "there is too much text to replace where it stands"
 msgstr ""
@@ -206,6 +258,18 @@ msgstr ""
 
 #: src-tauri/src/dictation.rs
 msgid "Dictation is not set up yet. Open Heyo Settings → Dictation to download it."
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "There is no speech model {0}"
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "The speech model in use cannot be deleted. Choose another first."
+msgstr ""
+
+#: src-tauri/src/dictation.rs
+msgid "The speech model is being downloaded. Cancel the download first."
 msgstr ""
 
 #: src-tauri/src/expand.rs
@@ -733,6 +797,10 @@ msgstr ""
 #: src-tauri/src/helper.rs
 #: src-tauri/src/slint_windows/model.rs
 msgid "Vocabulary"
+msgstr ""
+
+#: src-tauri/src/helper.rs
+msgid "Unpacking"
 msgstr ""
 
 #: src-tauri/src/helper.rs

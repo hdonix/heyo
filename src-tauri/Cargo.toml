@@ -67,6 +67,10 @@ flate2 = "1"
 # Checking what is downloaded against the hash it must have (the speech
 # models, `dictation/models.rs`). In the build already, through Tauri.
 sha2 = "0.10"
+# Unpacking the speech models, which sherpa-onnx publishes as .tar.bz2
+# (`dictation/models.rs`); bzip2 in Rust (libbz2-rs-sys), no C library.
+bzip2 = "0.6"
+tar = { version = "0.4", default-features = false }
 # The command-line tools that answer as models (`models/cli.rs`) run as child processes read as they write.
 tokio = { version = "1", features = ["process", "io-util", "sync"] }
 # The settings window is drawn by Slint, on a thread of its own

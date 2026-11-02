@@ -54,7 +54,7 @@ pub(crate) trait Engine {
 
 /// Writing, letters or digits: SenseVoice returns a lone punctuation mark
 /// for noise.
-fn meaningful(text: &str) -> bool {
+pub(crate) fn meaningful(text: &str) -> bool {
     static WORDY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[\p{L}\p{N}]").unwrap());
     WORDY.is_match(text)
 }
@@ -136,8 +136,12 @@ impl Session {
 
         let seconds = self.speech_samples as f64 / SAMPLE_RATE as f64;
         if self.speaking && seconds >= MIN_PARTIAL_SECONDS && now.saturating_sub(self.last_partial) >= PARTIAL_INTERVAL_MS {
-            self.last_partial = now;
+            let decoding = std::time::Instant::now();
             let heard = engine.decode(&self.speech.concat());
+            // A slow model is asked again only after twice as long as it
+            // took, if that is longer than the interval, or it would decode
+            // all the time and fall behind.
+            self.last_partial = now + (2 * decoding.elapsed().as_millis() as u64).saturating_sub(PARTIAL_INTERVAL_MS);
             let text = unfinished(&heard);
             if meaningful(text) {
                 say(Recognized::Partial(self.joined(text)));
