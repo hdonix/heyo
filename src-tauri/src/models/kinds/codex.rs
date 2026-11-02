@@ -2,12 +2,13 @@
 //! (`models/cli.rs`).
 
 use crate::i18n::marked;
-use crate::models::cli::{self, Tool};
+use crate::models::cli;
+use crate::models::codex::{self, PROGRAM};
 use crate::models::registry::{field, Can, Entry, Field, Provider, MODELS, PATH};
-use crate::models::Model;
+use crate::models::TextAdapter;
 
-use super::claude_code::{tool_can, tool_check, tool_status};
-use super::{Checked, Known, ProviderKind, Status};
+use super::claude_code::{tool_check, tool_status};
+use super::{text_can, Checked, Known, ProviderKind, Status};
 
 pub(crate) const WORD: &str = "codex";
 
@@ -34,8 +35,8 @@ impl ProviderKind for Codex {
     fn fields(&self) -> &'static [Field] {
         FIELDS
     }
-    fn can(&self, _provider: &Provider, need: Can) -> bool {
-        tool_can(need)
+    fn can(&self, provider: &Provider, need: Can) -> bool {
+        text_can(self, provider, need)
     }
     fn goes(&self, _provider: &Provider) -> &'static str {
         marked("Runs on this computer, and sends what it is given to OpenAI.")
@@ -44,16 +45,16 @@ impl ProviderKind for Codex {
         vec![String::new()]
     }
     fn status(&self, _provider: &Provider, known: &Known) -> Status {
-        tool_status(Tool::Codex, known)
+        tool_status(&PROGRAM, known)
     }
     fn found(&self, provider: &Provider) -> Option<Result<cli::Found, String>> {
-        Some(cli::found(Tool::Codex, provider.get(PATH)))
+        Some(cli::found(&PROGRAM, provider.get(PATH)))
     }
     fn check(&self, provider: &Provider) -> Result<Checked, String> {
-        tool_check(Tool::Codex, provider)
+        tool_check(&PROGRAM, provider)
     }
-    fn text(&self, provider: &Provider, model: &str) -> Option<Model> {
-        Some(Model::Cli(cli::Cli::new(Tool::Codex, provider.get(PATH), model)))
+    fn text(&self, provider: &Provider, model: &str) -> Option<Box<dyn TextAdapter>> {
+        Some(Box::new(codex::Codex::new(provider.get(PATH), model)))
     }
     fn api_name(&self) -> &'static str {
         "codex"

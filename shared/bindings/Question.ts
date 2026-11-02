@@ -3,10 +3,11 @@ import type { PromptImage } from "./PromptImage";
 import type { Turn } from "./Turn";
 
 /**
- * What is asked. Without `history` the prompt is text to work on
+ * What is asked, once. Without `history` the prompt is text to work on
  * (translate, rewrite, clean up…), and it is given as material, never as
  * a request to the model; with `history` (even an empty one) it is the
- * user's next message in a conversation.
+ * user's next message in a conversation. It is asked as one step of a
+ * conversation.
  */
 export type Question = { system: string, prompt: string, history?: Array<Turn>, 
 /**

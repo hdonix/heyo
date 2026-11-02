@@ -808,6 +808,59 @@ msgstr "命令执行失败"
 msgid "Refresh"
 msgstr "刷新"
 
+#: src-tauri/src/models/claude.rs
+msgid "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."
+msgstr "Claude 尚未设置。请在“Heyo 设置”→“模型”中添加 Anthropic API 密钥，或选择其他模型。"
+
+#: src-tauri/src/models/claude.rs
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Models."
+msgstr "Claude API 密钥无效。请在“Heyo 设置”→“模型”中检查。"
+
+#: src-tauri/src/models/claude.rs
+msgid "Claude's rate limit was reached. Try again shortly."
+msgstr "已达到 Claude 的速率限制，请稍后再试。"
+
+#: src-tauri/src/models/claude.rs
+msgid "Could not reach the Claude API."
+msgstr "无法连接 Claude API。"
+
+#: src-tauri/src/models/claude.rs
+msgid "Claude API error {0}: {1}"
+msgstr "Claude API 错误 {0}：{1}"
+
+#: src-tauri/src/models/claude.rs
+#: src-tauri/src/models/claude_code.rs
+msgid "Claude declined this request."
+msgstr "Claude 拒绝了这个请求。"
+
+#: src-tauri/src/models/claude.rs
+msgid "Claude returned no text."
+msgstr "Claude 没有返回任何文字。"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} is not given tools."
+msgstr "{0} 不能使用工具。"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."
+msgstr "{0} 未安装，或 Heyo 找不到它。请安装它，或在“Heyo 设置”→“模型”中指定它的可执行文件。"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Models."
+msgstr "在 {1} 找不到 {0}。请在“Heyo 设置”→“模型”中检查它的可执行文件。"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} stopped with an error: {1}"
+msgstr "{0} 出错停止：{1}"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} returned no text."
+msgstr "{0} 没有返回任何文字。"
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
+msgstr "{0} 尚未登录。请在终端中运行“{1}”，然后重试。"
+
 #: src-tauri/src/models/cli.rs
 msgid "{0} was not found. Install it, or name its executable here."
 msgstr "未找到 {0}。请安装它，或在此填写其可执行文件。"
@@ -1144,78 +1197,6 @@ msgid_plural "The server answers and lists {0} models."
 msgstr[0] "服务器有响应，列出了 {0} 个模型。"
 
 #: src-tauri/src/models/mod.rs
-msgid "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."
-msgstr "Claude 尚未设置。请在“Heyo 设置”→“模型”中添加 Anthropic API 密钥，或选择其他模型。"
-
-#: src-tauri/src/models/mod.rs
-msgid "The Claude API key is invalid. Check it in Heyo Settings → Models."
-msgstr "Claude API 密钥无效。请在“Heyo 设置”→“模型”中检查。"
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude's rate limit was reached. Try again shortly."
-msgstr "已达到 Claude 的速率限制，请稍后再试。"
-
-#: src-tauri/src/models/mod.rs
-msgid "Could not reach the Claude API."
-msgstr "无法连接 Claude API。"
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude API error {0}: {1}"
-msgstr "Claude API 错误 {0}：{1}"
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude declined this request."
-msgstr "Claude 拒绝了这个请求。"
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude returned no text."
-msgstr "Claude 没有返回任何文字。"
-
-#: src-tauri/src/models/mod.rs
-msgid "Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)"
-msgstr "无法连接 {0} 上的模型服务器。它在运行吗？（“Heyo 设置”→“模型”）"
-
-#: src-tauri/src/models/mod.rs
-msgid "The local model answered with an error ({0}): {1}"
-msgstr "本地模型返回了错误（{0}）：{1}"
-
-#: src-tauri/src/models/mod.rs
-msgid "The local model is not given images."
-msgstr "本地模型不接收图片。"
-
-#: src-tauri/src/models/mod.rs
-msgid "The local server lists no models."
-msgstr "本地服务器没有列出任何模型。"
-
-#: src-tauri/src/models/mod.rs
-msgid "The local model returned no text."
-msgstr "本地模型没有返回任何文本。"
-
-#: src-tauri/src/models/mod.rs
-msgid "the server did not answer with a model list"
-msgstr "服务器没有返回模型列表"
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."
-msgstr "{0} 未安装，或 Heyo 找不到它。请安装它，或在“Heyo 设置”→“模型”中指定它的可执行文件。"
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Models."
-msgstr "在 {1} 找不到 {0}。请在“Heyo 设置”→“模型”中检查它的可执行文件。"
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
-msgstr "{0} 尚未登录。请在终端中运行“{1}”，然后重试。"
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} stopped with an error: {1}"
-msgstr "{0} 出错停止：{1}"
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} returned no text."
-msgstr "{0} 没有返回任何文字。"
-
-#: src-tauri/src/models/mod.rs
 msgid "No model is chosen for this. Choose one in Heyo Settings."
 msgstr "这里还没有选择模型。请在“Heyo 设置”中选择一个。"
 
@@ -1230,6 +1211,30 @@ msgstr "{0} 不能用于这里。请在“Heyo 设置”中选择其他模型。
 #: src-tauri/src/models/mod.rs
 msgid "{0} is not set up: {1} (Heyo Settings → Models)"
 msgstr "{0} 尚未设置：{1}（“Heyo 设置”→“模型”）"
+
+#: src-tauri/src/models/openai.rs
+msgid "Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)"
+msgstr "无法连接 {0} 上的模型服务器。它在运行吗？（“Heyo 设置”→“模型”）"
+
+#: src-tauri/src/models/openai.rs
+msgid "the server did not answer with a model list"
+msgstr "服务器没有返回模型列表"
+
+#: src-tauri/src/models/openai.rs
+msgid "The local model is not given images."
+msgstr "本地模型不接收图片。"
+
+#: src-tauri/src/models/openai.rs
+msgid "The local server lists no models."
+msgstr "本地服务器没有列出任何模型。"
+
+#: src-tauri/src/models/openai.rs
+msgid "The local model returned no text."
+msgstr "本地模型没有返回任何文本。"
+
+#: src-tauri/src/models/openai.rs
+msgid "The local model answered with an error ({0}): {1}"
+msgstr "本地模型返回了错误（{0}）：{1}"
 
 #: src-tauri/src/models/registry.rs
 msgid "A provider needs a name."

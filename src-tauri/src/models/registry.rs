@@ -35,6 +35,11 @@ pub enum Can {
     Speech,
     /// Say what it has so far while it answers.
     Streaming,
+    /// Answer with calls of the tools it is offered, and go on from their
+    /// results (`models::text`). Nothing asks for it yet: what will is an
+    /// agent's loop.
+    #[cfg_attr(not(test), allow(dead_code))]
+    ToolCalls,
     /// Keep what it is given on this computer: it runs here and sends
     /// nothing elsewhere. Claude Code and Codex run here but send what
     /// they are asked to their makers' services, so they do not.
@@ -375,11 +380,14 @@ mod tests {
     #[test]
     fn each_kind_declares_what_it_can_do() {
         let claude = Provider::new("claude", kinds::ANTHROPIC);
-        assert!(claude.can(Can::Text) && claude.can(Can::Images) && !claude.can(Can::Speech) && !claude.can(Can::Private));
-        // A tool on this computer sends what it is asked to its maker's service.
+        assert!(claude.can(Can::Text) && claude.can(Can::Images) && claude.can(Can::ToolCalls) && !claude.can(Can::Speech) && !claude.can(Can::Private));
+        // A tool on this computer sends what it is asked to its maker's
+        // service, and its own tools stay off.
         for kind in [kinds::CLAUDE_CODE, kinds::CODEX] {
-            assert!(Provider::new("x", kind).can(Can::Images) && !Provider::new("x", kind).can(Can::Private));
+            let tool = Provider::new("x", kind);
+            assert!(tool.can(Can::Text) && tool.can(Can::Images) && !tool.can(Can::Private) && !tool.can(Can::ToolCalls));
         }
+        assert!(server("d", "http://127.0.0.1:8000/v1").can(Can::ToolCalls));
         // A server is as private as where it is.
         assert!(server("a", "http://127.0.0.1:11434/v1").can(Can::Private));
         assert!(!server("b", "http://192.168.1.20:8000/v1").can(Can::Private));

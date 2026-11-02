@@ -1,5 +1,6 @@
 //! OpenAI's models through Codex (`codex`), signed in with the user's
-//! ChatGPT account or key: one of the adapters of `models`, through `cli.rs`.
+//! ChatGPT account or key: a text adapter of `models`, through `cli.rs`.
+//! It is offered no tools of Heyo's, and as few of its own as it allows.
 //!
 //! It is run once per question, as Codex 0.166's `codex exec --help` says:
 //!
@@ -49,8 +50,12 @@ use std::path::Path;
 use base64::Engine;
 use serde_json::Value;
 
-use super::cli::{self, Cli, Scratch};
-use super::{ModelError, Question};
+use super::cli::{self, Cli, Program};
+use super::registry::Can;
+use super::text::{Conversation, Reply, Step, TextAdapter};
+use super::ModelError;
+
+pub(crate) const PROGRAM: Program = Program { name: "Codex", command: "codex", sign_in: "codex login" };
 
 /// The features that are tools, or bring tools, the model is not to have.
 const DISABLED: &[&str] = &[
@@ -73,26 +78,53 @@ const DISABLED: &[&str] = &[
     "remote_plugin",
 ];
 
-pub(super) async fn answer(cli: &Cli, program: &Path, scratch: &Scratch, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
-    let failed = |e: std::io::Error| cli.failed(e.to_string());
-    let system = scratch.file("system.md", cli::system(question).as_bytes()).map_err(failed)?;
-    let mut images = Vec::new();
-    for (number, image) in question.images.iter().enumerate() {
-        let data = base64::engine::general_purpose::STANDARD.decode(image.data.trim()).map_err(|e| cli.failed(e.to_string()))?;
-        let ending = image.media_type.strip_prefix("image/").unwrap_or("png");
-        images.push(scratch.file(&format!("image-{}.{ending}", number + 1), &data).map_err(failed)?);
-    }
-    let args = arguments(&scratch.work(), &system, &images, &cli.model);
+/// Codex, at the executable the settings name, asked for a model.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Codex(pub Cli);
 
-    let mut reading = Reading::default();
-    let ran = cli::run(cli, program, scratch, args, cli::message(question).into_bytes(), |line| reading.line(line, on_text)).await?;
-    if let Some(said) = reading.failed.filter(|_| !reading.completed) {
-        return Err(cli.failure(&said));
+impl Codex {
+    pub fn new(path: &str, model: &str) -> Codex {
+        Codex(Cli::new(&PROGRAM, path, model))
     }
-    match reading.text.trim() {
-        "" if reading.completed => Err(ModelError::CliSaidNothing(cli.tool)),
-        "" => Err(cli.ended_without_answer(&ran)),
-        answer => Ok(answer.to_owned()),
+
+    async fn ask(&self, conversation: &Conversation, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<Reply, ModelError> {
+        let cli = &self.0;
+        let (program, scratch) = cli.start(conversation)?;
+        let failed = |e: std::io::Error| cli.failed(e.to_string());
+        let system = scratch.file("system.md", cli::system(conversation).as_bytes()).map_err(failed)?;
+        let mut images = Vec::new();
+        for (number, image) in cli::images(conversation).into_iter().enumerate() {
+            let data = base64::engine::general_purpose::STANDARD.decode(image.data.trim()).map_err(|e| cli.failed(e.to_string()))?;
+            let ending = image.media_type.strip_prefix("image/").unwrap_or("png");
+            images.push(scratch.file(&format!("image-{}.{ending}", number + 1), &data).map_err(failed)?);
+        }
+        let args = arguments(&scratch.work(), &system, &images, &cli.model);
+
+        let mut reading = Reading::default();
+        let ran = cli::run(cli, &program, &scratch, args, cli::message(conversation).into_bytes(), |line| reading.line(line, on_text)).await?;
+        if let Some(said) = reading.failed.filter(|_| !reading.completed) {
+            return Err(cli.failure(&said));
+        }
+        match reading.text.trim() {
+            "" if reading.completed => Err(cli.said_nothing()),
+            "" => Err(cli.ended_without_answer(&ran)),
+            answer => Ok(Reply { text: answer.to_owned(), ..Reply::default() }),
+        }
+    }
+}
+
+impl TextAdapter for Codex {
+    fn can(&self, need: Can) -> bool {
+        // Its answer comes whole, but in as many messages as it writes.
+        matches!(need, Can::Images | Can::Streaming)
+    }
+
+    fn model(&self) -> String {
+        self.0.model.clone()
+    }
+
+    fn step<'a>(&'a self, conversation: &'a Conversation, on_text: &'a mut (dyn FnMut(&str) + Send)) -> Step<'a> {
+        Box::pin(self.ask(conversation, on_text))
     }
 }
 
@@ -168,10 +200,9 @@ impl Reading {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::super::cli::tests::{ask, Stub};
-    use super::super::cli::Tool;
-    use super::super::{Model, PromptImage, Turn};
+    use super::super::{Model, PromptImage, Question, Turn};
     use super::*;
     use serde_json::json;
 
@@ -180,17 +211,17 @@ mod tests {
     const REAL: &str = include_str!("fixtures/codex.jsonl");
 
     fn codex(stub: &Stub, model: &str) -> Model {
-        Model::Cli(Cli::new(Tool::Codex, &stub.path("codex"), model))
+        Model::of(Codex::new(&stub.path("codex"), model))
     }
 
-    fn printing(lines: &str) -> Stub {
+    pub(in super::super) fn printing(lines: &str) -> Stub {
         let stub = Stub::new("codex", "");
         std::fs::write(stub.dir.join("out"), lines).unwrap();
         // It keeps the pictures it was given, which go with the scratch directory.
         stub.then("for arg in \"$@\"; do case \"$arg\" in *image-*) cp \"$arg\" \"$here/\";; esac; done\necho 'Reading prompt from stdin...' >&2\ncat \"$here/out\"")
     }
 
-    fn events(messages: &[&str]) -> String {
+    pub(in super::super) fn events(messages: &[&str]) -> String {
         let mut lines = vec![json!({ "type": "thread.started", "thread_id": "t" }), json!({ "type": "turn.started" })];
         for (number, text) in messages.iter().enumerate() {
             lines.push(json!({ "type": "item.completed", "item": { "id": format!("item_{number}"), "type": "agent_message", "text": text } }));
@@ -260,23 +291,24 @@ mod tests {
         };
         let start = "{\"type\":\"thread.started\",\"thread_id\":\"t\"}\n{\"type\":\"turn.started\"}\n";
         let signed_out = format!("{start}{}\n{}\n", json!({ "type": "error", "message": "unexpected status 401 Unauthorized: Missing bearer or basic authentication in header" }), json!({ "type": "turn.failed", "error": { "message": "unexpected status 401 Unauthorized: Missing bearer or basic authentication in header" } }));
-        assert_eq!(ask_one(&signed_out, ""), Err(ModelError::CliNotSignedIn(Tool::Codex)));
+        let signed_out_said = Err(ModelError::Auth("Codex is not signed in. Run “codex login” in a terminal, then try again.".into()));
+        assert_eq!(ask_one(&signed_out, ""), signed_out_said);
         let unknown = format!("{start}{}\n", json!({ "type": "turn.failed", "error": { "message": "The 'gpt-9' model does not exist." } }));
-        assert_eq!(ask_one(&unknown, ""), Err(ModelError::CliFailed { tool: Tool::Codex, message: "The 'gpt-9' model does not exist.".into() }));
+        assert_eq!(ask_one(&unknown, ""), Err(ModelError::Failed("Codex stopped with an error: The 'gpt-9' model does not exist.".into())));
         // A connection tried again, then answered: the answer stands.
         let retried = format!("{start}{}\n{}", json!({ "type": "error", "message": "Reconnecting... 1/5" }), events(&["fine"]));
         assert_eq!(ask_one(&retried, ""), Ok("fine".into()));
-        assert_eq!(ask_one(&events(&[]), ""), Err(ModelError::CliSaidNothing(Tool::Codex)));
-        assert_eq!(ask_one("", "echo 'Error: Not logged in' >&2; exit 1"), Err(ModelError::CliNotSignedIn(Tool::Codex)));
-        assert_eq!(ask_one("", "echo 'error: unexpected argument --ignore-rules found' >&2; exit 2"), Err(ModelError::CliFailed { tool: Tool::Codex, message: "error: unexpected argument --ignore-rules found".into() }));
-        let missing = Model::Cli(Cli::new(Tool::Codex, "/nonexistent/codex", ""));
-        assert_eq!(ask(&missing, &Question::material("", "x")).0, Err(ModelError::CliNotFound { tool: Tool::Codex, at: "/nonexistent/codex".into() }));
+        assert_eq!(ask_one(&events(&[]), ""), Err(ModelError::Failed("Codex returned no text.".into())));
+        assert_eq!(ask_one("", "echo 'Error: Not logged in' >&2; exit 1"), signed_out_said);
+        assert_eq!(ask_one("", "echo 'error: unexpected argument --ignore-rules found' >&2; exit 2"), Err(ModelError::Failed("Codex stopped with an error: error: unexpected argument --ignore-rules found".into())));
+        let missing = Model::of(Codex::new("/nonexistent/codex", ""));
+        assert_eq!(ask(&missing, &Question::material("", "x")).0, Err(ModelError::NotSetUp("Codex was not found at /nonexistent/codex. Check its executable in Heyo Settings → Models.".into())));
     }
 
     #[cfg(unix)]
     #[test]
     fn calling_an_answer_off_ends_codex_and_what_it_started() {
         let beginning = json!({ "type": "item.completed", "item": { "id": "item_0", "type": "agent_message", "text": "Once" } }).to_string();
-        super::super::cli::tests::calling_off_ends_the_tool_and_its_children(Tool::Codex, "codex", &beginning);
+        super::super::cli::tests::calling_off_ends_the_tool_and_its_children("codex", |path| Model::of(Codex::new(path, "")), &beginning);
     }
 }

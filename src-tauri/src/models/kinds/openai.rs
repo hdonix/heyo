@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use crate::i18n::{marked, t, tf, tn};
 use crate::models::registry::{field, Can, Entry, Field, Provider, KEY, MODELS, URL};
-use crate::models::{address, openai, Address, Model};
+use crate::models::{address, openai, Address, TextAdapter};
 
-use super::{Checked, Known, Missing, ProviderKind, Source, Status};
+use super::{text_can, Checked, Known, Missing, ProviderKind, Source, Status};
 
 pub(crate) const WORD: &str = "openai-compatible";
 
@@ -37,7 +37,7 @@ impl ProviderKind for OpenaiCompatible {
     }
     fn can(&self, provider: &Provider, need: Can) -> bool {
         // Only as private as where the server is.
-        matches!(need, Can::Text | Can::Streaming) || (need == Can::Private && address(provider.get(URL)) == Address::ThisComputer)
+        text_can(self, provider, need) || (need == Can::Private && address(provider.get(URL)) == Address::ThisComputer)
     }
     fn source(&self) -> Source {
         Source::Listed
@@ -75,8 +75,8 @@ impl ProviderKind for OpenaiCompatible {
         let models = self.list(provider)?;
         Ok(Checked { said: tn("The server answers and lists {0} model.", "The server answers and lists {0} models.", models.len() as u64, &[&models.len()]), models: Some(models) })
     }
-    fn text(&self, provider: &Provider, model: &str) -> Option<Model> {
-        Some(Model::Local(openai::Local::new(provider.get(URL), provider.get(KEY), model)))
+    fn text(&self, provider: &Provider, model: &str) -> Option<Box<dyn TextAdapter>> {
+        Some(Box::new(openai::Local::new(provider.get(URL), provider.get(KEY), model)))
     }
     fn api_name(&self) -> &'static str {
         "local"

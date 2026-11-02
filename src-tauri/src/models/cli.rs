@@ -1,16 +1,18 @@
 //! A model reached through a command-line tool on this computer: Claude
 //! Code (`claude`) or Codex (`codex`), each signed in to its maker's
 //! service with the user's own account, which is what it is used for.
-//! What each is told and what it says back is the tool's own
-//! (`claude_code.rs`, `codex.rs`); this is what both share: where the
-//! executable is, and running it once per question.
+//! Each is a text adapter of its own, telling its tool what it is asked
+//! and reading what it says back (`claude_code.rs`, `codex.rs`); this is
+//! what both share: what a tool is called, where its executable is,
+//! running it once per question, and the words of what goes wrong.
 //!
 //! Both are coding agents, and Heyo wants nothing of them but text: each
 //! is run with every tool it has that can be turned off turned off, in an
 //! empty directory of its own, its configuration's extras (instruction
 //! files, MCP servers, hooks, plugins) left out where it allows that, and
 //! the question on its standard input (never on the command line, which
-//! other users can read and which is limited in length).
+//! other users can read and which is limited in length). So neither is
+//! offered tools of Heyo's either: a conversation with tools is refused.
 //!
 //! An answer called off (the future dropped) ends the tool and whatever it
 //! started: it runs as a process group of its own on Unix, and on Windows
@@ -24,67 +26,69 @@ use std::time::{Duration, Instant};
 
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 
-use super::{ModelError, Question};
+use super::text::{Conversation, Part, Turn};
+use super::{ModelError, PromptImage};
+use crate::i18n::tf;
 
-/// Which of the two tools.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Tool {
-    ClaudeCode,
-    Codex,
-}
-
-impl Tool {
+/// A command-line tool, as each adapter declares its own.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct Program {
     /// Its name, as its maker writes it (never translated).
-    pub fn name(self) -> &'static str {
-        match self {
-            Tool::ClaudeCode => "Claude Code",
-            Tool::Codex => "Codex",
-        }
-    }
-
+    pub name: &'static str,
     /// The command it is installed as.
-    pub fn program(self) -> &'static str {
-        match self {
-            Tool::ClaudeCode => "claude",
-            Tool::Codex => "codex",
-        }
-    }
-
+    pub command: &'static str,
     /// What signs in to it, typed in a terminal.
-    pub fn sign_in(self) -> &'static str {
-        match self {
-            Tool::ClaudeCode => "claude auth login",
-            Tool::Codex => "codex login",
-        }
-    }
+    pub sign_in: &'static str,
 }
 
 /// A command-line tool, and the model to ask it for.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Cli {
-    pub(super) tool: Tool,
+    pub(super) program: &'static Program,
     /// The executable the settings name; empty: found (`executable`).
     path: String,
     /// Empty: the tool's own default.
     pub(super) model: String,
 }
 
+impl std::fmt::Debug for Cli {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cli").field("program", &self.program.name).field("path", &self.path).field("model", &self.model).finish()
+    }
+}
+
 impl Cli {
-    pub fn new(tool: Tool, path: &str, model: &str) -> Cli {
-        Cli { tool, path: path.trim().to_owned(), model: model.trim().to_owned() }
+    pub fn new(program: &'static Program, path: &str, model: &str) -> Cli {
+        Cli { program, path: path.trim().to_owned(), model: model.trim().to_owned() }
     }
 
-    pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
-        let program = executable(self.tool, &self.path).ok_or_else(|| ModelError::CliNotFound { tool: self.tool, at: self.path.clone() })?;
-        let scratch = Scratch::new(self.tool).map_err(|e| self.failed(e.to_string()))?;
-        match self.tool {
-            Tool::ClaudeCode => super::claude_code::answer(self, &program, &scratch, question, on_text).await,
-            Tool::Codex => super::codex::answer(self, &program, &scratch, question, on_text).await,
+    /// What a question is asked with: the executable, and a directory of
+    /// its own. A conversation the tool cannot be given is refused.
+    pub(super) fn start(&self, conversation: &Conversation) -> Result<(PathBuf, Scratch), ModelError> {
+        if conversation.has_tools() {
+            return Err(ModelError::Failed(tf("{0} is not given tools.", &[&self.program.name])));
         }
+        let program = executable(self.program, &self.path).ok_or_else(|| self.not_found(&self.path))?;
+        let scratch = Scratch::new(self.program).map_err(|e| self.failed(e.to_string()))?;
+        Ok((program, scratch))
     }
 
+    /// The executable is not where the settings say (`at`), or, with `at`
+    /// empty, was not found.
+    fn not_found(&self, at: &str) -> ModelError {
+        ModelError::NotSetUp(match at {
+            "" => tf("{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models.", &[&self.program.name]),
+            at => tf("{0} was not found at {1}. Check its executable in Heyo Settings → Models.", &[&self.program.name, &at]),
+        })
+    }
+
+    /// The tool failed, and what it said of it.
     pub(super) fn failed(&self, message: impl Into<String>) -> ModelError {
-        ModelError::CliFailed { tool: self.tool, message: message.into() }
+        ModelError::Failed(tf("{0} stopped with an error: {1}", &[&self.program.name, &message.into()]))
+    }
+
+    pub(super) fn said_nothing(&self) -> ModelError {
+        ModelError::Failed(tf("{0} returned no text.", &[&self.program.name]))
     }
 
     /// What went wrong, from what the tool said of it: not being signed
@@ -93,7 +97,7 @@ impl Cli {
         let lower = said.to_lowercase();
         let signed_out = ["not logged in", "please run /login", "run /login", "codex login", "invalid api key", "401 unauthorized", "authentication_failed", "oauth token has expired"];
         if signed_out.iter().any(|sign| lower.contains(sign)) {
-            return ModelError::CliNotSignedIn(self.tool);
+            return ModelError::Auth(tf("{0} is not signed in. Run “{1}” in a terminal, then try again.", &[&self.program.name, &self.program.sign_in]));
         }
         self.failed(said)
     }
@@ -103,9 +107,9 @@ impl Cli {
     pub(super) fn ended_without_answer(&self, ran: &Ran) -> ModelError {
         let said = last_words(&ran.stderr);
         match ran.status {
-            Some(status) if status.success() && said.is_empty() => ModelError::CliSaidNothing(self.tool),
+            Some(status) if status.success() && said.is_empty() => self.said_nothing(),
             Some(status) if said.is_empty() => self.failed(status.to_string()),
-            _ if said.is_empty() => ModelError::CliSaidNothing(self.tool),
+            _ if said.is_empty() => self.said_nothing(),
             _ => self.failure(&said),
         }
     }
@@ -113,11 +117,19 @@ impl Cli {
 
 /// What the tool is given for a question: the system prompt goes beside
 /// it, in a file, as both read it from one.
-pub(super) fn system(question: &Question) -> &str {
+pub(super) fn system(conversation: &Conversation) -> &str {
     // Without one, each would fall back to its coding agent's own.
-    match question.system.trim() {
+    match conversation.system.trim() {
         "" => "You are a helpful assistant.",
-        _ => &question.system,
+        _ => &conversation.system,
+    }
+}
+
+/// The pictures of the user's last message.
+pub(super) fn images(conversation: &Conversation) -> Vec<&PromptImage> {
+    match conversation.turns.last() {
+        Some(Turn::User(parts)) => parts.iter().filter_map(|part| if let Part::Image(image) = part { Some(image) } else { None }).collect(),
+        _ => Vec::new(),
     }
 }
 
@@ -125,31 +137,37 @@ pub(super) fn system(question: &Question) -> &str {
 /// material and not as a request; in a conversation, the turns before it
 /// are written out ahead of it, as neither tool can be handed them as
 /// turns of its own.
-pub(super) fn message(question: &Question) -> String {
-    let Some(history) = &question.history else {
-        return format!("<text>\n{}\n</text>", question.prompt);
+pub(super) fn message(conversation: &Conversation) -> String {
+    let words = |turn: &Turn| match turn {
+        Turn::User(parts) => parts.iter().filter_map(Part::text).collect::<Vec<_>>().join("\n\n"),
+        Turn::Assistant(reply) => reply.text.clone(),
+        Turn::Results(_) => String::new(),
     };
+    let Some((last, history)) = conversation.turns.split_last() else { return String::new() };
+    if conversation.material() {
+        return format!("<text>\n{}\n</text>", words(last));
+    }
     if history.is_empty() {
-        return question.prompt.clone();
+        return words(last);
     }
     let mut said = String::from("The conversation so far:\n\n<conversation>\n");
     for turn in history {
-        let role = if turn.role == "assistant" { "assistant" } else { "user" };
-        said.push_str(&format!("<{role}>\n{}\n</{role}>\n", turn.content));
+        let role = if matches!(turn, Turn::Assistant(_)) { "assistant" } else { "user" };
+        said.push_str(&format!("<{role}>\n{}\n</{role}>\n", words(turn)));
     }
-    said.push_str(&format!("</conversation>\n\nReply to the user's next message:\n\n{}", question.prompt));
+    said.push_str(&format!("</conversation>\n\nReply to the user's next message:\n\n{}", words(last)));
     said
 }
 
 // --- Finding the executable ------------------------------------------------------
 
-/// The executable of `tool`: the one `setting` names (a path, or a command
+/// The executable of `program`: the one `setting` names (a path, or a command
 /// looked for as the tool's own is), else the tool's command on `PATH` or
 /// where its installers put it.
-pub fn executable(tool: Tool, setting: &str) -> Option<PathBuf> {
+pub fn executable(program: &Program, setting: &str) -> Option<PathBuf> {
     let setting = setting.trim();
     if setting.is_empty() {
-        return search(tool.program(), &places());
+        return search(program.command, &places());
     }
     let given = Path::new(setting);
     if given.components().count() > 1 || given.is_absolute() {
@@ -204,28 +222,27 @@ pub struct Found {
     pub version: String,
 }
 
-/// The executable of `tool` and its version, or why there is none to use.
+/// The executable of `program` and its version, or why there is none to use.
 /// Asked on every settings change, so the answer is remembered a while.
-pub fn found(tool: Tool, setting: &str) -> Result<Found, String> {
-    type Cached = std::collections::HashMap<(Tool, String), (Instant, Result<Found, String>)>;
+pub fn found(program: &'static Program, setting: &str) -> Result<Found, String> {
+    type Cached = std::collections::HashMap<(&'static str, String), (Instant, Result<Found, String>)>;
     // Each provider's own: there may be more than one tool, and more than one of each.
     static LAST: std::sync::Mutex<Option<Cached>> = std::sync::Mutex::new(None);
-    let key = (tool, setting.to_owned());
+    let key = (program.command, setting.to_owned());
     if let Some((at, result)) = LAST.lock().unwrap().get_or_insert_with(Default::default).get(&key) {
         if at.elapsed() < Duration::from_secs(60) {
             return result.clone();
         }
     }
-    let result = look(tool, setting);
+    let result = look(program, setting);
     LAST.lock().unwrap().get_or_insert_with(Default::default).insert(key, (Instant::now(), result.clone()));
     result
 }
 
-fn look(tool: Tool, setting: &str) -> Result<Found, String> {
-    use crate::i18n::tf;
-    let Some(path) = executable(tool, setting) else {
+fn look(program: &Program, setting: &str) -> Result<Found, String> {
+    let Some(path) = executable(program, setting) else {
         return Err(match setting.trim() {
-            "" => tf("{0} was not found. Install it, or name its executable here.", &[&tool.name()]),
+            "" => tf("{0} was not found. Install it, or name its executable here.", &[&program.name]),
             named => tf("There is no executable at {0}.", &[&named]),
         });
     };
@@ -259,9 +276,9 @@ fn look(tool: Tool, setting: &str) -> Result<Found, String> {
 pub(super) struct Scratch(PathBuf);
 
 impl Scratch {
-    fn new(tool: Tool) -> std::io::Result<Scratch> {
+    fn new(program: &Program) -> std::io::Result<Scratch> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let dir = std::env::temp_dir().join(format!("heyo-{}-{}-{}", tool.program(), std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+        let dir = std::env::temp_dir().join(format!("heyo-{}-{}-{}", program.command, std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
         let mut builder = std::fs::DirBuilder::new();
         builder.recursive(true);
         // What is asked is nobody else's to read.
@@ -343,7 +360,7 @@ pub(super) async fn run(cli: &Cli, program: &Path, scratch: &Scratch, args: Vec<
         child = command.spawn();
     }
     let child = child.map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => ModelError::CliNotFound { tool: cli.tool, at: program.to_string_lossy().into_owned() },
+        std::io::ErrorKind::NotFound => cli.not_found(&program.to_string_lossy()),
         _ => cli.failed(format!("{}: {e}", program.display())),
     })?;
     let mut child = Running(child);
@@ -414,7 +431,9 @@ pub(super) fn toml_string(value: &str) -> String {
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
-    use crate::models::{Model, Turn};
+    use super::super::claude_code::PROGRAM as CLAUDE_CODE;
+    use super::super::codex::PROGRAM as CODEX;
+    use crate::models::{Model, Question, Turn as Said};
 
     /// A stand-in for a tool: a shell script that keeps its arguments and
     /// what it was given on its standard input beside itself, then does
@@ -488,10 +507,10 @@ pub(super) mod tests {
     /// writes the beginning of an answer, starts a child that would
     /// outlive it, and waits.
     #[cfg(unix)]
-    pub fn calling_off_ends_the_tool_and_its_children(tool: Tool, program: &str, beginning: &str) {
+    pub fn calling_off_ends_the_tool_and_its_children(program: &str, model: impl FnOnce(&str) -> Model, beginning: &str) {
         let body = format!("sleep 300 &\necho $! > \"$here/child\"\necho $$ > \"$here/tool\"\nprintf '%s\\n' '{beginning}'\nwait");
         let stub = Stub::new(program, &body);
-        let model = Model::Cli(Cli::new(tool, &stub.path(program), ""));
+        let model = model(&stub.path(program));
         let (tx, rx) = std::sync::mpsc::channel();
         let asking = tauri::async_runtime::spawn(async move {
             let mut tell = move |text: &str| drop(tx.send(text.to_owned()));
@@ -510,18 +529,27 @@ pub(super) mod tests {
 
     #[test]
     fn text_to_work_on_is_fenced_and_a_conversation_written_out_before_the_message() {
-        assert_eq!(message(&Question::material("Translate.", "hello")), "<text>\nhello\n</text>");
+        let of = |question: &Question| Conversation::of(question);
+        assert_eq!(message(&of(&Question::material("Translate.", "hello"))), "<text>\nhello\n</text>");
         let empty = Question { prompt: "Hi?".into(), history: Some(vec![]), ..Question::default() };
-        assert_eq!(message(&empty), "Hi?");
+        assert_eq!(message(&of(&empty)), "Hi?");
         let going = Question {
             prompt: "And three?".into(),
-            history: Some(vec![Turn { role: "user".into(), content: "One?".into() }, Turn { role: "assistant".into(), content: "1.".into() }]),
+            history: Some(vec![Said { role: "user".into(), content: "One?".into() }, Said { role: "assistant".into(), content: "1.".into() }]),
             ..Question::default()
         };
-        assert_eq!(message(&going), "The conversation so far:\n\n<conversation>\n<user>\nOne?\n</user>\n<assistant>\n1.\n</assistant>\n</conversation>\n\nReply to the user's next message:\n\nAnd three?");
+        assert_eq!(message(&of(&going)), "The conversation so far:\n\n<conversation>\n<user>\nOne?\n</user>\n<assistant>\n1.\n</assistant>\n</conversation>\n\nReply to the user's next message:\n\nAnd three?");
         // Neither tool is left to its coding agent's own instructions.
-        assert_eq!(system(&Question::material("  ", "x")), "You are a helpful assistant.");
-        assert_eq!(system(&Question::material("Be brief.", "x")), "Be brief.");
+        assert_eq!(system(&of(&Question::material("  ", "x"))), "You are a helpful assistant.");
+        assert_eq!(system(&of(&Question::material("Be brief.", "x"))), "Be brief.");
+    }
+
+    #[test]
+    fn neither_tool_is_offered_tools_of_heyos() {
+        let mut conversation = Conversation::of(&Question::material("", "x"));
+        conversation.tools.push(crate::models::text::ToolSpec { name: "clock".into(), description: "The time.".into(), input_schema: serde_json::json!({ "type": "object" }) });
+        let refused = Cli::new(&CODEX, "/nonexistent/codex", "").start(&conversation).err();
+        assert_eq!(refused, Some(ModelError::Failed("Codex is not given tools.".into())));
     }
 
     #[test]
@@ -542,8 +570,8 @@ pub(super) mod tests {
         std::fs::write(stub.dir.join("codex"), "").unwrap();
         assert_eq!(search("codex", &places), None);
         // Named by a path, it is that file or nothing.
-        assert_eq!(executable(Tool::ClaudeCode, &stub.path("claude")), Some(stub.dir.join("claude")));
-        assert_eq!(executable(Tool::ClaudeCode, &stub.path("missing")), None);
+        assert_eq!(executable(&CLAUDE_CODE, &stub.path("claude")), Some(stub.dir.join("claude")));
+        assert_eq!(executable(&CLAUDE_CODE, &stub.path("missing")), None);
     }
 
     #[cfg(unix)]
@@ -551,10 +579,10 @@ pub(super) mod tests {
     fn the_settings_are_shown_the_executable_and_its_version_or_why_there_is_none() {
         let stub = Stub::new("claude", "");
         std::fs::write(stub.dir.join("claude"), "#!/bin/sh\necho '2.1.302 (Claude Code)'\n").unwrap();
-        assert_eq!(look(Tool::ClaudeCode, &stub.path("claude")), Ok(Found { path: stub.path("claude"), version: "2.1.302 (Claude Code)".into() }));
-        assert_eq!(look(Tool::ClaudeCode, "/nonexistent/claude"), Err("There is no executable at /nonexistent/claude.".into()));
+        assert_eq!(look(&CLAUDE_CODE, &stub.path("claude")), Ok(Found { path: stub.path("claude"), version: "2.1.302 (Claude Code)".into() }));
+        assert_eq!(look(&CLAUDE_CODE, "/nonexistent/claude"), Err("There is no executable at /nonexistent/claude.".into()));
         std::fs::write(stub.dir.join("claude"), "#!/bin/sh\nexit 3\n").unwrap();
-        assert_eq!(look(Tool::ClaudeCode, &stub.path("claude")), Err(format!("{} --version failed", stub.path("claude"))));
+        assert_eq!(look(&CLAUDE_CODE, &stub.path("claude")), Err(format!("{} --version failed", stub.path("claude"))));
     }
 
     #[test]
@@ -566,9 +594,14 @@ pub(super) mod tests {
 
     #[test]
     fn being_signed_out_is_told_from_other_failures() {
-        let cli = Cli::new(Tool::Codex, "", "");
-        assert_eq!(cli.failure("unexpected status 401 Unauthorized: Missing bearer"), ModelError::CliNotSignedIn(Tool::Codex));
-        assert_eq!(cli.failure("Not logged in · Please run /login"), ModelError::CliNotSignedIn(Tool::Codex));
-        assert_eq!(cli.failure("model 'gpt-9' does not exist"), ModelError::CliFailed { tool: Tool::Codex, message: "model 'gpt-9' does not exist".into() });
+        let cli = Cli::new(&CODEX, "", "");
+        let signed_out = ModelError::Auth("Codex is not signed in. Run “codex login” in a terminal, then try again.".into());
+        assert_eq!(cli.failure("unexpected status 401 Unauthorized: Missing bearer"), signed_out);
+        assert_eq!(cli.failure("Not logged in · Please run /login"), signed_out);
+        assert_eq!(cli.failure("model 'gpt-9' does not exist"), ModelError::Failed("Codex stopped with an error: model 'gpt-9' does not exist".into()));
+        let claude_code = Cli::new(&CLAUDE_CODE, "", "");
+        assert_eq!(claude_code.failure("Not logged in").to_string(), "Claude Code is not signed in. Run “claude auth login” in a terminal, then try again.");
+        assert_eq!(claude_code.not_found("").to_string(), "Claude Code is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models.");
+        assert_eq!(cli.not_found("/opt/codex"), ModelError::NotSetUp("Codex was not found at /opt/codex. Check its executable in Heyo Settings → Models.".into()));
     }
 }

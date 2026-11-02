@@ -183,7 +183,8 @@ mod tests {
             assert!(refused.contains("only a model on this computer"), "{refused}");
         }
         for url in ["http://127.0.0.1:8000/v1", "http://localhost:11434/v1"] {
-            assert_eq!(local_only(&with(vec![server("near", url)], ModelRef::to("near", "tiny"))), Ok(Model::local(url, "tiny")));
+            let near = local_only(&with(vec![server("near", url)], ModelRef::to("near", "tiny"))).unwrap();
+            assert_eq!(format!("{near:?}"), format!("{:?}", Model::local(url, "tiny")));
         }
         // Claude's API, and a command-line tool, which runs here but answers
         // from its maker's service: never the one asked.

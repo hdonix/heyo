@@ -1,5 +1,6 @@
 //! Claude through Claude Code (`claude`), signed in with the user's
-//! Claude account: one of the adapters of `models`, through `cli.rs`.
+//! Claude account: a text adapter of `models`, through `cli.rs`. It is
+//! offered no tools of Heyo's, and has none of its own.
 //!
 //! It is run once per question, as Claude Code 2.1's `--help` says:
 //!
@@ -38,25 +39,56 @@ use std::path::Path;
 
 use serde_json::{json, Value};
 
-use super::cli::{self, Cli, Scratch};
-use super::{ModelError, Question};
+use super::cli::{self, Cli, Program};
+use super::registry::Can;
+use super::text::{Conversation, Reply, Step, TextAdapter};
+use super::ModelError;
+use crate::i18n::t;
 
-pub(super) async fn answer(cli: &Cli, program: &Path, scratch: &Scratch, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
-    let system = scratch.file("system.md", cli::system(question).as_bytes()).map_err(|e| cli.failed(e.to_string()))?;
-    let args = arguments(&system, &cli.model);
-    let mut stdin = input(question).to_string();
-    stdin.push('\n');
+pub(crate) const PROGRAM: Program = Program { name: "Claude Code", command: "claude", sign_in: "claude auth login" };
 
-    let mut reading = Reading::default();
-    let ran = cli::run(cli, program, scratch, args, stdin.into_bytes(), |line| reading.line(line, on_text)).await?;
-    if let Some(said) = reading.failed {
-        return Err(cli.failure(&said));
+/// Claude Code, at the executable the settings name, asked for a model.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClaudeCode(pub Cli);
+
+impl ClaudeCode {
+    pub fn new(path: &str, model: &str) -> ClaudeCode {
+        ClaudeCode(Cli::new(&PROGRAM, path, model))
     }
-    match reading.end {
-        Some(End::Declined) => Err(ModelError::Declined),
-        _ if !reading.text.trim().is_empty() => Ok(reading.text.trim().to_owned()),
-        Some(End::Answered) => Err(ModelError::CliSaidNothing(cli.tool)),
-        None => Err(cli.ended_without_answer(&ran)),
+
+    async fn ask(&self, conversation: &Conversation, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<Reply, ModelError> {
+        let cli = &self.0;
+        let (program, scratch) = cli.start(conversation)?;
+        let system = scratch.file("system.md", cli::system(conversation).as_bytes()).map_err(|e| cli.failed(e.to_string()))?;
+        let args = arguments(&system, &cli.model);
+        let mut stdin = input(conversation).to_string();
+        stdin.push('\n');
+
+        let mut reading = Reading::default();
+        let ran = cli::run(cli, &program, &scratch, args, stdin.into_bytes(), |line| reading.line(line, on_text)).await?;
+        if let Some(said) = reading.failed {
+            return Err(cli.failure(&said));
+        }
+        match reading.end {
+            Some(End::Declined) => Err(ModelError::Refused(t("Claude declined this request.").into())),
+            _ if !reading.text.trim().is_empty() => Ok(Reply { text: reading.text.trim().to_owned(), ..Reply::default() }),
+            Some(End::Answered) => Err(cli.said_nothing()),
+            None => Err(cli.ended_without_answer(&ran)),
+        }
+    }
+}
+
+impl TextAdapter for ClaudeCode {
+    fn can(&self, need: Can) -> bool {
+        matches!(need, Can::Images | Can::Streaming)
+    }
+
+    fn model(&self) -> String {
+        self.0.model.clone()
+    }
+
+    fn step<'a>(&'a self, conversation: &'a Conversation, on_text: &'a mut (dyn FnMut(&str) + Send)) -> Step<'a> {
+        Box::pin(self.ask(conversation, on_text))
     }
 }
 
@@ -74,9 +106,9 @@ fn arguments(system: &Path, model: &str) -> Vec<OsString> {
 }
 
 /// The user message, as a line of stream-json input: the pictures, then the text.
-fn input(question: &Question) -> Value {
-    let mut content: Vec<Value> = question.images.iter().map(|image| json!({ "type": "image", "source": { "type": "base64", "media_type": image.media_type, "data": image.data } })).collect();
-    content.push(json!({ "type": "text", "text": cli::message(question) }));
+fn input(conversation: &Conversation) -> Value {
+    let mut content: Vec<Value> = cli::images(conversation).into_iter().map(|image| json!({ "type": "image", "source": { "type": "base64", "media_type": image.media_type, "data": image.data } })).collect();
+    content.push(json!({ "type": "text", "text": cli::message(conversation) }));
     json!({ "type": "user", "session_id": "", "parent_tool_use_id": null, "message": { "role": "user", "content": content } })
 }
 
@@ -160,10 +192,9 @@ impl Reading {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::super::cli::tests::{ask, Stub};
-    use super::super::cli::Tool;
-    use super::super::{Model, PromptImage, Turn};
+    use super::super::{Model, PromptImage, Question, Turn};
     use super::*;
 
     /// What Claude Code 2.1.302 wrote when asked, with these very
@@ -171,22 +202,22 @@ mod tests {
     const REAL: &str = include_str!("fixtures/claude-code.jsonl");
 
     fn claude(stub: &Stub) -> Model {
-        Model::Cli(Cli::new(Tool::ClaudeCode, &stub.path("claude"), ""))
+        Model::of(ClaudeCode::new(&stub.path("claude"), ""))
     }
 
     /// A stub that prints `lines`.
-    fn printing(lines: &[String]) -> Stub {
+    pub(in super::super) fn printing(lines: &[String]) -> Stub {
         let stub = Stub::new("claude", "");
         std::fs::write(stub.dir.join("out"), lines.join("\n") + "\n").unwrap();
         stub.then("cat \"$here/out\"")
     }
 
-    fn stream(event: Value) -> String {
+    pub(in super::super) fn stream(event: Value) -> String {
         json!({ "type": "stream_event", "event": event, "session_id": "s", "parent_tool_use_id": null }).to_string()
     }
 
     /// An answer as Claude Code streams it: `pieces` of text.
-    fn answer_lines(pieces: &[&str], stop: &str) -> Vec<String> {
+    pub(in super::super) fn answer_lines(pieces: &[&str], stop: &str) -> Vec<String> {
         let mut lines = vec![json!({ "type": "system", "subtype": "init", "tools": [], "mcp_servers": [] }).to_string()];
         lines.push(stream(json!({ "type": "message_start", "message": { "model": "claude-opus-4-8", "content": [] } })));
         lines.push(stream(json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "text", "text": "" } })));
@@ -253,7 +284,7 @@ mod tests {
             history: Some(vec![Turn { role: "user".into(), content: "One?".into() }, Turn { role: "assistant".into(), content: "1.".into() }]),
             ..Question::default()
         };
-        let model = Model::Cli(Cli::new(Tool::ClaudeCode, &stub.path("claude"), "sonnet"));
+        let model = Model::of(ClaudeCode::new(&stub.path("claude"), "sonnet"));
         assert_eq!(ask(&model, &question).0, Ok("3.".into()));
         assert_eq!(stub.args()[21..], ["--model", "sonnet"]);
         let given: Value = serde_json::from_str(stub.stdin().trim()).unwrap();
@@ -283,25 +314,25 @@ mod tests {
             json!({ "type": "assistant", "message": { "content": [{ "type": "text", "text": "Not logged in · Please run /login" }] }, "error": "authentication_failed" }).to_string(),
             json!({ "type": "result", "subtype": "success", "is_error": true, "result": "Not logged in · Please run /login" }).to_string(),
         ];
-        assert_eq!(ask_one(signed_out, ""), Err(ModelError::CliNotSignedIn(Tool::ClaudeCode)));
+        assert_eq!(ask_one(signed_out, ""), Err(ModelError::Auth("Claude Code is not signed in. Run “claude auth login” in a terminal, then try again.".into())));
         let api = vec![json!({ "type": "result", "subtype": "success", "is_error": true, "result": "API Error: 529 Overloaded" }).to_string()];
-        assert_eq!(ask_one(api, ""), Err(ModelError::CliFailed { tool: Tool::ClaudeCode, message: "API Error: 529 Overloaded".into() }));
+        assert_eq!(ask_one(api, ""), Err(ModelError::Failed("Claude Code stopped with an error: API Error: 529 Overloaded".into())));
         let turns = vec![json!({ "type": "result", "subtype": "error_max_turns", "is_error": true, "errors": ["Reached maximum number of turns"] }).to_string()];
-        assert_eq!(ask_one(turns, ""), Err(ModelError::CliFailed { tool: Tool::ClaudeCode, message: "Reached maximum number of turns".into() }));
-        assert_eq!(ask_one(answer_lines(&["I can't"], "refusal"), ""), Err(ModelError::Declined));
-        assert_eq!(ask_one(answer_lines(&[" "], "end_turn"), ""), Err(ModelError::CliSaidNothing(Tool::ClaudeCode)));
+        assert_eq!(ask_one(turns, ""), Err(ModelError::Failed("Claude Code stopped with an error: Reached maximum number of turns".into())));
+        assert_eq!(ask_one(answer_lines(&["I can't"], "refusal"), ""), Err(ModelError::Refused("Claude declined this request.".into())));
+        assert_eq!(ask_one(answer_lines(&[" "], "end_turn"), ""), Err(ModelError::Failed("Claude Code returned no text.".into())));
         // It ended with nothing on its standard output.
-        assert_eq!(ask_one(vec![], "echo 'error: unknown option --safe-mode' >&2; exit 1"), Err(ModelError::CliFailed { tool: Tool::ClaudeCode, message: "error: unknown option --safe-mode".into() }));
-        assert_eq!(ask_one(vec![], "exit 0"), Err(ModelError::CliSaidNothing(Tool::ClaudeCode)));
+        assert_eq!(ask_one(vec![], "echo 'error: unknown option --safe-mode' >&2; exit 1"), Err(ModelError::Failed("Claude Code stopped with an error: error: unknown option --safe-mode".into())));
+        assert_eq!(ask_one(vec![], "exit 0"), Err(ModelError::Failed("Claude Code returned no text.".into())));
         // Not there at all.
-        let missing = Model::Cli(Cli::new(Tool::ClaudeCode, "/nonexistent/claude", ""));
-        assert_eq!(ask(&missing, &Question::material("", "x")).0, Err(ModelError::CliNotFound { tool: Tool::ClaudeCode, at: "/nonexistent/claude".into() }));
+        let missing = Model::of(ClaudeCode::new("/nonexistent/claude", ""));
+        assert_eq!(ask(&missing, &Question::material("", "x")).0, Err(ModelError::NotSetUp("Claude Code was not found at /nonexistent/claude. Check its executable in Heyo Settings → Models.".into())));
     }
 
     #[cfg(unix)]
     #[test]
     fn calling_an_answer_off_ends_claude_code_and_what_it_started() {
         let beginning = stream(json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": "Once" } }));
-        super::super::cli::tests::calling_off_ends_the_tool_and_its_children(Tool::ClaudeCode, "claude", &beginning);
+        super::super::cli::tests::calling_off_ends_the_tool_and_its_children("claude", |path| Model::of(ClaudeCode::new(path, "")), &beginning);
     }
 }

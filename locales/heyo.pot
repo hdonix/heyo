@@ -805,6 +805,59 @@ msgstr ""
 msgid "Refresh"
 msgstr ""
 
+#: src-tauri/src/models/claude.rs
+msgid "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."
+msgstr ""
+
+#: src-tauri/src/models/claude.rs
+msgid "The Claude API key is invalid. Check it in Heyo Settings → Models."
+msgstr ""
+
+#: src-tauri/src/models/claude.rs
+msgid "Claude's rate limit was reached. Try again shortly."
+msgstr ""
+
+#: src-tauri/src/models/claude.rs
+msgid "Could not reach the Claude API."
+msgstr ""
+
+#: src-tauri/src/models/claude.rs
+msgid "Claude API error {0}: {1}"
+msgstr ""
+
+#: src-tauri/src/models/claude.rs
+#: src-tauri/src/models/claude_code.rs
+msgid "Claude declined this request."
+msgstr ""
+
+#: src-tauri/src/models/claude.rs
+msgid "Claude returned no text."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} is not given tools."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Models."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} stopped with an error: {1}"
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} returned no text."
+msgstr ""
+
+#: src-tauri/src/models/cli.rs
+msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
+msgstr ""
+
 #: src-tauri/src/models/cli.rs
 msgid "{0} was not found. Install it, or name its executable here."
 msgstr ""
@@ -1145,78 +1198,6 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src-tauri/src/models/mod.rs
-msgid "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "The Claude API key is invalid. Check it in Heyo Settings → Models."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude's rate limit was reached. Try again shortly."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "Could not reach the Claude API."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude API error {0}: {1}"
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude declined this request."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "Claude returned no text."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)"
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "The local model answered with an error ({0}): {1}"
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "The local model is not given images."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "The local server lists no models."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "The local model returned no text."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "the server did not answer with a model list"
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} was not found at {1}. Check its executable in Heyo Settings → Models."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} is not signed in. Run “{1}” in a terminal, then try again."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} stopped with an error: {1}"
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
-msgid "{0} returned no text."
-msgstr ""
-
-#: src-tauri/src/models/mod.rs
 msgid "No model is chosen for this. Choose one in Heyo Settings."
 msgstr ""
 
@@ -1230,6 +1211,30 @@ msgstr ""
 
 #: src-tauri/src/models/mod.rs
 msgid "{0} is not set up: {1} (Heyo Settings → Models)"
+msgstr ""
+
+#: src-tauri/src/models/openai.rs
+msgid "Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)"
+msgstr ""
+
+#: src-tauri/src/models/openai.rs
+msgid "the server did not answer with a model list"
+msgstr ""
+
+#: src-tauri/src/models/openai.rs
+msgid "The local model is not given images."
+msgstr ""
+
+#: src-tauri/src/models/openai.rs
+msgid "The local server lists no models."
+msgstr ""
+
+#: src-tauri/src/models/openai.rs
+msgid "The local model returned no text."
+msgstr ""
+
+#: src-tauri/src/models/openai.rs
+msgid "The local model answered with an error ({0}): {1}"
 msgstr ""
 
 #: src-tauri/src/models/registry.rs

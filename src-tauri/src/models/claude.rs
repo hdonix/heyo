@@ -1,10 +1,14 @@
-//! Claude, through Anthropic's Messages API over HTTPS: one of the two
-//! adapters of `models`. There is no SDK for Rust; the request and the
-//! events of its answer are the API's own (streamed as server-sent events).
+//! Claude, through Anthropic's Messages API over HTTPS: a text adapter of
+//! `models`. There is no SDK for Rust; the request and the events of its
+//! answer are the API's own (streamed as server-sent events), tools and
+//! their calls (`tool_use`, `tool_result`) among them.
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
-use super::{ModelError, Question};
+use super::registry::Can;
+use super::text::{Conversation, Part, Reply, Step, TextAdapter, ToolCall, Turn};
+use super::ModelError;
+use crate::i18n::{t, tf};
 
 /// The Claude model that answers when Claude is the provider.
 pub const CLAUDE_MODEL: &str = "claude-opus-5-5";
@@ -19,7 +23,7 @@ const OAUTH: &str = "oauth-2025-04-20";
 
 /// What Claude is asked with.
 #[derive(Clone, PartialEq)]
-enum Credential {
+pub(super) enum Credential {
     /// An API key (`x-api-key`).
     Key(String),
     /// A short-lived token of the user's own sign-in (`ant auth login`).
@@ -41,6 +45,30 @@ impl std::fmt::Debug for Claude {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Claude").field("key", &if self.key.is_empty() { "none" } else { "set" }).finish()
     }
+}
+
+// The failures, in the words the user is told them in.
+
+fn not_set_up() -> ModelError {
+    ModelError::NotSetUp(t("Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model.").into())
+}
+
+fn invalid_key() -> ModelError {
+    ModelError::Auth(t("The Claude API key is invalid. Check it in Heyo Settings → Models.").into())
+}
+
+fn rate_limited() -> ModelError {
+    ModelError::RateLimited(t("Claude's rate limit was reached. Try again shortly.").into())
+}
+
+fn unreachable() -> ModelError {
+    ModelError::Unreachable(t("Could not reach the Claude API.").into())
+}
+
+/// The API answered with an error: its status (or the kind of error, for
+/// one in the middle of an answer), and what it said.
+fn api_error(status: &str, message: &str) -> ModelError {
+    ModelError::Failed(tf("Claude API error {0}: {1}", &[&status, &message]))
 }
 
 impl Claude {
@@ -88,131 +116,260 @@ impl Claude {
 
     /// Whether the API takes the credential, at no cost: the list of models.
     pub async fn check(&self) -> Result<(), ModelError> {
-        let credential = self.credential().await.ok_or(ModelError::NotSetUp)?;
+        let credential = self.credential().await.ok_or_else(not_set_up)?;
         let request = super::client(false).get(format!("{}/v1/models?limit=1", self.base())).header("anthropic-version", VERSION).timeout(std::time::Duration::from_secs(10));
         let request = match &credential {
             Credential::Key(key) => request.header("x-api-key", key),
             Credential::Token(token) => request.bearer_auth(token).header("anthropic-beta", OAUTH),
         };
-        let response = request.send().await.map_err(|_| ModelError::ClaudeUnreachable)?;
+        let response = request.send().await.map_err(|_| unreachable())?;
         match response.status().as_u16() {
             200..=299 => Ok(()),
-            401 | 403 => Err(ModelError::InvalidKey),
-            429 => Err(ModelError::RateLimited),
-            code => Err(ModelError::Claude { status: code.to_string(), message: response.status().canonical_reason().unwrap_or_default().to_owned() }),
+            401 | 403 => Err(invalid_key()),
+            429 => Err(rate_limited()),
+            code => Err(api_error(&code.to_string(), response.status().canonical_reason().unwrap_or_default())),
         }
     }
 
-    pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
-        let credential = self.credential().await.ok_or(ModelError::NotSetUp)?;
+    async fn ask(&self, conversation: &Conversation, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<Reply, ModelError> {
+        let credential = self.credential().await.ok_or_else(not_set_up)?;
         let request = super::client(false).post(format!("{}/v1/messages", self.base())).header("content-type", "application/json").header("anthropic-version", VERSION);
         let request = match &credential {
             Credential::Key(key) => request.header("x-api-key", key).header("anthropic-beta", FALLBACK),
             Credential::Token(token) => request.bearer_auth(token).header("anthropic-beta", format!("{FALLBACK},{OAUTH}")),
         };
-        let response = request.body(body(question).to_string()).send().await.map_err(|_| ModelError::ClaudeUnreachable)?;
+        let response = request.body(body(conversation).to_string()).send().await.map_err(|_| unreachable())?;
         let status = response.status();
         if !status.is_success() {
             let said: Value = serde_json::from_str(&response.text().await.unwrap_or_default()).unwrap_or_default();
             let message = said["error"]["message"].as_str().unwrap_or(status.canonical_reason().unwrap_or_default()).to_owned();
             return Err(match status.as_u16() {
-                401 => ModelError::InvalidKey,
-                429 => ModelError::RateLimited,
-                code => ModelError::Claude { status: code.to_string(), message },
+                401 => invalid_key(),
+                429 => rate_limited(),
+                code => api_error(&code.to_string(), &message),
             });
         }
 
-        let (mut text, mut stop, mut failed) = (String::new(), None, None);
-        let read = super::events(response, |data| {
-            let Ok(event) = serde_json::from_str::<Value>(data) else { return true };
-            match event["type"].as_str().unwrap_or_default() {
-                // The text of every text block, in order: after a fallback
-                // mid-answer, the other model goes on from what was written.
-                "content_block_delta" if event["delta"]["type"] == "text_delta" => {
-                    text.push_str(event["delta"]["text"].as_str().unwrap_or_default());
-                    on_text(&text);
-                }
-                "message_delta" => {
-                    if let Some(reason) = event["delta"]["stop_reason"].as_str() {
-                        stop = Some(reason.to_owned());
-                    }
-                }
-                "message_stop" => return false,
-                "error" => {
-                    let error = &event["error"];
-                    failed = Some(match error["type"].as_str() {
-                        Some("rate_limit_error") => ModelError::RateLimited,
-                        kind => ModelError::Claude { status: kind.unwrap_or("error").to_owned(), message: error["message"].as_str().unwrap_or_default().to_owned() },
-                    });
-                    return false;
-                }
-                _ => {}
-            }
-            true
-        })
-        .await;
-        read.map_err(|_| ModelError::ClaudeUnreachable)?;
-        if let Some(failure) = failed {
-            return Err(failure);
-        }
-        // The fallback declined too, or there was none to ask.
-        if stop.as_deref() == Some("refusal") {
-            return Err(ModelError::Declined);
-        }
-        match text.trim() {
-            "" => Err(ModelError::ClaudeSaidNothing),
-            answer => Ok(answer.to_owned()),
-        }
+        let mut reading = Reading::default();
+        let read = super::events(response, |data| reading.event(data, on_text)).await;
+        read.map_err(|_| unreachable())?;
+        reading.reply()
     }
 }
 
-/// The request for a question.
-fn body(question: &Question) -> Value {
-    // Text to work on is fenced, so that it reads as material and not as a
-    // message; a conversation is sent as it is.
-    let prompt = match question.history {
-        Some(_) => question.prompt.clone(),
-        None => format!("<text>\n{}\n</text>", question.prompt),
-    };
-    let content = match question.images.as_slice() {
-        [] => json!(prompt),
-        images => {
-            let mut blocks: Vec<Value> = images.iter().map(|image| json!({ "type": "image", "source": { "type": "base64", "media_type": image.media_type, "data": image.data } })).collect();
-            blocks.push(json!({ "type": "text", "text": prompt }));
-            json!(blocks)
+impl TextAdapter for Claude {
+    fn can(&self, need: Can) -> bool {
+        matches!(need, Can::Images | Can::Streaming | Can::ToolCalls)
+    }
+
+    fn model(&self) -> String {
+        CLAUDE_MODEL.into()
+    }
+
+    fn step<'a>(&'a self, conversation: &'a Conversation, on_text: &'a mut (dyn FnMut(&str) + Send)) -> Step<'a> {
+        Box::pin(self.ask(conversation, on_text))
+    }
+}
+
+/// What has been read of the events of an answer so far.
+#[derive(Default)]
+struct Reading {
+    /// Its content blocks as they are written, by their index: thinking,
+    /// text, tool calls (with the JSON of their input still in pieces).
+    blocks: Vec<(Value, String)>,
+    /// The text of every text block, in order: after a fallback
+    /// mid-answer, the other model goes on from what was written.
+    text: String,
+    stop: Option<String>,
+    failed: Option<ModelError>,
+}
+
+impl Reading {
+    /// Takes in one event; false once there is nothing more to wait for.
+    fn event(&mut self, data: &str, on_text: &mut (dyn FnMut(&str) + Send)) -> bool {
+        let Ok(event) = serde_json::from_str::<Value>(data) else { return true };
+        let index = event["index"].as_u64().unwrap_or_default() as usize;
+        match event["type"].as_str().unwrap_or_default() {
+            "content_block_start" => {
+                if self.blocks.len() <= index {
+                    self.blocks.resize(index + 1, (Value::Null, String::new()));
+                }
+                self.blocks[index] = (event["content_block"].clone(), String::new());
+            }
+            "content_block_delta" => {
+                let delta = &event["delta"];
+                if delta["type"] == "text_delta" {
+                    self.text.push_str(delta["text"].as_str().unwrap_or_default());
+                    on_text(&self.text);
+                }
+                let Some((block, input)) = self.blocks.get_mut(index) else { return true };
+                match delta["type"].as_str().unwrap_or_default() {
+                    "input_json_delta" => input.push_str(delta["partial_json"].as_str().unwrap_or_default()),
+                    // A piece of the block's text, thinking or signature,
+                    // added to the field of the same name, so that the
+                    // block can be sent back as it was written.
+                    _ => {
+                        if let (Some(fields), Some(block)) = (delta.as_object(), block.as_object_mut()) {
+                            for (name, piece) in fields.iter().filter(|(name, _)| *name != "type") {
+                                let Some(piece) = piece.as_str() else { continue };
+                                let so_far = block.get(name).and_then(Value::as_str).unwrap_or_default();
+                                block.insert(name.clone(), json!(format!("{so_far}{piece}")));
+                            }
+                        }
+                    }
+                }
+            }
+            "content_block_stop" => {
+                if let Some((block, input)) = self.blocks.get_mut(index).filter(|(block, _)| block["type"] == "tool_use") {
+                    if !input.is_empty() {
+                        block["input"] = serde_json::from_str(input).unwrap_or_else(|_| json!(input));
+                    }
+                }
+            }
+            "message_delta" => {
+                if let Some(reason) = event["delta"]["stop_reason"].as_str() {
+                    self.stop = Some(reason.to_owned());
+                }
+            }
+            "message_stop" => return false,
+            "error" => {
+                let error = &event["error"];
+                self.failed = Some(match error["type"].as_str() {
+                    Some("rate_limit_error") => rate_limited(),
+                    kind => api_error(kind.unwrap_or("error"), error["message"].as_str().unwrap_or_default()),
+                });
+                return false;
+            }
+            _ => {}
         }
-    };
-    let mut messages: Vec<Value> = question.history.iter().flatten().map(|turn| json!({ "role": turn.role, "content": turn.content })).collect();
-    messages.push(json!({ "role": "user", "content": content }));
+        true
+    }
+
+    /// The turn it was, or why there is none.
+    fn reply(self) -> Result<Reply, ModelError> {
+        if let Some(failure) = self.failed {
+            return Err(failure);
+        }
+        // The fallback declined too, or there was none to ask.
+        if self.stop.as_deref() == Some("refusal") {
+            return Err(ModelError::Refused(t("Claude declined this request.").into()));
+        }
+        let blocks: Vec<Value> = self.blocks.into_iter().map(|(block, _)| block).filter(|block| !block.is_null()).collect();
+        let calls: Vec<ToolCall> = blocks
+            .iter()
+            .filter(|block| block["type"] == "tool_use")
+            .map(|block| ToolCall { id: block["id"].as_str().unwrap_or_default().into(), name: block["name"].as_str().unwrap_or_default().into(), input: block["input"].clone() })
+            .collect();
+        let text = self.text.trim().to_owned();
+        if text.is_empty() && calls.is_empty() {
+            return Err(ModelError::Failed(t("Claude returned no text.").into()));
+        }
+        Ok(Reply { text, calls, replay: Some(Value::Array(blocks)) })
+    }
+}
+
+/// The request for a step of a conversation.
+fn body(conversation: &Conversation) -> Value {
+    let messages: Vec<Value> = conversation.turns.iter().map(message).collect();
     // No temperature: this model takes none.
-    json!({
+    let mut body = json!({
         "model": CLAUDE_MODEL,
         "max_tokens": 64000,
         // Heyo asks for short rewriting and explaining; answer quickly.
         "output_config": { "effort": "low" },
         "fallbacks": "default",
-        "system": question.system,
+        "system": conversation.system,
         "messages": messages,
         "stream": true,
-    })
+    });
+    if !conversation.tools.is_empty() {
+        // Their input arrives whole and checked against its schema
+        // (`eager_input_streaming` stays off): nothing here would answer
+        // input that is not.
+        let tools: Vec<Value> = conversation.tools.iter().map(|tool| json!({ "name": tool.name, "description": tool.description, "input_schema": tool.input_schema })).collect();
+        body["tools"] = json!(tools);
+    }
+    body
+}
+
+/// A turn as a message of the API.
+fn message(turn: &Turn) -> Value {
+    match turn {
+        Turn::User(parts) => {
+            let content = match parts.as_slice() {
+                // Text alone goes as a string.
+                [part] if part.text().is_some() => json!(said(part)),
+                parts => json!(parts
+                    .iter()
+                    .map(|part| match part {
+                        Part::Image(image) => json!({ "type": "image", "source": { "type": "base64", "media_type": image.media_type, "data": image.data } }),
+                        text => json!({ "type": "text", "text": said(text) }),
+                    })
+                    .collect::<Vec<_>>()),
+            };
+            json!({ "role": "user", "content": content })
+        }
+        Turn::Assistant(reply) => {
+            // As the API wrote it, thinking and all; else from its parts.
+            let content = match &reply.replay {
+                Some(blocks) => blocks.clone(),
+                None if reply.calls.is_empty() => json!(reply.text),
+                None => {
+                    let mut blocks: Vec<Value> = Some(&reply.text).filter(|text| !text.is_empty()).map(|text| json!({ "type": "text", "text": text })).into_iter().collect();
+                    blocks.extend(reply.calls.iter().map(|call| json!({ "type": "tool_use", "id": call.id, "name": call.name, "input": call.input })));
+                    json!(blocks)
+                }
+            };
+            json!({ "role": "assistant", "content": content })
+        }
+        // All of a turn's results in one message.
+        Turn::Results(results) => {
+            let blocks: Vec<Value> = results
+                .iter()
+                .map(|result| {
+                    let mut block = Map::new();
+                    block.insert("type".into(), json!("tool_result"));
+                    block.insert("tool_use_id".into(), json!(result.call));
+                    block.insert("content".into(), json!(result.content));
+                    if result.failed {
+                        block.insert("is_error".into(), json!(true));
+                    }
+                    Value::Object(block)
+                })
+                .collect();
+            json!({ "role": "user", "content": blocks })
+        }
+    }
+}
+
+/// The words of a part: text to work on is fenced, so that it reads as
+/// material and not as a message.
+fn said(part: &Part) -> String {
+    match part {
+        Part::Material(text) => format!("<text>\n{text}\n</text>"),
+        part => part.text().unwrap_or_default().to_owned(),
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::super::mock::{block_on, Reply, Server};
-    use super::super::{Model, PromptImage, Turn};
+pub(super) mod tests {
+    use super::super::mock::{block_on, Reply as Answer, Server};
+    use super::super::{Model, PromptImage, Question, Turn as Said};
     use super::*;
 
     impl Claude {
         /// Claude at `base`, with `found` where the environment's credentials would be.
-        fn at(base: String, key: &str, found: Option<Credential>) -> Model {
-            Model::Claude(Claude { key: key.into(), test: Some((base, found)) })
+        pub(in super::super) fn at(base: String, key: &str, found: Option<Credential>) -> Model {
+            Model::of(Claude { key: key.into(), test: Some((base, found)) })
         }
     }
 
+    pub(in super::super) fn event(name: &str, data: Value) -> String {
+        format!("event: {name}\ndata: {data}\n\n")
+    }
+
     /// The events of an answer: `pieces` of text, then why it stopped.
-    fn sse(pieces: &[&str], stop: &str) -> String {
-        let event = |name: &str, data: Value| format!("event: {name}\ndata: {data}\n\n");
+    pub(in super::super) fn sse(pieces: &[&str], stop: &str) -> String {
         let mut out = event("message_start", json!({ "type": "message_start", "message": { "id": "msg_1", "type": "message", "model": CLAUDE_MODEL, "content": [] } }));
         out += &event("content_block_start", json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "thinking", "thinking": "" } }));
         out += &event("content_block_delta", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "thinking_delta", "thinking": "" } }));
@@ -269,7 +426,7 @@ mod tests {
         let question = Question {
             system: "Be brief.".into(),
             prompt: "And this?".into(),
-            history: Some(vec![Turn { role: "user".into(), content: "Hi".into() }, Turn { role: "assistant".into(), content: "Hello.".into() }]),
+            history: Some(vec![Said { role: "user".into(), content: "Hi".into() }, Said { role: "assistant".into(), content: "Hello.".into() }]),
             images: vec![PromptImage { media_type: "image/png".into(), data: "iVBORw0KGgo=".into() }],
             // Claude is asked without one.
             temperature: Some(1.0),
@@ -287,7 +444,7 @@ mod tests {
                 ] },
             ])
         );
-        assert!(body.get("temperature").is_none());
+        assert!(body.get("temperature").is_none() && body.get("tools").is_none());
     }
 
     #[test]
@@ -303,16 +460,16 @@ mod tests {
         assert_eq!(server.asked()[1].header("x-api-key"), Some("sk-mine"));
         // With none anywhere, nothing is sent and the user is told how to set one up.
         let (answer, _) = ask(&Claude::at(server.url(""), "", None), &Question::material("", "x"));
-        assert_eq!(answer, Err(ModelError::NotSetUp));
+        assert_eq!(answer.unwrap_err(), ModelError::NotSetUp("Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model.".into()));
         assert_eq!(server.asked().len(), 2);
     }
 
     #[test]
     fn a_declined_or_empty_answer_is_a_failure_in_words() {
         let declined = Server::start(|_| (200, sse(&["I can"], "refusal")));
-        assert_eq!(ask(&Claude::at(declined.url(""), "k", None), &Question::material("", "x")).0, Err(ModelError::Declined));
+        assert_eq!(ask(&Claude::at(declined.url(""), "k", None), &Question::material("", "x")).0, Err(ModelError::Refused("Claude declined this request.".into())));
         let empty = Server::start(|_| (200, sse(&[" "], "end_turn")));
-        assert_eq!(ask(&Claude::at(empty.url(""), "k", None), &Question::material("", "x")).0, Err(ModelError::ClaudeSaidNothing));
+        assert_eq!(ask(&Claude::at(empty.url(""), "k", None), &Question::material("", "x")).0, Err(ModelError::Failed("Claude returned no text.".into())));
     }
 
     #[test]
@@ -322,22 +479,22 @@ mod tests {
             let server = Server::start(move |_| (status, json!({ "type": "error", "error": { "type": kind, "message": message } }).to_string()));
             ask(&Claude::at(server.url(""), "k", None), &Question::material("", "x")).0.unwrap_err()
         };
-        assert_eq!(error(401, "authentication_error", "invalid x-api-key"), ModelError::InvalidKey);
-        assert_eq!(error(429, "rate_limit_error", "slow down"), ModelError::RateLimited);
-        assert_eq!(error(400, "invalid_request_error", "max_tokens: too big"), ModelError::Claude { status: "400".into(), message: "max_tokens: too big".into() });
+        assert_eq!(error(401, "authentication_error", "invalid x-api-key"), ModelError::Auth("The Claude API key is invalid. Check it in Heyo Settings → Models.".into()));
+        assert_eq!(error(429, "rate_limit_error", "slow down"), ModelError::RateLimited("Claude's rate limit was reached. Try again shortly.".into()));
+        assert_eq!(error(400, "invalid_request_error", "max_tokens: too big"), ModelError::Failed("Claude API error 400: max_tokens: too big".into()));
         assert_eq!(error(529, "overloaded_error", "Overloaded").to_string(), "Claude API error 529: Overloaded");
 
         // In the middle of an answer.
-        let breaking = Server::start(|_| (200, format!("event: error\ndata: {}\n\n", json!({ "type": "error", "error": { "type": "overloaded_error", "message": "Overloaded" } }))));
-        assert_eq!(ask(&Claude::at(breaking.url(""), "k", None), &Question::material("", "x")).0, Err(ModelError::Claude { status: "overloaded_error".into(), message: "Overloaded".into() }));
+        let breaking = Server::start(|_| (200, event("error", json!({ "type": "error", "error": { "type": "overloaded_error", "message": "Overloaded" } }))));
+        assert_eq!(ask(&Claude::at(breaking.url(""), "k", None), &Question::material("", "x")).0, Err(ModelError::Failed("Claude API error overloaded_error: Overloaded".into())));
 
-        assert_eq!(ask(&Claude::at("http://127.0.0.1:9".into(), "k", None), &Question::material("", "x")).0, Err(ModelError::ClaudeUnreachable));
+        assert_eq!(ask(&Claude::at("http://127.0.0.1:9".into(), "k", None), &Question::material("", "x")).0, Err(ModelError::Unreachable("Could not reach the Claude API.".into())));
     }
 
     #[test]
     fn an_answer_called_off_closes_the_connection() {
-        let start = format!("event: content_block_delta\ndata: {}\n\n", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": "Once" } }));
-        let server = Server::start(move |_| Reply::Stalls(start.clone()));
+        let start = event("content_block_delta", json!({ "type": "content_block_delta", "index": 0, "delta": { "type": "text_delta", "text": "Once" } }));
+        let server = Server::start(move |_| Answer::Stalls(start.clone()));
         let claude = Claude::at(server.url(""), "k", None);
         let (tx, rx) = std::sync::mpsc::channel();
         let asking = tauri::async_runtime::spawn(async move {

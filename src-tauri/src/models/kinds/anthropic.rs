@@ -2,9 +2,9 @@
 
 use crate::i18n::{marked, t};
 use crate::models::registry::{field, Can, Entry, Field, Provider, KEY};
-use crate::models::{claude, Model, CLAUDE_MODEL};
+use crate::models::{claude, TextAdapter, CLAUDE_MODEL};
 
-use super::{Checked, Known, ProviderKind, Status};
+use super::{text_can, Checked, Known, ProviderKind, Status};
 
 pub(crate) const WORD: &str = "anthropic";
 
@@ -28,8 +28,8 @@ impl ProviderKind for Anthropic {
     fn fields(&self) -> &'static [Field] {
         FIELDS
     }
-    fn can(&self, _provider: &Provider, need: Can) -> bool {
-        matches!(need, Can::Text | Can::Images | Can::Streaming)
+    fn can(&self, provider: &Provider, need: Can) -> bool {
+        text_can(self, provider, need)
     }
     fn goes(&self, _provider: &Provider) -> &'static str {
         marked("What it is given is sent to Anthropic.")
@@ -48,8 +48,8 @@ impl ProviderKind for Anthropic {
         tauri::async_runtime::block_on(claude::Claude::new(provider.get(KEY)).check()).map_err(|e| e.message())?;
         Ok(Checked { said: t("Claude's API takes the key.").into(), models: None })
     }
-    fn text(&self, provider: &Provider, _model: &str) -> Option<Model> {
-        Some(Model::Claude(claude::Claude::new(provider.get(KEY))))
+    fn text(&self, provider: &Provider, _model: &str) -> Option<Box<dyn TextAdapter>> {
+        Some(Box::new(claude::Claude::new(provider.get(KEY))))
     }
     fn api_name(&self) -> &'static str {
         "claude"

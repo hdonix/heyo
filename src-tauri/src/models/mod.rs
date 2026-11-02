@@ -1,26 +1,34 @@
 //! A model that answers: what Heyo's AI features ask of one, whichever
-//! answers. Claude (`claude.rs`), any model behind an OpenAI-compatible
-//! server (`openai.rs`), and the models the command-line tools Claude Code
-//! and Codex reach with the user's own sign-in (`cli.rs`) are its
-//! adapters, and [`Model::for_use`] picks one, by the provider and model
-//! the settings name for that use (`registry`). Every model Heyo asks is asked here, in this process, which
-//! alone holds the key: the extension runtime asks through `host.ai.ask`
-//! (`ai.rs`), dictation polishes what it heard (`dictation.rs`), and the
-//! clipboard's evaluation has cases written (`clipboard/cases.rs`).
+//! answers. Every text model is a [`TextAdapter`] (`text.rs`): Claude
+//! (`claude.rs`), any model behind an OpenAI-compatible server
+//! (`openai.rs`), and the models the command-line tools Claude Code
+//! (`claude_code.rs`) and Codex (`codex.rs`) reach with the user's own
+//! sign-in (both run through `cli.rs`). A provider's kind opens one
+//! (`kinds`), and [`Model::for_use`] the one the settings name for a use
+//! (`registry`). Every model Heyo asks is asked here, in this process,
+//! which alone holds the key: the extension runtime asks through
+//! `host.ai.ask` (`ai.rs`), dictation polishes what it heard
+//! (`dictation.rs`), and the clipboard's evaluation has cases written
+//! (`clipboard/cases.rs`).
 //!
 //! An answer is written as it comes, to a callback; it is called off by
 //! dropping the future that asks (aborting the task it runs in), which
 //! closes the connection, or ends the tool that was answering.
 
-mod claude;
-mod claude_code;
-pub(crate) mod cli;
-mod codex;
-mod openai;
 pub(crate) mod address;
+mod claude;
+pub(crate) mod claude_code;
+pub(crate) mod cli;
+pub(crate) mod codex;
 pub(crate) mod kinds;
+mod openai;
 pub(crate) mod registry;
+pub(crate) mod text;
 
+#[cfg(test)]
+mod contract;
+#[cfg(test)]
+pub(crate) mod fake;
 #[cfg(test)]
 pub(crate) mod mock;
 
@@ -36,6 +44,7 @@ use registry::{Unusable, Use};
 
 pub(crate) use address::{address, Address};
 pub(crate) use claude::CLAUDE_MODEL;
+pub(crate) use text::{Conversation, TextAdapter};
 
 /// An earlier question or answer of a conversation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -57,10 +66,11 @@ pub struct PromptImage {
     pub data: String,
 }
 
-/// What is asked. Without `history` the prompt is text to work on
+/// What is asked, once. Without `history` the prompt is text to work on
 /// (translate, rewrite, clean up…), and it is given as material, never as
 /// a request to the model; with `history` (even an empty one) it is the
-/// user's next message in a conversation.
+/// user's next message in a conversation. It is asked as one step of a
+/// conversation.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct Question {
@@ -87,49 +97,26 @@ impl Question {
     }
 }
 
-/// The model that answers.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Model {
-    Claude(claude::Claude),
-    /// A model behind an OpenAI-compatible server (vLLM, LM Studio,
-    /// Ollama, llama.cpp), on this computer or anywhere.
-    Local(openai::Local),
-    /// Claude Code's or Codex's model, through the tool on this computer.
-    Cli(cli::Cli),
-}
+/// The model that answers, as the settings name it for a use: its
+/// adapter, with what a one-shot question needs of it.
+#[derive(Debug)]
+pub struct Model(Box<dyn TextAdapter>);
 
-/// Why a model gave no answer, as the user is told it ([`ModelError::message`]).
+/// Why a model gave no answer: what kind of failure, in the words its
+/// adapter says it in ([`ModelError::message`]), for the user.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModelError {
-    /// Claude is the provider, and no credentials were found anywhere.
-    NotSetUp,
-    /// Claude did not take the credentials.
-    InvalidKey,
-    RateLimited,
-    ClaudeUnreachable,
-    /// Claude's API answered with an error: its status (or the kind of
-    /// error, for one in the middle of an answer), and what it said.
-    Claude { status: String, message: String },
-    /// Claude declined to answer (`stop_reason: "refusal"`).
-    Declined,
-    ClaudeSaidNothing,
-    /// The local server could not be reached at this origin.
-    LocalUnreachable(String),
-    /// The local server answered with an error status, and what it said.
-    Local { status: u16, detail: String },
-    NoImages,
-    NoModels,
-    LocalSaidNothing,
-    /// The server did not answer in the shape of one (a list of models).
-    NotAModelList,
-    /// The tool's executable is not where the settings say (`at`), or,
-    /// with `at` empty, was not found.
-    CliNotFound { tool: cli::Tool, at: String },
-    /// The tool is not signed in to its service.
-    CliNotSignedIn(cli::Tool),
-    /// The tool failed, and what it said of it.
-    CliFailed { tool: cli::Tool, message: String },
-    CliSaidNothing(cli::Tool),
+    /// It cannot be asked as it is set up: no credentials, no program, no model.
+    NotSetUp(String),
+    /// Its service did not take the credentials, or the tool is signed out.
+    Auth(String),
+    RateLimited(String),
+    /// Its service or server could not be reached.
+    Unreachable(String),
+    /// The model declined to answer.
+    Refused(String),
+    /// Anything else, with what was said of it.
+    Failed(String),
     /// The use has no model, or one that cannot be used for it (`registry::resolve`).
     Unusable(Unusable),
 }
@@ -138,24 +125,7 @@ impl ModelError {
     /// In words for the user, in the language Heyo speaks.
     pub fn message(&self) -> String {
         match self {
-            ModelError::NotSetUp => t("Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model.").into(),
-            ModelError::InvalidKey => t("The Claude API key is invalid. Check it in Heyo Settings → Models.").into(),
-            ModelError::RateLimited => t("Claude's rate limit was reached. Try again shortly.").into(),
-            ModelError::ClaudeUnreachable => t("Could not reach the Claude API.").into(),
-            ModelError::Claude { status, message } => tf("Claude API error {0}: {1}", &[status, message]),
-            ModelError::Declined => t("Claude declined this request.").into(),
-            ModelError::ClaudeSaidNothing => t("Claude returned no text.").into(),
-            ModelError::LocalUnreachable(origin) => tf("Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)", &[origin]),
-            ModelError::Local { status, detail } => tf("The local model answered with an error ({0}): {1}", &[status, detail]),
-            ModelError::NoImages => t("The local model is not given images.").into(),
-            ModelError::NoModels => t("The local server lists no models.").into(),
-            ModelError::LocalSaidNothing => t("The local model returned no text.").into(),
-            ModelError::NotAModelList => t("the server did not answer with a model list").into(),
-            ModelError::CliNotFound { tool, at } if at.is_empty() => tf("{0} is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models.", &[&tool.name()]),
-            ModelError::CliNotFound { tool, at } => tf("{0} was not found at {1}. Check its executable in Heyo Settings → Models.", &[&tool.name(), at]),
-            ModelError::CliNotSignedIn(tool) => tf("{0} is not signed in. Run “{1}” in a terminal, then try again.", &[&tool.name(), &tool.sign_in()]),
-            ModelError::CliFailed { tool, message } => tf("{0} stopped with an error: {1}", &[&tool.name(), message]),
-            ModelError::CliSaidNothing(tool) => tf("{0} returned no text.", &[&tool.name()]),
+            ModelError::NotSetUp(said) | ModelError::Auth(said) | ModelError::RateLimited(said) | ModelError::Unreachable(said) | ModelError::Refused(said) | ModelError::Failed(said) => said.clone(),
             ModelError::Unusable(why) => unusable(why),
         }
     }
@@ -171,32 +141,36 @@ impl Model {
     /// The model the settings name for `need`, as its provider's kind opens it.
     pub fn for_use(settings: &Settings, need: Use) -> Result<Model, ModelError> {
         let (provider, model) = registry::resolve(&settings.providers, need.reference(settings), need).map_err(ModelError::Unusable)?;
-        provider.kind().text(provider, model).ok_or_else(|| ModelError::Unusable(Unusable::Cannot(provider.name.clone())))
+        provider.kind().text(provider, model).map(Model).ok_or_else(|| ModelError::Unusable(Unusable::Cannot(provider.name.clone())))
     }
 
     /// The model `model` (empty: the first the server lists) of the
     /// OpenAI-compatible server at `url`, whatever the settings name.
     #[cfg(test)]
     pub fn local(url: &str, model: &str) -> Model {
-        Model::Local(openai::Local::new(url, "", model))
+        Model::of(openai::Local::new(url, "", model))
     }
 
-    /// Whether it can be given images besides text.
-    pub fn sees_images(&self) -> bool {
-        !matches!(self, Model::Local(_))
+    /// The model `adapter` is, whatever the settings name.
+    #[cfg(test)]
+    pub fn of(adapter: impl TextAdapter + 'static) -> Model {
+        Model(Box::new(adapter))
     }
 
-    /// The whole answer, trimmed, with nothing of what the model says
-    /// before it. `on_text` is given the answer so far each time it grows.
+    /// The whole answer to a one-shot question, trimmed, with nothing of
+    /// what the model says before it. `on_text` is given the answer so far
+    /// each time it grows.
     pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
-        if !question.images.is_empty() && !self.sees_images() {
-            return Err(ModelError::NoImages);
-        }
-        match self {
-            Model::Claude(claude) => claude.answer(question, on_text).await,
-            Model::Local(local) => local.answer(question, on_text).await,
-            Model::Cli(cli) => cli.answer(question, on_text).await,
-        }
+        Ok(self.0.step(&Conversation::of(question), on_text).await?.text)
+    }
+}
+
+/// The adapter's own: what it can do, and a step of a conversation.
+impl std::ops::Deref for Model {
+    type Target = dyn TextAdapter;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
     }
 }
 
@@ -216,11 +190,11 @@ pub fn provider(settings: &Settings) -> AiProvider {
         return AiProvider { kind: "none", model: String::new(), local: false };
     };
     let kind = provider.kind().api_name();
-    let model = if provider.kind == kinds::ANTHROPIC { CLAUDE_MODEL.into() } else { model.to_owned() };
+    let model = provider.kind().text(provider, model).map(|adapter| adapter.model()).unwrap_or_default();
     AiProvider { kind, model, local: provider.can(registry::Can::Private) }
 }
 
-// --- What both adapters share ---------------------------------------------------
+// --- What the adapters over HTTP share --------------------------------------------
 
 /// An HTTP client for one question. Not kept: a connection belongs to the
 /// async runtime it was opened on, and questions are asked from more than one.
@@ -259,7 +233,7 @@ async fn events(mut response: reqwest::Response, mut each: impl FnMut(&str) -> b
 mod tests {
     use super::*;
 
-    use registry::{ModelRef, Provider};
+    use registry::{Can, ModelRef, Provider};
 
     fn with(providers: Vec<Provider>, ai: ModelRef) -> Settings {
         let mut all = registry::defaults();
@@ -279,22 +253,29 @@ mod tests {
         provider
     }
 
+    /// What the adapter a model is, as it prints.
+    fn shown(model: &Model) -> String {
+        format!("{:?}", model.0)
+    }
+
     #[test]
     fn the_reference_names_the_adapter_and_what_it_can_be_given() {
         let claude = Model::for_use(&Settings::default(), Use::Answers).unwrap();
-        assert!(matches!(claude, Model::Claude(_)) && claude.sees_images());
+        assert!(shown(&claude).starts_with("Claude {") && claude.can(Can::Images) && claude.can(Can::ToolCalls));
         let settings = with(vec![server("ollama", "http://127.0.0.1:11434/v1")], ModelRef::to("ollama", "qwen3"));
         let local = Model::for_use(&settings, Use::Answers).unwrap();
-        assert!(local == Model::Local(openai::Local::new("http://127.0.0.1:11434/v1", "", "qwen3")) && !local.sees_images());
+        assert_eq!(shown(&local), shown(&Model::local("http://127.0.0.1:11434/v1", "qwen3")));
+        assert!(!local.can(Can::Images) && local.can(Can::ToolCalls));
         let settings = with(vec![tool("cc", kinds::CLAUDE_CODE, "/opt/claude")], ModelRef::to("cc", " opus "));
         let claude_code = Model::for_use(&settings, Use::Answers).unwrap();
-        assert!(claude_code == Model::Cli(cli::Cli::new(cli::Tool::ClaudeCode, "/opt/claude", "opus")) && claude_code.sees_images());
+        assert_eq!(shown(&claude_code), r#"ClaudeCode(Cli { program: "Claude Code", path: "/opt/claude", model: "opus" })"#);
+        assert!(claude_code.can(Can::Images) && !claude_code.can(Can::ToolCalls));
         let settings = with(vec![tool("codex", kinds::CODEX, "")], ModelRef::to("codex", ""));
-        assert_eq!(Model::for_use(&settings, Use::Answers).unwrap(), Model::Cli(cli::Cli::new(cli::Tool::Codex, "", "")));
+        assert_eq!(shown(&Model::for_use(&settings, Use::Answers).unwrap()), r#"Codex(Cli { program: "Codex", path: "", model: "" })"#);
         // Each use goes by its own reference.
         let settings = Settings { polish_model: ModelRef::to("codex", ""), ai_model: ModelRef::to(registry::CLAUDE, ""), ..settings };
-        assert!(matches!(Model::for_use(&settings, Use::DictationPolish), Ok(Model::Cli(_))));
-        assert!(matches!(Model::for_use(&settings, Use::Answers), Ok(Model::Claude(_))));
+        assert!(shown(&Model::for_use(&settings, Use::DictationPolish).unwrap()).starts_with("Codex("));
+        assert!(shown(&Model::for_use(&settings, Use::Answers).unwrap()).starts_with("Claude {"));
         // A reference to what is gone, or to what cannot answer in text, is refused in words.
         let gone = with(vec![], ModelRef::to("ollama", ""));
         assert_eq!(Model::for_use(&gone, Use::Answers).unwrap_err().to_string(), "The provider “ollama” this uses is no longer connected. Choose another model in Heyo Settings.");
@@ -306,6 +287,9 @@ mod tests {
     #[test]
     fn an_extension_is_told_which_model_answers_and_whether_its_questions_stay_here() {
         assert_eq!(provider(&Settings::default()), AiProvider { kind: "claude", model: CLAUDE_MODEL.into(), local: false });
+        // Claude's API has the one model, whatever the reference says.
+        let claude = Settings { ai_model: ModelRef::to(registry::CLAUDE, ""), ..Settings::default() };
+        assert_eq!(provider(&claude).model, CLAUDE_MODEL);
         let settings = with(vec![server("ollama", "http://127.0.0.1:11434/v1"), server("lan", "http://192.168.1.20:8000/v1")], ModelRef::to("ollama", "qwen3"));
         assert_eq!(provider(&settings), AiProvider { kind: "local", model: "qwen3".into(), local: true });
         // A server on another machine is not this computer, whatever it runs.
@@ -318,29 +302,8 @@ mod tests {
     }
 
     #[test]
-    fn every_failure_is_worded_for_the_user() {
-        let cases = [
-            (ModelError::NotSetUp, "Claude is not set up. Add an Anthropic API key in Heyo Settings → Models, or choose another model."),
-            (ModelError::InvalidKey, "The Claude API key is invalid. Check it in Heyo Settings → Models."),
-            (ModelError::RateLimited, "Claude's rate limit was reached. Try again shortly."),
-            (ModelError::ClaudeUnreachable, "Could not reach the Claude API."),
-            (ModelError::Claude { status: "529".into(), message: "Overloaded".into() }, "Claude API error 529: Overloaded"),
-            (ModelError::Declined, "Claude declined this request."),
-            (ModelError::ClaudeSaidNothing, "Claude returned no text."),
-            (ModelError::LocalUnreachable("http://127.0.0.1:9".into()), "Could not reach the model server at http://127.0.0.1:9. Is it running? (Heyo Settings → Models)"),
-            (ModelError::Local { status: 404, detail: "no such model".into() }, "The local model answered with an error (404): no such model"),
-            (ModelError::NoImages, "The local model is not given images."),
-            (ModelError::NoModels, "The local server lists no models."),
-            (ModelError::LocalSaidNothing, "The local model returned no text."),
-            (ModelError::CliNotFound { tool: cli::Tool::ClaudeCode, at: "".into() }, "Claude Code is not installed, or Heyo cannot find it. Install it, or name its executable in Heyo Settings → Models."),
-            (ModelError::CliNotFound { tool: cli::Tool::Codex, at: "/opt/codex".into() }, "Codex was not found at /opt/codex. Check its executable in Heyo Settings → Models."),
-            (ModelError::CliNotSignedIn(cli::Tool::ClaudeCode), "Claude Code is not signed in. Run “claude auth login” in a terminal, then try again."),
-            (ModelError::CliNotSignedIn(cli::Tool::Codex), "Codex is not signed in. Run “codex login” in a terminal, then try again."),
-            (ModelError::CliFailed { tool: cli::Tool::Codex, message: "model not found".into() }, "Codex stopped with an error: model not found"),
-            (ModelError::CliSaidNothing(cli::Tool::ClaudeCode), "Claude Code returned no text."),
-        ];
-        for (error, words) in cases {
-            assert_eq!(error.to_string(), words);
-        }
+    fn a_failure_is_its_adapters_words_or_why_the_use_has_no_model() {
+        assert_eq!(ModelError::RateLimited("Slow down.".into()).to_string(), "Slow down.");
+        assert_eq!(ModelError::Unusable(Unusable::Cannot("Doubao".into())).to_string(), "Doubao cannot be used for this. Choose another model in Heyo Settings.");
     }
 }

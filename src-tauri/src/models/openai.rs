@@ -1,12 +1,16 @@
 //! A model running on this computer, or anywhere, behind an
-//! OpenAI-compatible server (vLLM, LM Studio, Ollama, llama.cpp): one of the
-//! two adapters of `models`.
+//! OpenAI-compatible server (vLLM, LM Studio, Ollama, llama.cpp): a text
+//! adapter of `models`, through the server's chat completions, tools and
+//! their calls (`tools`, `tool_calls`, `tool` messages) among them.
 
 use std::time::Duration;
 
 use serde_json::{json, Value};
 
-use super::{ModelError, Question};
+use super::registry::Can;
+use super::text::{Conversation, Part, Reply, Step, TextAdapter, ToolCall, Turn};
+use super::ModelError;
+use crate::i18n::{t, tf};
 
 #[derive(Clone, PartialEq)]
 pub struct Local {
@@ -25,57 +29,156 @@ impl std::fmt::Debug for Local {
     }
 }
 
+// The failures, in the words the user is told them in.
+
+fn unreachable(url: &str) -> ModelError {
+    ModelError::Unreachable(tf("Could not reach the model server at {0}. Is it running? (Heyo Settings → Models)", &[&origin(url)]))
+}
+
+fn not_a_model_list() -> ModelError {
+    ModelError::Failed(t("the server did not answer with a model list").into())
+}
+
 impl Local {
     pub fn new(url: &str, key: &str, model: &str) -> Local {
         Local { url: url.trim().trim_end_matches('/').to_owned(), key: key.trim().to_owned(), model: model.trim().to_owned() }
     }
 
-    pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
+    async fn ask(&self, conversation: &Conversation, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<Reply, ModelError> {
+        if conversation.has_images() {
+            return Err(ModelError::Failed(t("The local model is not given images.").into()));
+        }
         let model = match self.model.as_str() {
-            "" => list(&self.url, &self.key, None).await?.into_iter().next().ok_or(ModelError::NoModels)?,
+            "" => list(&self.url, &self.key, None).await?.into_iter().next().ok_or_else(|| ModelError::NotSetUp(t("The local server lists no models.").into()))?,
             chosen => chosen.to_owned(),
         };
-        let conversation = question.history.is_some();
-        let mut messages = vec![json!({ "role": "system", "content": question.system })];
-        messages.extend(question.history.iter().flatten().map(|turn| json!({ "role": turn.role, "content": turn.content })));
-        let prompt = if conversation { question.prompt.clone() } else { as_material(&question.system, &question.prompt) };
-        messages.push(json!({ "role": "user", "content": prompt }));
-        let body = json!({
-            "model": model,
-            "stream": true,
-            // Rewriting tasks stay close to the text and give the same answer
-            // for the same text; a conversation may vary a little.
-            "temperature": question.temperature.unwrap_or(if conversation { 0.5 } else { 0.0 }),
-            "messages": messages,
-            // Qwen3 and similar: answer directly instead of reasoning first.
-            "chat_template_kwargs": { "enable_thinking": false },
-        });
-        let request = authorized(super::client(true).post(format!("{}/chat/completions", self.url)), &self.key).header("content-type", "application/json").body(body.to_string());
+        let request = authorized(super::client(true).post(format!("{}/chat/completions", self.url)), &self.key).header("content-type", "application/json").body(body(conversation, &model).to_string());
         let response = call(&self.url, request).await?;
 
-        let mut text = String::new();
-        let read = super::events(response, |data| {
-            if data == "[DONE]" {
-                return false;
+        let mut reading = Reading::default();
+        let read = super::events(response, |data| reading.event(data, on_text)).await;
+        read.map_err(|_| unreachable(&self.url))?;
+        reading.reply()
+    }
+}
+
+impl TextAdapter for Local {
+    fn can(&self, need: Can) -> bool {
+        matches!(need, Can::Streaming | Can::ToolCalls)
+    }
+
+    fn model(&self) -> String {
+        self.model.clone()
+    }
+
+    fn step<'a>(&'a self, conversation: &'a Conversation, on_text: &'a mut (dyn FnMut(&str) + Send)) -> Step<'a> {
+        Box::pin(self.ask(conversation, on_text))
+    }
+}
+
+/// The request for a step of a conversation, to `model`.
+fn body(conversation: &Conversation, model: &str) -> Value {
+    let mut messages = vec![json!({ "role": "system", "content": conversation.system })];
+    for turn in &conversation.turns {
+        match turn {
+            Turn::User(parts) => {
+                let said: Vec<String> = parts
+                    .iter()
+                    .filter_map(|part| match part {
+                        Part::Material(text) => Some(as_material(&conversation.system, text)),
+                        part => part.text().map(str::to_owned),
+                    })
+                    .collect();
+                messages.push(json!({ "role": "user", "content": said.join("\n\n") }));
             }
-            // A keep-alive or a line that is not a piece of the answer.
-            let Ok(event) = serde_json::from_str::<Value>(data) else { return true };
-            if let Some(delta) = event["choices"][0]["delta"]["content"].as_str().filter(|d| !d.is_empty()) {
-                text.push_str(delta);
-                let shown = without_thinking(&text);
-                if !shown.is_empty() {
-                    on_text(shown);
-                }
+            Turn::Assistant(reply) if reply.calls.is_empty() => messages.push(json!({ "role": "assistant", "content": reply.text })),
+            Turn::Assistant(reply) => {
+                let calls: Vec<Value> = reply.calls.iter().map(|call| json!({ "id": call.id, "type": "function", "function": { "name": call.name, "arguments": arguments(&call.input) } })).collect();
+                messages.push(json!({ "role": "assistant", "content": reply.text, "tool_calls": calls }));
             }
-            true
-        })
-        .await;
-        read.map_err(|_| ModelError::LocalUnreachable(origin(&self.url)))?;
-        let answer = without_thinking(&text).trim();
-        if answer.is_empty() {
-            return Err(ModelError::LocalSaidNothing);
+            Turn::Results(results) => messages.extend(results.iter().map(|result| json!({ "role": "tool", "tool_call_id": result.call, "content": result.content }))),
         }
-        Ok(answer.to_owned())
+    }
+    let mut body = json!({
+        "model": model,
+        "stream": true,
+        // Rewriting tasks stay close to the text and give the same answer
+        // for the same text; a conversation may vary a little.
+        "temperature": conversation.temperature.unwrap_or(if conversation.material() { 0.0 } else { 0.5 }),
+        "messages": messages,
+        // Qwen3 and similar: answer directly instead of reasoning first.
+        "chat_template_kwargs": { "enable_thinking": false },
+    });
+    if !conversation.tools.is_empty() {
+        let tools: Vec<Value> = conversation.tools.iter().map(|tool| json!({ "type": "function", "function": { "name": tool.name, "description": tool.description, "parameters": tool.input_schema } })).collect();
+        body["tools"] = json!(tools);
+    }
+    body
+}
+
+/// A call's input as the protocol carries it: JSON in a string.
+fn arguments(input: &Value) -> String {
+    match input {
+        Value::String(written) => written.clone(),
+        input => input.to_string(),
+    }
+}
+
+/// What has been read of the events of an answer so far.
+#[derive(Default)]
+struct Reading {
+    text: String,
+    /// The calls, by their index: id, name, and the JSON of the input in pieces.
+    calls: Vec<(String, String, String)>,
+}
+
+impl Reading {
+    /// Takes in one event; false once there is nothing more to wait for.
+    fn event(&mut self, data: &str, on_text: &mut (dyn FnMut(&str) + Send)) -> bool {
+        if data == "[DONE]" {
+            return false;
+        }
+        // A keep-alive or a line that is not a piece of the answer.
+        let Ok(event) = serde_json::from_str::<Value>(data) else { return true };
+        let delta = &event["choices"][0]["delta"];
+        if let Some(piece) = delta["content"].as_str().filter(|d| !d.is_empty()) {
+            self.text.push_str(piece);
+            let shown = without_thinking(&self.text);
+            if !shown.is_empty() {
+                on_text(shown);
+            }
+        }
+        for call in delta["tool_calls"].as_array().into_iter().flatten() {
+            let index = call["index"].as_u64().unwrap_or(self.calls.len().saturating_sub(1) as u64) as usize;
+            if self.calls.len() <= index {
+                self.calls.resize(index + 1, Default::default());
+            }
+            let (id, name, input) = &mut self.calls[index];
+            if let Some(given) = call["id"].as_str() {
+                *id = given.to_owned();
+            }
+            name.push_str(call["function"]["name"].as_str().unwrap_or_default());
+            input.push_str(call["function"]["arguments"].as_str().unwrap_or_default());
+        }
+        true
+    }
+
+    /// The turn it was, or why there is none.
+    fn reply(self) -> Result<Reply, ModelError> {
+        let calls: Vec<ToolCall> = self
+            .calls
+            .into_iter()
+            .filter(|(_, name, _)| !name.is_empty())
+            .map(|(id, name, input)| {
+                let input = if input.trim().is_empty() { json!({}) } else { serde_json::from_str(&input).unwrap_or(Value::String(input)) };
+                ToolCall { id, name, input }
+            })
+            .collect();
+        let text = without_thinking(&self.text).trim().to_owned();
+        if text.is_empty() && calls.is_empty() {
+            return Err(ModelError::Failed(t("The local model returned no text.").into()));
+        }
+        Ok(Reply { text, calls, replay: None })
     }
 }
 
@@ -92,15 +195,15 @@ pub async fn list(url: &str, key: &str, limit: Option<Duration>) -> Result<Vec<S
         request = request.timeout(limit);
     }
     let response = call(url, request).await?;
-    let body = response.text().await.map_err(|_| ModelError::LocalUnreachable(origin(url)))?;
-    let body: Value = serde_json::from_str(&body).map_err(|_| ModelError::NotAModelList)?;
-    let Some(models) = body["data"].as_array() else { return Err(ModelError::NotAModelList) };
+    let body = response.text().await.map_err(|_| unreachable(url))?;
+    let body: Value = serde_json::from_str(&body).map_err(|_| not_a_model_list())?;
+    let Some(models) = body["data"].as_array() else { return Err(not_a_model_list()) };
     Ok(models.iter().filter_map(|m| m["id"].as_str().map(str::to_owned)).collect())
 }
 
 /// Sends a request to the server at `url`; an answer that is an error is one.
 async fn call(url: &str, request: reqwest::RequestBuilder) -> Result<reqwest::Response, ModelError> {
-    let response = request.send().await.map_err(|_| ModelError::LocalUnreachable(origin(url)))?;
+    let response = request.send().await.map_err(|_| unreachable(url))?;
     let status = response.status();
     if status.is_success() {
         return Ok(response);
@@ -110,7 +213,12 @@ async fn call(url: &str, request: reqwest::RequestBuilder) -> Result<reqwest::Re
         .ok()
         .and_then(|parsed| parsed["error"]["message"].as_str().or(parsed["error"].as_str()).or(parsed["message"].as_str()).map(str::to_owned))
         .unwrap_or_else(|| body.chars().take(300).collect());
-    Err(ModelError::Local { status: status.as_u16(), detail })
+    let said = tf("The local model answered with an error ({0}): {1}", &[&status.as_u16(), &detail]);
+    Err(match status.as_u16() {
+        401 | 403 => ModelError::Auth(said),
+        429 => ModelError::RateLimited(said),
+        _ => ModelError::Failed(said),
+    })
 }
 
 /// The scheme, host and port of an address, which is what is said of it.
@@ -140,12 +248,12 @@ fn as_material(task: &str, text: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::super::mock::{block_on, Server};
-    use super::super::{Model, Turn};
+    use super::super::{Model, Question, Turn as Said};
     use super::*;
 
-    fn sse(pieces: &[&str]) -> String {
+    pub(in super::super) fn sse(pieces: &[&str]) -> String {
         let mut body: String = pieces.iter().map(|piece| format!("data: {}\n\n", json!({ "choices": [{ "delta": { "content": piece } }] }))).collect();
         body.push_str("data: [DONE]\n\n");
         body
@@ -171,6 +279,7 @@ mod tests {
         let prompt = body["messages"][1]["content"].as_str().unwrap();
         assert!(prompt.starts_with("Translate.\n\n<text>\nBonjour\n</text>\n\nDo the task above"), "{prompt}");
         assert_eq!(body["chat_template_kwargs"], json!({ "enable_thinking": false }));
+        assert!(body.get("tools").is_none());
     }
 
     #[test]
@@ -179,7 +288,7 @@ mod tests {
         let question = Question {
             system: "Count.".into(),
             prompt: "Three?".into(),
-            history: Some(vec![Turn { role: "user".into(), content: "One?".into() }, Turn { role: "assistant".into(), content: "1.".into() }]),
+            history: Some(vec![Said { role: "user".into(), content: "One?".into() }, Said { role: "assistant".into(), content: "1.".into() }]),
             temperature: Some(1.5),
             ..Question::default()
         };
@@ -198,6 +307,10 @@ mod tests {
                 { "role": "user", "content": "Three?" },
             ])
         );
+        // A conversation without a temperature of its own.
+        let question = Question { temperature: None, ..question };
+        block_on(Model::local(&server.url("/v1"), "qwen3").answer(&question, &mut |_| {})).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&server.asked()[1].body).unwrap()["temperature"], json!(0.5));
     }
 
     #[test]
@@ -206,24 +319,26 @@ mod tests {
         let ask = |model: Model, question: Question| block_on(model.answer(&question, &mut |_| {}));
 
         let unreachable = ask(local("http://127.0.0.1:9/v1"), Question::material("", "x")).unwrap_err();
-        assert_eq!(unreachable, ModelError::LocalUnreachable("http://127.0.0.1:9".into()));
+        assert_eq!(unreachable, ModelError::Unreachable("Could not reach the model server at http://127.0.0.1:9. Is it running? (Heyo Settings → Models)".into()));
 
         let image = Question { images: vec![super::super::PromptImage { media_type: "image/png".into(), data: String::new() }], ..Question::material("", "What is this?") };
-        assert_eq!(ask(local("http://127.0.0.1:9/v1"), image), Err(ModelError::NoImages));
+        assert_eq!(ask(local("http://127.0.0.1:9/v1"), image), Err(ModelError::Failed("The local model is not given images.".into())));
 
         let refusing = Server::start(|_| (404, json!({ "error": { "message": "model 'tiny' not found" } }).to_string()));
-        assert_eq!(ask(local(&refusing.url("/v1")), Question::material("", "x")), Err(ModelError::Local { status: 404, detail: "model 'tiny' not found".into() }));
+        assert_eq!(ask(local(&refusing.url("/v1")), Question::material("", "x")), Err(ModelError::Failed("The local model answered with an error (404): model 'tiny' not found".into())));
         let plain = Server::start(|_| (500, "x".repeat(400)));
-        assert_eq!(ask(local(&plain.url("/v1")), Question::material("", "x")), Err(ModelError::Local { status: 500, detail: "x".repeat(300) }));
+        assert_eq!(ask(local(&plain.url("/v1")), Question::material("", "x")), Err(ModelError::Failed(format!("The local model answered with an error (500): {}", "x".repeat(300)))));
+        let locked = Server::start(|_| (401, json!({ "error": "bad key" }).to_string()));
+        assert_eq!(ask(local(&locked.url("/v1")), Question::material("", "x")), Err(ModelError::Auth("The local model answered with an error (401): bad key".into())));
 
         let thinking_only = Server::start(|_| (200, sse(&["<think>I wonder", " what to say"])));
-        assert_eq!(ask(local(&thinking_only.url("/v1")), Question::material("", "x")), Err(ModelError::LocalSaidNothing));
+        assert_eq!(ask(local(&thinking_only.url("/v1")), Question::material("", "x")), Err(ModelError::Failed("The local model returned no text.".into())));
 
         let empty = Server::start(|_| (200, json!({ "data": [] }).to_string()));
-        assert_eq!(ask(Model::local(&empty.url("/v1"), ""), Question::material("", "x")), Err(ModelError::NoModels));
+        assert_eq!(ask(Model::local(&empty.url("/v1"), ""), Question::material("", "x")), Err(ModelError::NotSetUp("The local server lists no models.".into())));
         assert_eq!(block_on(list(&empty.url("/v1/"), "", None)), Ok(vec![]));
         let other = Server::start(|_| (200, "<html>".into()));
-        assert_eq!(block_on(list(&other.url("/v1"), "", None)), Err(ModelError::NotAModelList));
+        assert_eq!(block_on(list(&other.url("/v1"), "", None)).unwrap_err().to_string(), "the server did not answer with a model list");
     }
 
     #[test]

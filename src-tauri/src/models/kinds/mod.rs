@@ -173,8 +173,10 @@ pub(crate) trait ProviderKind: Sync {
     /// Whether it answers as it is set up: a connection, a sign-in, a
     /// program found. Blocks, up to some seconds: for a thread that can wait.
     fn check(&self, provider: &Provider) -> Result<Checked, String>;
-    /// `model` of it, as a model that answers in text; none if it has none.
-    fn text(&self, _provider: &Provider, _model: &str) -> Option<super::Model> {
+    /// `model` of it, as the adapter of a model that answers in text;
+    /// none if it has none. What it can be given besides text is the
+    /// adapter's to say ([`text_can`]).
+    fn text(&self, _provider: &Provider, _model: &str) -> Option<Box<dyn super::TextAdapter>> {
         None
     }
     /// What hears dictation with `model` of it, with the words of
@@ -204,6 +206,12 @@ pub(crate) fn status(missing: Option<Missing>, known: &Known) -> Status {
         (.., Some(n)) => Status::fine(&tn("{0} downloaded", "{0} downloaded", n as u64, &[&n]), t("Downloaded and run by Heyo itself.")),
         (None, None, None) => Status::fine(t("Set up"), ""),
     }
+}
+
+/// What a kind that answers in text can do as one: answer, and what its
+/// adapter says it can besides.
+pub(crate) fn text_can(kind: &dyn ProviderKind, provider: &Provider, need: Can) -> bool {
+    kind.text(provider, "").is_some_and(|adapter| need == Can::Text || adapter.can(need))
 }
 
 /// A failure of speech recognition, in words.
