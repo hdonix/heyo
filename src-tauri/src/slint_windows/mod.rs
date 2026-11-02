@@ -9,7 +9,9 @@
 //! - `ui/` is the windows, in Slint's language, drawn from the tokens of
 //!   the web interface (`tokens`, written into it by `build.rs`).
 //! - `model` works out what the settings show from what the host's
-//!   commands answer, and what to ask of the host when a control is used.
+//!   commands answer, and what to ask of the host when a control is used:
+//!   it routes to `pages`, each page of the window a module of its own;
+//!   `ids` names their controls and the pages themselves.
 //! - `icons` are the symbols drawn for the host's icon names.
 //! - `host` is how those commands are called, and the list of them;
 //!   `answer` is what they answer, typed.
@@ -43,6 +45,7 @@ mod keys;
 mod layer;
 mod life;
 mod model;
+mod pages;
 pub(crate) mod pill;
 mod pointer;
 mod press;

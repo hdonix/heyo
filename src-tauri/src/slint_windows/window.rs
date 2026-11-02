@@ -17,7 +17,6 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use serde_json::Value;
 use slint::winit_030::winit::dpi::{LogicalSize, PhysicalPosition};
 use slint::winit_030::winit::event::{ElementState, MouseButton, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
@@ -252,15 +251,15 @@ impl Live {
     }
 
     fn answered(&mut self, then: Then, answer: Result<Answer, String>) {
-        let copied = then == Then::Copied && answer.is_ok();
+        let said = self.model.known.copied;
         let more = self.model.answered(then, answer);
         self.ask(more);
         self.push();
-        if copied {
+        if !said && self.model.known.copied {
             // "Copied" is said for a moment.
             slint::Timer::single_shot(Duration::from_millis(2500), || {
                 with(|live| {
-                    live.model.copied = false;
+                    live.model.known.copied = false;
                     live.push();
                 });
             });
@@ -282,18 +281,18 @@ impl Live {
         host.set_nav(ModelRc::new(VecModel::from(nav)));
         host.set_nav_pages(pages as i32);
         host.set_nav_selected(selected);
-        host.set_page(self.model.page.as_str().into());
+        host.set_page(self.model.page.to_string().into());
         host.set_title(self.model.title().into());
         host.set_error(self.model.error.as_str().into());
         host.set_hotkeys(self.model.hotkeys_supported());
         host.set_find_placeholder(self.model.find_placeholder().into());
-        host.set_find_text(self.model.find.as_str().into());
+        host.set_find_text(self.model.known.find.as_str().into());
         let (title, ticked, picks) = self.model.filter().unwrap_or_default();
         host.set_filter_title(title.into());
         host.set_filter_count(ticked as i32);
         host.set_filter_picks(ModelRc::new(VecModel::from(picks.into_iter().map(|(id, title, heading, checked)| ui::Pick { id: id.into(), title: title.into(), heading, checked }).collect::<Vec<_>>())));
         self.lines.show(self.model.lines());
-        self.life.window().set_appearance(self.model.settings.get("appearance").and_then(Value::as_str).unwrap_or("system").into());
+        self.life.window().set_appearance(super::pages::word(&self.model.known.settings.settings.appearance).into());
     }
 
     fn push_recording(&mut self) {
@@ -507,7 +506,7 @@ fn wire(window: &ui::SettingsWindow) {
     });
     host.on_find(|text| {
         with(|live| {
-            live.model.find = text.into();
+            live.model.known.find = text.into();
             live.push();
         });
     });
@@ -660,8 +659,8 @@ fn make() -> Result<Live, String> {
     let (settings, hotkeys, capabilities, dark) = read.recv().map_err(|_| "the host did not answer".to_string())?;
     let mut model = Model::new();
     model.answered(Then::Settings, Ok(settings?));
-    model.answered(Then::Hotkeys, Ok(hotkeys?));
-    model.answered(Then::Capabilities, Ok(capabilities?));
+    model.answered(Then::Known, Ok(hotkeys?));
+    model.answered(Then::Known, Ok(capabilities?));
     window.set_system_dark(dark);
 
     let poll = slint::Timer::default();

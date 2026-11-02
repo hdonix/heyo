@@ -47,8 +47,11 @@ mod tests {
     /// Every symbol the window itself names is there.
     #[test]
     fn the_windows_own_symbols_are_there() {
-        for (_, _, symbol) in super::super::model::PAGES {
-            assert!(svg(symbol).is_some(), "{symbol}");
+        let known = super::super::pages::Known::default();
+        for page in super::super::pages::all().iter().filter(|page| !page.shows(&super::super::ids::PageId::Extension(String::new()))) {
+            for symbol in page.entries(&known).into_iter().filter_map(|entry| entry.icon) {
+                assert!(svg(&symbol).is_some(), "{symbol}");
+            }
         }
         for symbol in ["app-window-grid-3x3-16", "plug-16", "app-window-16", "store-16"] {
             assert!(svg(symbol).is_some(), "{symbol}");

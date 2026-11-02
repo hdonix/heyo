@@ -1,15 +1,21 @@
-//! What a control of the settings window acts on, and how that is
-//! written where it has to be a word.
+//! What a control of the settings window acts on, which page is shown,
+//! and how each is written where it has to be a word.
 //!
 //! The window is told lines and hands back which control was used: Slint
 //! has that as a string, the line's `id`. What the string says, and how,
 //! is this file's alone. The model makes an [`Id`] for each control and
 //! is handed one back (`Model::acted`); the markup hands back what it was
 //! given and composes nothing, so a line that has more than one control
-//! carries an id for each (`Line::more_id`, `check_id`, `alias_id`).
+//! carries an id for each (`Line::more_id`, `check_id`, `alias_id`). A
+//! page is named the same way ([`PageId`]): the sidebar hands back the id
+//! of the entry chosen, and a link the page it goes to.
 //! Every form is tried there and back in the tests below.
 
 use std::fmt;
+
+use crate::commands::settings::HotkeyName;
+use crate::models::registry::Use;
+use crate::permissions::Permission;
 
 /// Between the parts of an id that names several things.
 const SEP: char = '\u{1f}';
@@ -43,6 +49,72 @@ const ACTS: [(Act, &str); 9] = [
     (Act::SaveProvider, "save-provider"),
 ];
 
+/// A setting a control of the window changes by itself: a switch, a
+/// choice or a field. Which of the settings it is, the page that has the
+/// control says (`pages`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Setting {
+    LaunchAtLogin,
+    Appearance,
+    Language,
+    CompactMode,
+    HideOnBlur,
+    KeepCommand,
+    LiveActivities,
+    DictationHoldKey,
+    DictationLive,
+    DictationSource,
+    DictationLanguage,
+    DictationPolish,
+    NodePath,
+    Renderer,
+    ConfirmTerminalPaste,
+    ClipboardHistory,
+    ClipboardPaused,
+    ClipboardRetentionDays,
+    ClipboardMeaning,
+    SnippetExpansion,
+}
+
+const SETTINGS: [(Setting, &str); 20] = [
+    (Setting::LaunchAtLogin, "launch-at-login"),
+    (Setting::Appearance, "appearance"),
+    (Setting::Language, "language"),
+    (Setting::CompactMode, "compact-mode"),
+    (Setting::HideOnBlur, "hide-on-blur"),
+    (Setting::KeepCommand, "keep-command"),
+    (Setting::LiveActivities, "live-activities"),
+    (Setting::DictationHoldKey, "dictation-hold-key"),
+    (Setting::DictationLive, "dictation-live"),
+    (Setting::DictationSource, "dictation-source"),
+    (Setting::DictationLanguage, "dictation-language"),
+    (Setting::DictationPolish, "dictation-polish"),
+    (Setting::NodePath, "node-path"),
+    (Setting::Renderer, "renderer"),
+    (Setting::ConfirmTerminalPaste, "confirm-terminal-paste"),
+    (Setting::ClipboardHistory, "clipboard-history"),
+    (Setting::ClipboardPaused, "clipboard-paused"),
+    (Setting::ClipboardRetentionDays, "clipboard-retention-days"),
+    (Setting::ClipboardMeaning, "clipboard-meaning"),
+    (Setting::SnippetExpansion, "snippet-expansion"),
+];
+
+/// The uses of a model, as a picker of one is named.
+const USES: [(Use, &str); 4] = [(Use::Answers, "answers"), (Use::DictationRecognition, "recognition"), (Use::DictationPolish, "polish"), (Use::ClipboardCases, "cases")];
+
+/// Heyo's own hotkeys, as a hotkey field of one is named.
+const HOTKEYS: [(HotkeyName, &str); 3] = [(HotkeyName::Toggle, "toggle"), (HotkeyName::Clipboard, "clipboard"), (HotkeyName::Dictation, "dictation")];
+
+/// The word of `known` in `table`.
+fn word<T: PartialEq>(table: &[(T, &'static str)], known: &T) -> &'static str {
+    table.iter().find(|(one, _)| one == known).map_or("", |(_, word)| word)
+}
+
+/// What `word` is in `table`.
+fn named<T: Copy>(table: &[(T, &str)], word: &str) -> Option<T> {
+    table.iter().find(|(_, known)| *known == word).map(|(one, _)| *one)
+}
+
 /// What a picker's choice is written as: the provider and its model.
 pub(crate) fn choice(provider: &str, model: &str) -> String {
     format!("{provider}{SEP}{model}")
@@ -53,13 +125,67 @@ pub(crate) fn chosen(value: &str) -> Option<(&str, &str)> {
     value.split_once(SEP)
 }
 
+/// A page of the window.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PageId {
+    /// One of the pages of the sidebar's own, by its word (`general`,
+    /// `models`, … as `pages` registers them).
+    Own(String),
+    /// Choosing the kind of a provider to add.
+    AddProvider,
+    /// The form of the provider being added.
+    NewProvider,
+    /// A provider's page, by its id.
+    Provider(String),
+    /// An extension's page, by its id: `@heyo`, `@applications`, or the
+    /// directory it is in.
+    Extension(String),
+}
+
+const PROVIDER: &str = "provider:";
+
+impl fmt::Display for PageId {
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PageId::Own(word) => write!(out, "{word}"),
+            PageId::AddProvider => write!(out, "{PROVIDER}add"),
+            PageId::NewProvider => write!(out, "{PROVIDER}new"),
+            PageId::Provider(id) => write!(out, "{PROVIDER}{id}"),
+            PageId::Extension(id) => write!(out, "{id}"),
+        }
+    }
+}
+
+impl From<PageId> for String {
+    fn from(page: PageId) -> String {
+        page.to_string()
+    }
+}
+
+impl PageId {
+    /// The page `page` names. An extension is named by `@` and a word, or
+    /// by a whole path; a page of the sidebar's own by a word.
+    pub(crate) fn parse(page: &str) -> PageId {
+        match page.strip_prefix(PROVIDER) {
+            Some("add") => PageId::AddProvider,
+            Some("new") => PageId::NewProvider,
+            Some(id) => PageId::Provider(id.to_string()),
+            None if page.starts_with('@') || std::path::Path::new(page).is_absolute() => PageId::Extension(page.to_string()),
+            None => PageId::Own(page.to_string()),
+        }
+    }
+
+    /// One of the pages of the sidebar's own.
+    pub(crate) fn own(word: &str) -> PageId {
+        PageId::Own(word.to_string())
+    }
+}
+
 /// What a control acts on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Id {
-    /// A setting, by its name: a switch, a choice or a field of it.
-    Set(String),
-    /// A setting that is a number.
-    Num(String),
+    /// A setting: a switch, a choice or a field of it.
+    Set(Setting),
     /// The alias of an item of the palette.
     Alias(String),
     /// Whether a command is enabled.
@@ -72,7 +198,7 @@ pub(crate) enum Id {
     /// the extension's own); `kind` is what kind of control it has.
     Preference { extension: String, command: String, name: String, kind: String },
     /// A permission an extension was given, to take it back.
-    Revoke { extension: String, permission: String },
+    Revoke { extension: String, permission: Permission },
     /// Whether an extension shows live activities.
     Activities(String),
     Uninstall(String),
@@ -84,8 +210,8 @@ pub(crate) enum Id {
     IgnoreRemove(String),
     ExpandAdd,
     ExpandRemove(String),
-    /// The model a use refers to, by the use's setting: its picker.
-    Pick(String),
+    /// The model a use refers to: its picker.
+    Pick(Use),
     /// A field of a provider's configuration, or its `name`.
     ProviderField { provider: String, field: String },
     /// The button that forgets a provider's secret field.
@@ -98,7 +224,7 @@ pub(crate) enum Id {
     /// A field of that new provider's form, or its `name`.
     DraftField(String),
     /// Shows that page.
-    Go(String),
+    Go(PageId),
     /// A speech model of this computer, by its id: downloaded, its
     /// download called off, deleted, or used for dictation.
     SpeechDownload(String),
@@ -118,14 +244,13 @@ pub(crate) enum Id {
 impl fmt::Display for Id {
     fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Id::Set(name) => write!(out, "set:{name}"),
-            Id::Num(name) => write!(out, "num:{name}"),
+            Id::Set(setting) => write!(out, "set:{}", word(&SETTINGS, setting)),
             Id::Alias(item) => write!(out, "alias:{item}"),
             Id::Enable(command) => write!(out, "enable:{command}"),
             Id::EnableAll(extension) => write!(out, "enable-all:{extension}"),
             Id::Open(group) => write!(out, "open:{group}"),
             Id::Preference { extension, command, name, kind } => write!(out, "pref:{extension}{SEP}{command}{SEP}{name}{SEP}{kind}"),
-            Id::Revoke { extension, permission } => write!(out, "revoke:{extension}{SEP}{permission}"),
+            Id::Revoke { extension, permission } => write!(out, "revoke:{extension}{SEP}{}", permission.name()),
             Id::Activities(extension) => write!(out, "activities:{extension}"),
             Id::Uninstall(extension) => write!(out, "uninstall:{extension}"),
             Id::Words => write!(out, "words"),
@@ -133,7 +258,7 @@ impl fmt::Display for Id {
             Id::IgnoreRemove(application) => write!(out, "ignore:remove:{application}"),
             Id::ExpandAdd => write!(out, "expand:add"),
             Id::ExpandRemove(application) => write!(out, "expand:remove:{application}"),
-            Id::Pick(setting) => write!(out, "pick:{setting}"),
+            Id::Pick(need) => write!(out, "pick:{}", word(&USES, need)),
             Id::ProviderField { provider, field } => write!(out, "provider:{provider}{SEP}{field}"),
             Id::ForgetSecret { provider, field } => write!(out, "forget:{provider}{SEP}{field}"),
             Id::CheckProvider(provider) => write!(out, "check-provider:{provider}"),
@@ -145,7 +270,7 @@ impl fmt::Display for Id {
             Id::SpeechCancel(id) => write!(out, "speech-cancel:{id}"),
             Id::SpeechDelete(id) => write!(out, "speech-delete:{id}"),
             Id::SpeechUse(id) => write!(out, "speech-use:{id}"),
-            Id::Act(act) => write!(out, "act:{}", ACTS.iter().find(|(known, _)| known == act).map_or("", |(_, name)| name)),
+            Id::Act(act) => write!(out, "act:{}", word(&ACTS, act)),
             Id::Modification(which) => write!(out, "mod:{which}"),
             Id::Category(which) => write!(out, "cat:{which}"),
             Id::Named(name) => write!(out, "{name}"),
@@ -169,16 +294,22 @@ impl Id {
             "expand:add" => return Id::ExpandAdd,
             _ => {}
         }
-        if let Some(act) = id.strip_prefix("act:").and_then(|name| ACTS.iter().find(|(_, known)| *known == name)) {
-            return Id::Act(act.0);
+        if let Some(act) = id.strip_prefix("act:").and_then(|name| named(&ACTS, name)) {
+            return Id::Act(act);
+        }
+        if let Some(setting) = id.strip_prefix("set:").and_then(|name| named(&SETTINGS, name)) {
+            return Id::Set(setting);
+        }
+        if let Some(need) = id.strip_prefix("pick:").and_then(|name| named(&USES, name)) {
+            return Id::Pick(need);
         }
         if let Some(rest) = id.strip_prefix("pref:") {
             if let [extension, command, name, kind] = rest.split(SEP).collect::<Vec<_>>()[..] {
                 return Id::Preference { extension: own(extension), command: own(command), name: own(name), kind: own(kind) };
             }
         }
-        if let Some((extension, permission)) = id.strip_prefix("revoke:").and_then(|rest| rest.split_once(SEP)) {
-            return Id::Revoke { extension: own(extension), permission: own(permission) };
+        if let Some((extension, permission)) = id.strip_prefix("revoke:").and_then(|rest| rest.split_once(SEP)).and_then(|(extension, name)| Some((extension, Permission::named(name)?))) {
+            return Id::Revoke { extension: own(extension), permission };
         }
         if let Some((provider, field)) = id.strip_prefix("provider:").and_then(|rest| rest.split_once(SEP)) {
             return Id::ProviderField { provider: own(provider), field: own(field) };
@@ -186,10 +317,11 @@ impl Id {
         if let Some((provider, field)) = id.strip_prefix("forget:").and_then(|rest| rest.split_once(SEP)) {
             return Id::ForgetSecret { provider: own(provider), field: own(field) };
         }
+        if let Some(page) = id.strip_prefix("go:") {
+            return Id::Go(PageId::parse(page));
+        }
         // The longer of two that begin alike first.
-        let forms: [(&str, fn(String) -> Id); 22] = [
-            ("set:", Id::Set),
-            ("num:", Id::Num),
+        let forms: [(&str, fn(String) -> Id); 18] = [
             ("alias:", Id::Alias),
             ("enable-all:", Id::EnableAll),
             ("enable:", Id::Enable),
@@ -200,12 +332,10 @@ impl Id {
             ("expand:remove:", Id::ExpandRemove),
             ("mod:", Id::Modification),
             ("cat:", Id::Category),
-            ("pick:", Id::Pick),
             ("remove-provider:", Id::RemoveProvider),
             ("check-provider:", Id::CheckProvider),
             ("new-provider:", Id::NewProvider),
             ("draft:", Id::DraftField),
-            ("go:", Id::Go),
             ("speech-download:", Id::SpeechDownload),
             ("speech-cancel:", Id::SpeechCancel),
             ("speech-delete:", Id::SpeechDelete),
@@ -216,17 +346,17 @@ impl Id {
 }
 
 /// What a hotkey is bound to, as a hotkey field is named: one of Heyo's
-/// own hotkeys, by the host's name for it, or an item of the palette.
+/// own hotkeys, or an item of the palette.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Bound {
-    Own(String),
+    Own(HotkeyName),
     Item(String),
 }
 
 impl fmt::Display for Bound {
     fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Bound::Own(name) => write!(out, "@{name}"),
+            Bound::Own(name) => write!(out, "@{}", word(&HOTKEYS, name)),
             Bound::Item(id) => write!(out, "{id}"),
         }
     }
@@ -234,7 +364,10 @@ impl fmt::Display for Bound {
 
 impl Bound {
     pub(crate) fn parse(name: &str) -> Bound {
-        name.strip_prefix('@').map_or_else(|| Bound::Item(name.to_string()), |own| Bound::Own(own.to_string()))
+        match name.strip_prefix('@').and_then(|own| named(&HOTKEYS, own)) {
+            Some(own) => Bound::Own(own),
+            None => Bound::Item(name.to_string()),
+        }
     }
 }
 
@@ -246,8 +379,6 @@ mod tests {
     fn every_id_is_read_back_as_it_was_written() {
         let s = |word: &str| word.to_string();
         let mut all = vec![
-            Id::Set(s("compactMode")),
-            Id::Num(s("clipboardRetentionDays")),
             Id::Alias(s("app:files.desktop")),
             Id::Enable(s("cmd:zeta:one")),
             Id::EnableAll(s("/data/zeta")),
@@ -255,7 +386,8 @@ mod tests {
             Id::Preference { extension: s("zeta"), command: s("one"), name: s("loud"), kind: s("checkbox") },
             // An extension's own preference: no command.
             Id::Preference { extension: s("zeta"), command: s(""), name: s("token"), kind: s("password") },
-            Id::Revoke { extension: s("zeta"), permission: s("windows") },
+            Id::Revoke { extension: s("zeta"), permission: Permission::Windows },
+            Id::Revoke { extension: s("zeta"), permission: Permission::ScreenCapture },
             Id::Activities(s("zeta")),
             Id::Uninstall(s("/data/zeta")),
             Id::Words,
@@ -263,7 +395,6 @@ mod tests {
             Id::IgnoreRemove(s("firefox.desktop")),
             Id::ExpandAdd,
             Id::ExpandRemove(s("org.gnome.Terminal.desktop")),
-            Id::Pick(s("aiModel")),
             Id::ProviderField { provider: s("openai-compatible-2"), field: s("url") },
             Id::ProviderField { provider: s("claude"), field: s("name") },
             Id::ForgetSecret { provider: s("claude"), field: s("key") },
@@ -271,7 +402,6 @@ mod tests {
             Id::CheckProvider(s("doubao")),
             Id::NewProvider(s("openai-compatible")),
             Id::DraftField(s("url")),
-            Id::Go(s("provider:openai-compatible-2")),
             Id::SpeechDownload(s("whisper-turbo")),
             Id::SpeechCancel(s("parakeet-tdt-0.6b-v3")),
             Id::SpeechDelete(s("x-asr-2026-06-05")),
@@ -282,9 +412,51 @@ mod tests {
             Id::Named(s("")),
         ];
         all.extend(ACTS.iter().map(|(act, _)| Id::Act(*act)));
+        all.extend(SETTINGS.iter().map(|(setting, _)| Id::Set(*setting)));
+        all.extend(USES.iter().map(|(need, _)| Id::Pick(*need)));
+        all.extend(pages().into_iter().map(Id::Go));
         for id in all {
             assert_eq!(Id::parse(&id.to_string()), id, "{id}");
         }
+    }
+
+    /// One page of each form.
+    fn pages() -> Vec<PageId> {
+        let s = |word: &str| word.to_string();
+        vec![
+            PageId::Own(s("general")),
+            PageId::Own(s("models")),
+            PageId::AddProvider,
+            PageId::NewProvider,
+            PageId::Provider(s("openai-compatible-2")),
+            PageId::Extension(s("@heyo")),
+            PageId::Extension(s("@applications")),
+            PageId::Extension(s("/data/zeta")),
+        ]
+    }
+
+    #[test]
+    fn every_page_is_read_back_as_it_was_written() {
+        for page in pages() {
+            assert_eq!(PageId::parse(&page.to_string()), page, "{page}");
+        }
+        // As the window had them before they were typed.
+        assert_eq!(PageId::parse("provider:add").to_string(), "provider:add");
+        assert_eq!(PageId::parse("/src/alpha"), PageId::Extension("/src/alpha".to_string()));
+    }
+
+    #[test]
+    fn every_word_is_said_once() {
+        fn once<T>(table: &[(T, &str)]) {
+            let mut words: Vec<&str> = table.iter().map(|(_, word)| *word).collect();
+            words.sort();
+            words.dedup();
+            assert_eq!(words.len(), table.len());
+        }
+        once(&ACTS);
+        once(&SETTINGS);
+        once(&USES);
+        once(&HOTKEYS);
     }
 
     #[test]
@@ -307,9 +479,9 @@ mod tests {
 
     #[test]
     fn a_hotkey_is_heyos_own_or_an_items() {
-        for bound in [Bound::Own("toggle".to_string()), Bound::Item("app:files.desktop".to_string())] {
+        for bound in [Bound::Own(HotkeyName::Toggle), Bound::Own(HotkeyName::Dictation), Bound::Item("app:files.desktop".to_string())] {
             assert_eq!(Bound::parse(&bound.to_string()), bound);
         }
-        assert_eq!(Bound::Own("toggle".to_string()).to_string(), "@toggle");
+        assert_eq!(Bound::Own(HotkeyName::Toggle).to_string(), "@toggle");
     }
 }

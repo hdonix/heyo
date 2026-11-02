@@ -297,22 +297,22 @@ impl Use {
         }
     }
 
-    /// The setting, as it is stored.
-    pub fn setting(self) -> &'static str {
-        match self {
-            Use::Answers => "aiModel",
-            Use::DictationRecognition => "dictationModel",
-            Use::DictationPolish => "polishModel",
-            Use::ClipboardCases => "casesModel",
-        }
-    }
-
     pub fn reference(self, settings: &Settings) -> &ModelRef {
         match self {
             Use::Answers => &settings.ai_model,
             Use::DictationRecognition => &settings.dictation_model,
             Use::DictationPolish => &settings.polish_model,
             Use::ClipboardCases => &settings.cases_model,
+        }
+    }
+
+    /// The same, to change.
+    pub fn reference_mut(self, settings: &mut Settings) -> &mut ModelRef {
+        match self {
+            Use::Answers => &mut settings.ai_model,
+            Use::DictationRecognition => &mut settings.dictation_model,
+            Use::DictationPolish => &mut settings.polish_model,
+            Use::ClipboardCases => &mut settings.cases_model,
         }
     }
 
