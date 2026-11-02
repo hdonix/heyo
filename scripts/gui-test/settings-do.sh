@@ -21,8 +21,13 @@
 # the window's own: its edge, to drag it by.
 . "$(dirname "$0")/env.sh"
 scale=$(scale)
-# By its title in English or in Chinese, and then by the title it has.
-id=$(window '^Heyo (Settings|设置)$'); [ -n "$id" ] || { echo "no settings window" >&2; exit 1; }
+# By its class and its title in English or in Chinese (xdotool's search
+# by name does not match a title that is not ASCII), and then by the
+# title it has.
+id=$(for each in $(xdotool search --onlyvisible --classname heyo 2>/dev/null); do
+  case "$(xdotool getwindowname "$each")" in "Heyo Settings" | "Heyo 设置") echo "$each" ;; esac
+done | tail -1)
+[ -n "$id" ] || { echo "no settings window" >&2; exit 1; }
 title=$(xdotool getwindowname "$id")
 set -- "$@" -- $(place "$id")
 todo=
