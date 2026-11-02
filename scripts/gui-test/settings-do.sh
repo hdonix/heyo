@@ -2,7 +2,8 @@
 # Does things to the settings window that is on the sandbox's screen, one
 # after another, as a person would with pointer and keyboard:
 #
-#   settings-do.sh page TITLE        a page by its entry in the sidebar ("General", "Heyo Commands")
+#   settings-do.sh page TITLE        a page by its entry in the sidebar ("General", "Heyo Commands";
+#                                    "通用" where the window speaks Chinese)
 #   settings-do.sh press ROLE NAME   a click on a control, found by what it is and says
 #                                    ("push button" "Copy Diagnostics"; ask.py tree lists them)
 #   settings-do.sh click X Y         a click, at the window's own logical pixels
@@ -20,7 +21,9 @@
 # the window's own: its edge, to drag it by.
 . "$(dirname "$0")/env.sh"
 scale=$(scale)
-id=$(window '^Heyo Settings$'); [ -n "$id" ] || { echo "no settings window" >&2; exit 1; }
+# By its title in English or in Chinese, and then by the title it has.
+id=$(window '^Heyo (Settings|设置)$'); [ -n "$id" ] || { echo "no settings window" >&2; exit 1; }
+title=$(xdotool getwindowname "$id")
 set -- "$@" -- $(place "$id")
 todo=
 while [ "$1" != -- ]; do todo="$todo \"$1\""; shift; done
@@ -30,8 +33,8 @@ eval "set -- $todo"
 at() { xdotool mousemove $((X + $1 * scale)) $((Y + $2 * scale)); }
 while [ $# -gt 0 ]; do
   case $1 in
-    page) ask click "list item" "$2" "Heyo Settings" > /dev/null || exit 1; at 560 12; shift 2 ;;
-    press) ask click "$2" "$3" "Heyo Settings" > /dev/null || exit 1; shift 3 ;;
+    page) ask click "list item" "$2" "$title" > /dev/null || exit 1; at 560 12; shift 2 ;;
+    press) ask click "$2" "$3" "$title" > /dev/null || exit 1; shift 3 ;;
     click) at "$2" "$3"; xdotool click 1; shift 3 ;;
     move) at "$2" "$3"; shift 3 ;;
     key) xdotool key "$2"; shift 2 ;;
