@@ -144,6 +144,105 @@ msgstr "没有名为 {0} 的连接。"
 msgid "A connection needs a name."
 msgstr "连接需要一个名称。"
 
+#: src-tauri/src/connections/builtins.rs
+msgid "Password"
+msgstr "密码"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Most mail and calendar services want an app password or authorization code here, made for Heyo in the service's settings, not the password you sign in with."
+msgstr "大多数邮件和日历服务在这里要的是在服务的设置里为 Heyo 生成的应用专用密码或授权码，而不是登录用的密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Turn on IMAP in the mailbox's settings on the web, and use the authorization code it gives as the password."
+msgstr "在网页版邮箱的设置里开启 IMAP，并把它给出的授权码填作密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "IMAP Mail"
+msgstr "IMAP 邮件"
+
+#: src-tauri/src/connections/builtins.rs
+#: src-tauri/src/models/kinds/openai.rs
+#: runtime/src/connections/builtin/imap.ts
+msgid "Server"
+msgstr "服务器"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Port"
+msgstr "端口"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Security"
+msgstr "加密方式"
+
+#: src-tauri/src/connections/builtins.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "None"
+msgstr "无"
+
+#: src-tauri/src/connections/builtins.rs
+#: runtime/src/connections/builtin/imap.ts
+msgid "User Name"
+msgstr "用户名"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Folders"
+msgstr "文件夹"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Days to Bring First"
+msgstr "首次同步天数"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "How far back the first sync of a folder goes; later syncs bring everything new."
+msgstr "首次同步一个文件夹时往回取多少天；之后的同步会取回所有新邮件。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "QQ Mail"
+msgstr "QQ 邮箱"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Turn on IMAP in QQ Mail's settings on the web, and use the authorization code it gives as the password, not the QQ password."
+msgstr "在网页版 QQ 邮箱的设置里开启 IMAP，并把它给出的授权码填作密码，而不是 QQ 密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "NetEase 163 Mail"
+msgstr "网易 163 邮箱"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "NetEase 126 Mail"
+msgstr "网易 126 邮箱"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Alibaba Enterprise Mail"
+msgstr "阿里企业邮箱"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the whole address as the user name; with secure login on, a client password made in the mailbox's settings."
+msgstr "用户名填完整的邮箱地址；开启了安全登录时，密码填在邮箱设置里生成的客户端专用密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Tencent Enterprise Mail"
+msgstr "腾讯企业邮箱"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the whole address as the user name; with WeChat secure login on, a client password made in the mailbox's settings."
+msgstr "用户名填完整的邮箱地址；开启了微信安全登录时，密码填在邮箱设置里生成的客户端专用密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Needs 2-Step Verification on the Google account, and an app password made for Heyo."
+msgstr "需要 Google 账号开启两步验证，并为 Heyo 生成一个应用专用密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the name before @icloud.com as the user name, and an app-specific password made in the Apple Account's settings."
+msgstr "用户名填 @icloud.com 前面的部分，密码填在 Apple 账户设置里生成的应用专用密码。"
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Microsoft wants most accounts to sign in through its own page (OAuth), which Heyo cannot do yet: an app password works only where the account still allows one."
+msgstr "微软要求大多数账户通过它自己的页面（OAuth）登录，Heyo 暂时还做不到：只有账户仍然允许时，应用专用密码才能用。"
+
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
 msgstr "{0} 不是已安装的连接器。"
@@ -1201,10 +1300,6 @@ msgid "Heyo does not know this kind of provider."
 msgstr "Heyo 不认识这种提供商。"
 
 #: src-tauri/src/models/kinds/openai.rs
-msgid "Server"
-msgstr "服务器"
-
-#: src-tauri/src/models/kinds/openai.rs
 msgid "Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
 msgstr "任何兼容 OpenAI 的服务器都可以（vLLM、LM Studio、Ollama）。"
 
@@ -1981,13 +2076,6 @@ msgstr "剪贴板搜索用例"
 #: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."
 msgstr "根据你复制的内容编写衡量剪贴板搜索的用例：只提供把内容留在这台电脑上的模型。"
-
-#: src-tauri/src/slint_windows/pages/advanced.rs
-#: src-tauri/src/slint_windows/pages/dictation.rs
-#: src-tauri/src/slint_windows/pages/models.rs
-#: src-tauri/src/slint_windows/ui/widgets.slint
-msgid "None"
-msgstr "无"
 
 #: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Ask Before Pasting Several Lines into a Terminal"
@@ -5097,6 +5185,30 @@ msgstr "无法下载 Speedtest（{0}）。"
 #: runtime/src/compat.ts
 msgid "The Speedtest download does not match the expected file; not using it."
 msgstr "下载的 Speedtest 与预期的文件不符，不会使用它。"
+
+#: runtime/src/connections/builtin/common.ts
+msgid "{0} is not set."
+msgstr "没有设置{0}。"
+
+#: runtime/src/connections/builtin/common.ts
+msgid "The password is not set."
+msgstr "没有设置密码。"
+
+#: runtime/src/connections/builtin/common.ts
+msgid "The server refused the credentials: {0}"
+msgstr "服务器拒绝了登录凭据：{0}"
+
+#: runtime/src/connections/builtin/common.ts
+msgid "The server could not be reached: {0}"
+msgstr "无法连接服务器：{0}"
+
+#: runtime/src/connections/builtin/imap.ts
+msgid "(no subject)"
+msgstr "（无主题）"
+
+#: runtime/src/connections/builtin/imap.ts
+msgid "Attachment"
+msgstr "附件"
 
 #: runtime/src/session.ts
 msgid "Could not prepare {0} for Linux"

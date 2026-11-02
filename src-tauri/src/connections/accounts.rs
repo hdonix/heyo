@@ -242,10 +242,12 @@ pub fn kinds_in(dir: &Path) -> Vec<Kind> {
         .collect()
 }
 
-/// Every connector there is: Heyo's own (none yet), then those of the
+/// Every connector there is: Heyo's own (`builtins.rs`), then those of the
 /// installed extensions and of those being developed.
 pub fn kinds() -> Vec<Kind> {
-    crate::extensions::extension_dirs().iter().flat_map(|dir| kinds_in(dir)).collect()
+    let mut kinds = super::builtins::kinds();
+    kinds.extend(crate::extensions::extension_dirs().iter().flat_map(|dir| kinds_in(dir)));
+    kinds
 }
 
 /// The values of `kind`'s fields `given` names, checked against what the

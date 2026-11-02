@@ -103,6 +103,11 @@ for it. A translation uses these and no synonym; change a term here and in
 | First, Last (Third, Two Thirds) | 左侧, 右侧 | The layouts go from the left; “第一个” says nothing of where. |
 | System (a command's group) | 系统 | The commands that act on the computer; a message of its own (`command group`), since “System” alone is 跟随系统. |
 | Heyo Settings → Dictation (a path through the settings) | “Heyo 设置”→“听写” | Each step quoted, no spaces round the arrow. |
+| Connection (an account of a service Heyo syncs) | 连接 | As the settings page is named; “账户” is what the service has, not what Heyo keeps. |
+| Sync | 同步 | Standard. |
+| App password, app-specific password | 应用专用密码 | What Google and Apple call it in Chinese. |
+| Authorization code (QQ Mail's, NetEase's) | 授权码 | The mail services' own word. |
+| Secret (a field kept with the secrets) | 保密, 密钥 | 保密 for what a field is (保密环境变量), 密钥 for a key. |
 
 Names stay as they are: Heyo, Claude, Raycast, Wayland, GNOME Shell,
 Node.js, SenseVoice, PaddleOCR, and the names of keys (Enter, Esc, Ctrl).

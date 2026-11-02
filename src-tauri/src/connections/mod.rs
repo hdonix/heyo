@@ -4,6 +4,8 @@
 //!
 //! - `accounts.rs`: the accounts (settings), the connectors they can be of
 //!   (manifests), and what is remembered of their syncing.
+//! - `builtins.rs`: Heyo's own connectors (mail, calendars, MCP servers),
+//!   declared as a manifest would.
 //! - `scheduler.rs`: when each account is synced and watched, as plain
 //!   data with the time passed in.
 //! - `shell.rs`: what carries that out: the connections runtime's process
@@ -18,6 +20,7 @@
 //! ask of it.
 
 pub mod accounts;
+pub mod builtins;
 pub mod commands;
 pub mod scheduler;
 pub mod shell;

@@ -141,6 +141,105 @@ msgstr ""
 msgid "A connection needs a name."
 msgstr ""
 
+#: src-tauri/src/connections/builtins.rs
+msgid "Password"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Most mail and calendar services want an app password or authorization code here, made for Heyo in the service's settings, not the password you sign in with."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Turn on IMAP in the mailbox's settings on the web, and use the authorization code it gives as the password."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "IMAP Mail"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+#: src-tauri/src/models/kinds/openai.rs
+#: runtime/src/connections/builtin/imap.ts
+msgid "Server"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Port"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Security"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+#: src-tauri/src/slint_windows/pages/advanced.rs
+#: src-tauri/src/slint_windows/pages/dictation.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src-tauri/src/slint_windows/ui/widgets.slint
+msgid "None"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+#: runtime/src/connections/builtin/imap.ts
+msgid "User Name"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Folders"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Days to Bring First"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "How far back the first sync of a folder goes; later syncs bring everything new."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "QQ Mail"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Turn on IMAP in QQ Mail's settings on the web, and use the authorization code it gives as the password, not the QQ password."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "NetEase 163 Mail"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "NetEase 126 Mail"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Alibaba Enterprise Mail"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the whole address as the user name; with secure login on, a client password made in the mailbox's settings."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Tencent Enterprise Mail"
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the whole address as the user name; with WeChat secure login on, a client password made in the mailbox's settings."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Needs 2-Step Verification on the Google account, and an app password made for Heyo."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Use the name before @icloud.com as the user name, and an app-specific password made in the Apple Account's settings."
+msgstr ""
+
+#: src-tauri/src/connections/builtins.rs
+msgid "Microsoft wants most accounts to sign in through its own page (OAuth), which Heyo cannot do yet: an app password works only where the account still allows one."
+msgstr ""
+
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
 msgstr ""
@@ -1201,10 +1300,6 @@ msgid "Heyo does not know this kind of provider."
 msgstr ""
 
 #: src-tauri/src/models/kinds/openai.rs
-msgid "Server"
-msgstr ""
-
-#: src-tauri/src/models/kinds/openai.rs
 msgid "Any OpenAI-compatible server works (vLLM, LM Studio, Ollama)."
 msgstr ""
 
@@ -1982,13 +2077,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/advanced.rs
-#: src-tauri/src/slint_windows/pages/dictation.rs
-#: src-tauri/src/slint_windows/pages/models.rs
-#: src-tauri/src/slint_windows/ui/widgets.slint
-msgid "None"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/advanced.rs
@@ -5107,6 +5195,30 @@ msgstr ""
 
 #: runtime/src/compat.ts
 msgid "The Speedtest download does not match the expected file; not using it."
+msgstr ""
+
+#: runtime/src/connections/builtin/common.ts
+msgid "{0} is not set."
+msgstr ""
+
+#: runtime/src/connections/builtin/common.ts
+msgid "The password is not set."
+msgstr ""
+
+#: runtime/src/connections/builtin/common.ts
+msgid "The server refused the credentials: {0}"
+msgstr ""
+
+#: runtime/src/connections/builtin/common.ts
+msgid "The server could not be reached: {0}"
+msgstr ""
+
+#: runtime/src/connections/builtin/imap.ts
+msgid "(no subject)"
+msgstr ""
+
+#: runtime/src/connections/builtin/imap.ts
+msgid "Attachment"
 msgstr ""
 
 #: runtime/src/session.ts
