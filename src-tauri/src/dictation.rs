@@ -94,7 +94,8 @@ pub(crate) use engine::doubao;
 /// or a provider that is not set up (Doubao without a key), is what to say
 /// instead.
 fn opener(settings: &crate::settings::Settings) -> Result<Box<dyn Opener>, String> {
-    let (provider, model) = registry::resolve(&settings.providers, &settings.dictation_model, registry::Use::DictationRecognition).map_err(|why| crate::models::ModelError::Unusable(why).message())?;
+    let providers = settings.providers_in_use();
+    let (provider, model) = registry::resolve(&providers, &settings.dictation_model, registry::Use::DictationRecognition).map_err(|why| crate::models::ModelError::Unusable(why).message())?;
     match provider.kind().recognizer(provider, model, &vocabulary::parse(&settings.dictation_vocabulary)) {
         Some(opened) => opened.map_err(|failure| crate::models::kinds::worded(&failure)),
         None => Err(crate::models::ModelError::Unusable(registry::Unusable::Cannot(provider.name.clone())).message()),

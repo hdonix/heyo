@@ -386,6 +386,12 @@ and keeps the list of applications current. The rest, by what it is for:
 - `settings.rs`: see "Settings" below. `paths.rs` names every place Heyo
   keeps things, once (the XDG base directories; on Windows `lib.rs` points
   those at `%APPDATA%` and `%LOCALAPPDATA%` first).
+- `secrets.rs` is where API keys, tokens and passwords are kept and found,
+  by whose they are and their name (`provider:<id>/key`,
+  `connection:<id>/password`): today in the settings file, under
+  `secrets`, apart from the providers and connections they belong to, so
+  that what shows those cannot show a secret. A window is told only which
+  are set. A keyring would replace this one module.
 - `diagnostics.rs` keeps the log, writes panics into it and assembles what
   "Copy Diagnostics" copies, with secrets and the home directory scrubbed.
 - `renderer.rs` chooses how WebKitGTK draws (on the GPU, or on the CPU

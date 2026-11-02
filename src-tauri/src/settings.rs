@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::models::registry::{self, ModelRef, Provider};
+use crate::secrets::{Owner, Secrets};
 
 /// The colour scheme of the interface.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -77,8 +78,7 @@ pub struct Settings {
     /// nothing goes in before a sentence is finished.
     pub dictation_live: bool,
     /// The providers models are reached through (`models::registry`). Their
-    /// secrets (API keys) are for the host alone: a window is told only
-    /// which are set (`SettingsView::secrets_set`).
+    /// secrets (API keys) are not here but in `secrets`.
     pub providers: Vec<Provider>,
     /// The model that answers Ask AI, AI Chat, the selected-text actions
     /// and extensions' `AI.ask`.
@@ -118,9 +118,26 @@ pub struct Settings {
     pub live_activities: bool,
     /// Extensions (by manifest name) whose activities are turned off.
     pub activities_off: Vec<String>,
+    /// The secrets of the providers and the connections (`secrets`): for
+    /// the host alone. A window is told only which are set
+    /// (`ProviderState::secrets_set`), and never has them to send back.
+    #[serde(skip_serializing_if = "Secrets::is_empty")]
+    #[ts(skip)]
+    pub secrets: Secrets,
 }
 
 impl Settings {
+    /// The providers as they are used: each with its secrets among its
+    /// configuration. Not for a window.
+    pub fn providers_in_use(&self) -> Vec<Provider> {
+        let mut providers = self.providers.clone();
+        for provider in &mut providers {
+            let secrets = self.secrets.of(Owner::Provider(&provider.id));
+            provider.config.extend(secrets);
+        }
+        providers
+    }
+
     /// Whether the interface is dark right now: as chosen, or as the system
     /// is when the choice is to follow it.
     pub fn dark(&self) -> bool {
@@ -167,6 +184,7 @@ impl Default for Settings {
             renderer: crate::renderer::Renderer::Auto,
             live_activities: true,
             activities_off: Vec::new(),
+            secrets: Secrets::default(),
         }
     }
 }

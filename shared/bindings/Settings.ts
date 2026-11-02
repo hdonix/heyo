@@ -74,8 +74,7 @@ dictationHoldKey: string,
 dictationLive: boolean, 
 /**
  * The providers models are reached through (`models::registry`). Their
- * secrets (API keys) are for the host alone: a window is told only
- * which are set (`SettingsView::secrets_set`).
+ * secrets (API keys) are not here but in `secrets`.
  */
 providers: Array<Provider>, 
 /**

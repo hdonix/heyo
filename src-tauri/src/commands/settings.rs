@@ -12,9 +12,9 @@ use crate::models::registry::{self, Provider};
 
 pub(crate) const SETTINGS_WINDOW: &str = "settings";
 
-/// The provider `id` as it is saved, secrets and all: for the host alone.
+/// The provider `id` as it is used, secrets and all: for the host alone.
 fn saved_provider(app: &AppHandle, id: &str) -> Result<Provider, String> {
-    let provider = app.state::<SettingsState>().0.read().unwrap().providers.iter().find(|provider| provider.id == id).cloned();
+    let provider = app.state::<SettingsState>().0.read().unwrap().providers_in_use().into_iter().find(|provider| provider.id == id);
     provider.ok_or_else(|| tf("There is no provider {0}.", &[&id]))
 }
 
@@ -199,20 +199,19 @@ impl SettingsView {
     }
 }
 
-/// The providers as a window may see them: each secret taken out, and
-/// whether it was there said instead.
-fn without_secrets(providers: &mut [Provider]) -> std::collections::BTreeMap<String, ProviderState> {
-    providers
+/// The settings as a window may see them: without the secrets, and with
+/// which of each provider's are set said instead.
+fn without_secrets(settings: &mut Settings) -> std::collections::BTreeMap<String, ProviderState> {
+    let secrets = std::mem::take(&mut settings.secrets);
+    settings
+        .providers
         .iter_mut()
         .map(|provider| {
-            let mut state = ProviderState::default();
+            // Nothing of a secret field is shown, whatever put it there.
             for field in provider.kind().fields().iter().filter(|field| field.entry == registry::Entry::Secret) {
-                if let Some(value) = provider.config.get_mut(field.name).filter(|value| !value.trim().is_empty()) {
-                    value.clear();
-                    state.secrets_set.push(field.name.to_owned());
-                }
+                provider.config.remove(field.name);
             }
-            state.cli_found = provider.kind().found(provider);
+            let state = ProviderState { secrets_set: secrets.names(crate::secrets::Owner::Provider(&provider.id)), cli_found: provider.kind().found(provider) };
             (provider.id.clone(), state)
         })
         .collect()
@@ -221,7 +220,7 @@ fn without_secrets(providers: &mut [Provider]) -> std::collections::BTreeMap<Str
 fn view(app: &AppHandle) -> SettingsView {
     let mut settings = app.state::<SettingsState>().0.read().unwrap().clone();
     SettingsView {
-        provider_states: without_secrets(&mut settings.providers),
+        provider_states: without_secrets(&mut settings),
         node_version: settings::node_version(&settings.node()),
         node_overridden: std::env::var_os("HEYO_NODE").is_some(),
         launch_at_login: settings::launch_at_login(),
@@ -250,8 +249,10 @@ pub(crate) fn get_settings(app: AppHandle, window: tauri::WebviewWindow) -> Sett
 pub(crate) fn change_settings(mut changes: serde_json::Map<String, Value>, app: AppHandle) -> Result<SettingsView, String> {
     // The providers have commands of their own: a window never has their
     // secrets to send back.
-    if changes.contains_key("providers") {
-        return Err("the providers are not changed this way".into());
+    for own in ["providers", "secrets"] {
+        if changes.contains_key(own) {
+            return Err(format!("the {own} are not changed this way"));
+        }
     }
     if let Some(enabled) = changes.remove("launchAtLogin") {
         let enabled = enabled.as_bool().ok_or("launchAtLogin is on or off")?;
@@ -275,11 +276,11 @@ pub(crate) fn install_shell_extension() -> Result<platform::Capabilities, String
     Ok(platform::capabilities())
 }
 
-/// Changes the providers as `change` does, if it can.
-fn change_providers(app: &AppHandle, change: impl FnOnce(&mut Vec<Provider>) -> Result<(), String>) -> Result<SettingsView, String> {
+/// Changes the providers and their secrets as `change` does, if it can.
+fn change_providers(app: &AppHandle, change: impl FnOnce(&mut Vec<Provider>, &mut crate::secrets::Secrets) -> Result<(), String>) -> Result<SettingsView, String> {
     let _changing = changing();
     let mut next = app.state::<SettingsState>().0.read().unwrap().clone();
-    change(&mut next.providers)?;
+    change(&mut next.providers, &mut next.secrets)?;
     commit(app, next)
 }
 
@@ -288,14 +289,14 @@ fn change_providers(app: &AppHandle, change: impl FnOnce(&mut Vec<Provider>) -> 
 /// new one says. Its id is made here.
 pub(crate) fn add_provider(kind: String, name: String, config: std::collections::BTreeMap<String, String>, app: AppHandle) -> Result<SettingsView, String> {
     let known = crate::models::kinds::addable().find(|known| known.word() == kind).ok_or_else(|| tf("{0} is not a provider that can be added.", &[&kind]))?;
-    change_providers(&app, |providers| {
+    change_providers(&app, |providers, secrets| {
         let id = registry::new_id(providers, known.word());
         providers.push(Provider::new(&id, known.word()));
         if !name.trim().is_empty() {
-            registry::set_field(providers, &id, "name", &name)?;
+            registry::set_field(providers, secrets, &id, "name", &name)?;
         }
         for (field, value) in &config {
-            registry::set_field(providers, &id, field, value)?;
+            registry::set_field(providers, secrets, &id, field, value)?;
         }
         Ok(())
     })
@@ -304,12 +305,12 @@ pub(crate) fn add_provider(kind: String, name: String, config: std::collections:
 /// Sets a field of a provider's configuration, or its name (`name`). A
 /// secret is never shown again; an empty one is removed.
 pub(crate) fn set_provider_field(provider: String, field: String, value: String, app: AppHandle) -> Result<SettingsView, String> {
-    change_providers(&app, |providers| registry::set_field(providers, &provider, &field, &value))
+    change_providers(&app, |providers, secrets| registry::set_field(providers, secrets, &provider, &field, &value))
 }
 
 /// Disconnects a provider. What refers to it says it is gone.
 pub(crate) fn remove_provider(id: String, app: AppHandle) -> Result<SettingsView, String> {
-    change_providers(&app, |providers| registry::remove(providers, &id))
+    change_providers(&app, |providers, secrets| registry::remove(providers, secrets, &id))
 }
 
 /// Opens the settings window, or brings it back if it is already open.
@@ -470,15 +471,22 @@ mod tests {
 
     #[test]
     fn no_window_is_told_a_secret_only_that_it_is_set() {
-        let mut providers = registry::defaults();
-        providers[1].config.insert(registry::KEY.into(), "sk-ant-secret".into());
+        use crate::secrets::Owner;
+        let mut settings = Settings::default();
+        settings.secrets.store(Owner::Provider("claude"), registry::KEY, "sk-ant-secret");
+        settings.secrets.store(Owner::Connection("work"), "password", "hunter2");
         let mut server = Provider::new("ollama", crate::models::kinds::OPENAI_COMPATIBLE);
-        server.config.extend([(registry::URL.to_string(), "http://127.0.0.1:11434/v1".to_string()), (registry::KEY.to_string(), "  ".to_string())]);
-        providers.push(server);
-        let states = without_secrets(&mut providers);
-        assert_eq!(providers[1].get(registry::KEY), "");
-        assert_eq!(providers[2].get(registry::URL), "http://127.0.0.1:11434/v1");
+        server.config.insert(registry::URL.to_string(), "http://127.0.0.1:11434/v1".to_string());
+        settings.providers.push(server);
+        // What is used has the key with it.
+        assert_eq!(settings.providers_in_use()[1].get(registry::KEY), "sk-ant-secret");
+        // A secret field in a configuration, however it got there, is not shown either.
+        settings.providers[1].config.insert(registry::KEY.into(), "sk-ant-stray".into());
+        let states = without_secrets(&mut settings);
+        assert_eq!(settings.providers[1].get(registry::KEY), "");
+        assert_eq!(settings.providers[2].get(registry::URL), "http://127.0.0.1:11434/v1");
         assert_eq!((states["claude"].secrets_set.as_slice(), states["ollama"].secrets_set.as_slice()), (&["key".to_string()][..], &[][..]));
-        assert!(!serde_json::to_string(&providers).unwrap().contains("sk-ant-secret"));
+        let shown = serde_json::to_string(&settings).unwrap();
+        assert!(!shown.contains("sk-ant") && !shown.contains("hunter2") && !shown.contains("secrets"), "{shown}");
     }
 }

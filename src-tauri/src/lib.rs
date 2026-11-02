@@ -24,6 +24,7 @@ mod root;
 mod runtime;
 mod screenshot;
 mod search;
+mod secrets;
 mod settings;
 mod usage;
 mod wire;

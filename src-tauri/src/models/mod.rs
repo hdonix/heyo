@@ -140,7 +140,8 @@ impl std::fmt::Display for ModelError {
 impl Model {
     /// The model the settings name for `need`, as its provider's kind opens it.
     pub fn for_use(settings: &Settings, need: Use) -> Result<Model, ModelError> {
-        let (provider, model) = registry::resolve(&settings.providers, need.reference(settings), need).map_err(ModelError::Unusable)?;
+        let providers = settings.providers_in_use();
+        let (provider, model) = registry::resolve(&providers, need.reference(settings), need).map_err(ModelError::Unusable)?;
         provider.kind().text(provider, model).map(Model).ok_or_else(|| ModelError::Unusable(Unusable::Cannot(provider.name.clone())))
     }
 
@@ -186,7 +187,8 @@ fn unusable(why: &Unusable) -> String {
 
 /// Which model answers `AI.ask`, for an extension deciding what to send.
 pub fn provider(settings: &Settings) -> AiProvider {
-    let Ok((provider, model)) = registry::resolve(&settings.providers, &settings.ai_model, Use::Answers) else {
+    let providers = settings.providers_in_use();
+    let Ok((provider, model)) = registry::resolve(&providers, &settings.ai_model, Use::Answers) else {
         return AiProvider { kind: "none", model: String::new(), local: false };
     };
     let kind = provider.kind().api_name();

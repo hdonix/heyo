@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::secrets::{Owner, Secrets};
 use crate::settings::Settings;
 
 use super::kinds::{self, ProviderKind};
@@ -216,8 +217,9 @@ pub fn new_id(providers: &[Provider], word: &str) -> String {
 
 /// What `field` of the provider `id` names is set to `value`: one of its
 /// kind's fields, or its `name`. Values are kept trimmed; an empty secret
-/// is a secret removed.
-pub fn set_field(providers: &mut [Provider], id: &str, field: &str, value: &str) -> Result<(), String> {
+/// is a secret removed. A secret is kept among `secrets`, never in the
+/// provider's configuration.
+pub fn set_field(providers: &mut [Provider], secrets: &mut Secrets, id: &str, field: &str, value: &str) -> Result<(), String> {
     use crate::i18n::tf;
     let provider = providers.iter_mut().find(|provider| provider.id == id).ok_or_else(|| tf("There is no provider {0}.", &[&id]))?;
     let value = value.trim();
@@ -228,8 +230,12 @@ pub fn set_field(providers: &mut [Provider], id: &str, field: &str, value: &str)
         provider.name = value.into();
         return Ok(());
     }
-    if !provider.kind().fields().iter().any(|known| known.name == field) {
+    let Some(known) = provider.kind().fields().iter().find(|known| known.name == field) else {
         return Err(tf("{0} has no setting {1}.", &[&provider.name, &field]));
+    };
+    if known.entry == Entry::Secret {
+        secrets.store(Owner::Provider(id), field, value);
+        return Ok(());
     }
     if value.is_empty() {
         provider.config.remove(field);
@@ -239,14 +245,16 @@ pub fn set_field(providers: &mut [Provider], id: &str, field: &str, value: &str)
     Ok(())
 }
 
-/// Takes the provider `id` away, if it is one that can be.
-pub fn remove(providers: &mut Vec<Provider>, id: &str) -> Result<(), String> {
+/// Takes the provider `id` away, if it is one that can be, and its secrets
+/// with it.
+pub fn remove(providers: &mut Vec<Provider>, secrets: &mut Secrets, id: &str) -> Result<(), String> {
     use crate::i18n::tf;
     let at = providers.iter().position(|provider| provider.id == id).ok_or_else(|| tf("There is no provider {0}.", &[&id]))?;
     if providers[at].kind().builtin() {
         return Err(tf("{0} cannot be removed.", &[&providers[at].name]));
     }
     providers.remove(at);
+    secrets.forget(Owner::Provider(id));
     Ok(())
 }
 
@@ -408,20 +416,23 @@ mod tests {
 
     #[test]
     fn a_provider_is_set_up_field_by_field_and_removed_unless_it_is_fixed() {
-        let mut providers = defaults();
-        set_field(&mut providers, CLAUDE, KEY, "  sk-ant-1 ").unwrap();
-        set_field(&mut providers, CLAUDE, "name", " Work ").unwrap();
-        assert_eq!((providers[1].get(KEY), providers[1].name.as_str()), ("sk-ant-1", "Work"));
+        let (mut providers, mut secrets) = (defaults(), Secrets::default());
+        set_field(&mut providers, &mut secrets, CLAUDE, KEY, "  sk-ant-1 ").unwrap();
+        set_field(&mut providers, &mut secrets, CLAUDE, "name", " Work ").unwrap();
+        // The key is kept with the secrets, not in the configuration.
+        assert_eq!((providers[1].get(KEY), secrets.read(Owner::Provider(CLAUDE), KEY), providers[1].name.as_str()), ("", Some("sk-ant-1"), "Work"));
         // An empty secret is one removed; a field the kind has not, or no name, is refused.
-        set_field(&mut providers, CLAUDE, KEY, "").unwrap();
-        assert!(!providers[1].config.contains_key(KEY));
-        assert!(set_field(&mut providers, CLAUDE, URL, "http://x").is_err());
-        assert!(set_field(&mut providers, CLAUDE, "name", " ").is_err());
-        assert!(set_field(&mut providers, "gone", KEY, "x").is_err());
-        assert!(remove(&mut providers, LOCAL_SPEECH).is_err());
-        remove(&mut providers, CLAUDE).unwrap();
-        assert_eq!(providers.len(), 1);
-        assert!(remove(&mut providers, CLAUDE).is_err());
+        set_field(&mut providers, &mut secrets, CLAUDE, KEY, "").unwrap();
+        assert!(secrets.is_empty());
+        assert!(set_field(&mut providers, &mut secrets, CLAUDE, URL, "http://x").is_err());
+        assert!(set_field(&mut providers, &mut secrets, CLAUDE, "name", " ").is_err());
+        assert!(set_field(&mut providers, &mut secrets, "gone", KEY, "x").is_err());
+        assert!(remove(&mut providers, &mut secrets, LOCAL_SPEECH).is_err());
+        // Removed, it takes its secrets with it.
+        set_field(&mut providers, &mut secrets, CLAUDE, KEY, "sk-ant-2").unwrap();
+        remove(&mut providers, &mut secrets, CLAUDE).unwrap();
+        assert_eq!((providers.len(), secrets.is_empty()), (1, true));
+        assert!(remove(&mut providers, &mut secrets, CLAUDE).is_err());
     }
 
     #[test]
