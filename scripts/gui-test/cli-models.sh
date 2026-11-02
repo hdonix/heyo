@@ -26,15 +26,16 @@ shot() {
 
 for provider in claude-code codex; do
   tool=${provider%-code}
-  seed aiProvider="$provider" anthropicApiKey="" dictationPolish=clean dictationLive=false dictationLanguage=en dictationVocabulary='[]' > /dev/null
+  seed providers='[{"id":"claude-code","kind":"claude-code","name":"Claude Code"},{"id":"codex","kind":"codex","name":"Codex"}]' \
+    aiModel="{\"provider\":\"$provider\",\"model\":\"\"}" polishModel="{\"provider\":\"$provider\",\"model\":\"\"}" dictationPolish=clean dictationLive=false dictationLanguage=en dictationVocabulary='[]' > /dev/null
   "$HERE/sandbox.sh" up > /dev/null || exit 1
 
   # The settings: the provider chosen, the tool found on the PATH.
   heyo --open heyo:settings > /dev/null 2>&1
   wait_window '^Heyo Settings$' 100 > /dev/null || { echo "$provider: no settings window"; "$HERE/sandbox.sh" down > /dev/null; exit 1; }
   w 2
-  "$HERE/settings-do.sh" page Advanced wait 1.5 move 560 400 wheel 10 wait 1.5 shot "cli-$tool-settings"
-  echo "$provider: the settings say: $(ask tree "Heyo Settings" 2>/dev/null | grep -E "Executable|Using|Model Name|not found" | head -4 | cut -c1-200)"
+  "$HERE/settings-do.sh" page Models wait 1.5 move 560 400 wheel 10 wait 1.5 shot "cli-$tool-settings"
+  echo "$provider: the settings say: $(ask tree "Heyo Settings" 2>/dev/null | grep -E "Executable|Using|not found" | head -4 | cut -c1-200)"
   xdotool key Escape; w 1
 
   # Ask AI, then AI Chat with a follow-up.

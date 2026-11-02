@@ -16,7 +16,9 @@ configure() {
 import json, os, sys
 path, provider, port = sys.argv[1:4]
 settings = json.load(open(path)) if os.path.exists(path) else {}
-settings.update(hideOnBlur=False, aiProvider=provider, anthropicApiKey="", localModelUrl=f"http://127.0.0.1:{port}/v1", localModelName="stub-model")
+stub = {"id": "stub", "kind": "openai-compatible", "name": "Stub", "config": {"url": f"http://127.0.0.1:{port}/v1"}}
+settings.update(hideOnBlur=False, providers=[{"id": "claude", "kind": "anthropic", "name": "Claude"}, stub],
+                aiModel={"provider": "stub", "model": "stub-model"} if provider == "local" else {"provider": "claude", "model": ""})
 json.dump(settings, open(path, "w"))
 PY
 }

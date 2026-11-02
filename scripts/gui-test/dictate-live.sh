@@ -89,7 +89,8 @@ path, live, polish, port, hold = sys.argv[1:6]
 settings = json.load(open(path)) if os.path.exists(path) else {}
 settings.update(dictationLive=live == "on", dictationPolish=polish, dictationHoldKey=hold, dictationLanguage="en",
                 dictationVocabulary=["sandwiches -> 三明治", "coffee -> 咖啡😀"], clipboardPaused=False,
-                aiProvider="local", anthropicApiKey="", localModelUrl=f"http://127.0.0.1:{port}/v1", localModelName="stub-model")
+                providers=[{"id": "stub", "kind": "openai-compatible", "name": "Stub", "config": {"url": f"http://127.0.0.1:{port}/v1"}}],
+                aiModel={"provider": "stub", "model": "stub-model"}, polishModel={"provider": "stub", "model": "stub-model"})
 json.dump(settings, open(path, "w"))
 PY
 }

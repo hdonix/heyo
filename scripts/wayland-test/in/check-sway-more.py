@@ -200,7 +200,9 @@ def stub():
         os.remove(STUB_LOG)
     server = subprocess.Popen(["python3", "/heyo/scripts/gui-test/llm-stub.py", str(STUB_PORT), STUB_LOG])
     time.sleep(0.5)
-    return server, ("aiProvider=\"local\"", 'anthropicApiKey=""', f'localModelUrl="http://127.0.0.1:{STUB_PORT}/v1"', 'localModelName="stub-model"')
+    stub = json.dumps([{"id": "stub", "kind": "openai-compatible", "name": "Stub", "config": {"url": f"http://127.0.0.1:{STUB_PORT}/v1"}}])
+    model = json.dumps({"provider": "stub", "model": "stub-model"})
+    return server, (f"providers={stub}", f"aiModel={model}", f"polishModel={model}")
 
 
 def stub_said():
