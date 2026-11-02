@@ -3,7 +3,12 @@
 /**
  * Which model answers `AI.ask`.
  */
-export type AiProvider = { kind: "claude" | "local" | "claude-code" | "codex", 
+export type AiProvider = { 
+/**
+ * `none` when no model is chosen for answers, or the one chosen
+ * cannot be used.
+ */
+kind: "claude" | "local" | "claude-code" | "codex" | "none", 
 /**
  * Claude's model, or the local model's name as set, empty for the
  * first the server lists; or the model Claude Code or Codex is asked

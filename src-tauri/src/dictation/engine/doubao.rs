@@ -35,9 +35,6 @@ use super::sentences::between;
 use super::{Failure, Recognized, Recognizer, Say, SAMPLE_RATE};
 use crate::i18n::marked;
 
-/// The provider's id, as a feature refers to it (`settings::ModelRef`).
-pub(crate) const PROVIDER: &str = "doubao";
-
 /// Where Volcengine listens: the bidirectional endpoint, optimised.
 const ENDPOINT: &str = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async";
 
@@ -52,85 +49,17 @@ pub(crate) const RESOURCES: &[(&str, &str)] = &[
     ("volc.bigasr.sauc.concurrent", marked("Doubao Streaming ASR 1.0, Concurrent")),
 ];
 
-// --- The provider, as the settings show it --------------------------------
+// --- The provider, as the settings declare it (`models::registry`) ---------
 
-/// What a provider can do.
-#[allow(dead_code)] // For the settings' Models page, which is next.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Capability {
-    /// Speech to text while it is spoken: a `Recognizer`.
-    StreamingSpeechToText,
-    /// What it is given is sent to a service elsewhere.
-    Cloud,
-}
+/// The consoles a key can be from: value, title.
+pub(crate) const CONSOLES: &[(&str, &str)] = &[("new", marked("New Console: API Key")), ("old", marked("Old Console: App ID and Access Token"))];
 
-/// The kind of control a field of the configuration has.
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum FieldKind {
-    /// One of these: value, title (marked for translation).
-    Choice(&'static [(&'static str, &'static str)]),
-    Text,
-    /// Never shown again once it is given: the window is only told
-    /// whether it is set (`<setting>Set`), and it is set by a command of
-    /// its own (`commands::settings::set_secret`, `settings::SECRETS`).
-    Secret,
-    Switch,
-}
-
-/// A field of a provider's configuration: the setting it is stored in, by
-/// the name the settings are stored by, and what is said of it (marked
-/// for translation). `shown_when`: the field only applies while another
-/// setting has that value.
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Field {
-    pub setting: &'static str,
-    pub label: &'static str,
-    pub description: &'static str,
-    pub kind: FieldKind,
-    pub shown_when: Option<(&'static str, &'static str)>,
-}
-
-/// A provider as the settings' Models page shows it.
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Provider {
-    pub id: &'static str,
-    pub name: &'static str,
-    /// Said where it is chosen: where what it is given goes.
-    pub description: &'static str,
-    pub capabilities: &'static [Capability],
-    pub fields: &'static [Field],
-    /// Its models: id (`ModelRef::model`), title.
-    pub models: &'static [(&'static str, &'static str)],
-}
-
-#[allow(dead_code)]
-const CONSOLES: &[(&str, &str)] = &[("new", marked("New Console: API Key")), ("old", marked("Old Console: App ID and Access Token"))];
-
-/// The configuration of the provider.
-#[allow(dead_code)]
-const FIELDS: &[Field] = &[
-    Field { setting: "doubaoConsole", label: marked("Console"), description: marked("Which of Volcengine's consoles your key is from."), kind: FieldKind::Choice(CONSOLES), shown_when: None },
-    Field { setting: "doubaoApiKey", label: marked("API Key"), description: marked("From the new console."), kind: FieldKind::Secret, shown_when: Some(("doubaoConsole", "new")) },
-    Field { setting: "doubaoAppId", label: marked("App ID"), description: marked("From the old console, with its Access Token."), kind: FieldKind::Text, shown_when: Some(("doubaoConsole", "old")) },
-    Field { setting: "doubaoAccessToken", label: marked("Access Token"), description: marked("From the old console."), kind: FieldKind::Secret, shown_when: Some(("doubaoConsole", "old")) },
-    Field { setting: "doubaoRemoveFillers", label: marked("Remove Filler Words"), description: marked("Doubao takes out filler words, stutters and repeated words."), kind: FieldKind::Switch, shown_when: None },
-];
-
-/// Doubao, at Volcengine.
-#[allow(dead_code)]
-pub(crate) const fn provider() -> Provider {
-    Provider {
-        id: PROVIDER,
-        name: marked("Doubao (Volcengine)"),
-        description: marked("Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there."),
-        capabilities: &[Capability::StreamingSpeechToText, Capability::Cloud],
-        fields: FIELDS,
-        models: RESOURCES,
-    }
-}
+/// The fields of a Doubao provider's configuration (`registry::Provider::config`).
+pub(crate) const CONSOLE: &str = "console";
+pub(crate) const API_KEY: &str = "apiKey";
+pub(crate) const APP_ID: &str = "appId";
+pub(crate) const ACCESS_TOKEN: &str = "accessToken";
+pub(crate) const REMOVE_FILLERS: &str = "removeFillers";
 
 /// The audio of a packet: 200 ms, which the documentation says the
 /// bidirectional mode works best with.
@@ -191,17 +120,22 @@ impl std::fmt::Debug for Config {
 }
 
 impl Config {
-    /// The config the settings make for the model (resource) `model`; an
-    /// empty one is the first. A key the console needs and has not been
-    /// given is what fails (`doubao-no-key`).
-    pub(crate) fn from_settings(settings: &crate::settings::Settings, model: &str) -> Result<Config, Failure> {
-        let vocabulary = crate::dictation::vocabulary::parse(&settings.dictation_vocabulary);
-        let key = Config::key(&settings.doubao_console, &settings.doubao_api_key, &settings.doubao_app_id, &settings.doubao_access_token).ok_or_else(|| Failure::new("doubao-no-key"))?;
+    /// The config a provider of Doubao's is set up with, for the model
+    /// (resource) `model`, an empty one being the first, with the words of
+    /// `vocabulary`. A key the console needs and has not been given is what
+    /// fails (`doubao-no-key`).
+    pub(crate) fn of(provider: &crate::models::registry::Provider, model: &str, vocabulary: &crate::dictation::vocabulary::Vocabulary) -> Result<Config, Failure> {
+        let key = Config::key(provider.get(CONSOLE), provider.get(API_KEY), provider.get(APP_ID), provider.get(ACCESS_TOKEN)).ok_or_else(|| Failure::new("doubao-no-key"))?;
         let resource = match model {
             "" => RESOURCES[0].0,
             model => RESOURCES.iter().map(|(id, _)| *id).find(|id| *id == model).ok_or_else(|| Failure::failed(format!("Doubao has no model {model}")))?,
         };
-        Ok(Config { key, resource: resource.into(), remove_fillers: settings.doubao_remove_fillers, hotwords: hotwords(&vocabulary) })
+        Ok(Config { key, resource: resource.into(), remove_fillers: provider.get(REMOVE_FILLERS) == "true", hotwords: hotwords(vocabulary) })
+    }
+
+    /// Whether a provider has all of the key its console needs.
+    pub(crate) fn keyed(provider: &crate::models::registry::Provider) -> bool {
+        Config::key(provider.get(CONSOLE), provider.get(API_KEY), provider.get(APP_ID), provider.get(ACCESS_TOKEN)).is_some()
     }
 
     /// The key of that console, where all of it is given.
@@ -603,7 +537,7 @@ fn session(url: &str, config: &Config, audio: &Receiver<Out>, heard: &mut Heard)
 /// connection, the request, and the service's first answer to it, with
 /// no audio. Takes up to `CONNECTING` twice over; for a thread that can
 /// wait.
-#[allow(dead_code)] // For the settings' Models page, which is next.
+#[allow(dead_code)] // For a "Test Connection" on the Models page.
 pub(crate) fn check(config: &Config) -> Result<(), Failure> {
     check_at(&endpoint(), config)
 }
@@ -632,13 +566,6 @@ fn check_at(url: &str, config: &Config) -> Result<(), Failure> {
     let _ = socket.close(None);
     let _ = socket.flush();
     answered
-}
-
-/// A recognizer of Doubao's for that model (resource), as the settings
-/// configure the provider; or why there is none (no key, say).
-#[allow(dead_code)]
-pub(crate) fn recognizer(settings: &crate::settings::Settings, model: &str) -> Result<Doubao, Failure> {
-    Config::from_settings(settings, model).map(Doubao::new)
 }
 
 /// The connection of the recording in progress.

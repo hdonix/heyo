@@ -8,22 +8,31 @@ use serde_json::{json, Value};
 
 use super::{ModelError, Question};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Local {
     /// Base URL of the server, e.g. http://127.0.0.1:8000/v1.
     url: String,
+    /// What the server asks for, if it asks (a bearer token); empty: none.
+    key: String,
     /// The model to ask for; empty means the first one the server lists.
     model: String,
 }
 
+/// The key stays out of anything printed.
+impl std::fmt::Debug for Local {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Local").field("url", &self.url).field("key", &if self.key.is_empty() { "none" } else { "set" }).field("model", &self.model).finish()
+    }
+}
+
 impl Local {
-    pub fn new(url: &str, model: &str) -> Local {
-        Local { url: url.trim().trim_end_matches('/').to_owned(), model: model.trim().to_owned() }
+    pub fn new(url: &str, key: &str, model: &str) -> Local {
+        Local { url: url.trim().trim_end_matches('/').to_owned(), key: key.trim().to_owned(), model: model.trim().to_owned() }
     }
 
     pub async fn answer(&self, question: &Question, on_text: &mut (dyn FnMut(&str) + Send)) -> Result<String, ModelError> {
         let model = match self.model.as_str() {
-            "" => list(&self.url, None).await?.into_iter().next().ok_or(ModelError::NoModels)?,
+            "" => list(&self.url, &self.key, None).await?.into_iter().next().ok_or(ModelError::NoModels)?,
             chosen => chosen.to_owned(),
         };
         let conversation = question.history.is_some();
@@ -41,7 +50,7 @@ impl Local {
             // Qwen3 and similar: answer directly instead of reasoning first.
             "chat_template_kwargs": { "enable_thinking": false },
         });
-        let request = super::client(true).post(format!("{}/chat/completions", self.url)).header("content-type", "application/json").body(body.to_string());
+        let request = authorized(super::client(true).post(format!("{}/chat/completions", self.url)), &self.key).header("content-type", "application/json").body(body.to_string());
         let response = call(&self.url, request).await?;
 
         let mut text = String::new();
@@ -70,10 +79,15 @@ impl Local {
     }
 }
 
+/// A request with the server's key, where it has one.
+fn authorized(request: reqwest::RequestBuilder, key: &str) -> reqwest::RequestBuilder {
+    if key.is_empty() { request } else { request.bearer_auth(key) }
+}
+
 /// The models the server at `url` offers, waiting no longer than `limit`.
-pub async fn list(url: &str, limit: Option<Duration>) -> Result<Vec<String>, ModelError> {
+pub async fn list(url: &str, key: &str, limit: Option<Duration>) -> Result<Vec<String>, ModelError> {
     let url = url.trim().trim_end_matches('/');
-    let mut request = super::client(true).get(format!("{url}/models"));
+    let mut request = authorized(super::client(true).get(format!("{url}/models")), key.trim());
     if let Some(limit) = limit {
         request = request.timeout(limit);
     }
@@ -207,9 +221,9 @@ mod tests {
 
         let empty = Server::start(|_| (200, json!({ "data": [] }).to_string()));
         assert_eq!(ask(Model::local(&empty.url("/v1"), ""), Question::material("", "x")), Err(ModelError::NoModels));
-        assert_eq!(block_on(list(&empty.url("/v1/"), None)), Ok(vec![]));
+        assert_eq!(block_on(list(&empty.url("/v1/"), "", None)), Ok(vec![]));
         let other = Server::start(|_| (200, "<html>".into()));
-        assert_eq!(block_on(list(&other.url("/v1"), None)), Err(ModelError::NotAModelList));
+        assert_eq!(block_on(list(&other.url("/v1"), "", None)), Err(ModelError::NotAModelList));
     }
 
     #[test]

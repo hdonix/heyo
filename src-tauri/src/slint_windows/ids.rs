@@ -18,7 +18,6 @@ const SEP: char = '\u{1f}';
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Act {
     InstallShellExtension,
-    InstallDictation,
     InstallOcr,
     InstallMeaning,
     OpenExtensions,
@@ -26,18 +25,30 @@ pub(crate) enum Act {
     CopyDiagnostics,
     /// Looks for a newer Heyo, or installs the one that was found.
     Update,
+    /// Shows the Models page.
+    OpenModels,
 }
 
 const ACTS: [(Act, &str); 8] = [
     (Act::InstallShellExtension, "install-shell-extension"),
-    (Act::InstallDictation, "install-dictation"),
     (Act::InstallOcr, "install-ocr"),
     (Act::InstallMeaning, "install-meaning"),
     (Act::OpenExtensions, "open-extensions"),
     (Act::ClearClipboard, "clear-clipboard"),
     (Act::CopyDiagnostics, "copy-diagnostics"),
     (Act::Update, "update"),
+    (Act::OpenModels, "open-models"),
 ];
+
+/// What a picker's choice is written as: the provider and its model.
+pub(crate) fn choice(provider: &str, model: &str) -> String {
+    format!("{provider}{SEP}{model}")
+}
+
+/// The provider and model a picker's choice names; none for no model.
+pub(crate) fn chosen(value: &str) -> Option<(&str, &str)> {
+    value.split_once(SEP)
+}
 
 /// What a control acts on.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,13 +81,21 @@ pub(crate) enum Id {
     IgnoreRemove(String),
     ExpandAdd,
     ExpandRemove(String),
-    /// The API key, typed; and the button that forgets it.
-    ApiKey,
-    ForgetApiKey,
-    /// Another secret (`settings::SECRETS`), by its setting's name, typed;
-    /// and the button that forgets it.
-    Secret(String),
-    ForgetSecret(String),
+    /// The model a use refers to, by the use's setting: its picker.
+    Pick(String),
+    /// A field of a provider's configuration, or its `name`.
+    ProviderField { provider: String, field: String },
+    /// The button that forgets a provider's secret field.
+    ForgetSecret { provider: String, field: String },
+    /// The menu that adds a provider, of the kind chosen.
+    AddProvider,
+    RemoveProvider(String),
+    /// A speech model of this computer, by its id: downloaded, its
+    /// download called off, deleted, or used for dictation.
+    SpeechDownload(String),
+    SpeechCancel(String),
+    SpeechDelete(String),
+    SpeechUse(String),
     Act(Act),
     /// In the menu that narrows the Shortcuts table: one of its
     /// modifications, or one of its categories.
@@ -105,10 +124,15 @@ impl fmt::Display for Id {
             Id::IgnoreRemove(application) => write!(out, "ignore:remove:{application}"),
             Id::ExpandAdd => write!(out, "expand:add"),
             Id::ExpandRemove(application) => write!(out, "expand:remove:{application}"),
-            Id::ApiKey => write!(out, "apikey"),
-            Id::ForgetApiKey => write!(out, "more:apikey"),
-            Id::Secret(name) => write!(out, "secret:{name}"),
-            Id::ForgetSecret(name) => write!(out, "forget-secret:{name}"),
+            Id::Pick(setting) => write!(out, "pick:{setting}"),
+            Id::ProviderField { provider, field } => write!(out, "provider:{provider}{SEP}{field}"),
+            Id::ForgetSecret { provider, field } => write!(out, "forget:{provider}{SEP}{field}"),
+            Id::AddProvider => write!(out, "provider:add"),
+            Id::RemoveProvider(provider) => write!(out, "remove-provider:{provider}"),
+            Id::SpeechDownload(id) => write!(out, "speech-download:{id}"),
+            Id::SpeechCancel(id) => write!(out, "speech-cancel:{id}"),
+            Id::SpeechDelete(id) => write!(out, "speech-delete:{id}"),
+            Id::SpeechUse(id) => write!(out, "speech-use:{id}"),
             Id::Act(act) => write!(out, "act:{}", ACTS.iter().find(|(known, _)| known == act).map_or("", |(_, name)| name)),
             Id::Modification(which) => write!(out, "mod:{which}"),
             Id::Category(which) => write!(out, "cat:{which}"),
@@ -131,8 +155,7 @@ impl Id {
             "words" => return Id::Words,
             "ignore:add" => return Id::IgnoreAdd,
             "expand:add" => return Id::ExpandAdd,
-            "apikey" => return Id::ApiKey,
-            "more:apikey" => return Id::ForgetApiKey,
+            "provider:add" => return Id::AddProvider,
             _ => {}
         }
         if let Some(act) = id.strip_prefix("act:").and_then(|name| ACTS.iter().find(|(_, known)| *known == name)) {
@@ -146,10 +169,14 @@ impl Id {
         if let Some((extension, permission)) = id.strip_prefix("revoke:").and_then(|rest| rest.split_once(SEP)) {
             return Id::Revoke { extension: own(extension), permission: own(permission) };
         }
+        if let Some((provider, field)) = id.strip_prefix("provider:").and_then(|rest| rest.split_once(SEP)) {
+            return Id::ProviderField { provider: own(provider), field: own(field) };
+        }
+        if let Some((provider, field)) = id.strip_prefix("forget:").and_then(|rest| rest.split_once(SEP)) {
+            return Id::ForgetSecret { provider: own(provider), field: own(field) };
+        }
         // The longer of two that begin alike first.
-        let forms: [(&str, fn(String) -> Id); 14] = [
-            ("secret:", Id::Secret),
-            ("forget-secret:", Id::ForgetSecret),
+        let forms: [(&str, fn(String) -> Id); 18] = [
             ("set:", Id::Set),
             ("num:", Id::Num),
             ("alias:", Id::Alias),
@@ -162,6 +189,12 @@ impl Id {
             ("expand:remove:", Id::ExpandRemove),
             ("mod:", Id::Modification),
             ("cat:", Id::Category),
+            ("pick:", Id::Pick),
+            ("remove-provider:", Id::RemoveProvider),
+            ("speech-download:", Id::SpeechDownload),
+            ("speech-cancel:", Id::SpeechCancel),
+            ("speech-delete:", Id::SpeechDelete),
+            ("speech-use:", Id::SpeechUse),
         ];
         forms.iter().find_map(|(prefix, form)| id.strip_prefix(prefix).map(|rest| form(own(rest)))).unwrap_or_else(|| Id::Named(own(id)))
     }
@@ -215,10 +248,16 @@ mod tests {
             Id::IgnoreRemove(s("firefox.desktop")),
             Id::ExpandAdd,
             Id::ExpandRemove(s("org.gnome.Terminal.desktop")),
-            Id::ApiKey,
-            Id::ForgetApiKey,
-            Id::Secret(s("doubaoApiKey")),
-            Id::ForgetSecret(s("doubaoAccessToken")),
+            Id::Pick(s("aiModel")),
+            Id::ProviderField { provider: s("openai-compatible-2"), field: s("url") },
+            Id::ProviderField { provider: s("claude"), field: s("name") },
+            Id::ForgetSecret { provider: s("claude"), field: s("key") },
+            Id::AddProvider,
+            Id::RemoveProvider(s("codex")),
+            Id::SpeechDownload(s("whisper-turbo")),
+            Id::SpeechCancel(s("parakeet-tdt-0.6b-v3")),
+            Id::SpeechDelete(s("x-asr-2026-06-05")),
+            Id::SpeechUse(s("sense-voice-2024-07-17")),
             Id::Modification(s("hotkey")),
             Id::Category(s("applications")),
             Id::Named(s("cmd:zeta:one")),
@@ -228,6 +267,13 @@ mod tests {
         for id in all {
             assert_eq!(Id::parse(&id.to_string()), id, "{id}");
         }
+    }
+
+    #[test]
+    fn a_choice_is_read_back_as_its_provider_and_model() {
+        assert_eq!(chosen(&choice("ollama", "qwen3:8b")), Some(("ollama", "qwen3:8b")));
+        assert_eq!(chosen(&choice("codex", "")), Some(("codex", "")));
+        assert_eq!(chosen(""), None);
     }
 
     #[test]

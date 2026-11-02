@@ -14,7 +14,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::models::{address, Address, Model, Question};
+use crate::models::registry::{Unusable, Use};
+use crate::models::{Model, Question};
 use crate::settings::Settings;
 
 /// An entry to write queries for.
@@ -128,17 +129,14 @@ pub(crate) fn parse(answer: &str, text: &str) -> Vec<Case> {
     cases
 }
 
-/// The model on this computer the settings name, whichever provider they
-/// choose for everything else (Claude's API, or Claude Code or Codex, which
-/// run here but send what they are asked to their makers' services); none
-/// at an address that is not this computer, whatever the settings say.
+/// The model the settings name for writing cases (`casesModel`): only one
+/// that keeps what it is given on this computer, which the reference is
+/// held to however it was set (`registry::Use::ClipboardCases`).
 pub(crate) fn local_only(settings: &Settings) -> Result<Model, String> {
-    let url = settings.local_model_url.trim();
-    if address(url) != Address::ThisComputer {
-        let named = if url.is_empty() { "no address" } else { url };
-        return Err(format!("Cases are written from what you copied, so only a model on this computer may write them, and {named} is not one. Set a local model in Heyo Settings → Advanced."));
-    }
-    Ok(Model::local(url, &settings.local_model_name))
+    Model::for_use(settings, Use::ClipboardCases).map_err(|why| match why {
+        crate::models::ModelError::Unusable(Unusable::Cannot(name)) => format!("Cases are written from what you copied, so only a model on this computer may write them, and {name} is not one. Choose one in Heyo Settings → Advanced."),
+        other => other.message(),
+    })
 }
 
 /// The cases `model` (one `local_only` gave) writes for an entry.
@@ -151,6 +149,7 @@ pub(crate) async fn cases_for(entry: &CaseEntry, model: &Model) -> Result<Vec<Ca
 mod tests {
     use super::*;
     use crate::models::mock::{block_on, Server};
+    use crate::models::registry::{self, Kind, ModelRef, Provider};
     use serde_json::json;
 
     fn entry() -> CaseEntry {
@@ -161,27 +160,38 @@ mod tests {
         Case { kind, query: query.into() }
     }
 
+    fn server(id: &str, url: &str) -> Provider {
+        let mut provider = Provider::new(id, Kind::OpenaiCompatible);
+        provider.config.insert(registry::URL.into(), url.into());
+        provider
+    }
+
+    /// The settings with these servers besides the usual providers, and
+    /// cases written by `cases`.
+    fn with(servers: Vec<Provider>, cases: ModelRef) -> Settings {
+        let mut providers = registry::defaults();
+        providers[1].config.insert(registry::KEY.into(), "sk-secret".into());
+        providers.extend(servers);
+        providers.push(Provider::new("cc", Kind::ClaudeCode));
+        Settings { providers, cases_model: cases, ..Settings::default() }
+    }
+
     #[test]
     fn only_a_model_on_this_computer_is_ever_asked() {
-        let mut settings = Settings { local_model_name: "tiny".into(), ..Settings::default() };
-        for url in ["https://api.example.com/v1", "http://192.168.1.20:8000/v1", "", "not a url"] {
-            settings.local_model_url = url.into();
-            let refused = local_only(&settings).unwrap_err();
+        for url in ["https://api.example.com/v1", "http://192.168.1.20:8000/v1", "not a url"] {
+            let refused = local_only(&with(vec![server("far", url)], ModelRef::to("far", "tiny"))).unwrap_err();
             assert!(refused.contains("only a model on this computer"), "{refused}");
         }
         for url in ["http://127.0.0.1:8000/v1", "http://localhost:11434/v1"] {
-            settings.local_model_url = url.into();
-            assert_eq!(local_only(&settings), Ok(Model::local(url, "tiny")));
+            assert_eq!(local_only(&with(vec![server("near", url)], ModelRef::to("near", "tiny"))), Ok(Model::local(url, "tiny")));
         }
-        // A command-line tool runs here but answers from its maker's
-        // service, as Claude's API does: never the one asked.
-        for provider in [crate::models::CLAUDE_CODE, crate::models::CODEX] {
-            settings.ai_provider = provider.into();
-            assert_eq!(local_only(&settings), Ok(Model::local("http://localhost:11434/v1", "tiny")));
-            settings.local_model_url = "https://api.example.com/v1".into();
-            assert!(local_only(&settings).is_err());
-            settings.local_model_url = "http://localhost:11434/v1".into();
+        // Claude's API, and a command-line tool, which runs here but answers
+        // from its maker's service: never the one asked.
+        for other in [registry::CLAUDE, "cc"] {
+            assert!(local_only(&with(vec![], ModelRef::to(other, ""))).unwrap_err().contains("only a model on this computer"));
         }
+        // None chosen: said so.
+        assert!(local_only(&with(vec![], ModelRef::none())).unwrap_err().starts_with("No model is chosen"));
     }
 
     #[test]
@@ -197,7 +207,7 @@ mod tests {
         let characters: Vec<char> = answer.chars().collect();
         let stream: String = characters.chunks(20).map(|piece| format!("data: {}\n\n", json!({ "choices": [{ "delta": { "content": piece.iter().collect::<String>() } }] }))).collect();
         let server = Server::start(move |_| (200, format!("{stream}data: [DONE]\n\n")));
-        let settings = Settings { ai_provider: "claude".into(), anthropic_api_key: "sk-secret".into(), local_model_url: server.url("/v1"), local_model_name: "tiny".into(), ..Settings::default() };
+        let settings = Settings { ai_model: ModelRef::to(registry::CLAUDE, ""), ..with(vec![self::server("near", &server.url("/v1"))], ModelRef::to("near", "tiny")) };
         let cases = block_on(cases_for(&entry(), &local_only(&settings).unwrap())).unwrap();
         assert_eq!(cases.iter().map(|c| c.kind).collect::<Vec<_>>(), ["keyword", "description", "cross-language", "exact", "hinted"]);
         let asked = server.asked();

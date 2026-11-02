@@ -104,12 +104,14 @@ mod tests {
             ("main", "get_settings", true),
             // …but what it draws comes from extensions: it changes no settings.
             ("main", "change_settings", false),
-            ("main", "set_anthropic_api_key", false),
+            ("main", "set_provider_field", false),
+            ("main", "add_provider", false),
+            ("main", "remove_provider", false),
             ("main", "set_extension_preferences", false),
             ("main", "uninstall_extension", false),
             ("main", "install_shell_extension", false),
             ("main", "clear_clipboard_history", false),
-            ("main", "local_models", false),
+            ("main", "provider_models", false),
             ("main", "copy_diagnostics", false),
             // What an extension was allowed is the user's to take back, in the
             // settings; the palette, which extensions draw in, cannot.

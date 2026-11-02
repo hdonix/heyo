@@ -27,7 +27,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use super::{ModelError, Question};
 
 /// Which of the two tools.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tool {
     ClaudeCode,
     Codex,
@@ -207,15 +207,17 @@ pub struct Found {
 /// The executable of `tool` and its version, or why there is none to use.
 /// Asked on every settings change, so the answer is remembered a while.
 pub fn found(tool: Tool, setting: &str) -> Result<Found, String> {
-    type Cached = (Tool, String, Instant, Result<Found, String>);
+    type Cached = std::collections::HashMap<(Tool, String), (Instant, Result<Found, String>)>;
+    // Each provider's own: there may be more than one tool, and more than one of each.
     static LAST: std::sync::Mutex<Option<Cached>> = std::sync::Mutex::new(None);
-    if let Some((was, path, at, result)) = &*LAST.lock().unwrap() {
-        if *was == tool && path == setting && at.elapsed() < Duration::from_secs(60) {
+    let key = (tool, setting.to_owned());
+    if let Some((at, result)) = LAST.lock().unwrap().get_or_insert_with(Default::default).get(&key) {
+        if at.elapsed() < Duration::from_secs(60) {
             return result.clone();
         }
     }
     let result = look(tool, setting);
-    *LAST.lock().unwrap() = Some((tool, setting.to_owned(), Instant::now(), result.clone()));
+    LAST.lock().unwrap().get_or_insert_with(Default::default).insert(key, (Instant::now(), result.clone()));
     result
 }
 

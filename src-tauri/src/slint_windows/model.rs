@@ -13,14 +13,15 @@
 //! What the host decides is not decided here: every change goes through a
 //! command, and is shown as the host then says it is.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{json, Map, Value};
 
 use super::host::Command;
 use crate::i18n::{self, marked, t, tf, tn, translate};
-use crate::models::{address, Address, CLAUDE_CODE, CODEX};
-use super::ids::{Act, Bound, Id};
+use crate::models::registry::{self, Entry as Field, Kind, ModelRef, Provider, Use};
+use crate::models::{address, Address};
+use super::ids::{self, Act, Bound, Id};
 use super::keys;
 
 /// The pages: id, title, and the symbol on its tile in the sidebar.
@@ -29,6 +30,7 @@ pub(crate) const PAGES: &[(&str, &str, &str)] = &[
     ("shortcuts", marked("Shortcuts"), "keyboard-16"),
     ("dictation", marked("Dictation"), "microphone-16"),
     ("screenshots", marked("Screenshots"), "camera-16"),
+    ("models", marked("Models"), "computer-chip-16"),
     ("advanced", marked("Advanced"), "wrench-screwdriver-16"),
     ("about", marked("About"), "info-01-16"),
 ];
@@ -43,12 +45,9 @@ const DICTATION_LANGUAGES: &[(&str, &str)] = &[("auto", marked("Detect Automatic
 
 const POLISH_MODES: &[(&str, &str, &str)] = &[
     ("off", marked("Off"), marked("The text is left as it was recognized.")),
-    ("clean", marked("Clean Up"), marked("When you finish, Claude removes filler words, applies your corrections and fixes punctuation, then the result is pasted.")),
-    ("translate", marked("Translate to English"), marked("When you finish, Claude cleans up what you said and pastes it in English.")),
+    ("clean", marked("Clean Up"), marked("When you finish, the model removes filler words, applies your corrections and fixes punctuation, then the result is pasted.")),
+    ("translate", marked("Translate to English"), marked("When you finish, the model cleans up what you said and pastes it in English.")),
 ];
-
-/// The models Heyo's AI features can use: the `aiProvider` setting, title.
-const PROVIDERS: &[(&str, &str)] = &[("claude", marked("Claude")), ("local", marked("Local Model")), (CLAUDE_CODE, marked("Claude Code (CLI)")), (CODEX, marked("Codex (CLI)"))];
 
 const RETENTION: &[(&str, &str)] = &[("1", marked("1 Day")), ("7", marked("7 Days")), ("30", marked("1 Month")), ("90", marked("3 Months")), ("180", marked("6 Months")), ("365", marked("1 Year"))];
 
@@ -284,12 +283,14 @@ pub(crate) enum Then {
     Applications,
     ItemHotkeys,
     Dictation,
+    /// The speech models of this computer (`dictation::models`).
+    Speech,
     Ocr,
     Meaning,
     Sources,
     /// What the extension with this id may ask Heyo for.
     Permissions(String),
-    /// The models the server at this address lists.
+    /// The models the server that is this provider lists, by its id.
     Models(String),
     Copied,
     Checked,
@@ -321,8 +322,9 @@ pub(crate) struct Model {
     pub sources: Vec<Value>,
     /// The extension whose permissions are known, and they.
     pub permissions: (String, Vec<Value>),
-    /// The address the local model's server was asked at, and its models.
-    pub models: Option<(String, Result<Vec<String>, String>)>,
+    /// The models each OpenAI-compatible server listed, by the provider's
+    /// id, or why it could not be asked.
+    pub listed: BTreeMap<String, Result<Vec<String>, String>>,
     pub extensions: Vec<Value>,
     pub applications: Vec<Value>,
     pub item_hotkeys: Map<String, Value>,
@@ -334,8 +336,8 @@ pub(crate) struct Model {
     pub modifications: BTreeSet<String>,
     pub category: String,
     pub expanded: BTreeSet<String>,
-    /// How far the speech engine's download is, while one runs.
-    pub progress: Option<String>,
+    /// The speech models of this computer, as `dictation::models` says them.
+    pub speech: Vec<Value>,
     pub ocr_installing: bool,
     pub meaning_installing: bool,
     pub update: Update,
@@ -493,6 +495,7 @@ impl Model {
             "shortcuts" => self.shortcuts(),
             "dictation" => self.dictation_page(),
             "screenshots" => self.screenshots(),
+            "models" => self.models_page(),
             "advanced" => self.advanced(),
             "about" => self.about(),
             _ => self.extension().map(|extension| self.extension_page(&extension)).unwrap_or_default(),
@@ -658,15 +661,8 @@ impl Model {
     fn dictation_page(&self) -> Vec<Line> {
         let mut page = Page::default();
         page.note(t("Hold the hotkey while you speak and let go, or tap it to start and tap again to finish: what you said is typed into the window you are working in. Speech is recognized on this computer."));
-        let installed = flag(&self.dictation, "installed");
-        let engine = Line::row(Id::Act(Act::InstallDictation), t("Speech Recognition")).says(if installed { t("SenseVoice is installed. Audio never leaves this computer.") } else { t("A one-time download of about 270 MB (SenseVoice speech model).") });
-        let engine = if installed {
-            engine.badge(t("Installed"))
-        } else if self.progress.is_some() || flag(&self.dictation, "installing") {
-            engine.text(self.progress.clone().unwrap_or_else(|| t("Downloading…").into()))
-        } else {
-            engine.button(t("Download"))
-        };
+        // Speech models are downloaded on the Models page.
+        let engine = vec![self.picker(Use::DictationRecognition, t("Speech Recognition"), t("Models on this computer keep your audio here; a service is sent it. Download speech models in Models."), None)];
         let hotkey = Line::row("", t("Hotkey"));
         let hotkey = if self.hotkeys_supported() { hotkey.says(t("Tap to start and tap again to finish, or hold it while you speak")).hotkey(&Bound::Own("dictation".into()).to_string(), self.hotkeys.get("dictation")) } else { hotkey.says(t("Bind a desktop keyboard shortcut to heyo --dictate.")) };
         let known = !self.capabilities.is_null();
@@ -677,7 +673,8 @@ impl Model {
             let hold = hold.says(if self.chosen("dictationHoldKey").is_empty() { t("A single key to hold while you speak. It keeps working as usual in shortcuts.") } else { t("Hold it and speak; let go to finish. A quick tap, or using it in a shortcut, does nothing.") });
             if known { hold.select(&self.chosen("dictationHoldKey"), std::iter::once(("", t("None"))).chain(list(&self.capabilities, "holdKeys").iter().filter_map(|key| Some((key["value"].as_str()?, key["title"].as_str()?))))) } else { hold }
         };
-        let mut rows = vec![engine, hotkey, hold];
+        let mut rows = engine;
+        rows.extend([hotkey, hold]);
         let live = self.live_description();
         if !live.is_empty() {
             let row = Line::row(Id::Set("dictationLive".into()), t("Type as You Speak")).says(live);
@@ -704,9 +701,8 @@ impl Model {
         let polish = self.chosen("dictationPolish");
         let mode = POLISH_MODES.iter().find(|(value, ..)| *value == polish).unwrap_or(&POLISH_MODES[0]);
         let mut rows = vec![Line::row(Id::Set("dictationPolish".into()), t("Mode")).says(translate(mode.2)).select(mode.0, POLISH_MODES.iter().map(|(value, title, _)| (*value, translate(title))))];
-        // Claude's API is the one that needs a key (or a sign-in Heyo cannot see).
-        if mode.0 != "off" && self.chosen("aiProvider") == "claude" && !self.set("anthropicApiKeySet") {
-            rows.push(Line::row("", t("Claude API Key")).says(t("Polishing needs a Claude API key or a local model. Set either in Advanced.")));
+        if mode.0 != "off" {
+            rows.push(self.picker(Use::DictationPolish, t("Model"), "", None));
         }
         page.card(t("Polish with AI"), rows);
         page.done()
@@ -730,24 +726,6 @@ impl Model {
 
     // --- Advanced ----------------------------------------------------------
 
-    /// Whether the local model's server answers, and where what is sent to
-    /// it goes; the second is whether that is a warning.
-    fn server_description(&self) -> (String, bool) {
-        let url = self.chosen("localModelUrl");
-        let status = match &self.models {
-            Some((asked, Ok(models))) if *asked == url && models.is_empty() => t("Connected, but the server lists no models.").to_string(),
-            Some((asked, Ok(models))) if *asked == url => tf("Connected: {}", &[&models.join(", ")]),
-            Some((asked, Err(e))) if *asked == url => tf("Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama).", &[e]),
-            _ => t("Checking…").to_string(),
-        };
-        match address(&url) {
-            Address::ThisComputer => (format!("{status} {}", t("Text stays on this computer.")), false),
-            Address::Unknown => (format!("{status} {}", t("This is not an http or https address.")), true),
-            Address::Elsewhere { host, encrypted: true } => (format!("{status} {}", tf("This address is not this computer: the text you select, ask about and dictate is sent to {0}.", &[&host])), true),
-            Address::Elsewhere { host, encrypted: false } => (format!("{status} {}", tf("This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer.", &[&host])), true),
-        }
-    }
-
     fn advanced(&self) -> Vec<Line> {
         let mut page = Page::default();
         let node = self.setting("nodeVersion");
@@ -767,38 +745,242 @@ impl Model {
             t("Rendering"),
             vec![Line::row(Id::Set("renderer".into()), t("Renderer")).says(t("How the palette and what else the web view draws is drawn. Automatic keeps to the CPU on an NVIDIA driver without modesetting (the GPU cannot share frames there) and lets WebKit choose elsewhere; GPU with shared memory draws on the GPU and copies each frame, which is faster at 200% scale and keeps every CSS effect. Takes effect when Heyo is next started.")).select(&self.chosen("renderer"), RENDERERS.iter().map(|(value, title)| (*value, translate(title))))],
         );
-        let provider = self.chosen("aiProvider");
-        let provider = PROVIDERS.iter().find(|(value, _)| *value == provider).map_or("claude", |(value, _)| value);
-        let mut rows = vec![Line::row(Id::Set("aiProvider".into()), t("Model")).says(t("Answers Selected Text Actions and polishes dictation.")).select(provider, PROVIDERS.iter().map(|(value, title)| (*value, translate(title))))];
-        if let Some((tool, path, model)) = match provider {
-            CLAUDE_CODE => Some(("Claude Code", "claudeCodePath", "claudeCodeModel")),
-            CODEX => Some(("Codex", "codexPath", "codexModel")),
-            _ => None,
-        } {
-            let found = self.setting("cliFound");
-            let (program, sign_in, maker) = if provider == CODEX { ("codex", "codex login", "OpenAI") } else { ("claude", "claude auth login", "Anthropic") };
-            let (said, missing) = match (found.get("Ok"), found.get("Err").and_then(Value::as_str)) {
-                (Some(found), _) => (tf("Using {0} at {1}.", &[&text(found, "version"), &text(found, "path")]), false),
-                (None, Some(why)) => (why.to_string(), true),
-                _ => (t("Checking…").to_string(), false),
-            };
-            let signed_in = tf("{0} answers with the account it is signed in to ({1}); no API key is needed.", &[&tool, &sign_in]);
-            let sent = tf("What you select, ask about and dictate is sent to {0} through it.", &[&maker]);
-            rows.push(Line::row(Id::Set(path.into()), t("Executable")).says(format!("{said} {signed_in} {sent}")).warns(missing).field(self.chosen(path), &tf("{0} (from PATH)", &[&program])));
-            let default = if provider == CODEX { t("Leave empty for Codex's default model. Heyo runs Codex without your config.toml, so its model setting does not apply here.") } else { t("Leave empty for Claude Code's default model, or name one: an alias such as opus or sonnet, or a model's full name.") };
-            rows.push(Line::row(Id::Set(model.into()), t("Model Name")).says(default).field(self.chosen(model), "default"));
-        } else if provider == "local" {
-            let (description, warning) = self.server_description();
-            rows.push(Line::row(Id::Set("localModelUrl".into()), t("Server")).says(description).warns(warning).field(self.chosen("localModelUrl"), "http://127.0.0.1:8000/v1"));
-            rows.push(Line::row(Id::Set("localModelName".into()), t("Model Name")).says(t("Leave empty to use the first model the server offers.")).field(self.chosen("localModelName"), "automatic"));
-        } else {
-            let saved = self.set("anthropicApiKeySet");
-            let key = Line::row(Id::ApiKey, t("API Key")).says(t("Leave empty to use ANTHROPIC_API_KEY or an `ant auth login` profile.")).secret(if saved { t("Saved — type a new key to replace it") } else { "sk-ant-…" });
-            rows.push(if saved { key.more(t("Remove"), Id::ForgetApiKey) } else { key });
-        }
-        page.card("AI", rows);
+        page.card(
+            "AI",
+            vec![
+                self.picker(Use::Answers, t("Model"), t("Answers Ask AI, AI Chat, Selected Text Actions and extensions."), None),
+                self.picker(Use::ClipboardCases, t("Clipboard Search Cases"), t("Writes the cases the clipboard search is measured by, from what you copied: only a model that keeps it on this computer is offered."), Some(t("None"))),
+                Line::row(Id::Act(Act::OpenModels), t("Providers")).says(t("Connect Claude, servers such as Ollama, Claude Code, Codex and speech services, and download speech models.")).button(t("Open Models")),
+            ],
+        );
         page.card(t("Pasting"), vec![Line::row(Id::Set("confirmTerminalPaste".into()), t("Ask Before Pasting Several Lines into a Terminal")).says(t("A terminal runs each pasted line as a command. Dictation never asks: there, line breaks become spaces.")).switch(self.set("confirmTerminalPaste"))]);
         page.card(t("Data"), vec![Line::row("", t("Settings File")).says(self.chosen("settingsPath"))]);
+        page.done()
+    }
+
+    // --- Providers, and the models each use refers to ---------------------
+
+    /// The providers, as the host told them (their secrets taken out).
+    /// A secret that is set stands as something in its field, so that
+    /// what needs it is not taken for missing.
+    fn providers(&self) -> Vec<Provider> {
+        let mut providers: Vec<Provider> = serde_json::from_value(self.setting("providers").clone()).unwrap_or_default();
+        for provider in &mut providers {
+            for name in list(self.provider_state(&provider.id), "secretsSet").iter().filter_map(Value::as_str) {
+                provider.config.insert(name.to_string(), "(set)".into());
+            }
+        }
+        providers
+    }
+
+    /// The model `need` refers to.
+    fn reference(&self, need: Use) -> ModelRef {
+        serde_json::from_value(self.setting(need.setting()).clone()).unwrap_or_default()
+    }
+
+    /// What the host said of a provider besides its settings.
+    fn provider_state(&self, id: &str) -> &Value {
+        self.setting("providerStates").get(id).unwrap_or(&Value::Null)
+    }
+
+    fn secret_set(&self, id: &str, field: &str) -> bool {
+        list(self.provider_state(id), "secretsSet").iter().any(|name| name == field)
+    }
+
+    /// The models each server listed, of those that answered.
+    fn listed_models(&self) -> BTreeMap<String, Vec<String>> {
+        self.listed.iter().filter_map(|(id, models)| Some((id.clone(), models.as_ref().ok()?.clone()))).collect()
+    }
+
+    /// Whether the speech model `id` is downloaded; for none, the one in use.
+    fn speech_installed(&self, id: &str) -> bool {
+        self.speech.iter().any(|entry| (if id.is_empty() { flag(entry, "inUse") } else { entry["id"] == id }) && flag(entry, "installed"))
+    }
+
+    /// What keeps a provider from being used as it is now, as far as is
+    /// known; none if nothing does.
+    fn trouble(&self, provider: &Provider) -> Option<String> {
+        if let Some(missing) = provider.unset() {
+            return Some(translate(missing).into());
+        }
+        match provider.kind {
+            Kind::ClaudeCode | Kind::Codex => self.provider_state(&provider.id)["cliFound"].get("Err").and_then(Value::as_str).map(str::to_string),
+            Kind::OpenaiCompatible => match self.listed.get(&provider.id) {
+                Some(Err(e)) => Some(tf("Not reachable: {0}.", &[e])),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// A picker of the model `need` refers to: each model of each provider
+    /// that can be used for it, as "provider · model", and `off` first where
+    /// using none is a choice. What it refers to that cannot be used, or is
+    /// gone, is said as a warning.
+    fn picker(&self, need: Use, label: &str, description: &str, off: Option<&str>) -> Line {
+        let providers = self.providers();
+        let reference = self.reference(need);
+        let mut choices: Vec<(String, String)> = off.map(|off| (String::new(), off.to_string())).into_iter().collect();
+        choices.extend(registry::offered(&providers, need, &self.listed_models()).into_iter().map(|(offered, title)| (ids::choice(&offered.provider, &offered.model), title)));
+        let value = if reference.is_none() { String::new() } else { ids::choice(&reference.provider, &reference.model) };
+        let problem = match registry::resolve(&providers, &reference, need) {
+            Err(registry::Unusable::NoneChosen) if off.is_some() => None,
+            Err(why) => Some(crate::models::ModelError::Unusable(why).message()),
+            Ok((provider, model)) => self.trouble(provider).or_else(|| (provider.kind == Kind::LocalSpeech && !self.speech.is_empty() && !self.speech_installed(model)).then(|| tf("{0} is not downloaded yet. Download it in Models.", &[&provider.model_title(model)]))),
+        };
+        if !choices.iter().any(|(choice, _)| *choice == value) {
+            let name = providers.iter().find(|provider| provider.id == reference.provider).map_or(reference.provider.clone(), |provider| provider.name.clone());
+            let title = if reference.is_none() { t("None").to_string() } else { format!("{name} · {}", if reference.model.is_empty() { t("Default") } else { &reference.model }) };
+            choices.push((value.clone(), title));
+        }
+        let said = match &problem {
+            Some(problem) if !description.is_empty() => format!("{problem} {description}"),
+            Some(problem) => problem.clone(),
+            None => description.to_string(),
+        };
+        let mut line = Line::row(Id::Pick(need.setting().into()), label).says(said).warns(problem.is_some());
+        (line.control, line.value, line.choices) = ("select", value, choices);
+        line
+    }
+
+    /// What is asked to know the models of every server that has an address.
+    fn listings(&self) -> Vec<Ask> {
+        self.providers().into_iter().filter(|provider| provider.kind == Kind::OpenaiCompatible && provider.unset().is_none()).map(|provider| ask(Command::ProviderModels(provider.id.clone()), Then::Models(provider.id))).collect()
+    }
+
+    // --- Models --------------------------------------------------------------
+
+    /// What a provider can do and where what it is given goes, in words.
+    fn abilities(provider: &Provider) -> String {
+        use registry::Can;
+        let does = if provider.can(Can::Speech) {
+            t("Speech to text.")
+        } else if provider.can(Can::Images) {
+            t("Text, and pictures with it.")
+        } else {
+            t("Text.")
+        };
+        let goes = match provider.kind {
+            _ if provider.can(Can::Private) => t("Runs on this computer: what it is given stays here."),
+            Kind::ClaudeCode => t("Runs on this computer, and sends what it is given to Anthropic."),
+            Kind::Codex => t("Runs on this computer, and sends what it is given to OpenAI."),
+            Kind::OpenaiCompatible | Kind::Doubao => "",
+            _ => t("What it is given is sent to Anthropic."),
+        };
+        format!("{does} {goes}").trim().to_string()
+    }
+
+    /// Whether a server answers, and where what is sent to it goes; the
+    /// second is whether that is a warning.
+    fn server_status(&self, provider: &Provider) -> (String, bool) {
+        let url = provider.get(registry::URL);
+        if url.is_empty() {
+            return (t("Type the server's address: any OpenAI-compatible server works (vLLM, LM Studio, Ollama).").into(), true);
+        }
+        let (status, failed) = match self.listed.get(&provider.id) {
+            Some(Ok(models)) if models.is_empty() => (t("Connected, but the server lists no models.").to_string(), false),
+            Some(Ok(models)) => (tf("Connected: {}", &[&models.join(", ")]), false),
+            Some(Err(e)) => (tf("Not reachable: {0}. Any OpenAI-compatible server works (vLLM, LM Studio, Ollama).", &[e]), true),
+            None => (t("Checking…").to_string(), false),
+        };
+        match address(url) {
+            Address::ThisComputer => (format!("{status} {}", t("Text stays on this computer.")), failed),
+            Address::Unknown => (format!("{status} {}", t("This is not an http or https address.")), true),
+            Address::Elsewhere { host, encrypted: true } => (format!("{status} {}", tf("This address is not this computer: the text you select, ask about and dictate is sent to {0}.", &[&host])), true),
+            Address::Elsewhere { host, encrypted: false } => (format!("{status} {}", tf("This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer.", &[&host])), true),
+        }
+    }
+
+    /// How a provider is: whether it can be used, and what it does. The
+    /// second is whether that is a warning.
+    fn status(&self, provider: &Provider) -> (String, bool) {
+        let (status, warning) = match provider.kind {
+            Kind::Anthropic if self.secret_set(&provider.id, registry::KEY) => (t("Connected with an API key.").to_string(), false),
+            Kind::Anthropic => (t("No API key saved: Heyo uses ANTHROPIC_API_KEY or an `ant auth login` profile, if there is one.").to_string(), false),
+            Kind::OpenaiCompatible => self.server_status(provider),
+            Kind::ClaudeCode | Kind::Codex => {
+                let found = &self.provider_state(&provider.id)["cliFound"];
+                let (tool, sign_in) = if provider.kind == Kind::Codex { ("Codex", "codex login") } else { ("Claude Code", "claude auth login") };
+                let (said, missing) = match (found.get("Ok"), found.get("Err").and_then(Value::as_str)) {
+                    (Some(found), _) => (tf("Using {0} at {1}.", &[&text(found, "version"), &text(found, "path")]), false),
+                    (None, Some(why)) => (why.to_string(), true),
+                    _ => (t("Checking…").to_string(), false),
+                };
+                (format!("{said} {}", tf("{0} answers with the account it is signed in to ({1}); no API key is needed.", &[&tool, &sign_in])), missing)
+            }
+            Kind::LocalSpeech => (t("Downloaded and run by Heyo itself.").to_string(), false),
+            Kind::Doubao => match provider.unset() {
+                Some(missing) => (translate(missing).to_string(), true),
+                None => (t("Your audio is sent to Volcengine (ByteDance) while you dictate, and recognized there.").to_string(), false),
+            },
+        };
+        // A server says for itself where what it is given goes.
+        let abilities = if provider.kind == Kind::OpenaiCompatible { String::new() } else { Self::abilities(provider) };
+        (format!("{status} {abilities}").trim().to_string(), warning)
+    }
+
+    /// The speech models of this computer: each with what it hears, how
+    /// much it is, and what can be done with it (download it, or call
+    /// the download off; use it, or delete it).
+    fn speech_rows(&self) -> Vec<Line> {
+        self.speech
+            .iter()
+            .map(|entry| {
+                let id = text(entry, "id");
+                let size = tf("{0} MB", &[&entry["megabytes"].as_u64().unwrap_or(0)]);
+                let row = Line::row(Id::SpeechDownload(id.clone()), text(entry, "name")).says(format!("{} · {size}. {}", text(entry, "languages"), text(entry, "note")));
+                let going = &entry["downloading"];
+                if !going.is_null() {
+                    let percent = match (going["received"].as_f64(), going["total"].as_f64()) {
+                        (Some(received), Some(total)) if total > 0.0 => format!(" {}%", (received / total * 100.0).round()),
+                        _ => "…".into(),
+                    };
+                    row.text(format!("{}{percent}", crate::helper::step(&text(going, "step")))).more(t("Cancel"), Id::SpeechCancel(id))
+                } else if flag(entry, "installed") && flag(entry, "inUse") {
+                    row.badge(t("In Use"))
+                } else if flag(entry, "installed") {
+                    Line { id: Id::SpeechDelete(id.clone()).into(), ..row }.confirm(t("Delete…"), t("Click Again to Delete")).more(t("Use"), Id::SpeechUse(id))
+                } else {
+                    row.button(t("Download"))
+                }
+            })
+            .collect()
+    }
+
+    fn provider_card(&self, page: &mut Page, provider: &Provider) {
+        let (status, warning) = self.status(provider);
+        let head = Line::row(Id::RemoveProvider(provider.id.clone()), translate(provider.kind.title())).says(status).warns(warning);
+        let mut rows = vec![if provider.kind.removable() { head.confirm(t("Remove…"), t("Click Again to Remove")) } else { head }];
+        if provider.kind.removable() {
+            rows.push(Line::row(Id::ProviderField { provider: provider.id.clone(), field: "name".into() }, t("Name")).field(provider.name.clone(), translate(provider.kind.title())));
+        }
+        for field in provider.kind.fields().iter().filter(|field| provider.applies(field)) {
+            let row = Line::row(Id::ProviderField { provider: provider.id.clone(), field: field.name.into() }, translate(field.title)).says(translate(field.description));
+            rows.push(match field.entry {
+                Field::Secret if self.secret_set(&provider.id, field.name) => row.secret(t("Saved — type a new key to replace it")).more(t("Remove"), Id::ForgetSecret { provider: provider.id.clone(), field: field.name.into() }),
+                Field::Secret => row.secret(field.placeholder),
+                Field::Choice(choices) => {
+                    let chosen = provider.get(field.name);
+                    row.select(if chosen.is_empty() { choices[0].0 } else { chosen }, choices.iter().map(|(value, title)| (*value, translate(title))))
+                }
+                Field::Switch => row.switch(provider.get(field.name) == "true"),
+                _ => row.field(provider.config.get(field.name).cloned().unwrap_or_default(), field.placeholder),
+            });
+        }
+        if provider.kind == Kind::LocalSpeech {
+            rows.extend(self.speech_rows());
+        }
+        page.card(&provider.name, rows);
+    }
+
+    fn models_page(&self) -> Vec<Line> {
+        let mut page = Page::default();
+        page.note(t("Connect the services and programs that run models. Each feature then uses one of their models, chosen where the feature is set up: AI answers in Advanced, speech recognition and polishing in Dictation."));
+        for provider in self.providers() {
+            self.provider_card(&mut page, &provider);
+        }
+        let kinds = registry::ADDABLE.iter().map(|kind| (kind.word(), translate(kind.title())));
+        page.card(t("Add a Provider"), vec![Line::row(Id::AddProvider, t("Provider")).says(t("Several of one kind can be added, two servers for instance.")).select("", std::iter::once(("", t("Add Provider…"))).chain(kinds))]);
         page.done()
     }
 
@@ -1069,11 +1251,7 @@ impl Model {
             Id::Set(name) => {
                 // A switch says true or false; everything else its words.
                 let value = if value == "true" || value == "false" { json!(on) } else { json!(value) };
-                let mut asks = self.change(&name, value);
-                if name == "localModelUrl" || name == "aiProvider" {
-                    asks.extend(self.entered());
-                }
-                asks
+                self.change(&name, value)
             }
             Id::Num(name) => value.parse::<u64>().map(|number| self.change(&name, json!(number))).unwrap_or_default(),
             Id::Alias(item) => {
@@ -1138,18 +1316,45 @@ impl Model {
             Id::ExpandAdd => self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", value, true)),
             Id::IgnoreRemove(application) => self.change("clipboardIgnoredApps", self.listed("clipboardIgnoredApps", &application, false)),
             Id::ExpandRemove(application) => self.change("snippetExpansionIgnoredApps", self.listed("snippetExpansionIgnoredApps", &application, false)),
-            // The key has a command of its own, which is the only way it is set.
-            Id::ApiKey if value.trim().is_empty() => Vec::new(),
-            Id::ApiKey => vec![ask(Command::SetAnthropicApiKey(value.to_string()), Then::Settings)],
-            Id::ForgetApiKey => vec![ask(Command::SetAnthropicApiKey(String::new()), Then::Settings)],
-            // The other secrets, by their settings' names (`settings::SECRETS`).
-            Id::Secret(_) if value.trim().is_empty() => Vec::new(),
-            Id::Secret(name) => vec![ask(Command::SetSecret { name, value: value.to_string() }, Then::Settings)],
-            Id::ForgetSecret(name) => vec![ask(Command::SetSecret { name, value: String::new() }, Then::Settings)],
+            Id::Pick(setting) => {
+                let (provider, model) = ids::chosen(value).unwrap_or_default();
+                self.change(&setting, json!(ModelRef::to(provider, model)))
+            }
+            // A provider has commands of its own: the window never has its
+            // secrets to send back with the rest of the settings.
+            Id::ProviderField { provider, field } => {
+                let Some(known) = self.providers().into_iter().find(|known| known.id == provider) else { return Vec::new() };
+                let secret = known.kind.fields().iter().any(|known| known.name == field && known.entry == Field::Secret);
+                let was = if field == "name" { known.name.as_str() } else { known.get(&field) };
+                if (secret && value.trim().is_empty()) || (!secret && was == value.trim()) {
+                    return Vec::new();
+                }
+                let mut asks = vec![ask(Command::SetProviderField { provider: provider.clone(), field: field.clone(), value: value.to_string() }, Then::Settings)];
+                // Where the server is, or what it asks for, changed: asked again.
+                if known.kind == Kind::OpenaiCompatible && (field == registry::URL || field == registry::KEY) {
+                    self.listed.remove(&provider);
+                    asks.push(ask(Command::ProviderModels(provider.clone()), Then::Models(provider)));
+                }
+                asks
+            }
+            Id::ForgetSecret { provider, field } => vec![ask(Command::SetProviderField { provider, field, value: String::new() }, Then::Settings)],
+            Id::AddProvider if value.is_empty() => Vec::new(),
+            Id::AddProvider => vec![ask(Command::AddProvider(value.to_string()), Then::Settings)],
+            Id::RemoveProvider(provider) => {
+                self.listed.remove(&provider);
+                vec![ask(Command::RemoveProvider(provider), Then::Settings)]
+            }
+            Id::Act(Act::OpenModels) => self.show("models"),
             Id::Act(Act::InstallShellExtension) => vec![ask(Command::InstallShellExtension, Then::Capabilities)],
-            Id::Act(Act::InstallDictation) => {
-                self.progress = Some(t("Starting…").into());
-                vec![ask(Command::DictationInstall, Then::Started("dictation"))]
+            // The speech models of this computer: each a command of the host's,
+            // and then what they are is asked again.
+            Id::SpeechDownload(id) => vec![ask(Command::DownloadSpeechModel(id), Then::Nothing), ask(Command::SpeechModels, Then::Speech)],
+            Id::SpeechCancel(id) => vec![ask(Command::CancelSpeechDownload(id), Then::Nothing), ask(Command::SpeechModels, Then::Speech)],
+            Id::SpeechDelete(id) => vec![ask(Command::DeleteSpeechModel(id), Then::Nothing), ask(Command::SpeechModels, Then::Speech)],
+            Id::SpeechUse(id) => {
+                let mut asks = self.change(Use::DictationRecognition.setting(), json!(ModelRef::to(registry::LOCAL_SPEECH, &id)));
+                asks.push(ask(Command::SpeechModels, Then::Speech));
+                asks
             }
             Id::Act(Act::InstallOcr) => {
                 self.ocr_installing = true;
@@ -1197,12 +1402,9 @@ impl Model {
     /// What the page that is shown needs to know besides.
     pub(crate) fn entered(&self) -> Vec<Ask> {
         match self.page.as_str() {
-            "dictation" => vec![ask(Command::DictationStatus, Then::Dictation)],
+            "dictation" | "models" => [vec![ask(Command::DictationStatus, Then::Dictation), ask(Command::SpeechModels, Then::Speech)], self.listings()].concat(),
             "screenshots" => vec![ask(Command::OcrStatus, Then::Ocr)],
-            "advanced" if self.chosen("aiProvider") == "local" => {
-                let url = self.chosen("localModelUrl");
-                vec![ask(Command::LocalModels(url.clone()), Then::Models(url))]
-            }
+            "advanced" => self.listings(),
             BUILTIN => vec![ask(Command::ClipboardSources, Then::Sources), ask(Command::ClipboardMeaningStatus, Then::Meaning)],
             page if self.extensions.iter().any(|extension| extension["id"] == page && !flag(extension, "builtin")) => vec![ask(Command::ExtensionPermissions(page.to_string()), Then::Permissions(page.to_string()))],
             _ => Vec::new(),
@@ -1233,11 +1435,10 @@ impl Model {
             Ok(answer) => answer,
             Err(message) => {
                 match then {
-                    Then::Models(url) => {
-                        self.models = Some((url, Err(message)));
+                    Then::Models(provider) => {
+                        self.listed.insert(provider, Err(message));
                         return Vec::new();
                     }
-                    Then::Started("dictation") => self.progress = None,
                     Then::Started("ocr") => self.ocr_installing = false,
                     Then::Started("meaning") => self.meaning_installing = false,
                     Then::Checked => self.update = Update::Unknown,
@@ -1277,6 +1478,11 @@ impl Model {
                 }
             }
             Then::Dictation => self.dictation = answer,
+            Then::Speech => {
+                if let Value::Array(speech) = answer {
+                    self.speech = speech;
+                }
+            }
             Then::Ocr => self.ocr = answer,
             Then::Meaning => self.meaning = answer,
             Then::Sources => {
@@ -1289,7 +1495,9 @@ impl Model {
                     self.permissions = (extension, rows);
                 }
             }
-            Then::Models(url) => self.models = Some((url, Ok(answer.as_array().map(|models| models.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()))),
+            Then::Models(provider) => {
+                self.listed.insert(provider, Ok(answer.as_array().map(|models| models.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()));
+            }
             Then::Copied => self.copied = true,
             Then::Checked => self.update = answer.as_str().map_or(Update::Newest, |version| Update::Newer(version.to_string())),
             Then::Bound(id, accelerator) => {
@@ -1322,18 +1530,9 @@ impl Model {
             // leaves out what only this window may know: ask for the whole.
             event::SETTINGS_CHANGED => vec![ask(Command::GetSettings, Then::Settings)],
             event::INDEX_READY => Self::reload(),
-            event::DICTATION_INSTALL => {
-                if over {
-                    self.progress = None;
-                    return vec![ask(Command::DictationStatus, Then::Dictation)];
-                }
-                let percent = match (told["received"].as_f64(), told["total"].as_f64()) {
-                    (received, Some(total)) if total > 0.0 => format!(" {}%", (received.unwrap_or(0.0) / total * 100.0).round()),
-                    _ => "…".into(),
-                };
-                self.progress = Some(format!("{}{percent}", text(told, "step")));
-                Vec::new()
-            }
+            // How far each download is, the host keeps: asked for again.
+            event::DICTATION_INSTALL if over => vec![ask(Command::DictationStatus, Then::Dictation), ask(Command::SpeechModels, Then::Speech)],
+            event::DICTATION_INSTALL => vec![ask(Command::SpeechModels, Then::Speech)],
             event::OCR_INSTALL => {
                 self.ocr_installing = !over;
                 if over { vec![ask(Command::OcrStatus, Then::Ocr)] } else { Vec::new() }
@@ -1514,16 +1713,64 @@ mod tests {
         assert!(model.item_hotkeys.is_empty());
     }
 
+    /// The providers as the host tells them: Claude with its key taken out,
+    /// a server on this computer and one elsewhere, Claude Code found and
+    /// Codex not, and the speech models of this computer.
+    fn providers() -> Value {
+        json!({
+            "providers": [
+                { "id": "local-speech", "kind": "local-speech", "name": "Speech Models on This Computer" },
+                { "id": "claude", "kind": "anthropic", "name": "Claude", "config": { "key": "" } },
+                { "id": "ollama", "kind": "openai-compatible", "name": "Ollama", "config": { "url": "http://127.0.0.1:11434/v1" } },
+                { "id": "lan", "kind": "openai-compatible", "name": "Workstation", "config": { "url": "http://10.0.0.5:8000/v1" } },
+                { "id": "claude-code", "kind": "claude-code", "name": "Claude Code" },
+                { "id": "codex", "kind": "codex", "name": "Codex", "config": { "path": "/opt/codex" } },
+            ],
+            "providerStates": {
+                "claude": { "secretsSet": ["key"], "cliFound": null },
+                "claude-code": { "secretsSet": [], "cliFound": { "Ok": { "path": "/home/ada/.local/bin/claude", "version": "2.1.302 (Claude Code)" } } },
+                "codex": { "secretsSet": [], "cliFound": { "Err": "There is no executable at /opt/codex." } },
+            },
+            "aiModel": { "provider": "ollama", "model": "qwen3" },
+            "dictationModel": { "provider": "local-speech", "model": "x-asr-2026-06-05" },
+            "polishModel": { "provider": "claude", "model": "claude-opus-5-5" },
+            "casesModel": { "provider": "", "model": "" },
+        })
+    }
+
+    /// The speech models of this computer as the host says them: one in
+    /// use, one downloading, one not downloaded.
+    fn speech() -> Vec<Value> {
+        let entry = |id: &str, name: &str, installed: bool, in_use: bool, downloading: Value| json!({ "id": id, "name": name, "languages": "Chinese, English", "note": "Fast.", "megabytes": 240, "installed": installed, "inUse": in_use, "takesLanguage": true, "downloading": downloading });
+        vec![
+            entry("sense-voice-2024-07-17", "SenseVoice Small", true, false, Value::Null),
+            entry("x-asr-2026-06-05", "X-ASR Streaming", false, true, json!({ "step": "speech-model", "received": 67, "total": 134 })),
+            entry("whisper-turbo", "Whisper Turbo", false, false, Value::Null),
+        ]
+    }
+
+    /// `providers()` with these settings besides.
+    fn with_providers(more: Value) -> Map<String, Value> {
+        let mut settings = providers().as_object().unwrap().clone();
+        settings.extend(more.as_object().unwrap().clone());
+        settings
+    }
+
     #[test]
     fn dictation_says_what_this_session_can_do() {
         let mut model = told(
-            json!({ "dictationHoldKey": "", "dictationLive": true, "dictationSource": "", "dictationLanguage": "zh", "dictationVocabulary": ["TypeScript", "杰森 -> JSON"], "dictationPolish": "clean", "aiProvider": "claude", "anthropicApiKeySet": false }),
+            Value::Object(with_providers(json!({ "dictationHoldKey": "", "dictationLive": true, "dictationSource": "", "dictationLanguage": "zh", "dictationVocabulary": ["TypeScript", "杰森 -> JSON"], "dictationPolish": "clean" }))),
             json!({ "session": "x11", "holdKey": "full", "holdKeys": [{ "value": "Control_R", "title": "Right Ctrl" }], "dictationWords": ["composed", "rewritten", "pasted"] }),
         );
         model.page = "dictation".into();
         model.dictation = json!({ "installed": false, "installing": false, "microphones": [{ "name": "alsa_input.usb", "description": "USB Microphone" }] });
+        model.speech = speech();
         let lines = model.lines();
-        assert_eq!((row(&lines, "Speech Recognition").control, row(&lines, "Speech Recognition").value.as_str()), ("button", "Download"));
+        // Recognition: the speech models that can be used, the one chosen not downloaded yet; no download here.
+        let recognition = row(&lines, "Speech Recognition");
+        assert_eq!(&titles(recognition)[..3], ["Speech Models on This Computer · Default", "Speech Models on This Computer · SenseVoice Small", "Speech Models on This Computer · SenseVoice (Cantonese)"]);
+        assert!(recognition.danger && recognition.description.starts_with("X-ASR Streaming is not downloaded yet. Download it in Models."), "{}", recognition.description);
+        assert!(!lines.iter().any(|line| line.control == "button"));
         assert_eq!(titles(row(&lines, "Hold-to-Talk Key")), ["None", "Right Ctrl"]);
         assert!(row(&lines, "Hold-to-Talk Key").description.starts_with("A single key to hold"));
         let live = row(&lines, "Type as You Speak");
@@ -1533,48 +1780,64 @@ mod tests {
         assert_eq!(row(&lines, "Language").value, "zh");
         assert_eq!(lines.iter().find(|line| line.kind == "area").unwrap().value, "TypeScript\n杰森 -> JSON");
         assert!(row(&lines, "Mode").value == "clean" && row(&lines, "Mode").description.contains("filler words"));
-        assert!(has(&lines, "Claude API Key"));
-        assert_eq!(model.entered()[0].command, Command::DictationStatus);
+        // Polishing: the text models, of every provider that answers in text.
+        let polishing = row(&lines, "Model");
+        assert_eq!(polishing.value, ids::choice("claude", "claude-opus-5-5"));
+        assert!(titles(polishing).contains(&"Claude · claude-opus-5-5") && titles(polishing).contains(&"Codex · Default") && !titles(polishing).iter().any(|title| title.contains("Speech Models")));
+        assert!(!polishing.danger);
+        assert_eq!(model.entered().iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["dictation_status", "speech_models", "provider_models", "provider_models"]);
+        // One that is downloaded: nothing to say.
+        model.settings.insert("dictationModel".into(), json!({ "provider": "local-speech", "model": "sense-voice-2024-07-17" }));
+        assert!(!row(&model.lines(), "Speech Recognition").danger);
     }
 
     #[test]
     fn dictation_explains_what_a_session_cannot_do() {
-        let mut model = told(json!({ "dictationHoldKey": "Control_R", "dictationPolish": "nonsense" }), json!({ "session": "wayland", "holdKey": "none", "holdKeys": [], "dictationWords": ["pasted"] }));
+        let mut model = told(Value::Object(with_providers(json!({ "dictationHoldKey": "Control_R", "dictationPolish": "nonsense" }))), json!({ "session": "wayland", "holdKey": "none", "holdKeys": [], "dictationWords": ["pasted"] }));
         model.page = "dictation".into();
         model.dictation = json!({ "installed": true, "installing": false, "microphones": [] });
         let lines = model.lines();
-        assert_eq!(row(&lines, "Speech Recognition").control, "badge");
         assert!(row(&lines, "Microphone").danger);
         assert!(row(&lines, "Hold-to-Talk Key").control.is_empty() && row(&lines, "Hold-to-Talk Key").description.contains("cannot be watched"));
         assert!(row(&lines, "Type as You Speak").control.is_empty() && row(&lines, "Type as You Speak").description.starts_with("Not available on Wayland"));
-        // A mode it does not know is shown as none.
+        // A mode it does not know is shown as none, and then there is no model to choose.
         assert_eq!(row(&lines, "Mode").value, "off");
-        assert!(!has(&lines, "Claude API Key"));
+        assert!(!has(&lines, "Model"));
     }
 
     #[test]
-    fn a_download_is_followed() {
-        let mut model = told(json!({}), json!({}));
-        model.page = "dictation".into();
+    fn a_speech_model_is_downloaded_used_and_deleted_on_the_models_page() {
+        let mut model = told(providers(), json!({}));
+        model.show("models");
+        model.answered(Then::Speech, Ok(json!(speech())));
+        let lines = model.lines();
+        let speech = card(&lines, "Speech Models on This Computer");
+        // Its status, then one row a model: downloaded but not used, downloading, not downloaded.
+        assert!(speech[0].control.is_empty() && speech[0].description.contains("stays here"), "{:?}", speech[0]);
+        let downloaded = row(speech, "SenseVoice Small");
+        assert_eq!((downloaded.control, downloaded.value.as_str(), downloaded.more.as_str()), ("confirm", "Delete…", "Use"));
+        assert_eq!(downloaded.description, "Chinese, English · 240 MB. Fast.");
+        let downloading = row(speech, "X-ASR Streaming");
+        assert_eq!((downloading.control, downloading.value.as_str(), downloading.more.as_str()), ("text", "Speech model 50%", "Cancel"));
+        assert_eq!((row(speech, "Whisper Turbo").control, row(speech, "Whisper Turbo").value.as_str()), ("button", "Download"));
+        let names = |asks: Vec<Ask>| asks.iter().map(|ask| ask.command.clone()).collect::<Vec<_>>();
+        assert_eq!(names(model.acted(&row(speech, "Whisper Turbo").id, "")), [Command::DownloadSpeechModel("whisper-turbo".into()), Command::SpeechModels]);
+        assert_eq!(names(model.acted(&downloading.more_id, "")), [Command::CancelSpeechDownload("x-asr-2026-06-05".into()), Command::SpeechModels]);
+        assert_eq!(names(model.acted(&downloaded.id, "")), [Command::DeleteSpeechModel("sense-voice-2024-07-17".into()), Command::SpeechModels]);
+        // Used: dictation refers to it.
+        let asks = model.acted(&downloaded.more_id, "");
+        assert_eq!(asks[0].command, Command::ChangeSettings(json!({ "dictationModel": { "provider": "local-speech", "model": "sense-voice-2024-07-17" } }).as_object().unwrap().clone()));
+        // A download's progress, and its end, are read again from the host.
         use crate::wire::event;
-        assert_eq!(asked(&model.acted("act:install-dictation", "")).name(), "dictation_install");
-        assert_eq!(row(&model.lines(), "Speech Recognition").value, "Starting…");
-        assert!(model.heard(event::DICTATION_INSTALL, &json!({ "type": "progress", "step": "Downloading model", "received": 135, "total": 270 })).is_empty());
-        assert_eq!(row(&model.lines(), "Speech Recognition").value, "Downloading model 50%");
-        model.heard(event::DICTATION_INSTALL, &json!({ "type": "progress", "step": "Unpacking" }));
-        assert_eq!(row(&model.lines(), "Speech Recognition").value, "Unpacking…");
-        assert_eq!(asked(&model.heard(event::DICTATION_INSTALL, &json!({ "type": "error", "message": "no space left" }))).name(), "dictation_status");
-        assert_eq!((row(&model.lines(), "Speech Recognition").control, model.error.as_str()), ("button", "no space left"));
-        // What that asked is answered; why it failed stays said, until
-        // something else is done.
-        model.answered(Then::Dictation, Ok(json!({ "installed": false, "installing": false, "microphones": [] })));
+        assert_eq!(names(model.heard(event::DICTATION_INSTALL, &json!({ "type": "progress", "step": "speech-model", "received": 1, "total": 2 }))), [Command::SpeechModels]);
+        assert_eq!(names(model.heard(event::DICTATION_INSTALL, &json!({ "type": "error", "message": "no space left" }))), [Command::DictationStatus, Command::SpeechModels]);
         assert_eq!(model.error, "no space left");
-        model.acted("set:dictationLive", "false");
-        assert_eq!(model.error, "");
-        // It could not even be started.
-        model.acted("act:install-dictation", "");
-        model.answered(Then::Started("dictation"), Err("no Node.js".into()));
-        assert_eq!((row(&model.lines(), "Speech Recognition").control, model.error.as_str()), ("button", "no Node.js"));
+        // In use: said, and no delete.
+        let mut used = self::speech();
+        used[0]["inUse"] = json!(true);
+        model.answered(Then::Speech, Ok(json!(used)));
+        let lines = model.lines();
+        assert_eq!(row(card(&lines, "Speech Models on This Computer"), "SenseVoice Small").control, "badge");
     }
 
     #[test]
@@ -1601,64 +1864,112 @@ mod tests {
     }
 
 
-    #[test]
-    fn advanced_says_where_text_goes_and_keeps_the_key_to_its_command() {
-        let mut model = told(json!({ "nodeVersion": { "Err": "node was not found" }, "nodeOverridden": true, "nodePath": "", "extensionsDir": "/data/extensions", "settingsPath": "/config/settings.json", "renderer": "auto", "aiProvider": "claude", "anthropicApiKeySet": true, "localModelUrl": "http://10.0.0.5:8000/v1", "localModelName": "" }), json!({}));
-        model.page = "advanced".into();
-        let lines = model.lines();
-        assert!(row(&lines, "Node.js").danger && row(&lines, "Node.js").description == "node was not found HEYO_NODE overrides this setting. Extensions need Node.js 22 or newer.");
-        assert_eq!((row(&lines, "API Key").control, row(&lines, "API Key").more.as_str(), row(&lines, "API Key").value.as_str()), ("secret", "Remove", ""));
-        assert!(!has(&lines, "Server"));
-        assert_eq!(asked(&model.acted("apikey", "sk-ant-1")), Command::SetAnthropicApiKey("sk-ant-1".into()));
-        assert!(model.acted("apikey", "  ").is_empty());
-        assert_eq!(asked(&model.acted("more:apikey", "")), Command::SetAnthropicApiKey(String::new()));
-        // Another secret goes by its own command too, by its setting's name.
-        assert_eq!(asked(&model.acted("secret:doubaoApiKey", " k ")), Command::SetSecret { name: "doubaoApiKey".into(), value: " k ".into() });
-        assert!(model.acted("secret:doubaoApiKey", "").is_empty());
-        assert_eq!(asked(&model.acted("forget-secret:doubaoAccessToken", "")), Command::SetSecret { name: "doubaoAccessToken".into(), value: String::new() });
-        // A local model: its server is asked, and what is not this computer is a warning.
-        let asks = model.acted("set:aiProvider", "local");
-        assert_eq!(asks.iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["change_settings", "local_models"]);
-        let server = row(&model.lines(), "Server").clone();
-        assert!(server.danger && server.description.starts_with("Checking…") && server.description.contains("sent to 10.0.0.5:8000 over plain http"));
-        model.answered(Then::Models("http://10.0.0.5:8000/v1".into()), Ok(json!(["qwen", "llama"])));
-        assert!(row(&model.lines(), "Server").description.starts_with("Connected: qwen, llama This address is not this computer"));
-        // An answer for an address that is no longer the one set is not shown.
-        model.settings.insert("localModelUrl".into(), json!("http://127.0.0.1:1/v1"));
-        let server = row(&model.lines(), "Server").clone();
-        assert!(!server.danger && server.description == "Checking… Text stays on this computer.");
-        model.answered(Then::Models("http://127.0.0.1:1/v1".into()), Err("connection refused".into()));
-        assert!(row(&model.lines(), "Server").description.starts_with("Not reachable: connection refused."));
-        assert!(model.error.is_empty(), "a server that does not answer is said on its row");
+    /// The card of a provider on the Models page: its lines, from its
+    /// heading to the next.
+    fn card<'a>(lines: &'a [Line], title: &str) -> &'a [Line] {
+        let at = lines.iter().position(|line| line.kind == "heading" && line.label == title).unwrap_or_else(|| panic!("no card {title}"));
+        let end = lines[at + 1..].iter().position(|line| line.kind == "heading" || line.kind == "end").map_or(lines.len(), |end| at + 1 + end);
+        &lines[at + 1..end]
     }
 
     #[test]
-    fn a_command_line_tool_is_shown_found_or_not_with_its_model() {
-        let found = json!({ "Ok": { "path": "/home/ada/.local/bin/claude", "version": "2.1.302 (Claude Code)" } });
-        let mut model = told(json!({ "aiProvider": "claude-code", "cliFound": found, "claudeCodePath": "", "claudeCodeModel": "opus", "anthropicApiKeySet": false }), json!({}));
-        model.page = "advanced".into();
+    fn the_models_page_says_how_each_provider_is_and_where_what_it_is_given_goes() {
+        let mut model = told(providers(), json!({}));
+        assert_eq!(model.show("models").iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["dictation_status", "speech_models", "provider_models", "provider_models"]);
         let lines = model.lines();
-        assert_eq!(row(&lines, "Model").value, "claude-code");
-        assert_eq!(row(&lines, "Model").choices.iter().map(|(_, title)| title.as_str()).collect::<Vec<_>>(), ["Claude", "Local Model", "Claude Code (CLI)", "Codex (CLI)"]);
-        let executable = row(&lines, "Executable").clone();
-        assert_eq!((executable.id.as_str(), executable.control, executable.value.as_str(), executable.placeholder.as_str(), executable.danger), ("set:claudeCodePath", "field", "", "claude (from PATH)", false));
-        assert!(executable.description.starts_with("Using 2.1.302 (Claude Code) at /home/ada/.local/bin/claude. ") && executable.description.contains("Claude Code answers with the account it is signed in to (claude auth login)") && executable.description.ends_with("sent to Anthropic through it."), "{}", executable.description);
-        assert_eq!((row(&lines, "Model Name").id.as_str(), row(&lines, "Model Name").value.as_str()), ("set:claudeCodeModel", "opus"));
-        // Neither a key nor a server is asked for, and nothing is asked of the host but the change.
-        assert!(!has(&lines, "API Key") && !has(&lines, "Server"));
-        assert_eq!(model.acted("set:aiProvider", "codex").iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["change_settings"]);
-        // Not found: said as a warning on its row.
-        model.settings.insert("cliFound".into(), json!({ "Err": "Codex was not found. Install it, or name its executable here." }));
+        // The speech models of this computer cannot be removed; their models are listed with their downloads.
+        assert!(card(&lines, "Speech Models on This Computer")[0].control.is_empty());
+        // Claude: the key is never shown, only that it is saved, and it can be forgotten.
+        let claude = card(&lines, "Claude");
+        assert!(claude[0].control == "confirm" && claude[0].description.starts_with("Connected with an API key."));
+        let key = row(claude, "API Key");
+        assert_eq!((key.control, key.value.as_str(), key.placeholder.as_str(), key.more.as_str()), ("secret", "", "Saved — type a new key to replace it", "Remove"));
+        assert_eq!(asked(&model.acted(&key.id, "sk-ant-2")), Command::SetProviderField { provider: "claude".into(), field: "key".into(), value: "sk-ant-2".into() });
+        assert!(model.acted(&key.id, "  ").is_empty());
+        assert_eq!(asked(&model.acted(&key.more_id, "")), Command::SetProviderField { provider: "claude".into(), field: "key".into(), value: String::new() });
+        // A server: whether it answers, and whether it is this computer.
+        assert!(card(&lines, "Ollama")[0].description.starts_with("Checking… Text stays on this computer."));
+        model.answered(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
+        model.answered(Then::Models("lan".into()), Err("connection refused".into()));
         let lines = model.lines();
-        let executable = row(&lines, "Executable").clone();
-        assert!(executable.danger && executable.id == "set:codexPath" && executable.description.starts_with("Codex was not found.") && executable.description.contains("(codex login)") && executable.description.ends_with("sent to OpenAI through it."));
-        assert_eq!(row(&lines, "Model Name").id, "set:codexModel");
-        // Polishing does not ask for Claude's key when a tool answers.
+        assert!(card(&lines, "Ollama")[0].description.starts_with("Connected: qwen3, llama3 Text stays on this computer.") && !card(&lines, "Ollama")[0].danger);
+        let lan = &card(&lines, "Workstation")[0];
+        assert!(lan.danger && lan.description.starts_with("Not reachable: connection refused.") && lan.description.contains("sent to 10.0.0.5:8000 over plain http"));
+        assert!(model.error.is_empty(), "a server that does not answer is said on its card");
+        // Its address changed: it is asked again.
+        let url = row(card(&lines, "Ollama"), "Server").id.clone();
+        assert_eq!(model.acted(&url, "http://127.0.0.1:11434/v1").len(), 0, "the same address is no change");
+        let asks = model.acted(&url, "http://127.0.0.1:8080/v1");
+        assert_eq!(asks.iter().map(|ask| ask.command.clone()).collect::<Vec<_>>(), [Command::SetProviderField { provider: "ollama".into(), field: "url".into(), value: "http://127.0.0.1:8080/v1".into() }, Command::ProviderModels("ollama".into())]);
+        // The tools: found or not, and where what they are given goes.
+        let code = &card(&lines, "Claude Code")[0];
+        assert!(!code.danger && code.description.starts_with("Using 2.1.302 (Claude Code) at /home/ada/.local/bin/claude.") && code.description.ends_with("sends what it is given to Anthropic."), "{}", code.description);
+        let codex = &card(&lines, "Codex")[0];
+        assert!(codex.danger && codex.description.starts_with("There is no executable at /opt/codex."));
+        assert_eq!(row(card(&lines, "Codex"), "Executable").value, "/opt/codex");
+        // Added, renamed, removed: each a command of its own.
+        let add = lines.iter().find(|line| line.id == "provider:add").unwrap();
+        assert_eq!(titles(add), ["Add Provider…", "Claude API", "OpenAI-Compatible Server", "Claude Code", "Codex", "Doubao (Volcengine)"]);
+        assert_eq!(asked(&model.acted("provider:add", "openai-compatible")), Command::AddProvider("openai-compatible".into()));
+        assert!(model.acted("provider:add", "").is_empty());
+        assert_eq!(asked(&model.acted(&row(card(&lines, "Codex"), "Name").id, "Work Codex")), Command::SetProviderField { provider: "codex".into(), field: "name".into(), value: "Work Codex".into() });
+        assert_eq!(asked(&model.acted(&codex.id, "")), Command::RemoveProvider("codex".into()));
+    }
+
+    #[test]
+    fn doubao_asks_for_the_key_of_its_console_and_its_resources_are_speech_models() {
+        let mut settings = with_providers(json!({ "dictationModel": { "provider": "doubao", "model": "" } }));
+        settings["providers"].as_array_mut().unwrap().push(json!({ "id": "doubao", "kind": "doubao", "name": "Doubao", "config": {} }));
+        let mut model = told(Value::Object(settings), json!({}));
+        model.page = "models".into();
+        let lines = model.lines();
+        let doubao = card(&lines, "Doubao");
+        assert!(doubao[0].danger && doubao[0].description.starts_with("The key is missing."));
+        assert_eq!(row(doubao, "Console").value, "new");
+        assert!(has(doubao, "API Key") && !has(doubao, "App ID") && row(doubao, "Remove Filler Words").control == "switch");
+        // The old console: an App ID and an Access Token instead.
+        model.settings["providers"][6]["config"] = json!({ "console": "old", "appId": "id" });
+        model.settings["providerStates"]["doubao"] = json!({ "secretsSet": ["accessToken"] });
+        let lines = model.lines();
+        let doubao = card(&lines, "Doubao");
+        assert!(!doubao[0].danger && !has(doubao, "API Key") && row(doubao, "App ID").value == "id" && row(doubao, "Access Token").more == "Remove");
+        assert_eq!(asked(&model.acted(&row(doubao, "Remove Filler Words").id, "true")), Command::SetProviderField { provider: "doubao".into(), field: "removeFillers".into(), value: "true".into() });
+        // Recognition offers its resources beside the models of this computer.
         model.page = "dictation".into();
-        model.settings.insert("dictationPolish".into(), json!("clean"));
-        assert!(!has(&model.lines(), "Claude API Key"));
-        model.settings.insert("aiProvider".into(), json!("claude"));
-        assert!(has(&model.lines(), "Claude API Key"));
+        let lines = model.lines();
+        let recognition = row(&lines, "Speech Recognition");
+        assert!(titles(recognition).contains(&"Doubao · Doubao Streaming ASR 2.0, Hourly"));
+        assert_eq!(recognition.value, ids::choice("doubao", ""));
+    }
+
+    #[test]
+    fn a_picker_offers_what_can_be_used_and_says_what_cannot() {
+        let mut model = told(providers(), json!({}));
+        model.page = "advanced".into();
+        model.answered(Then::Models("ollama".into()), Ok(json!(["qwen3", "llama3"])));
+        let lines = model.lines();
+        let answers = row(&lines, "Model");
+        assert_eq!(answers.value, ids::choice("ollama", "qwen3"));
+        assert_eq!(&titles(answers)[..4], ["Claude · claude-opus-5-5", "Ollama · First Listed", "Ollama · qwen3", "Ollama · llama3"]);
+        assert!(!answers.danger);
+        // Cases: none, or a model that keeps what it is given here; never Claude, a tool, or the server elsewhere.
+        let cases = row(&lines, "Clipboard Search Cases");
+        assert_eq!(titles(cases), ["None", "Ollama · First Listed", "Ollama · qwen3", "Ollama · llama3"]);
+        assert!(cases.value.is_empty() && !cases.danger);
+        // Choosing is a change of the reference.
+        assert_eq!(patch(&model.acted(&answers.id, &ids::choice("claude-code", "opus"))), json!({ "aiModel": { "provider": "claude-code", "model": "opus" } }));
+        assert_eq!(patch(&model.acted(&cases.id, "")), json!({ "casesModel": { "provider": "", "model": "" } }));
+        // A tool that is not found: said where it is chosen.
+        model.settings.insert("aiModel".into(), json!({ "provider": "codex", "model": "" }));
+        let answers = row(&model.lines(), "Model").clone();
+        assert!(answers.danger && answers.description.starts_with("There is no executable at /opt/codex."));
+        // A provider that is gone: still shown, and said.
+        model.settings.insert("aiModel".into(), json!({ "provider": "gone", "model": "big" }));
+        let answers = row(&model.lines(), "Model").clone();
+        assert!(answers.danger && answers.value == ids::choice("gone", "big") && titles(&answers).contains(&"gone · big") && answers.description.contains("no longer connected"));
+        // Models is a button away.
+        assert_eq!(model.acted("act:open-models", "").iter().map(|ask| ask.command.name()).collect::<Vec<_>>(), ["dictation_status", "speech_models", "provider_models", "provider_models"]);
+        assert_eq!(model.page, "models");
     }
 
     #[test]
@@ -1705,10 +2016,10 @@ mod tests {
         let mut model = with_extensions();
         let (entries, pages) = model.nav();
         assert_eq!(pages, PAGES.len());
-        assert_eq!(entries.iter().map(|entry| entry.title.as_str()).collect::<Vec<_>>(), ["General", "Shortcuts", "Dictation", "Screenshots", "Advanced", "About", "Applications", "Heyo Commands", "alpha Notes", "Zeta Tools"]);
+        assert_eq!(entries.iter().map(|entry| entry.title.as_str()).collect::<Vec<_>>(), ["General", "Shortcuts", "Dictation", "Screenshots", "Models", "Advanced", "About", "Applications", "Heyo Commands", "alpha Notes", "Zeta Tools"]);
         // A page's symbol, a symbol the host named, a file of the extension's own.
-        assert_eq!((entries[0].icon.as_deref(), entries[7].icon.as_deref(), entries[9].icon.as_deref()), (Some("cog-16"), Some("store-16"), Some("/data/zeta/assets/icon.png")));
-        assert!(entries[9].extension && !entries[0].extension);
+        assert_eq!((entries[0].icon.as_deref(), entries[8].icon.as_deref(), entries[10].icon.as_deref()), (Some("cog-16"), Some("store-16"), Some("/data/zeta/assets/icon.png")));
+        assert!(entries[10].extension && !entries[0].extension);
         // An extension is found by a command of its own; the applications
         // only by their name.
         model.nav_search = "dict".into();

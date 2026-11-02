@@ -33,7 +33,7 @@ mod composed;
 mod engine;
 mod listening;
 mod microphone;
-mod models;
+pub(crate) mod models;
 mod onscreen;
 mod polish;
 mod vocabulary;
@@ -52,6 +52,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::helper::InstallProgress;
 use crate::platform::composing::{self, Composing, Stir};
 use crate::platform::typed::{self, Lost, Writing};
+use crate::models::registry;
 use crate::{pasting, SettingsState};
 use composed::{Composed, Tell};
 use onscreen::{OnScreen, Shortfall, Standing, Step};
@@ -170,39 +171,47 @@ fn heard(event: &Value) -> Option<Heard> {
     }
 }
 
-/// Doubao, as a provider of speech recognition: its configuration's
-/// fields, its models, checking it, and a recognizer of it (for the
-/// settings' Models page).
+/// Doubao, as a provider of speech recognition (`models::registry`): its
+/// configuration, its models, checking it.
 pub(crate) use engine::doubao;
 
+/// Whether the settings choose a model of this computer's to recognize
+/// dictation with (`dictationModel`, of the provider `registry::LOCAL_SPEECH`).
+fn on_this_computer(settings: &crate::settings::Settings) -> bool {
+    settings.dictation_model.provider == registry::LOCAL_SPEECH
+}
+
 /// What recognizes dictation, as the settings choose it (`dictationModel`,
-/// the one place it is chosen): none for the model on this computer, or
-/// how Doubao is to. Doubao without a key is what to say instead.
+/// resolved through the providers: the one place it is chosen): none for
+/// a model on this computer, or how Doubao is to. A reference to what
+/// cannot recognize speech, or Doubao without a key, is what to say instead.
 fn cloud(settings: &crate::settings::Settings) -> Result<Option<doubao::Config>, String> {
-    if settings.dictation_model.provider != doubao::PROVIDER {
-        return Ok(None);
+    use registry::{Kind, Use};
+    let (provider, model) = registry::resolve(&settings.providers, &settings.dictation_model, Use::DictationRecognition).map_err(|why| crate::models::ModelError::Unusable(why).message())?;
+    match provider.kind {
+        Kind::Doubao => doubao::Config::of(provider, model, &vocabulary::parse(&settings.dictation_vocabulary)).map(Some).map_err(|failure| crate::helper::worded(&failure.said(), t("Dictation failed")).full()),
+        _ => Ok(None),
     }
-    doubao::Config::from_settings(settings, &settings.dictation_model.model).map(Some).map_err(|failure| crate::helper::worded(&failure.said(), t("Dictation failed")).full())
 }
 
 pub fn dir() -> PathBuf {
     crate::paths::data().join("dictation")
 }
 
-/// The model on this computer the settings choose (`dictationModel` with
-/// no provider: the model is an entry of the catalogue, or none for the
+/// The model on this computer the settings choose (`dictationModel` of
+/// the speech models of this computer: the model is an entry of the catalogue, or none for the
 /// default or the one that is installed), as a recording in `language`,
 /// or the one they set, is heard with it. Where they choose another
 /// provider, what would be heard with on this computer without it.
 fn local(settings: &crate::settings::Settings, language: Option<String>) -> engine::Chosen {
-    let model = if settings.dictation_model.provider.is_empty() { settings.dictation_model.model.as_str() } else { "" };
+    let model = if on_this_computer(settings) { settings.dictation_model.model.as_str() } else { "" };
     engine::Chosen::of(&dir(), model, language.as_deref().unwrap_or(&settings.dictation_language))
 }
 
 /// Whether what `settings` choose to hear with can be used without a
 /// download first.
 pub fn ready(settings: &crate::settings::Settings) -> bool {
-    !settings.dictation_model.provider.is_empty() || local(settings, None).ready(&dir())
+    !on_this_computer(settings) || local(settings, None).ready(&dir())
 }
 
 /// The entry of the catalogue in use, if the settings choose a model on
@@ -210,7 +219,7 @@ pub fn ready(settings: &crate::settings::Settings) -> bool {
 fn in_use(app: &AppHandle) -> Option<String> {
     let settings = app.state::<SettingsState>();
     let settings = settings.0.read().unwrap();
-    settings.dictation_model.provider.is_empty().then(|| local(&settings, None).model)
+    on_this_computer(&settings).then(|| local(&settings, None).model)
 }
 
 /// What the dictation window is told of a recording: the recording's account
@@ -813,13 +822,16 @@ fn ended(app: &AppHandle, event: Value) {
 /// polished text, or with what was heard and why it was not polished.
 fn polish_then_end(app: &AppHandle, raw: String, instructions: String, words: Arc<Words>) {
     emit(app, json!({ "type": "polishing" }));
-    let model = crate::models::Model::from_settings(&app.state::<SettingsState>().0.read().unwrap());
+    let model = crate::models::Model::for_use(&app.state::<SettingsState>().0.read().unwrap(), registry::Use::DictationPolish);
     let state = app.state::<Dictation>();
     // Held until the task is known: it must be there to be taken back.
     let mut state = state.0.lock().unwrap();
     let ending = app.clone();
     state.polishing = Some(tauri::async_runtime::spawn(async move {
-        let result = polish::polished(&model, &raw, instructions, &words.corrector).await;
+        let result = match &model {
+            Ok(model) => polish::polished(model, &raw, instructions, &words.corrector).await,
+            Err(why) => polish::unpolished(&raw, why),
+        };
         // Unless the recording was discarded meanwhile (`cancel`).
         if ending.state::<Dictation>().0.lock().unwrap().polishing.take().is_some() {
             ended(&ending, result);
@@ -954,7 +966,7 @@ pub fn begin(app: &AppHandle, watch_hotkey: bool) {
     };
     if cloud.is_none() && !chosen.ready(&dir()) {
         drop(state);
-        return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Dictation to download it.").into());
+        return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Models to download a speech model.").into());
     }
     // Before the recording starts: a recognizer that is kept answers at
     // once, and the window must not hear that it is ready before it hears
@@ -1109,11 +1121,9 @@ struct Downloading {
 }
 
 /// A model of the catalogue as the settings page lists it.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, Clone, PartialEq, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
-// The settings' Models page lists, downloads and deletes the speech
-// models with these; it is not there yet.
-#[allow(dead_code)]
+#[ts(export, export_to = "../../shared/bindings/", rename = "SpeechModel")]
 pub(crate) struct ModelState {
     id: &'static str,
     name: &'static str,
@@ -1130,10 +1140,8 @@ pub(crate) struct ModelState {
     downloading: Option<Progress>,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
-// The settings' Models page lists, downloads and deletes the speech
-// models with these; it is not there yet.
-#[allow(dead_code)]
+#[derive(Serialize, Debug, Clone, PartialEq, ts_rs::TS)]
+#[ts(export, export_to = "../../shared/bindings/", rename = "SpeechModelProgress")]
 pub(crate) struct Progress {
     /// A step of the installation, by its code (`helper::step`).
     step: String,
@@ -1142,9 +1150,6 @@ pub(crate) struct Progress {
 }
 
 /// The speech models, and what each is to this installation.
-// The settings' Models page lists, downloads and deletes the speech
-// models with these; it is not there yet.
-#[allow(dead_code)]
 pub(crate) fn models(app: &AppHandle) -> Vec<ModelState> {
     let in_use = in_use(app).unwrap_or_default();
     let state = app.state::<Dictation>();
@@ -1222,19 +1227,7 @@ pub(crate) fn download(app: &AppHandle, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Downloads the model of this computer's that the settings choose, if
-/// they choose one.
-pub fn install(app: &AppHandle) -> Result<(), String> {
-    match in_use(app) {
-        Some(model) => download(app, &model),
-        None => Ok(()),
-    }
-}
-
 /// Stops a model's download; what it fetched so far is thrown away.
-// The settings' Models page lists, downloads and deletes the speech
-// models with these; it is not there yet.
-#[allow(dead_code)]
 pub(crate) fn cancel_download(app: &AppHandle, id: &str) -> Result<(), String> {
     let model = model(id)?;
     if let Some(going) = app.state::<Dictation>().0.lock().unwrap().downloads.remove(model.id) {
@@ -1245,9 +1238,6 @@ pub(crate) fn cancel_download(app: &AppHandle, id: &str) -> Result<(), String> {
 
 /// Deletes a model's files, unless recordings are heard with it: another
 /// is chosen first.
-// The settings' Models page lists, downloads and deletes the speech
-// models with these; it is not there yet.
-#[allow(dead_code)]
 pub(crate) fn delete(app: &AppHandle, id: &str) -> Result<(), String> {
     let model = model(id)?;
     if in_use(app).is_some_and(|in_use| in_use == model.id) {

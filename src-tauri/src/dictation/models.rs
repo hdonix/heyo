@@ -169,7 +169,7 @@ pub(crate) const CATALOGUE: &[Model] = &[
         // ASLP-lab's fine-tuning for Cantonese (its README says so). Heard
         // on 2026-11-02: no punctuation, English in capitals and worse than
         // the 2024 model's.
-        name: "SenseVoice Small Cantonese",
+        name: "SenseVoice (Cantonese)",
         languages: marked("Cantonese, Chinese, English"),
         note: marked("Fast, made for Cantonese. No punctuation."),
         megabytes: 166,
@@ -203,9 +203,9 @@ pub(crate) const CATALOGUE: &[Model] = &[
     },
     Model {
         id: "paraformer-zh-2025-10-07",
-        name: "Paraformer",
+        name: "Paraformer (Sichuanese)",
         // ASLP-lab's Paraformer-large for Sichuanese (WenetSpeech-Chuan).
-        languages: marked("Chinese, Sichuanese"),
+        languages: marked("Sichuanese, Chinese"),
         note: marked("Fast, made for Sichuanese. No punctuation, little English."),
         megabytes: 228,
         kind: Kind::Paraformer,

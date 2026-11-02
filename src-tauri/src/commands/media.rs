@@ -24,7 +24,3 @@ pub(crate) fn ocr_install(app: AppHandle) -> Result<(), String> {
 pub(crate) fn dictation_status(app: AppHandle) -> dictation::Status {
     dictation::status(&app)
 }
-
-pub(crate) fn dictation_install(app: AppHandle) -> Result<(), String> {
-    dictation::install(&app)
-}

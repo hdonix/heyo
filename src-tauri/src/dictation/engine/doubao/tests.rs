@@ -155,50 +155,34 @@ fn a_service_that_cannot_be_reached_is_said_to_be() {
 }
 
 #[test]
-fn the_providers_settings_make_a_config_with_the_key_of_its_console_or_none() {
-    use crate::settings::Settings;
-    let settings = Settings {
-        doubao_api_key: " k ".into(),
-        doubao_app_id: " id ".into(),
-        doubao_access_token: "token".into(),
-        doubao_remove_fillers: true,
-        dictation_vocabulary: vec!["TypeScript".into(), "杰森 -> JSON".into()],
-        ..Settings::default()
-    };
-    // (Keys are compared, never printed.)
-    let made = Config::from_settings(&settings, RESOURCES[2].0).unwrap();
+fn the_providers_configuration_makes_a_config_with_the_key_of_its_console_or_none() {
+    use crate::models::registry::{Kind, Provider};
+    let mut provider = Provider::new("doubao", Kind::Doubao);
+    provider.config.extend([(API_KEY, " k "), (APP_ID, " id "), (ACCESS_TOKEN, "token"), (REMOVE_FILLERS, "true")].map(|(name, value)| (name.to_string(), value.to_string())));
+    let vocabulary = crate::dictation::vocabulary::parse(&["TypeScript".into(), "杰森 -> JSON".into()]);
+    let none = crate::dictation::vocabulary::Vocabulary::default();
+    // (Keys are compared, never printed.) No console said: the new one.
+    let made = Config::of(&provider, RESOURCES[2].0, &vocabulary).unwrap();
     assert!(made.key == Key::Api("k".into()));
     assert_eq!((made.resource.as_str(), made.remove_fillers, made.hotwords), (RESOURCES[2].0, true, vec!["TypeScript".to_owned(), "JSON".to_owned()]));
-    let old = Settings { doubao_console: "old".into(), ..settings.clone() };
-    assert!(Config::from_settings(&old, "").unwrap().key == Key::App { id: "id".into(), token: "token".into() });
+    let mut old = provider.clone();
+    old.config.insert(CONSOLE.into(), "old".into());
+    assert!(Config::of(&old, "", &none).unwrap().key == Key::App { id: "id".into(), token: "token".into() });
     // No model: the first; one it does not have: none.
-    assert_eq!(Config::from_settings(&old, "").unwrap().resource, RESOURCES[0].0);
-    assert_eq!(Config::from_settings(&old, "volc.other").unwrap_err().code, "failed");
+    assert_eq!(Config::of(&old, "", &none).unwrap().resource, RESOURCES[0].0);
+    assert_eq!(Config::of(&old, "volc.other", &none).unwrap_err().code, "failed");
     // The console's key is missing.
-    for keyless in [Settings { doubao_api_key: "".into(), ..settings.clone() }, Settings { doubao_access_token: " ".into(), ..old.clone() }, Settings { doubao_app_id: "".into(), ..old.clone() }] {
-        assert_eq!(Config::from_settings(&keyless, "").unwrap_err(), Failure::new("doubao-no-key"));
+    for (from, field) in [(&provider, API_KEY), (&old, ACCESS_TOKEN), (&old, APP_ID)] {
+        let mut keyless = from.clone();
+        keyless.config.insert(field.into(), " ".into());
+        assert_eq!(Config::of(&keyless, "", &none).unwrap_err(), Failure::new("doubao-no-key"));
+        assert!(!Config::keyed(&keyless));
     }
-    assert!(recognizer(&settings, "").is_ok());
+    assert!(Config::keyed(&provider) && Config::keyed(&old));
     // The key is never printed.
-    let printed = format!("{:?}", Config::from_settings(&Settings { doubao_api_key: "sk-secret".into(), ..settings }, "").unwrap());
+    provider.config.insert(API_KEY.into(), "sk-secret".into());
+    let printed = format!("{:?}", Config::of(&provider, "", &none).unwrap());
     assert!(!printed.contains("sk-secret") && printed.contains("API key"), "{printed}");
-}
-
-#[test]
-fn the_provider_says_what_it_is_and_its_fields_are_settings() {
-    let provider = provider();
-    assert_eq!(provider.id, "doubao");
-    assert_eq!(provider.capabilities, [Capability::StreamingSpeechToText, Capability::Cloud]);
-    assert_eq!(provider.models.iter().map(|(id, _)| *id).collect::<Vec<_>>(), ["volc.seedasr.sauc.duration", "volc.seedasr.sauc.concurrent", "volc.bigasr.sauc.duration", "volc.bigasr.sauc.concurrent"]);
-    let settings = serde_json::to_value(crate::settings::Settings::default()).unwrap();
-    for field in provider.fields {
-        assert!(settings.get(field.setting).is_some(), "{} is no setting", field.setting);
-        assert_eq!(field.kind == FieldKind::Secret, crate::settings::SECRETS.contains(&field.setting), "{}", field.setting);
-        if let Some((other, value)) = field.shown_when {
-            assert!(settings.get(other).is_some(), "{other}");
-            assert!(provider.fields.iter().any(|field| field.setting == other && matches!(field.kind, FieldKind::Choice(choices) if choices.iter().any(|(choice, _)| *choice == value))));
-        }
-    }
 }
 
 #[test]

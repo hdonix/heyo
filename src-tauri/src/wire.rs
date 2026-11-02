@@ -560,7 +560,9 @@ pub struct MemoryResult {
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[ts(export, export_to = "../../shared/bindings/")]
 pub struct AiProvider {
-    #[ts(type = "\"claude\" | \"local\" | \"claude-code\" | \"codex\"")]
+    /// `none` when no model is chosen for answers, or the one chosen
+    /// cannot be used.
+    #[ts(type = "\"claude\" | \"local\" | \"claude-code\" | \"codex\" | \"none\"")]
     pub kind: &'static str,
     /// Claude's model, or the local model's name as set, empty for the
     /// first the server lists; or the model Claude Code or Codex is asked

@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::models::registry::{self, ModelRef, Provider};
+
 /// The colour scheme of the interface.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
@@ -63,7 +65,7 @@ pub struct Settings {
     pub dictation_language: String,
     /// PulseAudio source to record from; empty means the default.
     pub dictation_source: String,
-    /// What the model (`ai_provider`) does with the transcript: `off`,
+    /// What the model (`polish_model`) does with the transcript: `off`,
     /// `clean` or `translate`.
     pub dictation_polish: String,
     /// A key that dictates while it is held (`talkkey::KEYS`); empty for none.
@@ -74,24 +76,20 @@ pub struct Settings {
     /// corrected where it stands (`platform::Words`). Off, or elsewhere,
     /// nothing goes in before a sentence is finished.
     pub dictation_live: bool,
-    /// Claude API key, for the host alone (`models`); empty uses the
-    /// environment's credentials.
-    pub anthropic_api_key: String,
-    /// Which model Heyo's AI features use: `claude`, `local`, or the model
-    /// of a command-line tool on this computer, `claude-code` or `codex`.
-    pub ai_provider: String,
-    /// Base URL of an OpenAI-compatible server on this computer.
-    pub local_model_url: String,
-    /// Model to ask that server for; empty means the first one it lists.
-    pub local_model_name: String,
-    /// Claude Code's executable; empty means `claude`, found (`models::cli`).
-    pub claude_code_path: String,
-    /// The model Claude Code is asked for; empty means its own default.
-    pub claude_code_model: String,
-    /// Codex's executable; empty means `codex`, found.
-    pub codex_path: String,
-    /// The model Codex is asked for; empty means its own default.
-    pub codex_model: String,
+    /// The providers models are reached through (`models::registry`). Their
+    /// secrets (API keys) are for the host alone: a window is told only
+    /// which are set (`SettingsView::secrets_set`).
+    pub providers: Vec<Provider>,
+    /// The model that answers Ask AI, AI Chat, the selected-text actions
+    /// and extensions' `AI.ask`.
+    pub ai_model: ModelRef,
+    /// The model dictation recognizes speech with.
+    pub dictation_model: ModelRef,
+    /// The model dictation is polished with, when it is (`dictation_polish`).
+    pub polish_model: ModelRef,
+    /// The model that writes the clipboard's search cases: only one that
+    /// keeps what it is given on this computer.
+    pub cases_model: ModelRef,
     /// Clipboard history is not recorded for now (`clipboard_history` is
     /// whether it is recorded at all).
     pub clipboard_paused: bool,
@@ -120,37 +118,7 @@ pub struct Settings {
     pub live_activities: bool,
     /// Extensions (by manifest name) whose activities are turned off.
     pub activities_off: Vec<String>,
-    /// What recognizes dictation: a model of a provider, by reference
-    /// (`ModelRef`). No provider is the model on this computer.
-    pub dictation_model: ModelRef,
-    /// The Doubao provider's configuration (Volcengine's speech services,
-    /// `dictation::engine::doubao::provider`): which console its key is
-    /// from, `new` (an API key) or `old` (an App ID and Access Token), and
-    /// the key. Like the Claude key, for the host alone: the secrets never
-    /// go to a window.
-    pub doubao_console: String,
-    pub doubao_api_key: String,
-    pub doubao_app_id: String,
-    pub doubao_access_token: String,
-    /// Doubao takes filler words, stutters and repetitions out.
-    pub doubao_remove_fillers: bool,
 }
-
-/// A model of a provider, as a feature refers to it: Doubao's provider
-/// and one of its resources, say (`{"provider": "doubao", "model":
-/// "volc.seedasr.sauc.duration"}`). An empty provider is none.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(default)]
-#[ts(export, export_to = "../../shared/bindings/")]
-pub struct ModelRef {
-    pub provider: String,
-    pub model: String,
-}
-
-/// The settings that are secrets: each set by a command of its own
-/// (`commands::settings::set_secret`), and never sent to a window, which
-/// is only told whether it is set (`<name>Set`).
-pub const SECRETS: &[&str] = &["doubaoApiKey", "doubaoAccessToken"];
 
 impl Settings {
     /// Whether the interface is dark right now: as chosen, or as the system
@@ -183,14 +151,12 @@ impl Default for Settings {
             dictation_polish: "off".into(),
             dictation_hold_key: String::new(),
             dictation_live: true,
-            anthropic_api_key: String::new(),
-            ai_provider: "claude".into(),
-            local_model_url: "http://127.0.0.1:8000/v1".into(),
-            local_model_name: String::new(),
-            claude_code_path: String::new(),
-            claude_code_model: String::new(),
-            codex_path: String::new(),
-            codex_model: String::new(),
+            providers: registry::defaults(),
+            ai_model: ModelRef::to(registry::CLAUDE, crate::models::CLAUDE_MODEL),
+            // The default model, or the one downloaded (`dictation::models::chosen`).
+            dictation_model: ModelRef::to(registry::LOCAL_SPEECH, ""),
+            polish_model: ModelRef::to(registry::CLAUDE, crate::models::CLAUDE_MODEL),
+            cases_model: ModelRef::none(),
             clipboard_paused: false,
             clipboard_ignored_apps: Vec::new(),
             dictation_vocabulary: Vec::new(),
@@ -201,12 +167,6 @@ impl Default for Settings {
             renderer: crate::renderer::Renderer::Auto,
             live_activities: true,
             activities_off: Vec::new(),
-            dictation_model: ModelRef::default(),
-            doubao_console: "new".into(),
-            doubao_api_key: String::new(),
-            doubao_app_id: String::new(),
-            doubao_access_token: String::new(),
-            doubao_remove_fillers: false,
         }
     }
 }
@@ -282,6 +242,13 @@ fn autostart_path() -> PathBuf {
 }
 
 impl Settings {
+    /// The settings with what is always there: the speech models of this
+    /// computer among the providers (`registry::with_fixed`).
+    fn whole(mut self) -> Settings {
+        self.providers = registry::with_fixed(std::mem::take(&mut self.providers));
+        self
+    }
+
     /// These settings with some fields changed: `changes` holds the new
     /// values under the names the settings are stored by. Every other field
     /// stays as it is. A name that is not a setting, or a value of the wrong
@@ -296,7 +263,7 @@ impl Settings {
                 None => return Err(format!("there is no setting called {name}")),
             }
         }
-        serde_json::from_value(serde_json::Value::Object(fields)).map_err(|e| format!("not a valid value for a setting: {e}"))
+        serde_json::from_value(serde_json::Value::Object(fields)).map(Settings::whole).map_err(|e| format!("not a valid value for a setting: {e}"))
     }
 
     pub fn load() -> Self {
@@ -314,7 +281,7 @@ impl Settings {
     pub fn load_from(path: &Path) -> (Settings, Option<PathBuf>) {
         let Ok(text) = fs::read_to_string(path) else { return (Settings::default(), None) };
         match serde_json::from_str(&text) {
-            Ok(settings) => (settings, None),
+            Ok(settings) => (Settings::whole(settings), None),
             Err(e) => {
                 let kept = path.with_extension("json.bad");
                 eprintln!("heyo: {} is not valid ({e}); kept as {}", path.display(), kept.display());
@@ -472,8 +439,14 @@ mod tests {
             serde_json::Value::String(s) if name == "appearance" => json!(if s == "dark" { "light" } else { "dark" }),
             serde_json::Value::String(s) if name == "renderer" => json!(if s == "cpu" { "auto" } else { "cpu" }),
             serde_json::Value::String(s) => json!(format!("{s}x")),
+            // Another provider besides those there are.
+            serde_json::Value::Array(all) if name == "providers" => {
+                let mut all = all.clone();
+                all.push(json!({ "id": "ollama", "kind": "openai-compatible", "name": "Ollama", "config": { "url": "http://127.0.0.1:11434/v1" } }));
+                json!(all)
+            }
             serde_json::Value::Array(_) => json!(["x"]),
-            serde_json::Value::Object(_) if name == "dictationModel" => json!({ "provider": "doubao", "model": "volc.bigasr.sauc.duration" }),
+            serde_json::Value::Object(reference) if reference.contains_key("provider") => json!({ "provider": "ollama", "model": "qwen3" }),
             serde_json::Value::Object(_) => json!({ "x": "y" }),
             serde_json::Value::Null => panic!("{name} has no value"),
         }
@@ -481,7 +454,9 @@ mod tests {
 
     #[test]
     fn a_change_leaves_every_other_setting_alone() {
-        let before = Settings { compact_mode: true, favorites: vec!["app:a".into()], anthropic_api_key: "sk-secret".into(), ..Settings::default() };
+        let mut providers = registry::defaults();
+        providers[1].config.insert(registry::KEY.into(), "sk-secret".into());
+        let before = Settings { compact_mode: true, favorites: vec!["app:a".into()], providers, ..Settings::default() };
         let after = before.changed(&changes(json!({ "appearance": "dark" }))).unwrap();
         assert_eq!(after, Settings { appearance: Appearance::Dark, ..before.clone() });
         // Several at once, by the names they are stored under.
@@ -597,6 +572,10 @@ mod tests {
         // A file from an older version, with fields missing and one unknown.
         fs::write(&path, r#"{"hideOnBlur": false, "somethingOld": 1}"#).unwrap();
         assert_eq!(Settings::load_from(&path).0, Settings { hide_on_blur: false, ..Settings::default() });
+        // The speech models of this computer are there whatever the file says.
+        fs::write(&path, r#"{"providers": [{"id": "claude", "kind": "anthropic", "name": "Claude"}]}"#).unwrap();
+        let ids: Vec<String> = Settings::load_from(&path).0.providers.into_iter().map(|provider| provider.id).collect();
+        assert_eq!(ids, [registry::LOCAL_SPEECH, "claude"]);
 
         fs::write(&path, "{ not json").unwrap();
         let (loaded, kept) = Settings::load_from(&path);

@@ -59,23 +59,29 @@ pub(crate) enum Command {
     GetCapabilities,
     InstallShellExtension,
     DictationStatus,
-    DictationInstall,
+    /// The speech models of this computer, and what each is to this installation.
+    SpeechModels,
+    /// By its id.
+    DownloadSpeechModel(String),
+    CancelSpeechDownload(String),
+    DeleteSpeechModel(String),
     CopyDiagnostics,
     CheckForUpdate,
     InstallUpdate,
-    /// The key; none, when it is empty.
-    SetAnthropicApiKey(String),
-    /// One of the other secrets, by the name of its setting; none, when
-    /// the value is empty.
-    SetSecret { name: String, value: String },
+    /// A provider of this kind (`registry::Kind::word`), connected.
+    AddProvider(String),
+    /// A field of a provider's configuration, or its `name`, as it is to be.
+    SetProviderField { provider: String, field: String, value: String },
+    /// By its id.
+    RemoveProvider(String),
     OpenExtensionsFolder,
     /// All the preferences of the extension of that name, as they are to be.
     SetExtensionPreferences { extension: String, values: Value },
     /// By the extension's id.
     UninstallExtension(String),
     ClearClipboardHistory,
-    /// The models the server at that address lists.
-    LocalModels(String),
+    /// The models the server that is this provider lists, by its id.
+    ProviderModels(String),
     OcrStatus,
     OcrInstall,
     ClipboardSources,
@@ -104,17 +110,21 @@ impl Command {
             Command::GetCapabilities => "get_capabilities",
             Command::InstallShellExtension => "install_shell_extension",
             Command::DictationStatus => "dictation_status",
-            Command::DictationInstall => "dictation_install",
+            Command::SpeechModels => "speech_models",
+            Command::DownloadSpeechModel(_) => "download_speech_model",
+            Command::CancelSpeechDownload(_) => "cancel_speech_download",
+            Command::DeleteSpeechModel(_) => "delete_speech_model",
             Command::CopyDiagnostics => "copy_diagnostics",
             Command::CheckForUpdate => "check_for_update",
             Command::InstallUpdate => "install_update",
-            Command::SetAnthropicApiKey(_) => "set_anthropic_api_key",
-            Command::SetSecret { .. } => "set_secret",
+            Command::AddProvider(_) => "add_provider",
+            Command::SetProviderField { .. } => "set_provider_field",
+            Command::RemoveProvider(_) => "remove_provider",
             Command::OpenExtensionsFolder => "open_extensions_folder",
             Command::SetExtensionPreferences { .. } => "set_extension_preferences",
             Command::UninstallExtension(_) => "uninstall_extension",
             Command::ClearClipboardHistory => "clear_clipboard_history",
-            Command::LocalModels(_) => "local_models",
+            Command::ProviderModels(_) => "provider_models",
             Command::OcrStatus => "ocr_status",
             Command::OcrInstall => "ocr_install",
             Command::ClipboardSources => "clipboard_sources",
@@ -152,19 +162,23 @@ impl Host for Running {
             Command::GetCapabilities => answer(settings::get_capabilities()),
             Command::InstallShellExtension => answer(settings::install_shell_extension()?),
             Command::DictationStatus => answer(media::dictation_status(app)),
-            Command::DictationInstall => answer(media::dictation_install(app)?),
+            Command::SpeechModels => answer(crate::dictation::models(&app)),
+            Command::DownloadSpeechModel(id) => answer(crate::dictation::download(&app, &id)?),
+            Command::CancelSpeechDownload(id) => answer(crate::dictation::cancel_download(&app, &id)?),
+            Command::DeleteSpeechModel(id) => answer(crate::dictation::delete(&app, &id)?),
             Command::CopyDiagnostics => answer(settings::copy_diagnostics(app)?),
             Command::CheckForUpdate => answer(block_on(updates::check_for_update(app))?),
             Command::InstallUpdate => answer(block_on(updates::install_update(app))?),
-            Command::SetAnthropicApiKey(key) => answer(settings::set_anthropic_api_key(key, app)?),
-            Command::SetSecret { name, value } => answer(settings::set_secret(name, value, app)?),
+            Command::AddProvider(kind) => answer(settings::add_provider(kind, app)?),
+            Command::SetProviderField { provider, field, value } => answer(settings::set_provider_field(provider, field, value, app)?),
+            Command::RemoveProvider(id) => answer(settings::remove_provider(id, app)?),
             Command::OpenExtensionsFolder => answer(settings::open_extensions_folder()?),
             // The preferences are the host's own shape, which the model
             // was given and hands back with one of them changed.
             Command::SetExtensionPreferences { extension, values } => answer(settings::set_extension_preferences(extension, serde_json::from_value(values).map_err(|e| format!("values: {e}"))?)?),
             Command::UninstallExtension(id) => answer(settings::uninstall_extension(id, app)?),
             Command::ClearClipboardHistory => answer(settings::clear_clipboard_history(app.state())),
-            Command::LocalModels(url) => answer(block_on(settings::local_models(url))?),
+            Command::ProviderModels(id) => answer(block_on(settings::provider_models(id, app))?),
             Command::OcrStatus => answer(media::ocr_status()),
             Command::OcrInstall => answer(media::ocr_install(app)?),
             Command::ClipboardSources => answer(clipboard::clipboard_sources(app)),
@@ -230,8 +244,9 @@ mod tests {
         let (none, nothing) = (String::new, Value::Null);
         let changing = [
             Command::ChangeSettings(Map::new()),
-            Command::SetAnthropicApiKey(none()),
-            Command::SetSecret { name: none(), value: none() },
+            Command::AddProvider(none()),
+            Command::SetProviderField { provider: none(), field: none(), value: none() },
+            Command::RemoveProvider(none()),
             Command::SetExtensionPreferences { extension: none(), values: nothing },
             Command::UninstallExtension(none()),
             Command::RevokeExtensionPermission { extension: none(), permission: permissions::Permission::Windows },

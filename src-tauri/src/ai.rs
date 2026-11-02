@@ -31,7 +31,10 @@ pub(crate) fn ask(app: &AppHandle, id: &Value, background: bool, question: Quest
     let Some(number) = id.as_u64() else {
         return reply_to(app, background, &reply(id.clone(), Err::<Value, _>("a question needs the number of its request")));
     };
-    let model = Model::from_settings(&app.state::<crate::SettingsState>().0.read().unwrap());
+    let model = match Model::for_use(&app.state::<crate::SettingsState>().0.read().unwrap(), crate::models::registry::Use::Answers) {
+        Ok(model) => model,
+        Err(why) => return reply_to(app, background, &reply(id.clone(), Err::<Value, _>(why.message()))),
+    };
     let (app, id) = (app.clone(), id.clone());
     // Held until the task is known, which it must be before it can end.
     let mut asking = ASKING.lock().unwrap();

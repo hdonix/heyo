@@ -8,13 +8,16 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::*;
+use crate::models::registry::{self, Kind, Provider};
 
 pub(crate) const SETTINGS_WINDOW: &str = "settings";
 
-/// The models an OpenAI-compatible server on this computer offers; an error
-/// says why it could not be asked.
-pub(crate) async fn local_models(url: String) -> Result<Vec<String>, String> {
-    crate::models::local_models(&url).await.map_err(|e| e.message())
+/// The models the OpenAI-compatible server that is the provider `id`
+/// lists; an error says why it could not be asked.
+pub(crate) async fn provider_models(id: String, app: AppHandle) -> Result<Vec<String>, String> {
+    let provider = app.state::<SettingsState>().0.read().unwrap().providers.iter().find(|provider| provider.id == id).cloned();
+    let provider = provider.ok_or_else(|| tf("There is no provider {0}.", &[&id]))?;
+    crate::models::listed_models(&provider).await.map_err(|e| e.message())
 }
 
 /// Makes `next` the settings: saves them, does what the change calls for
@@ -94,6 +97,19 @@ pub(crate) fn update_settings(app: &AppHandle, change: impl FnOnce(&mut Settings
     commit(app, next).map(|_| ())
 }
 
+/// What the settings window is told of a provider besides its settings.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../shared/bindings/")]
+pub(crate) struct ProviderState {
+    /// Which of its secret fields hold something. What they hold never
+    /// goes to a window: there they are empty.
+    secrets_set: Vec<String>,
+    /// For a command-line tool: where it is and its version, or why there
+    /// is none to run.
+    cli_found: Option<Result<crate::models::cli::Found, String>>,
+}
+
 /// Settings plus derived, read-only state for the settings page.
 #[derive(Clone, Serialize, ts_rs::TS)]
 #[serde(rename_all = "camelCase")]
@@ -101,18 +117,11 @@ pub(crate) fn update_settings(app: &AppHandle, change: impl FnOnce(&mut Settings
 pub(crate) struct SettingsView {
     #[serde(flatten)]
     settings: Settings,
-    /// Whether a Claude API key is stored. The key itself never goes to a
-    /// window (`anthropicApiKey` is always empty here).
-    anthropic_api_key_set: bool,
-    /// The same of Doubao's secrets (`settings::SECRETS`).
-    doubao_api_key_set: bool,
-    doubao_access_token_set: bool,
+    /// Each provider's, by its id.
+    provider_states: std::collections::BTreeMap<String, ProviderState>,
     launch_at_login: bool,
     node_version: Result<String, String>,
     node_overridden: bool,
-    /// The command-line tool the provider is, where it is and its version,
-    /// or why there is none to run; none for a provider that is no tool.
-    cli_found: Option<Result<crate::models::cli::Found, String>>,
     extensions_dir: String,
     settings_path: String,
     version: String,
@@ -129,29 +138,44 @@ impl SettingsView {
         if label != SETTINGS_WINDOW {
             self.extensions_dir.clear();
             self.settings_path.clear();
-            self.cli_found = None;
+            for state in self.provider_states.values_mut() {
+                state.cli_found = None;
+            }
         }
         self
     }
 }
 
+/// The providers as a window may see them: each secret taken out, and
+/// whether it was there said instead.
+fn without_secrets(providers: &mut [Provider]) -> std::collections::BTreeMap<String, ProviderState> {
+    use crate::models::cli::{found, Tool};
+    providers
+        .iter_mut()
+        .map(|provider| {
+            let mut state = ProviderState::default();
+            for field in provider.kind.fields().iter().filter(|field| field.entry == registry::Entry::Secret) {
+                if let Some(value) = provider.config.get_mut(field.name).filter(|value| !value.trim().is_empty()) {
+                    value.clear();
+                    state.secrets_set.push(field.name.to_owned());
+                }
+            }
+            state.cli_found = match provider.kind {
+                Kind::ClaudeCode => Some(found(Tool::ClaudeCode, provider.get(registry::PATH))),
+                Kind::Codex => Some(found(Tool::Codex, provider.get(registry::PATH))),
+                _ => None,
+            };
+            (provider.id.clone(), state)
+        })
+        .collect()
+}
+
 fn view(app: &AppHandle) -> SettingsView {
     let mut settings = app.state::<SettingsState>().0.read().unwrap().clone();
-    let anthropic_api_key_set = !settings.anthropic_api_key.is_empty();
-    settings.anthropic_api_key.clear();
-    let doubao_api_key_set = !std::mem::take(&mut settings.doubao_api_key).is_empty();
-    let doubao_access_token_set = !std::mem::take(&mut settings.doubao_access_token).is_empty();
     SettingsView {
-        anthropic_api_key_set,
-        doubao_api_key_set,
-        doubao_access_token_set,
+        provider_states: without_secrets(&mut settings.providers),
         node_version: settings::node_version(&settings.node()),
         node_overridden: std::env::var_os("HEYO_NODE").is_some(),
-        cli_found: match settings.ai_provider.as_str() {
-            crate::models::CLAUDE_CODE => Some(crate::models::cli::found(crate::models::cli::Tool::ClaudeCode, &settings.claude_code_path)),
-            crate::models::CODEX => Some(crate::models::cli::found(crate::models::cli::Tool::Codex, &settings.codex_path)),
-            _ => None,
-        },
         launch_at_login: settings::launch_at_login(),
         extensions_dir: paths::extensions().to_string_lossy().into_owned(),
         settings_path: settings::settings_path().to_string_lossy().into_owned(),
@@ -176,9 +200,10 @@ pub(crate) fn get_settings(app: AppHandle, window: tauri::WebviewWindow) -> Sett
 /// Changes some settings: `changes` holds the new values of the ones that
 /// change, by name, and nothing else. `launchAtLogin` may be among them.
 pub(crate) fn change_settings(mut changes: serde_json::Map<String, Value>, app: AppHandle) -> Result<SettingsView, String> {
-    // The key has a command of its own, which is the only way it is set.
-    if changes.contains_key("anthropicApiKey") || settings::SECRETS.iter().any(|name| changes.contains_key(*name)) {
-        return Err("the API key is not set this way".into());
+    // The providers have commands of their own: a window never has their
+    // secrets to send back.
+    if changes.contains_key("providers") {
+        return Err("the providers are not changed this way".into());
     }
     if let Some(enabled) = changes.remove("launchAtLogin") {
         let enabled = enabled.as_bool().ok_or("launchAtLogin is on or off")?;
@@ -202,24 +227,33 @@ pub(crate) fn install_shell_extension() -> Result<platform::Capabilities, String
     Ok(platform::capabilities())
 }
 
-/// Stores the Claude API key; an empty one removes it.
-pub(crate) fn set_anthropic_api_key(key: String, app: AppHandle) -> Result<SettingsView, String> {
+/// Changes the providers as `change` does, if it can.
+fn change_providers(app: &AppHandle, change: impl FnOnce(&mut Vec<Provider>) -> Result<(), String>) -> Result<SettingsView, String> {
     let _changing = changing();
     let mut next = app.state::<SettingsState>().0.read().unwrap().clone();
-    next.anthropic_api_key = key.trim().to_owned();
-    commit(&app, next)
+    change(&mut next.providers)?;
+    commit(app, next)
 }
 
-/// Stores one of the secrets (`settings::SECRETS`) by its name; an empty
-/// one removes it.
-pub(crate) fn set_secret(name: String, value: String, app: AppHandle) -> Result<SettingsView, String> {
-    if !settings::SECRETS.contains(&name.as_str()) {
-        return Err(format!("{name} is not a secret"));
-    }
-    let _changing = changing();
-    let changes = serde_json::Map::from_iter([(name, Value::from(value.trim()))]);
-    let next = app.state::<SettingsState>().0.read().unwrap().changed(&changes)?;
-    commit(&app, next)
+/// Connects a new provider of `kind` (by its word), named as its kind is.
+pub(crate) fn add_provider(kind: String, app: AppHandle) -> Result<SettingsView, String> {
+    let kind = Kind::from_word(&kind).filter(|kind| registry::ADDABLE.contains(kind)).ok_or_else(|| tf("{0} is not a provider that can be added.", &[&kind]))?;
+    change_providers(&app, |providers| {
+        let id = registry::new_id(providers, kind);
+        providers.push(Provider::new(&id, kind));
+        Ok(())
+    })
+}
+
+/// Sets a field of a provider's configuration, or its name (`name`). A
+/// secret is never shown again; an empty one is removed.
+pub(crate) fn set_provider_field(provider: String, field: String, value: String, app: AppHandle) -> Result<SettingsView, String> {
+    change_providers(&app, |providers| registry::set_field(providers, &provider, &field, &value))
+}
+
+/// Disconnects a provider. What refers to it says it is gone.
+pub(crate) fn remove_provider(id: String, app: AppHandle) -> Result<SettingsView, String> {
+    change_providers(&app, |providers| registry::remove(providers, &id))
 }
 
 /// Opens the settings window, or brings it back if it is already open.
@@ -354,15 +388,13 @@ mod tests {
 
     #[test]
     fn only_the_settings_window_learns_where_the_files_are() {
+        let found = Some(Ok(crate::models::cli::Found { path: "/home/ada/.local/bin/claude".into(), version: "2.1.302 (Claude Code)".into() }));
         let view = SettingsView {
-            settings: Settings { anthropic_api_key: String::new(), compact_mode: true, ..Settings::default() },
-            anthropic_api_key_set: true,
-            doubao_api_key_set: false,
-            doubao_access_token_set: false,
+            settings: Settings { compact_mode: true, ..Settings::default() },
+            provider_states: [("cc".to_string(), ProviderState { secrets_set: vec!["key".into()], cli_found: found })].into(),
             launch_at_login: false,
             node_version: Ok("v24.0.0".into()),
             node_overridden: false,
-            cli_found: Some(Ok(crate::models::cli::Found { path: "/home/ada/.local/bin/claude".into(), version: "2.1.302 (Claude Code)".into() })),
             extensions_dir: "/home/ada/.local/share/heyo/extensions".into(),
             settings_path: "/home/ada/.config/heyo/settings.json".into(),
             version: "0.1.0".into(),
@@ -371,11 +403,26 @@ mod tests {
         let whole = view.clone().for_window(SETTINGS_WINDOW);
         assert_eq!(whole.settings_path, "/home/ada/.config/heyo/settings.json");
         assert_eq!(whole.extensions_dir, "/home/ada/.local/share/heyo/extensions");
+        assert!(whole.provider_states["cc"].cli_found.is_some());
         for label in ["main", "screenshot", "pin-1", "*", ""] {
             let seen = view.clone().for_window(label);
-            assert_eq!((seen.settings_path.as_str(), seen.extensions_dir.as_str(), &seen.cli_found), ("", "", &None), "{label}");
+            assert_eq!((seen.settings_path.as_str(), seen.extensions_dir.as_str(), &seen.provider_states["cc"].cli_found), ("", "", &None), "{label}");
             // What the palette lays itself out by is still there.
-            assert!(seen.settings.compact_mode && seen.anthropic_api_key_set);
+            assert!(seen.settings.compact_mode && seen.provider_states["cc"].secrets_set == ["key"]);
         }
+    }
+
+    #[test]
+    fn no_window_is_told_a_secret_only_that_it_is_set() {
+        let mut providers = registry::defaults();
+        providers[1].config.insert(registry::KEY.into(), "sk-ant-secret".into());
+        let mut server = Provider::new("ollama", Kind::OpenaiCompatible);
+        server.config.extend([(registry::URL.to_string(), "http://127.0.0.1:11434/v1".to_string()), (registry::KEY.to_string(), "  ".to_string())]);
+        providers.push(server);
+        let states = without_secrets(&mut providers);
+        assert_eq!(providers[1].get(registry::KEY), "");
+        assert_eq!(providers[2].get(registry::URL), "http://127.0.0.1:11434/v1");
+        assert_eq!((states["claude"].secrets_set.as_slice(), states["ollama"].secrets_set.as_slice()), (&["key".to_string()][..], &[][..]));
+        assert!(!serde_json::to_string(&providers).unwrap().contains("sk-ant-secret"));
     }
 }

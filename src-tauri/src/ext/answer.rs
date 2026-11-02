@@ -1210,12 +1210,15 @@ mod tests {
     fn the_model_is_said_without_its_key() {
         let bench = Bench::new(&[]);
         let writer = bench.install("writer", &["ai"]);
-        bench.settings.write().unwrap().anthropic_api_key = "sk-secret".into();
+        use crate::models::registry::{self, Kind, ModelRef, Provider};
+        bench.settings.write().unwrap().providers[1].config.insert(registry::KEY.into(), "sk-secret".into());
         assert_eq!(bench.result(&writer, "ext.ai.provider", Value::Null), json!({ "kind": "claude", "model": "claude-opus-5-5", "local": false }));
         {
             let mut settings = bench.settings.write().unwrap();
-            settings.ai_provider = "local".into();
-            settings.local_model_name = "qwen3".into();
+            let mut server = Provider::new("ollama", Kind::OpenaiCompatible);
+            server.config.insert(registry::URL.into(), "http://127.0.0.1:8000/v1".into());
+            settings.providers.push(server);
+            settings.ai_model = ModelRef::to("ollama", "qwen3");
         }
         assert_eq!(bench.result(&writer, "ext.ai.provider", Value::Null), json!({ "kind": "local", "model": "qwen3", "local": true }));
         // Listing it is enough.
