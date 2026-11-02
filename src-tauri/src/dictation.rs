@@ -848,7 +848,10 @@ pub fn toggle(app: &AppHandle) {
 pub fn finish(app: &AppHandle) {
     let state = app.state::<Dictation>();
     let mut state = state.0.lock().unwrap();
-    if !state.recording {
+    // Not recording, or told to finish already and finishing: the hotkey
+    // repeats while it is held, and each repeat may come as a `heyo
+    // --dictate` after the release that finished it.
+    if !state.recording || state.listening.is_none() {
         return;
     }
     // An extension is given what was said, as it was said.
@@ -856,7 +859,7 @@ pub fn finish(app: &AppHandle) {
         Some(_) => "off".to_owned(),
         None => app.state::<SettingsState>().0.read().unwrap().dictation_polish.clone(),
     };
-    let stopped = state.listening.take().ok_or_else(|| t("dictation is not running").to_owned()).and_then(|listening| listening.stop());
+    let stopped = state.listening.take().map_or(Ok(()), |listening| listening.stop());
     if let Err(e) = stopped {
         eprintln!("heyo: {e}");
         // What the recording wrote is finished off by its own thread.
