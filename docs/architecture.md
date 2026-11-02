@@ -257,12 +257,30 @@ and keeps the list of applications current. The rest, by what it is for:
   for one request. It is consent and a record, not a sandbox: extensions
   run in one Node.js process and can read files themselves. `confirm.rs`
   is how the host puts a question of its own into the palette's dialog.
-- `models/` is every call to an AI model, and the only place one is made:
-  `Model` with its two adapters, Claude over HTTPS (`claude.rs`) and an
-  OpenAI-compatible server (`openai.rs`), picked from the settings, with
-  each failure worded for the user once; `address.rs` says whether a
-  model's address is this computer. `ai.rs` answers the runtime's
-  questions with it.
+- `models/` is every call to an AI model, and the only place one is made.
+  Providers are what the settings connect (`registry.rs`), each of a kind
+  in a file of its own (`kinds/`) that says what it needs, which models
+  it has, how it is checked, and what it opens for a use: a speech
+  recognizer, or a text model. A text model is a `TextAdapter`
+  (`text.rs`), the seam between Heyo and every protocol: it is given one
+  step of a conversation (the system prompt, turns of user text, text to
+  work on, pictures, assistant text and tool calls, tool results, and the
+  tools on offer) and answers with the next assistant turn, its text told
+  as it grows, called off by dropping the step. It declares what it can
+  be given besides text (pictures, tools), which is what its kind says it
+  can do, and words its own failures, into one small classified
+  `ModelError` (not set up, sign-in, rate limit, unreachable, declined,
+  failed). The adapters are Claude's Messages API (`claude.rs`), an
+  OpenAI-compatible server (`openai.rs`), both with tool calls, and
+  Claude Code (`claude_code.rs`) and Codex (`codex.rs`) through what
+  running a command-line tool takes (`cli.rs`), with every tool of theirs
+  off and none of Heyo's given. `Model` is the one a use's setting names,
+  with the one-shot question that Ask AI, AI Chat, the selected-text
+  actions (`ai.rs`), dictation's polishing and the clipboard's cases ask
+  through it. One contract suite holds every adapter, and a scripted fake,
+  to the same streaming, cancelling, failing and tool calls
+  (`contract.rs`). `address.rs` says whether a model's address is this
+  computer.
 - `menubar.rs` turns menu bar commands into tray icons and runs commands
   that have an `interval`. `links.rs` registers Heyo for the `raycast://`
   links that OAuth sign-ins come back through.
