@@ -428,7 +428,6 @@ impl Read for Counted<'_> {
     }
 }
 
-#[allow(dead_code)] // The Models page's (`dictation::delete`).
 /// Takes a model's files away. The voice detector, which the others use
 /// too, stays.
 pub(crate) fn delete(dir: &Path, model: &Model) -> std::io::Result<()> {
@@ -522,6 +521,169 @@ async fn fetch(url: &str, partial: &Path, file: &Pinned, progress: Progress<'_>,
         return Err(format!("what {host} sent is not the expected file (SHA-256 {got}, expected {}); it was not installed", file.sha256));
     }
     Ok(())
+}
+
+/// The catalogue as the settings show it: each model with whether it is
+/// downloaded, being downloaded or in use; and its downloads, each on a
+/// thread of its own, which go on while no window is there to show them.
+pub(crate) mod downloads {
+    use std::collections::BTreeMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use serde::Serialize;
+    use serde_json::{json, Value};
+    use tauri::{AppHandle, Emitter};
+
+    use super::{find, Model, CATALOGUE};
+    use crate::dictation::dir;
+    use crate::helper::InstallProgress;
+    use crate::i18n::{t, translate};
+
+    /// A speech model being downloaded: how far it is, and what stops it.
+    struct Downloading {
+        /// A step of the installation (`helper::step`), and bytes `received`
+        /// of `total` (0 where that is not known).
+        step: String,
+        received: u64,
+        total: u64,
+        cancel: Arc<AtomicBool>,
+    }
+
+    /// The speech models being downloaded, by their ids.
+    static GOING: Mutex<BTreeMap<&'static str, Downloading>> = Mutex::new(BTreeMap::new());
+
+    /// A model of the catalogue as the settings page lists it.
+    #[derive(Serialize, Debug, Clone, PartialEq, ts_rs::TS)]
+    #[serde(rename_all = "camelCase")]
+    #[ts(export, export_to = "../../shared/bindings/", rename = "SpeechModel")]
+    pub(crate) struct ModelState {
+        id: &'static str,
+        name: &'static str,
+        /// In the user's language, as `note`.
+        languages: &'static str,
+        note: &'static str,
+        megabytes: u32,
+        installed: bool,
+        /// Whether recordings are heard with it.
+        in_use: bool,
+        /// Whether the `dictationLanguage` setting is given to it.
+        takes_language: bool,
+        /// How far its download is, while it runs.
+        downloading: Option<Progress>,
+    }
+
+    #[derive(Serialize, Debug, Clone, PartialEq, ts_rs::TS)]
+    #[ts(export, export_to = "../../shared/bindings/", rename = "SpeechModelProgress")]
+    pub(crate) struct Progress {
+        /// A step of the installation, by its code (`helper::step`).
+        step: String,
+        received: u64,
+        total: u64,
+    }
+
+    /// Whether a model is being downloaded.
+    pub(crate) fn any() -> bool {
+        !GOING.lock().unwrap().is_empty()
+    }
+
+    /// The speech models, and what each is to this installation, where
+    /// recordings are heard with `in_use`.
+    pub(crate) fn listed(in_use: Option<&str>) -> Vec<ModelState> {
+        let going = GOING.lock().unwrap();
+        let dir = dir();
+        CATALOGUE
+            .iter()
+            .map(|model| ModelState {
+                id: model.id,
+                name: model.name,
+                languages: translate(model.languages),
+                note: translate(model.note),
+                megabytes: model.megabytes,
+                installed: model.installed(&dir),
+                in_use: Some(model.id) == in_use,
+                takes_language: model.language,
+                downloading: going.get(model.id).map(|going| Progress { step: going.step.clone(), received: going.received, total: going.total }),
+            })
+            .collect()
+    }
+
+    fn model(id: &str) -> Result<&'static Model, String> {
+        find(id).ok_or_else(|| crate::i18n::tf("There is no speech model {0}", &[&id]))
+    }
+
+    /// Downloads a speech model. How far it is the settings window reads in
+    /// `listed`, when the `heyo://dictation-install` events say it changed.
+    pub(crate) fn start(app: &AppHandle, id: &str) -> Result<(), String> {
+        let model = model(id)?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        {
+            let mut going = GOING.lock().unwrap();
+            if going.contains_key(model.id) {
+                return Ok(());
+            }
+            going.insert(model.id, Downloading { step: "speech-model".into(), received: 0, total: 0, cancel: cancel.clone() });
+        }
+        let app = app.clone();
+        let report = move |app: &AppHandle, message: Value| match InstallProgress::of(message) {
+            Ok(progress) => drop(app.emit(crate::wire::event::DICTATION_INSTALL, progress)),
+            Err(e) => eprintln!("heyo: dictation: not the progress of an installation: {e}"),
+        };
+        let stop = cancel.clone();
+        // This download's own, and not one started again after it was cancelled.
+        let this = move |going: &Downloading| Arc::ptr_eq(&going.cancel, &cancel);
+        std::thread::Builder::new()
+            .name("dictation-download".into())
+            .spawn(move || {
+                let progress = |step: &str, received: u64, total: u64| {
+                    if let Some(going) = GOING.lock().unwrap().get_mut(model.id).filter(|going| this(going)) {
+                        (going.step, going.received, going.total) = (step.to_owned(), received, total);
+                    }
+                    report(&app, json!({ "type": "progress", "step": step, "received": received, "total": total }));
+                };
+                let done = tauri::async_runtime::block_on(super::install(&dir(), model, &progress, &stop));
+                {
+                    let mut going = GOING.lock().unwrap();
+                    if going.get(model.id).is_some_and(|going| this(going)) {
+                        going.remove(model.id);
+                    }
+                }
+                match done {
+                    Ok(()) => report(&app, json!({ "type": "installed" })),
+                    // Whoever cancelled it knows.
+                    Err(failure) if failure.code == "cancelled" => {}
+                    Err(failure) => {
+                        let mut said = failure.said();
+                        said["type"] = "error".into();
+                        report(&app, said)
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Stops a model's download; what it fetched so far is thrown away.
+    pub(crate) fn cancel(id: &str) -> Result<(), String> {
+        let model = model(id)?;
+        if let Some(going) = GOING.lock().unwrap().remove(model.id) {
+            going.cancel.store(true, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+
+    /// Deletes a model's files, unless recordings are heard with it
+    /// (`in_use`): another is chosen first.
+    pub(crate) fn delete(id: &str, in_use: Option<&str>) -> Result<(), String> {
+        let model = model(id)?;
+        if in_use == Some(model.id) {
+            return Err(t("The speech model in use cannot be deleted. Choose another first.").into());
+        }
+        if GOING.lock().unwrap().contains_key(model.id) {
+            return Err(t("The speech model is being downloaded. Cancel the download first.").into());
+        }
+        super::delete(&dir(), model).map_err(|e| e.to_string())
+    }
 }
 
 #[cfg(test)]

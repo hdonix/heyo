@@ -1,12 +1,17 @@
 //! Voice dictation: speak, and the text goes into the focused window.
 //!
 //! A recording (`listening`) records the microphone (`microphone`) and
-//! has a recognizer hear it (`engine`: SenseVoice on this computer, from
-//! files downloaded on demand, `models`). This module starts and stops it
-//! (`heyo --dictate` toggles), writes what it heard the user's way
-//! (`vocabulary`), shows the progress window, optionally has the transcript
-//! polished by the model the settings name (`polish`), and writes what is
-//! heard into the application the user is working in.
+//! has a recognizer hear it (`engine`: a model of the catalogue on this
+//! computer, from files downloaded on demand, `models`; or a service, as
+//! the provider the settings name opens it). The life of the recordings,
+//! one after the other, is the `session`'s: what starts, finishes or
+//! discards one, what is done with what it hears, when it is polished by
+//! the model the settings name (`polish`) and when it is over, and what the
+//! pill is told meanwhile. It answers each thing that happens with what is
+//! to be done; the shell here does that, and is the only part that holds
+//! the application. What is heard is written the user's way (`vocabulary`)
+//! into the application the user is working in, or given to an extension
+//! that asked to listen.
 //!
 //! The words reach the application one of two ways ([`Way`]), chosen when
 //! the recording starts, before a word is heard:
@@ -36,20 +41,19 @@ mod microphone;
 pub(crate) mod models;
 mod onscreen;
 mod polish;
+mod session;
 pub(crate) mod vocabulary;
 
-use crate::i18n::{t, translate};
+use crate::i18n::translate;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
-use crate::helper::InstallProgress;
 use crate::platform::composing::{self, Composing, Stir};
 use crate::platform::typed::{self, Lost, Writing};
 use crate::models::registry;
@@ -58,119 +62,26 @@ use composed::{Composed, Tell};
 use engine::Opener;
 pub(crate) use engine::LANGUAGES;
 use onscreen::{OnScreen, Shortfall, Standing, Step};
-use vocabulary::{Corrector, Vocabulary};
+use session::{Effect, End, Input, Said, Session, Setup};
+pub(crate) use session::{Heard, NotListening};
 
-
+/// Dictation in Tauri's state: the session, and what its effects hold
+/// while they last.
 #[derive(Default)]
-pub struct Dictation(Mutex<State>);
+pub struct Dictation(Mutex<Shell>);
 
+/// What carries out what the session calls for. Each is the recording's
+/// of that number.
 #[derive(Default)]
-struct State {
+struct Shell {
+    session: Session,
     /// The recording in progress, until it is told to end.
-    listening: Option<listening::Listening>,
-    recording: bool,
-    /// The hotkey that started the recording has not been released yet.
-    holding: bool,
-    /// When a hotkey held to talk was let go and so finished the recording.
-    let_go: Option<std::time::Instant>,
-    /// Counts recordings, so a hold watcher can tell its own has ended.
-    session: u64,
+    listening: Option<(u64, listening::Listening)>,
     /// Where what is heard goes to be written into the application: the
     /// recording's own thread takes it from there.
-    writing: Option<Arc<Mailbox>>,
-    /// The speech models being downloaded, by their ids.
-    downloads: std::collections::BTreeMap<&'static str, Downloading>,
-    /// Who is given the text of this recording instead of the focused
-    /// window: an extension that asked to listen.
-    listener: Option<Listener>,
-    /// The user's words, for the recording in progress or the last one:
-    /// what was heard is written their way, and the polishing model told them.
-    words: Arc<Words>,
-    /// How the recording is polished once it is over (`dictationPolish`),
-    /// as it was set when it was finished.
-    polish: String,
+    writing: Option<(u64, Arc<Mailbox>)>,
     /// The polishing of the recording that is over, while it goes on.
     polishing: Option<tauri::async_runtime::JoinHandle<()>>,
-}
-
-/// A vocabulary, and the correction pass made of it.
-#[derive(Default)]
-struct Words {
-    vocabulary: Vocabulary,
-    corrector: Corrector,
-}
-
-impl Words {
-    fn of(lines: &[String]) -> Arc<Words> {
-        let vocabulary = vocabulary::parse(lines);
-        Arc::new(Words { corrector: Corrector::new(&vocabulary), vocabulary })
-    }
-}
-
-/// What the recording says, with what it says went wrong in words: it
-/// says that as a code (`helper::worded`). The pill has room for the short
-/// words; the rest is for the log.
-fn said(event: Value) -> Value {
-    if event["type"] != "error" {
-        return event;
-    }
-    let worded = crate::helper::worded(&event, t("Dictation failed"));
-    eprintln!("heyo: dictation: {}", worded.full());
-    json!({ "type": "error", "message": worded.short })
-}
-
-/// What the recording said it heard, with the user's words written their way.
-fn corrected(mut event: Value, corrector: &Corrector) -> Value {
-    if matches!(event["type"].as_str(), Some("partial" | "segment" | "result")) {
-        for field in ["text", "raw"] {
-            if let Some(text) = event[field].as_str() {
-                event[field] = corrector.correct(text).into();
-            }
-        }
-    }
-    event
-}
-
-/// What an extension hears of the recording it started.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Heard {
-    /// A sentence by itself, as soon as it is recognized.
-    Segment(String),
-    /// All of it; the recording is over.
-    Result(String),
-    Cancelled,
-    Failed(String),
-}
-
-impl Heard {
-    fn ends(&self) -> bool {
-        !matches!(self, Heard::Segment(_))
-    }
-}
-
-type Listener = std::sync::Arc<dyn Fn(Heard) + Send + Sync>;
-
-/// Why listening could not start.
-#[derive(Debug, PartialEq)]
-pub(crate) enum NotListening {
-    /// A recording is in progress, and there is one microphone.
-    Busy,
-    /// The speech engine has not been downloaded.
-    NotInstalled,
-    Failed(String),
-}
-
-/// What an event of the recording tells the one listening, if anything.
-fn heard(event: &Value) -> Option<Heard> {
-    let text = || event["text"].as_str().unwrap_or_default().to_owned();
-    match event["type"].as_str().unwrap_or_default() {
-        // Without the space that sets it apart from the sentence before.
-        "segment" => Some(Heard::Segment(text().trim_start().to_owned())),
-        "result" if event["cancelled"] == true => Some(Heard::Cancelled),
-        "result" => Some(Heard::Result(text())),
-        "error" => Some(Heard::Failed(event["message"].as_str().unwrap_or(t("Dictation failed")).to_owned())),
-        _ => None,
-    }
 }
 
 /// Doubao, as a provider of speech recognition (`models::registry`): its
@@ -250,50 +161,6 @@ pub(crate) enum Told {
         kept: Option<bool>,
     },
     Error { message: String },
-}
-
-/// Tells the pill of the recording: what `Told` declares and nothing else.
-/// The pill is Slint's (`slint_windows::pill`); without it, as when Slint
-/// could not start, the recording goes on all the same.
-fn emit(_app: &AppHandle, event: Value) {
-    match serde_json::from_value::<Told>(event) {
-        Ok(told) => crate::slint_windows::pill::tell(told),
-        Err(e) => eprintln!("heyo: dictation: not something its window is told: {e}"),
-    }
-}
-
-/// Shows the pill at the bottom center of the screen, without taking
-/// keyboard focus from the application being dictated into.
-fn show_window(app: &AppHandle) {
-    crate::slint_windows::pill::show(app);
-}
-
-fn hide_window_after(app: &AppHandle, delay: Duration) {
-    let app = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(delay);
-        // A new recording may have started meanwhile.
-        if !app.state::<Dictation>().0.lock().unwrap().recording {
-            crate::slint_windows::pill::hide();
-        }
-    });
-}
-
-/// Starts recording from `source`, heard by what `opener` opens, in
-/// `language`: what is heard comes to `handle`.
-fn start(app: &AppHandle, opener: Box<dyn Opener>, source: &str, language: &str) -> Result<listening::Listening, String> {
-    let receiver = app.clone();
-    listening::listen(source, opener, language, Arc::new(move |event| handle(&receiver, said(event))))
-}
-
-/// What the thread that writes is told, in the order it was heard.
-enum Said {
-    /// The sentence in progress.
-    Partial(String),
-    /// A finished sentence.
-    Sentence(String),
-    /// The recording's last word: its result, or an error.
-    Ended(Value),
 }
 
 /// Between the recording, which says what it hears as it hears it, and the
@@ -632,41 +499,36 @@ impl Writer {
         self.way.live()
     }
 
-    /// The recording's last word, as the window is to be
-    /// told it: with what could not be done added.
-    fn end(&mut self, mut event: Value) -> Value {
-        if event["type"] != "result" {
-            self.hear(Spoken::Failed);
-            return event;
-        }
-        let text = event["text"].as_str().unwrap_or_default().to_owned();
-        let heard = match event["cancelled"] == true {
-            true => Spoken::Cancelled,
-            false => Spoken::Result { text: &text, polished: event["polished"] == true },
+    /// The recording's last word, as the window is to be told it: with
+    /// what could not be done added.
+    fn end(&mut self, end: End) -> Told {
+        let mut told = end.told();
+        let polished;
+        let heard = match &end {
+            End::Failed(_) => {
+                self.hear(Spoken::Failed);
+                return told;
+            }
+            End::Cancelled => Spoken::Cancelled,
+            End::Over(outcome) => {
+                polished = outcome.polished;
+                Spoken::Result { text: &outcome.text, polished }
+            }
         };
         self.hear(heard);
-        match self.way.shortfall() {
-            // The text in the application is what was heard.
-            Some(Shortfall::NotPolished(why)) => {
-                event["warning"] = json!(translate(why));
-                event["text"] = event["raw"].clone();
+        if let Told::Result { text, raw, warning, kept, .. } = &mut told {
+            match self.way.shortfall() {
+                // The text in the application is what was heard.
+                Some(Shortfall::NotPolished(why)) => {
+                    *warning = Some(translate(why).into());
+                    *text = raw.clone();
+                }
+                Some(Shortfall::NotTakenBack) => *kept = Some(true),
+                None => {}
             }
-            Some(Shortfall::NotTakenBack) => event["kept"] = json!(true),
-            None => {}
         }
-        event
+        told
     }
-}
-
-/// How long the window stays once the recording is over: longer where
-/// there is something to read.
-fn linger(last: &Value) -> Duration {
-    if last["type"] != "result" {
-        return Duration::from_secs(4);
-    }
-    // A warning, having heard nothing, or how a cancelled recording ended.
-    let to_read = last["warning"].is_string() || last["raw"].as_str().is_some_and(str::is_empty);
-    Duration::from_millis(if to_read { 2500 } else { 300 })
 }
 
 /// Why the words cannot go in as they are spoken in the window in front,
@@ -679,21 +541,16 @@ fn here(app: &AppHandle) -> Result<Vec<String>, &'static str> {
     }
 }
 
-/// Begins composing the words of recording number `session` in the window
-/// in front, if they can be composed there.
-fn composer(app: &AppHandle, live: bool, polishing: bool, session: u64) -> Option<Composer> {
+/// Begins composing the words of recording number `recording` in the
+/// window in front, if they can be composed there.
+fn composer(app: &AppHandle, live: bool, polishing: bool, recording: u64) -> Option<Composer> {
     if !composing::supported() {
         return None;
     }
     // While the hotkey that started the recording is down, the desktop has
     // the keyboard and no field has the focus: which field the words are
     // for shows when the key is let go.
-    let held = || {
-        let state = app.state::<Dictation>();
-        let state = state.0.lock().unwrap();
-        state.holding && state.recording && state.session == session
-    };
-    while held() {
+    while app.state::<Dictation>().0.lock().unwrap().session.holding(recording) {
         std::thread::sleep(Duration::from_millis(15));
     }
     let hold_key = app.state::<SettingsState>().0.read().unwrap().dictation_hold_key.clone();
@@ -701,15 +558,15 @@ fn composer(app: &AppHandle, live: bool, polishing: bool, session: u64) -> Optio
     Composer::begin(live, polishing, &[hold_key.as_str()]).map_err(|why| eprintln!("heyo: dictation: the words are not composed in the application ({why})")).ok()
 }
 
-/// Starts the thread that writes recording number `session` into the
+/// Starts the thread that writes recording number `recording` into the
 /// application: what is heard reaches it through `mailbox`, and it ends
 /// with the recording. `live`: the words are wanted as they are spoken.
-fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool, session: u64) -> std::io::Result<()> {
+fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool, recording: u64) -> std::io::Result<()> {
     let app = app.clone();
     let spawned = std::thread::Builder::new().name("dictation-writing".into()).spawn(move || {
         let asking = app.clone();
         let paster = Paster::new(live && typed::rewriting(), polishing, pasting::borrow(), mailbox.own_presses.clone(), Box::new(move || here(&asking)));
-        let mut writer = Writer::new(composer(&app, live, polishing, session), paster);
+        let mut writer = Writer::new(composer(&app, live, polishing, recording), paster);
         let mut told = None;
         let last = loop {
             let last = match mailbox.next() {
@@ -721,326 +578,203 @@ fn write(app: &AppHandle, mailbox: Arc<Mailbox>, live: bool, polishing: bool, se
                     writer.hear(Spoken::Sentence(&text));
                     None
                 }
-                Said::Ended(event) => Some(writer.end(event)),
+                Said::Ended(end) => Some(writer.end(end)),
             };
             if let Some(live) = writer.writing_live().filter(|live| told != Some(*live)) {
                 told = Some(live);
-                emit(&app, json!({ "type": "writing", "live": live }));
+                crate::slint_windows::pill::tell(Told::Writing { live });
             }
             if let Some(last) = last {
                 break last;
             }
         };
-        {
-            let state = app.state::<Dictation>();
-            let mut state = state.0.lock().unwrap();
-            state.recording = false;
-            state.writing = None;
-        }
         // The session's input method is the user's again; a loan ends, and
         // the clipboard comes back once the last piece has been read from it.
         drop(writer);
-        hide_window_after(&app, linger(&last));
-        emit(&app, last);
+        run(&app, Input::Written(recording, last));
     });
     spawned.map(|_| ())
 }
 
-/// Handles one event of the recording.
-fn handle(app: &AppHandle, event: Value) {
-    let (listener, words, polish) = {
-        let state = app.state::<Dictation>();
-        let state = state.0.lock().unwrap();
-        (state.listener.clone(), state.words.clone(), state.polish.clone())
-    };
-    let event = corrected(event, &words.corrector);
-    // A recording an extension started: the text is the extension's, and
-    // nothing is pasted anywhere.
-    if let Some(listener) = listener {
-        if let Some(heard) = heard(&event) {
-            if heard.ends() {
-                let state = app.state::<Dictation>();
-                let mut state = state.0.lock().unwrap();
-                state.recording = false;
-                state.listener = None;
-                drop(state);
-                hide_window_after(app, Duration::from_millis(300));
-            }
-            listener(heard);
-        }
-        return emit(app, event);
-    }
-    let writing = app.state::<Dictation>().0.lock().unwrap().writing.clone();
-    let text = || event["text"].as_str().unwrap_or_default().to_owned();
-    match (event["type"].as_str().unwrap_or_default(), writing) {
-        ("partial", Some(writing)) => writing.post(Said::Partial(text())),
-        ("segment", Some(writing)) => writing.post(Said::Sentence(text())),
-        ("result", _) if event["cancelled"] != true => {
-            let raw = text();
-            match polish::instructions(&polish, &words.vocabulary).filter(|_| !raw.is_empty()) {
-                Some(instructions) => polish_then_end(app, raw, instructions, words),
-                None => ended(app, event),
-            }
-            return;
-        }
-        ("result" | "error", _) => return ended(app, event),
-        _ => {}
-    }
-    emit(app, event);
-}
-
-/// The recording is over, as `event` says (a result or an error).
-fn ended(app: &AppHandle, event: Value) {
-    let writing = app.state::<Dictation>().0.lock().unwrap().writing.clone();
-    match writing {
-        // The window hears of the end once all of it is written.
-        Some(writing) => writing.post(Said::Ended(event)),
-        // Nothing is writing: the recording ends as it is.
-        None => {
-            app.state::<Dictation>().0.lock().unwrap().recording = false;
-            hide_window_after(app, linger(&event));
-            emit(app, event);
-        }
+/// The settings a recording starts or finishes with, as they are now.
+fn setup(app: &AppHandle) -> Setup {
+    let settings = app.state::<SettingsState>();
+    let settings = settings.0.read().unwrap();
+    Setup {
+        opener: opener(&settings),
+        source: settings.dictation_source.clone(),
+        language: settings.dictation_language.clone(),
+        polish: settings.dictation_polish.clone(),
+        vocabulary: settings.dictation_vocabulary.clone(),
+        live: settings.dictation_live,
     }
 }
 
-/// Has what was heard polished, and then ends the recording with the
-/// polished text, or with what was heard and why it was not polished.
-fn polish_then_end(app: &AppHandle, raw: String, instructions: String, words: Arc<Words>) {
-    emit(app, json!({ "type": "polishing" }));
-    let model = crate::models::Model::for_use(&app.state::<SettingsState>().0.read().unwrap(), registry::Use::DictationPolish);
-    let state = app.state::<Dictation>();
-    // Held until the task is known: it must be there to be taken back.
-    let mut state = state.0.lock().unwrap();
-    let ending = app.clone();
-    state.polishing = Some(tauri::async_runtime::spawn(async move {
-        let result = match &model {
-            Ok(model) => polish::polished(model, &raw, instructions, &words.corrector).await,
-            Err(why) => polish::unpolished(&raw, why),
-        };
-        // Unless the recording was discarded meanwhile (`cancel`).
-        if ending.state::<Dictation>().0.lock().unwrap().polishing.take().is_some() {
-            ended(&ending, result);
+/// Has the session take `input`, and carries out what it calls for, with
+/// what that comes to taken in turn. One at a time: what the session
+/// called for is done before it takes the next. What reaches an extension
+/// is said once nothing is held. The answer to an extension that asked to
+/// listen, if it did.
+fn run(app: &AppHandle, input: Input) -> Option<Result<u64, NotListening>> {
+    let mut inputs = VecDeque::from([input]);
+    let mut heard = Vec::new();
+    let mut answer = None;
+    let dictation = app.state::<Dictation>();
+    let mut shell = dictation.0.lock().unwrap();
+    while let Some(input) = inputs.pop_front() {
+        if let Input::Written(recording, _) = &input {
+            shell.writing.take_if(|(writing, _)| writing == recording);
         }
-    }));
+        let effects = shell.session.on(input, Instant::now(), &|| setup(app));
+        for effect in effects {
+            match effect {
+                Effect::Hear(ear, said) => heard.push((ear, said)),
+                Effect::Listening(answered) => answer = Some(answered),
+                effect => inputs.extend(shell.perform(app, effect)),
+            }
+        }
+    }
+    drop(shell);
+    for (ear, said) in heard {
+        (ear.0)(said);
+    }
+    answer
+}
+
+impl Shell {
+    /// Carries out `effect`, and says what became of it where the session
+    /// is to know.
+    fn perform(&mut self, app: &AppHandle, effect: Effect) -> Option<Input> {
+        match effect {
+            Effect::Tell(told) => crate::slint_windows::pill::tell(told),
+            // Without the pill, as when Slint could not start, the
+            // recording goes on all the same.
+            Effect::ShowPill => crate::slint_windows::pill::show(app),
+            Effect::HidePill => crate::slint_windows::pill::hide(),
+            Effect::HideAfter(after) => {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(after);
+                    run(&app, Input::Lingered);
+                });
+            }
+            Effect::Start { recording, opener, source, language } => {
+                let receiver = app.clone();
+                let tell = Arc::new(move |event| drop(run(&receiver, Input::Recorded(recording, event))));
+                match listening::listen(&source, opener, &language, tell) {
+                    Ok(listening) => {
+                        self.listening = Some((recording, listening));
+                        return Some(Input::Started(recording));
+                    }
+                    Err(why) => return Some(Input::Unstarted(recording, why)),
+                }
+            }
+            Effect::Write { recording, live, polishing } => {
+                let mailbox = Arc::new(Mailbox::default());
+                match write(app, mailbox.clone(), live, polishing, recording) {
+                    Ok(()) => self.writing = Some((recording, mailbox)),
+                    Err(e) => eprintln!("heyo: dictation has nothing to write with: {e}"),
+                }
+            }
+            Effect::WatchKeys(recording) => watch_keys(app, recording),
+            Effect::Stop(recording) => {
+                let listening = self.listening.take_if(|(listening, _)| *listening == recording);
+                let stopped = listening.ok_or_else(|| crate::i18n::t("dictation is not running").to_owned()).and_then(|(_, listening)| listening.stop());
+                if let Err(why) = stopped {
+                    return Some(Input::Unstopped(recording, why));
+                }
+            }
+            Effect::Discard(recording) => {
+                if let Some((_, listening)) = self.listening.take_if(|(listening, _)| *listening == recording) {
+                    listening.cancel();
+                }
+            }
+            Effect::Post(recording, said) => match &self.writing {
+                Some((writing, mailbox)) if *writing == recording => mailbox.post(said),
+                // Nothing is writing: the recording ends as it is.
+                _ => {
+                    if let Said::Ended(end) = said {
+                        return Some(Input::Written(recording, end.told()));
+                    }
+                }
+            },
+            Effect::Polish { recording, raw, instructions, words } => {
+                let model = crate::models::Model::for_use(&app.state::<SettingsState>().0.read().unwrap(), registry::Use::DictationPolish);
+                let app = app.clone();
+                self.polishing = Some(tauri::async_runtime::spawn(async move {
+                    let outcome = match &model {
+                        Ok(model) => polish::polished(model, &raw, instructions, &words.corrector).await,
+                        Err(why) => polish::unpolished(&raw, why),
+                    };
+                    run(&app, Input::Polished(recording, outcome));
+                }));
+            }
+            Effect::StopPolishing => {
+                if let Some(polishing) = self.polishing.take() {
+                    polishing.abort();
+                }
+            }
+            Effect::Hear(..) | Effect::Listening(_) => unreachable!("said once nothing is held"),
+        }
+        None
+    }
+}
+
+/// Waits for the keys that are down to be released: those of the hotkey
+/// that started recording `recording`.
+fn watch_keys(app: &AppHandle, recording: u64) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Some(keys) = crate::windows::keys_down().filter(|keys| keys.iter().any(|b| *b != 0)) {
+            loop {
+                std::thread::sleep(Duration::from_millis(30));
+                let Some(now) = crate::windows::keys_down() else { break };
+                if keys.iter().zip(now).any(|(was, is)| was & !is != 0) {
+                    break;
+                }
+            }
+        }
+        run(&app, Input::LetGo(recording));
+    });
 }
 
 /// A mouse button went down on the dictation window. That moves no cursor
 /// in the application being written into, and must not be taken for the
 /// user's doing something there.
 pub fn pressed(app: &AppHandle) {
-    if let Some(writing) = &app.state::<Dictation>().0.lock().unwrap().writing {
+    if let Some((_, writing)) = &app.state::<Dictation>().0.lock().unwrap().writing {
         writing.own_presses.fetch_add(1, Ordering::SeqCst);
     }
 }
 
-fn fail(app: &AppHandle, message: String) {
-    eprintln!("heyo: {message}");
-    show_window(app);
-    emit(app, json!({ "type": "error", "message": message }));
-    hide_window_after(app, Duration::from_secs(4));
-}
-
-/// Holding the hotkey longer than this makes it push-to-talk: releasing it
-/// finishes. A shorter press leaves the recording running until the next one.
-const HOLD: Duration = Duration::from_millis(450);
-
-/// Waits for the keys that were down when recording started to be released.
-fn watch_hold(app: AppHandle, keys: [u8; 32], session: u64) {
-    std::thread::spawn(move || {
-        let started = std::time::Instant::now();
-        loop {
-            std::thread::sleep(Duration::from_millis(30));
-            let Some(now) = crate::windows::keys_down() else { break };
-            if keys.iter().zip(now).any(|(was, is)| was & !is != 0) {
-                break;
-            }
-        }
-        let state = app.state::<Dictation>();
-        let mut state = state.0.lock().unwrap();
-        if state.session != session || !state.recording {
-            return;
-        }
-        state.holding = false;
-        let held = started.elapsed() >= HOLD;
-        if held {
-            state.let_go = Some(std::time::Instant::now());
-        }
-        drop(state);
-        if held {
-            finish(&app);
-        }
-    });
-}
-
-/// How long after a hotkey held to talk is let go a press of it is taken
-/// for one of its repeats: they can reach Heyo (as `heyo --dictate`, each a
-/// process of its own) after the release, and even after the recording it
-/// finished is over, where one would start another.
-const REPEATS_FOR: Duration = Duration::from_secs(1);
-
 /// Starts dictating, or finishes if a recording is in progress.
 pub fn toggle(app: &AppHandle) {
-    let (recording, holding, let_go) = {
-        let state = app.state::<Dictation>();
-        let state = state.0.lock().unwrap();
-        (state.recording, state.holding, state.let_go)
-    };
-    if !recording && let_go.is_some_and(|at| at.elapsed() < REPEATS_FOR) {
-        return;
-    }
-    if !recording {
-        begin(app, true);
-    } else if !holding {
-        // (While the hotkey is held, key repeat may invoke this again.)
-        finish(app);
-    }
+    run(app, Input::Toggle);
 }
 
-/// Finishes the recording in progress: what was said is pasted.
-pub fn finish(app: &AppHandle) {
-    let state = app.state::<Dictation>();
-    let mut state = state.0.lock().unwrap();
-    // Not recording, or told to finish already and finishing: the hotkey
-    // repeats while it is held, and each repeat may come as a `heyo
-    // --dictate` after the release that finished it.
-    if !state.recording || state.listening.is_none() {
-        return;
-    }
-    // An extension is given what was said, as it was said.
-    state.polish = match state.listener {
-        Some(_) => "off".to_owned(),
-        None => app.state::<SettingsState>().0.read().unwrap().dictation_polish.clone(),
-    };
-    let stopped = state.listening.take().map_or(Ok(()), |listening| listening.stop());
-    if let Err(e) = stopped {
-        eprintln!("heyo: {e}");
-        // What the recording wrote is finished off by its own thread.
-        if let Some(writing) = state.writing.clone() {
-            return writing.post(Said::Ended(json!({ "type": "error", "message": e })));
-        }
-        state.recording = false;
-        let listener = state.listener.take();
-        drop(state);
-        if let Some(listener) = listener {
-            listener(Heard::Failed(e.clone()));
-        }
-        fail(app, e);
-    }
-}
-
-/// Starts dictating. With `watch_hotkey`, a hotkey held down past `HOLD`
-/// finishes the recording when it is released; the push-to-talk key does
-/// its own watching.
-pub fn begin(app: &AppHandle, watch_hotkey: bool) {
-    let state = app.state::<Dictation>();
-    let mut state = state.0.lock().unwrap();
-    if state.recording {
-        return;
-    }
-    let (opener, source, language, polish, vocabulary, live) = {
-        let settings = app.state::<SettingsState>();
-        let settings = settings.0.read().unwrap();
-        (opener(&settings), settings.dictation_source.clone(), settings.dictation_language.clone(), settings.dictation_polish.clone(), settings.dictation_vocabulary.clone(), settings.dictation_live)
-    };
-    let opener = match opener {
-        Ok(opener) => opener,
-        Err(e) => {
-            drop(state);
-            return fail(app, e);
-        }
-    };
-    if !opener.ready() {
-        drop(state);
-        return fail(app, t("Dictation is not set up yet. Open Heyo Settings → Models to download a speech model.").into());
-    }
-    // Before the recording starts: a recognizer that is kept answers at
-    // once, and the window must not hear that it is ready before it hears
-    // that a recording begins.
-    emit(app, json!({ "type": "start", "polish": polish, "cloud": opener.sends_audio() }));
-    match start(app, opener, &source, &language) {
-        Ok(listening) => {
-            state.listening = Some(listening);
-            // Kept for the whole recording, polishing included.
-            state.words = Words::of(&vocabulary);
-            state.polish = "off".into();
-            state.recording = true;
-            state.session += 1;
-            let mailbox = Arc::new(Mailbox::default());
-            match write(app, mailbox.clone(), live, polish != "off", state.session) {
-                Ok(()) => state.writing = Some(mailbox),
-                Err(e) => eprintln!("heyo: dictation has nothing to write with: {e}"),
-            }
-            // The hotkey that started this is usually still down.
-            let held = crate::windows::keys_down().filter(|keys| watch_hotkey && keys.iter().any(|b| *b != 0));
-            state.holding = held.is_some();
-            if let Some(keys) = held {
-                watch_hold(app.clone(), keys, state.session);
-            }
-            drop(state);
-            show_window(app);
-        }
-        Err(e) => {
-            drop(state);
-            fail(app, e);
-        }
-    }
+/// Discards the recording in progress.
+pub fn cancel(app: &AppHandle) {
+    run(app, Input::Cancel);
 }
 
 /// Starts a recording for an extension: `listener` is given each sentence
 /// and, at the end, all of it; nothing is pasted. The recording ends like
-/// any other (`finish`, the hotkey, the window's buttons) or is discarded
+/// any other (the hotkey, the window's buttons) or is discarded
 /// (`cancel_listening`). Returns the recording's number.
 pub(crate) fn listen(app: &AppHandle, language: Option<String>, indicator: bool, listener: impl Fn(Heard) + Send + Sync + 'static) -> Result<u64, NotListening> {
-    let state = app.state::<Dictation>();
-    let mut state = state.0.lock().unwrap();
-    if state.recording {
-        return Err(NotListening::Busy);
-    }
-    let (opener, source, language, vocabulary) = {
-        let settings = app.state::<SettingsState>();
-        let settings = settings.0.read().unwrap();
-        (opener(&settings), settings.dictation_source.clone(), language.unwrap_or_else(|| settings.dictation_language.clone()), settings.dictation_vocabulary.clone())
-    };
-    let opener = opener.map_err(NotListening::Failed)?;
-    if !opener.ready() {
-        return Err(NotListening::NotInstalled);
-    }
-    let in_cloud = opener.sends_audio();
-    state.listening = Some(start(app, opener, &source, &language).map_err(NotListening::Failed)?);
-    state.words = Words::of(&vocabulary);
-    state.polish = "off".into();
-    state.recording = true;
-    state.holding = false;
-    state.session += 1;
-    state.listener = Some(std::sync::Arc::new(listener));
-    let session = state.session;
-    drop(state);
-    if indicator {
-        show_window(app);
-        emit(app, json!({ "type": "start", "polish": "off", "cloud": in_cloud }));
-    }
-    Ok(session)
-}
-
-/// Whether that recording is still going, for the extension that started it.
-fn listening(state: &State, session: u64) -> bool {
-    state.recording && state.session == session && state.listener.is_some()
+    let ear = session::Ear(Arc::new(listener));
+    run(app, Input::Listen { language, indicator, ear }).unwrap_or(Err(NotListening::Busy))
 }
 
 /// Ends the recording an extension started, if it is still the one going:
 /// what was said comes to its listener.
-pub(crate) fn stop_listening(app: &AppHandle, session: u64) {
-    if listening(&app.state::<Dictation>().0.lock().unwrap(), session) {
-        finish(app);
-    }
+pub(crate) fn stop_listening(app: &AppHandle, recording: u64) {
+    run(app, Input::StopListening(recording));
 }
 
 /// Discards the recording an extension started, if it is still the one going.
-pub(crate) fn cancel_listening(app: &AppHandle, session: u64) {
-    if listening(&app.state::<Dictation>().0.lock().unwrap(), session) {
-        cancel(app);
-    }
+pub(crate) fn cancel_listening(app: &AppHandle, recording: u64) {
+    run(app, Input::CancelListening(recording));
 }
 
 /// Dictates while the hold-to-talk key from the settings is held.
@@ -1050,30 +784,20 @@ pub fn watch_hold_key(app: &AppHandle) {
     std::thread::spawn(move || {
         let setting = app.clone();
         let key = move || setting.state::<SettingsState>().0.read().unwrap().dictation_hold_key.clone();
-        let result = watch_hold(key, |hold| match hold {
-            Hold::Started => begin(&app, false),
-            Hold::Released => finish(&app),
-            Hold::Cancelled => cancel(&app),
+        let result = watch_hold(key, |hold| {
+            run(
+                &app,
+                match hold {
+                    Hold::Started => Input::HoldStarted,
+                    Hold::Released => Input::HoldReleased,
+                    Hold::Cancelled => Input::Cancel,
+                },
+            );
         });
         if let Err(e) = result {
             eprintln!("heyo: {e}");
         }
     });
-}
-
-/// Discards the recording in progress.
-pub fn cancel(app: &AppHandle) {
-    let state = app.state::<Dictation>();
-    let mut state = state.0.lock().unwrap();
-    // Being polished: the recording is over, and the polishing stops.
-    if let Some(polishing) = state.polishing.take() {
-        polishing.abort();
-        drop(state);
-        return ended(app, json!({ "type": "result", "text": "", "raw": "", "polished": false, "cancelled": true }));
-    }
-    if let Some(listening) = state.listening.take().filter(|_| state.recording) {
-        listening.cancel();
-    }
 }
 
 /// Whether dictation can be used, for the settings page.
@@ -1086,150 +810,28 @@ pub struct Status {
 }
 
 pub fn status(app: &AppHandle) -> Status {
-    Status {
-        installed: ready(&app.state::<SettingsState>().0.read().unwrap()),
-        installing: !app.state::<Dictation>().0.lock().unwrap().downloads.is_empty(),
-        microphones: microphone::microphones(),
-    }
-}
-
-/// A speech model being downloaded: how far it is, and what stops it.
-struct Downloading {
-    /// A step of the installation (`helper::step`), and bytes `received`
-    /// of `total` (0 where that is not known).
-    step: String,
-    received: u64,
-    total: u64,
-    cancel: Arc<std::sync::atomic::AtomicBool>,
-}
-
-/// A model of the catalogue as the settings page lists it.
-#[derive(Serialize, Debug, Clone, PartialEq, ts_rs::TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../shared/bindings/", rename = "SpeechModel")]
-pub(crate) struct ModelState {
-    id: &'static str,
-    name: &'static str,
-    /// In the user's language, as `note`.
-    languages: &'static str,
-    note: &'static str,
-    megabytes: u32,
-    installed: bool,
-    /// Whether recordings are heard with it.
-    in_use: bool,
-    /// Whether the `dictationLanguage` setting is given to it.
-    takes_language: bool,
-    /// How far its download is, while it runs.
-    downloading: Option<Progress>,
-}
-
-#[derive(Serialize, Debug, Clone, PartialEq, ts_rs::TS)]
-#[ts(export, export_to = "../../shared/bindings/", rename = "SpeechModelProgress")]
-pub(crate) struct Progress {
-    /// A step of the installation, by its code (`helper::step`).
-    step: String,
-    received: u64,
-    total: u64,
+    Status { installed: ready(&app.state::<SettingsState>().0.read().unwrap()), installing: models::downloads::any(), microphones: microphone::microphones() }
 }
 
 /// The speech models, and what each is to this installation.
-pub(crate) fn models(app: &AppHandle) -> Vec<ModelState> {
-    let in_use = in_use(app).unwrap_or_default();
-    let state = app.state::<Dictation>();
-    let state = state.0.lock().unwrap();
-    let dir = dir();
-    models::CATALOGUE
-        .iter()
-        .map(|model| ModelState {
-            id: model.id,
-            name: model.name,
-            languages: translate(model.languages),
-            note: translate(model.note),
-            megabytes: model.megabytes,
-            installed: model.installed(&dir),
-            in_use: model.id == in_use,
-            takes_language: model.language,
-            downloading: state.downloads.get(model.id).map(|going| Progress { step: going.step.clone(), received: going.received, total: going.total }),
-        })
-        .collect()
+pub(crate) fn models(app: &AppHandle) -> Vec<models::downloads::ModelState> {
+    models::downloads::listed(in_use(app).as_deref())
 }
 
-fn model(id: &str) -> Result<&'static models::Model, String> {
-    models::find(id).ok_or_else(|| crate::i18n::tf("There is no speech model {0}", &[&id]))
-}
-
-/// Downloads a speech model on a thread of its own, which goes on while
-/// no window is there to show it. How far it is the settings window reads
-/// in `models`, when the `heyo://dictation-install` events say it changed.
+/// Downloads a speech model (`models::downloads`).
 pub(crate) fn download(app: &AppHandle, id: &str) -> Result<(), String> {
-    let model = model(id)?;
-    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    {
-        let state = app.state::<Dictation>();
-        let mut state = state.0.lock().unwrap();
-        if state.downloads.contains_key(model.id) {
-            return Ok(());
-        }
-        state.downloads.insert(model.id, Downloading { step: "speech-model".into(), received: 0, total: 0, cancel: cancel.clone() });
-    }
-    let app = app.clone();
-    let report = move |app: &AppHandle, message: Value| match InstallProgress::of(message) {
-        Ok(progress) => drop(app.emit(crate::wire::event::DICTATION_INSTALL, progress)),
-        Err(e) => eprintln!("heyo: dictation: not the progress of an installation: {e}"),
-    };
-    std::thread::Builder::new()
-        .name("dictation-download".into())
-        .spawn(move || {
-            let progress = |step: &str, received: u64, total: u64| {
-                if let Some(going) = app.state::<Dictation>().0.lock().unwrap().downloads.get_mut(model.id).filter(|going| Arc::ptr_eq(&going.cancel, &cancel)) {
-                    (going.step, going.received, going.total) = (step.to_owned(), received, total);
-                }
-                report(&app, json!({ "type": "progress", "step": step, "received": received, "total": total }));
-            };
-            let done = tauri::async_runtime::block_on(models::install(&dir(), model, &progress, &cancel));
-            {
-                let state = app.state::<Dictation>();
-                let mut state = state.0.lock().unwrap();
-                // Unless it was cancelled, and the same model is downloading again.
-                if state.downloads.get(model.id).is_some_and(|going| Arc::ptr_eq(&going.cancel, &cancel)) {
-                    state.downloads.remove(model.id);
-                }
-            }
-            match done {
-                Ok(()) => report(&app, json!({ "type": "installed" })),
-                // Whoever cancelled it knows.
-                Err(failure) if failure.code == "cancelled" => {}
-                Err(failure) => {
-                    let mut said = failure.said();
-                    said["type"] = "error".into();
-                    report(&app, said)
-                }
-            }
-        })
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    models::downloads::start(app, id)
 }
 
 /// Stops a model's download; what it fetched so far is thrown away.
-pub(crate) fn cancel_download(app: &AppHandle, id: &str) -> Result<(), String> {
-    let model = model(id)?;
-    if let Some(going) = app.state::<Dictation>().0.lock().unwrap().downloads.remove(model.id) {
-        going.cancel.store(true, Ordering::Relaxed);
-    }
-    Ok(())
+pub(crate) fn cancel_download(_app: &AppHandle, id: &str) -> Result<(), String> {
+    models::downloads::cancel(id)
 }
 
 /// Deletes a model's files, unless recordings are heard with it: another
 /// is chosen first.
 pub(crate) fn delete(app: &AppHandle, id: &str) -> Result<(), String> {
-    let model = model(id)?;
-    if in_use(app).is_some_and(|in_use| in_use == model.id) {
-        return Err(t("The speech model in use cannot be deleted. Choose another first.").into());
-    }
-    if app.state::<Dictation>().0.lock().unwrap().downloads.contains_key(model.id) {
-        return Err(t("The speech model is being downloaded. Cancel the download first.").into());
-    }
-    models::delete(&dir(), model).map_err(|e| e.to_string())
+    models::downloads::delete(id, in_use(app).as_deref())
 }
 
 #[cfg(test)]
@@ -1240,6 +842,8 @@ mod tests {
     use crate::platform::desktop::fake::Fake;
     use crate::platform::desktop::Supported;
     use crate::platform::Support;
+    use serde_json::{json, Value};
+    use session::Outcome;
 
     const HOTKEY: &str = "<Control><Alt>d";
     const SECOND: Duration = Duration::from_secs(1);
@@ -1263,11 +867,16 @@ mod tests {
 
     /// The recording ends; what the window is told of it.
     fn end(writer: &mut Writer, text: &str, raw: &str) -> Value {
-        writer.end(json!({ "type": "result", "text": text, "raw": raw, "polished": text != raw }))
+        serde_json::to_value(writer.end(End::Over(Outcome { text: text.into(), raw: raw.into(), polished: text != raw, warning: None }))).unwrap()
     }
 
     fn cancel(writer: &mut Writer) -> Value {
-        writer.end(json!({ "type": "result", "text": "", "raw": "", "polished": false, "cancelled": true }))
+        serde_json::to_value(writer.end(End::Cancelled)).unwrap()
+    }
+
+    /// The recording breaks off; what the window is told of it.
+    fn break_off(writer: &mut Writer) -> Told {
+        writer.end(End::Failed("the sound server stopped the recording".into()))
     }
 
     /// What was asked of the desktop, without the notes to the clipboard
@@ -1286,17 +895,6 @@ mod tests {
         assert!(composing::supported());
         let paster = Paster::new(live, polishing, pasting.borrow(), Arc::default(), Box::new(|| Ok(vec![HOTKEY.to_owned()])));
         Writer::new(Composer::begin(live, polishing, &[MENU]).ok(), paster)
-    }
-
-    #[test]
-    fn what_was_heard_is_written_the_users_way_in_progress_and_finished() {
-        let words = Words::of(&["Heyo".into(), "jason -> JSON".into()]);
-        let fix = |event: Value| corrected(event, &words.corrector);
-        assert_eq!(fix(json!({ "type": "partial", "text": " open heyo" })), json!({ "type": "partial", "text": " open Heyo" }));
-        assert_eq!(fix(json!({ "type": "segment", "text": " Send the jason." })), json!({ "type": "segment", "text": " Send the JSON." }));
-        assert_eq!(fix(json!({ "type": "result", "text": "open heyo", "raw": "open heyo" })), json!({ "type": "result", "text": "open Heyo", "raw": "open Heyo" }));
-        // Nothing else a recording says has words in it.
-        assert_eq!(fix(json!({ "type": "error", "message": "heyo failed" })), json!({ "type": "error", "message": "heyo failed" }));
     }
 
     #[test]
@@ -1411,8 +1009,7 @@ mod tests {
         desktop.during(|| {
             let mut writer = composer(desktop, pasting, true, false);
             hear(&mut writer, &["One.", "~ Two th"]);
-            let error = json!({ "type": "error", "message": "the sound server stopped the recording" });
-            assert_eq!(writer.end(error.clone()), error);
+            assert_eq!(break_off(&mut writer), Told::Error { message: "the sound server stopped the recording".into() });
             assert_eq!((desktop.field().as_str(), desktop.composing.lock().unwrap().as_str()), ("One. Two th", ""));
         });
     }
@@ -1667,7 +1264,7 @@ mod tests {
             // What the window shows is what is in the application.
             assert_eq!(last["text"], "um hello there.");
             assert!(last["warning"].as_str().unwrap().contains("left as it was heard"));
-            assert_eq!(linger(&last), Duration::from_millis(2500));
+            assert_eq!(session::linger(&serde_json::from_value(last).unwrap()), Duration::from_millis(2500));
         });
         // Without live words, polished text is pasted at the end as before.
         let (desktop, _, pasting) = desk("firefox", None);
@@ -1678,7 +1275,7 @@ mod tests {
             let last = end(&mut writer, "Hello there.", "um hello there.");
             assert_eq!(asked(desktop), ["copy Hello there.", "wait 60", "paste"]);
             assert_eq!(last["warning"], Value::Null);
-            assert_eq!(linger(&last), Duration::from_millis(300));
+            assert_eq!(session::linger(&serde_json::from_value(last).unwrap()), Duration::from_millis(300));
         });
     }
 
@@ -1752,7 +1349,7 @@ mod tests {
                 all.push(match mailbox.next() {
                     Said::Partial(text) => format!("~{text}"),
                     Said::Sentence(text) => text,
-                    Said::Ended(event) => event["type"].as_str().unwrap().to_owned(),
+                    Said::Ended(end) => format!("{end:?}"),
                 });
             }
             all
@@ -1771,20 +1368,8 @@ mod tests {
         mailbox.post(Said::Sentence(" And so on.".into()));
         mailbox.post(Said::Sentence(" Third.".into()));
         mailbox.post(Said::Partial(" Fou".into()));
-        mailbox.post(Said::Ended(json!({ "type": "result" })));
-        assert_eq!(waiting(&mailbox), ["The weather is nice.", " And so on.", " Third.", "result"]);
-    }
-
-    #[test]
-    fn what_needs_reading_stays_up() {
-        let soon = Duration::from_millis(300);
-        let later = Duration::from_millis(2500);
-        assert_eq!(linger(&json!({ "type": "result", "text": "Hello.", "raw": "Hello." })), soon);
-        // Polishing failed, nothing was heard, or the recording was cancelled.
-        assert_eq!(linger(&json!({ "type": "result", "text": "um hello", "raw": "um hello", "warning": "no API key" })), later);
-        assert_eq!(linger(&json!({ "type": "result", "text": "", "raw": "" })), later);
-        assert_eq!(linger(&json!({ "type": "result", "text": "", "raw": "", "cancelled": true, "kept": true })), later);
-        assert_eq!(linger(&json!({ "type": "error", "message": "no microphone" })), Duration::from_secs(4));
+        mailbox.post(Said::Ended(End::Cancelled));
+        assert_eq!(waiting(&mailbox), ["The weather is nice.", " And so on.", " Third.", "Cancelled"]);
     }
 
     #[test]
@@ -1794,51 +1379,10 @@ mod tests {
             let mut writer = writer(pasting, true, false);
             hear(&mut writer, &["~Hello"]);
             asked(desktop);
-            let error = json!({ "type": "error", "message": "the sound server stopped the recording" });
-            assert_eq!(writer.end(error.clone()), error);
+            assert_eq!(break_off(&mut writer), Told::Error { message: "the sound server stopped the recording".into() });
             assert_eq!(asked(desktop), Vec::<String>::new());
             assert_eq!(desktop.field(), "Hello");
         });
-    }
-
-    #[test]
-    fn an_extension_listening_hears_sentences_and_then_all_of_it() {
-        assert_eq!(heard(&json!({ "type": "segment", "text": "Hello." })), Some(Heard::Segment("Hello.".into())));
-        // A later sentence comes with the space before it, which is not part of it.
-        assert_eq!(heard(&json!({ "type": "segment", "text": " World." })), Some(Heard::Segment("World.".into())));
-        assert_eq!(heard(&json!({ "type": "result", "text": "Hello. World.", "raw": "Hello. World.", "polished": false })), Some(Heard::Result("Hello. World.".into())));
-        // Nothing heard is still an answer; a discarded recording is not text.
-        assert_eq!(heard(&json!({ "type": "result", "text": "", "raw": "" })), Some(Heard::Result(String::new())));
-        assert_eq!(heard(&json!({ "type": "result", "text": "", "raw": "", "cancelled": true })), Some(Heard::Cancelled));
-        assert_eq!(heard(&json!({ "type": "error", "message": "no microphone" })), Some(Heard::Failed("no microphone".into())));
-        // What only the window shows.
-        for progress in [json!({ "type": "partial", "text": "Hel" }), json!({ "type": "level", "value": 0.4 }), json!({ "type": "ready" }), json!({ "type": "polishing" })] {
-            assert_eq!(heard(&progress), None, "{progress}");
-        }
-        assert!(!Heard::Segment("a".into()).ends());
-        assert!(Heard::Result("a".into()).ends() && Heard::Cancelled.ends() && Heard::Failed("a".into()).ends());
-    }
-
-    #[test]
-    fn a_recording_is_its_starters_only_while_it_is_the_one_going() {
-        let mut state = State { recording: true, session: 4, listener: Some(std::sync::Arc::new(|_| {})), ..State::default() };
-        assert!(listening(&state, 4));
-        // An earlier recording's stop must not end this one.
-        assert!(!listening(&state, 3));
-        // Nor may an extension end what the user is dictating.
-        state.listener = None;
-        assert!(!listening(&state, 4));
-        state.recording = false;
-        assert!(!listening(&state, 4));
-    }
-
-    #[test]
-    fn what_went_wrong_is_worded_to_fit_the_pill() {
-        assert_eq!(said(json!({ "type": "error", "code": "no-recorder" })), json!({ "type": "error", "message": "No audio recorder" }));
-        // A failure it has no code for: the words of what failed are for the log.
-        assert_eq!(said(json!({ "type": "error", "code": "failed", "detail": "the speech model could not be loaded" })), json!({ "type": "error", "message": "Dictation failed" }));
-        // What it heard is passed on as it is.
-        assert_eq!(said(json!({ "type": "segment", "text": "Hello." })), json!({ "type": "segment", "text": "Hello." }));
     }
 
     /// Everything a recording says (`listening`), and what the host says

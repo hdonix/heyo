@@ -1,8 +1,6 @@
 //! One recording, from the microphone to what was heard: records, has the
 //! recognizer hear it, measures how loud it is for the pill, and says all
-//! of it as it happens, in the events the rest of `dictation` reads:
-//!
-//!   ready | level | partial | segment | result | error
+//! of it as it happens, as [`Event`]s.
 //!
 //! The recording starts before the recognizer is loaded, so that nothing
 //! said meanwhile is lost: what is recorded waits for it. The recognizer is
@@ -11,8 +9,6 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-
-use serde_json::{json, Value};
 
 use super::engine::{Failure, Opener, Recognized, Recognizer};
 use super::microphone::{self, Taker};
@@ -32,8 +28,28 @@ enum Input {
     Failed(Failure),
 }
 
+/// What a recording says, in order: ready, then how loud it is and what
+/// it hears, then one last word (heard, cancelled or failed).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Event {
+    /// The recognizer is listening.
+    Ready,
+    /// How loud it is, from 0 to 1.
+    Level(f64),
+    /// The sentence in progress, as far as it is recognized.
+    Partial(String),
+    /// A finished sentence, as it is written after those before it.
+    Sentence(String),
+    /// The recording is over: all of what was heard.
+    Heard(String),
+    /// The recording was discarded.
+    Cancelled,
+    /// The recording broke off.
+    Failed(Failure),
+}
+
 /// Says where the events of a recording go.
-pub(crate) type Tell = Arc<dyn Fn(Value) + Send + Sync>;
+pub(crate) type Tell = Arc<dyn Fn(Event) + Send + Sync>;
 
 /// The recording in progress, as whoever started it holds it.
 pub(crate) struct Listening(Sender<Input>);
@@ -84,23 +100,17 @@ pub(crate) fn listen(source: &str, opener: Box<dyn Opener>, language: &str, tell
                 Ok(Some(last)) => tell(last),
                 // Nobody waits for it any more.
                 Ok(None) => {}
-                Err(_) => tell(error(&Failure::failed("the recording ended unexpectedly"))),
+                Err(_) => tell(Event::Failed(Failure::failed("the recording ended unexpectedly"))),
             }
         })
         .map_err(|e| crate::i18n::tf("failed to start dictation: {0}", &[&e]))?;
     Ok(Listening(tx))
 }
 
-fn error(failure: &Failure) -> Value {
-    let mut said = failure.said();
-    said["type"] = "error".into();
-    said
-}
-
 /// The recording, until it ends: what it heard is told as it is heard,
 /// and its last word returned.
 /// A recognizer that fails says so where the microphone does (`tx`).
-fn run(opener: &dyn Opener, language: &str, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Value> {
+fn run(opener: &dyn Opener, language: &str, recording: microphone::Recording, (tx, rx): (Sender<Input>, Receiver<Input>), tell: &Tell) -> Option<Event> {
     let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     kept.idle_since = None;
     let key = opener.kept().map(|model| (model.to_owned(), language.to_owned()));
@@ -117,7 +127,7 @@ fn run(opener: &dyn Opener, language: &str, recording: microphone::Recording, (t
     };
     if let Err(failure) = opened {
         drop(recording);
-        return Some(error(&failure));
+        return Some(Event::Failed(failure));
     }
     let recognizer: &mut dyn Recognizer = match own.as_mut() {
         Some(own) => own.as_mut(),
@@ -125,11 +135,11 @@ fn run(opener: &dyn Opener, language: &str, recording: microphone::Recording, (t
     };
     let heard = tell.clone();
     recognizer.begin(Box::new(move |recognized| match recognized {
-        Recognized::Partial(text) => heard(json!({ "type": "partial", "text": text })),
-        Recognized::Sentence(text) => heard(json!({ "type": "segment", "text": text })),
+        Recognized::Partial(text) => heard(Event::Partial(text)),
+        Recognized::Sentence(text) => heard(Event::Sentence(text)),
         Recognized::Failed(failure) => drop(tx.send(Input::Failed(failure))),
     }));
-    tell(json!({ "type": "ready" }));
+    tell(Event::Ready);
     let mut meter = Meter::new(Instant::now());
     let mut recording = Some(recording);
     let last = loop {
@@ -137,19 +147,19 @@ fn run(opener: &dyn Opener, language: &str, recording: microphone::Recording, (t
         match input {
             Input::Audio(samples) => {
                 if let Some(value) = meter.feed(&samples, Instant::now()) {
-                    tell(json!({ "type": "level", "value": value }));
+                    tell(Event::Level(value));
                 }
                 recognizer.feed(&samples);
             }
             Input::Stop => {
                 recording = None;
                 break Some(match recognizer.finish() {
-                    Ok(raw) => json!({ "type": "result", "text": raw, "raw": raw, "polished": false }),
-                    Err(failure) => error(&failure),
+                    Ok(raw) => Event::Heard(raw),
+                    Err(failure) => Event::Failed(failure),
                 });
             }
-            Input::Cancel => break Some(json!({ "type": "result", "text": "", "raw": "", "polished": false, "cancelled": true })),
-            Input::Failed(failure) => break Some(error(&failure)),
+            Input::Cancel => break Some(Event::Cancelled),
+            Input::Failed(failure) => break Some(Event::Failed(failure)),
         }
     };
     drop(recording);
@@ -231,18 +241,19 @@ mod tests {
             let listening = listen("", opener, "en", Arc::new(move |event| drop(tx.lock().unwrap().send(event)))).unwrap();
             std::env::remove_var("HEYO_DICTATION_WAV");
             let mut events = Vec::new();
-            while events.iter().filter(|event: &&Value| event["type"] == "segment").count() < 2 {
-                events.push(rx.recv_timeout(Duration::from_secs(20)).unwrap_or_else(|_| panic!("{model}: the two sentences: {:?}", events.iter().filter(|event| event["type"] != "level").collect::<Vec<_>>())));
+            let level = |event: &Event| matches!(event, Event::Level(_));
+            let sentences = |events: &[Event]| events.iter().filter_map(|event| if let Event::Sentence(text) = event { Some(text.clone()) } else { None }).collect::<Vec<_>>();
+            while sentences(&events).len() < 2 {
+                events.push(rx.recv_timeout(Duration::from_secs(20)).unwrap_or_else(|_| panic!("{model}: the two sentences: {:?}", events.iter().filter(|event| !level(event)).collect::<Vec<_>>())));
             }
             listening.stop().unwrap();
-            let last = rx.iter().find(|event| event["type"] != "level").unwrap();
-            assert_eq!(events[0], json!({ "type": "ready" }), "{model}");
-            let levels: Vec<f64> = events.iter().filter_map(|event| event["value"].as_f64()).collect();
+            let last = rx.iter().find(|event| !level(event)).unwrap();
+            assert_eq!(events[0], Event::Ready, "{model}");
+            let levels: Vec<f64> = events.iter().filter_map(|event| if let Event::Level(value) = event { Some(*value) } else { None }).collect();
             assert!(levels.len() > 20 && levels.iter().any(|level| *level > 0.1), "{model}: {levels:?}");
-            let segments: Vec<&str> = events.iter().filter(|event| event["type"] == "segment").filter_map(|event| event["text"].as_str()).collect();
-            assert_eq!(segments, ["Good morning.", " See you soon."], "{model}");
-            assert!(events.iter().any(|event| event["type"] == "partial"), "{model}: heard in progress, at the pace of speech");
-            assert_eq!(last, json!({ "type": "result", "text": "Good morning. See you soon.", "raw": "Good morning. See you soon.", "polished": false }), "{model}");
+            assert_eq!(sentences(&events), ["Good morning.", " See you soon."], "{model}");
+            assert!(events.iter().any(|event| matches!(event, Event::Partial(_))), "{model}: heard in progress, at the pace of speech");
+            assert_eq!(last, Event::Heard("Good morning. See you soon.".into()), "{model}");
         }
         let _ = std::fs::remove_file(&wav);
     }

@@ -170,6 +170,7 @@ msgid "Korean"
 msgstr ""
 
 #: src-tauri/src/dictation/listening.rs
+#: src-tauri/src/dictation.rs
 msgid "dictation is not running"
 msgstr ""
 
@@ -229,6 +230,18 @@ msgstr ""
 msgid "Accurate and fast, with punctuation."
 msgstr ""
 
+#: src-tauri/src/dictation/models.rs
+msgid "There is no speech model {0}"
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "The speech model in use cannot be deleted. Choose another first."
+msgstr ""
+
+#: src-tauri/src/dictation/models.rs
+msgid "The speech model is being downloaded. Cancel the download first."
+msgstr ""
+
 #: src-tauri/src/dictation/onscreen.rs
 msgid "there is too much text to replace where it stands"
 msgstr ""
@@ -237,25 +250,13 @@ msgstr ""
 msgid "it could not safely take the place of the text, which was left as it was heard"
 msgstr ""
 
-#: src-tauri/src/dictation.rs
-#: src-tauri/src/models/kinds/mod.rs
-msgid "Dictation failed"
-msgstr ""
-
-#: src-tauri/src/dictation.rs
+#: src-tauri/src/dictation/session.rs
 msgid "Dictation is not set up yet. Open Heyo Settings → Models to download a speech model."
 msgstr ""
 
-#: src-tauri/src/dictation.rs
-msgid "There is no speech model {0}"
-msgstr ""
-
-#: src-tauri/src/dictation.rs
-msgid "The speech model in use cannot be deleted. Choose another first."
-msgstr ""
-
-#: src-tauri/src/dictation.rs
-msgid "The speech model is being downloaded. Cancel the download first."
+#: src-tauri/src/dictation/session.rs
+#: src-tauri/src/models/kinds/mod.rs
+msgid "Dictation failed"
 msgstr ""
 
 #: src-tauri/src/expand.rs

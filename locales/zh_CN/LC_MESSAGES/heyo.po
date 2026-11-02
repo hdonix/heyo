@@ -173,6 +173,7 @@ msgid "Korean"
 msgstr "韩语"
 
 #: src-tauri/src/dictation/listening.rs
+#: src-tauri/src/dictation.rs
 msgid "dictation is not running"
 msgstr "听写未在运行"
 
@@ -232,6 +233,18 @@ msgstr "英语及其他 24 种欧洲语言"
 msgid "Accurate and fast, with punctuation."
 msgstr "准确且速度快，带标点。"
 
+#: src-tauri/src/dictation/models.rs
+msgid "There is no speech model {0}"
+msgstr "没有语音识别模型 {0}"
+
+#: src-tauri/src/dictation/models.rs
+msgid "The speech model in use cannot be deleted. Choose another first."
+msgstr "无法删除正在使用的语音识别模型。请先选择其他模型。"
+
+#: src-tauri/src/dictation/models.rs
+msgid "The speech model is being downloaded. Cancel the download first."
+msgstr "该语音识别模型正在下载。请先取消下载。"
+
 #: src-tauri/src/dictation/onscreen.rs
 msgid "there is too much text to replace where it stands"
 msgstr "文本太多，无法原地替换"
@@ -240,26 +253,14 @@ msgstr "文本太多，无法原地替换"
 msgid "it could not safely take the place of the text, which was left as it was heard"
 msgstr "无法安全地替换原文，已保留听到的内容"
 
-#: src-tauri/src/dictation.rs
-#: src-tauri/src/models/kinds/mod.rs
-msgid "Dictation failed"
-msgstr "听写失败"
-
-#: src-tauri/src/dictation.rs
+#: src-tauri/src/dictation/session.rs
 msgid "Dictation is not set up yet. Open Heyo Settings → Models to download a speech model."
 msgstr "听写尚未设置。请打开“Heyo 设置”→“模型”，下载一个语音识别模型。"
 
-#: src-tauri/src/dictation.rs
-msgid "There is no speech model {0}"
-msgstr "没有语音识别模型 {0}"
-
-#: src-tauri/src/dictation.rs
-msgid "The speech model in use cannot be deleted. Choose another first."
-msgstr "无法删除正在使用的语音识别模型。请先选择其他模型。"
-
-#: src-tauri/src/dictation.rs
-msgid "The speech model is being downloaded. Cancel the download first."
-msgstr "该语音识别模型正在下载。请先取消下载。"
+#: src-tauri/src/dictation/session.rs
+#: src-tauri/src/models/kinds/mod.rs
+msgid "Dictation failed"
+msgstr "听写失败"
 
 #: src-tauri/src/expand.rs
 msgid "Snippets cannot expand as you type here"

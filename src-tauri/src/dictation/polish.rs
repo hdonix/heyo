@@ -5,8 +5,7 @@
 //! When it gives no answer, the transcript is kept as it was heard, with
 //! why it was not polished.
 
-use serde_json::{json, Value};
-
+use super::session::Outcome;
 use super::vocabulary::{self, Corrector, Vocabulary};
 use crate::models::{Model, ModelError, Question};
 
@@ -42,26 +41,26 @@ pub(crate) fn instructions(mode: &str, vocabulary: &Vocabulary) -> Option<String
     Some(format!("{task}{}", vocabulary::prompt(vocabulary, TERMS)))
 }
 
-/// The end of a recording, as the helper's `result` says it, once `raw`
-/// has been polished by `model` as `instructions` say: the polished text,
-/// or what was heard with a warning.
-pub(crate) async fn polished(model: &Model, raw: &str, instructions: String, corrector: &Corrector) -> Value {
+/// What a recording came to once `raw` has been polished by `model` as
+/// `instructions` say: the polished text, or what was heard with a warning.
+pub(crate) async fn polished(model: &Model, raw: &str, instructions: String, corrector: &Corrector) -> Outcome {
     match model.answer(&Question::material(instructions, raw), &mut |_| {}).await {
-        Ok(text) => json!({ "type": "result", "text": corrector.correct(&text), "raw": raw, "polished": true }),
+        Ok(text) => Outcome { text: corrector.correct(&text), raw: raw.into(), polished: true, warning: None },
         Err(why) => unpolished(raw, &why),
     }
 }
 
-/// The end of a recording that was not polished, and why: the recognized
-/// text is still worth having.
-pub(crate) fn unpolished(raw: &str, why: &ModelError) -> Value {
-    json!({ "type": "result", "text": raw, "raw": raw, "polished": false, "warning": why.message() })
+/// What a recording that was not polished came to, and why: the
+/// recognized text is still worth having.
+pub(crate) fn unpolished(raw: &str, why: &ModelError) -> Outcome {
+    Outcome { warning: Some(why.message()), ..Outcome::heard(raw) }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::mock::{block_on, Server};
+    use serde_json::{json, Value};
 
     fn vocabulary(lines: &[&str]) -> Vocabulary {
         vocabulary::parse(&lines.iter().map(|line| line.to_string()).collect::<Vec<_>>())
@@ -84,7 +83,7 @@ mod tests {
         let words = vocabulary(&["Heyo"]);
         let raw = "嗯 the meeting is in heyo on Wednesday, no, Thursday";
         let result = block_on(polished(&Model::local(&server.url("/v1"), "tiny"), raw, instructions("clean", &words).unwrap(), &Corrector::new(&words)));
-        assert_eq!(result, json!({ "type": "result", "text": "The meeting is in Heyo on Thursday.", "raw": raw, "polished": true }));
+        assert_eq!(result, Outcome { text: "The meeting is in Heyo on Thursday.".into(), raw: raw.into(), polished: true, warning: None });
         // The transcript went as material, with the task before it.
         let asked: Value = serde_json::from_str(&server.asked()[0].body).unwrap();
         let prompt = asked["messages"][1]["content"].as_str().unwrap();
@@ -94,9 +93,6 @@ mod tests {
     #[test]
     fn without_an_answer_what_was_heard_is_kept_and_why_is_said() {
         let result = block_on(polished(&Model::local("http://127.0.0.1:9/v1", "tiny"), "hello there", instructions("clean", &Vocabulary::default()).unwrap(), &Corrector::default()));
-        assert_eq!(
-            result,
-            json!({ "type": "result", "text": "hello there", "raw": "hello there", "polished": false, "warning": "Could not reach the model server at http://127.0.0.1:9. Is it running? (Heyo Settings → Models)" })
-        );
+        assert_eq!(result, Outcome { warning: Some("Could not reach the model server at http://127.0.0.1:9. Is it running? (Heyo Settings → Models)".into()), ..Outcome::heard("hello there") });
     }
 }
