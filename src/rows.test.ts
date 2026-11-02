@@ -3,6 +3,9 @@
 import { expect, test } from "vitest";
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
+import type { ConnectionFound } from "../shared/bindings/ConnectionFound";
+import type { ConnectionItem } from "../shared/bindings/ConnectionItem";
+import type { ConnectionsFound } from "../shared/bindings/ConnectionsFound";
 import type { Item } from "../shared/bindings/Item";
 import type { Calculation } from "./calculator";
 import { reportFailuresIn, type Command } from "./host";
@@ -415,4 +418,69 @@ test("a failure nothing else depends on is shown, and success is not claimed bef
   ]);
   // Not being able to count a use is nobody's concern.
   expect(await doing(rowOf(files), failing("record_usage"))).toEqual([["record_usage", { id: "app:files" }], ["launch", { id: "app:files", arguments: undefined }]]);
+});
+
+// --- What connectors synced ---------------------------------------------------
+
+const synced = (account: string, id: string, rest: Partial<ConnectionItem> = {}): ConnectionFound => ({
+  account,
+  score: 1,
+  item: {
+    id,
+    kind: "email",
+    title: id,
+    time: "2026-11-02T09:00:00+08:00",
+    people: [{ name: "Zhang Wei", address: "zhang.wei@example.com", role: "from" }],
+    text: `The body of ${id}`,
+    ...rest,
+  },
+});
+const accounts = { work: { name: "Work", web: "https://mail.example.com" }, team: { name: "Team" } };
+const connected = (found: ConnectionFound[], rest: Partial<ConnectionsFound> = {}): ConnectionsFound => ({ found, complete: true, accounts, ...rest });
+const budget = synced("work", "Budget review");
+const meeting = synced("team", "Budget sync", { kind: "event", people: [{ name: "Li Na", role: "organizer" }], url: "https://meet.example.com/b", text: undefined });
+
+test("what connectors synced comes after what was found, at most six, in groups of a kind, the kind of the best first", () => {
+  const many = [meeting, budget, ...["a", "b", "c", "d", "e"].map((id) => synced("work", id)), synced("team", "event 2", { kind: "event" })];
+  // Found by who sent it: in no title, so after the applications and commands.
+  expect(laidOut(rows("zhang", { items: [notes], connections: connected(many) }))).toEqual([
+    ["cmd:/ext:notes", undefined],
+    ["connection-team-Budget sync", "Events"],
+    ["connection-work-Budget review", "Mail"],
+    ["connection-work-a", undefined],
+    ["connection-work-b", undefined],
+    ["connection-work-c", undefined],
+    ["connection-work-d", undefined],
+    ["fallback-google", "Use “zhang” with…"],
+    ["fallback-ask-ai", undefined],
+    ["fallback-files", undefined],
+  ]);
+  // Nothing typed, nothing of them; and what an account no longer there found is not shown.
+  expect(rows("", { connections: connected([budget]) })).toEqual([]);
+  expect(rows("budget", { connections: connected([synced("gone", "x")]) }).some((row) => row.type === "connection")).toBe(false);
+});
+
+test("what connectors synced goes first when the query names its kind, or only it has the query in its title", () => {
+  const first = (query: string, items: Item[], found: ConnectionsFound) => rows(query, { items, connections: found })[0];
+  expect(first("邮件", [notes], connected([budget], { kind: "email" }))).toMatchObject({ type: "connection", heading: "Mail" });
+  expect(first("budget", [notes], connected([budget]))).toMatchObject({ type: "connection" });
+  expect(rows("budget", { items: [notes], connections: connected([budget]) })[1]).toMatchObject({ key: "cmd:/ext:notes", heading: "Results" });
+  // An application that has it in its title stays first.
+  expect(first("notes", [notes], connected([synced("work", "Notes from Monday")]))).toMatchObject({ type: "item" });
+});
+
+test("an item that says where it is opens there; one that does not is previewed", async () => {
+  const [mail] = rows("budget", { connections: connected([budget]) });
+  const about = describe(mail, typing({ query: "budget" }), palette().fake);
+  expect(listed(about)).toEqual([["Preview"], ["Copy Body (ctrl+shift+c)", "Copy Sender Address (ctrl+shift+a)", "Open Work on the Web (ctrl+o)"]]);
+  expect(await doing(mail)).toEqual([["preview_connection", { account: "work", id: "Budget review" }]]);
+  expect(await doing(mail, { title: "Copy Body" })).toEqual([["copy_text", { text: "The body of Budget review", paste: false }]]);
+  expect(await doing(mail, { title: "Copy Sender Address" })).toEqual([["copy_text", { text: "zhang.wei@example.com", paste: false }]]);
+  expect(await doing(mail, { title: "Open Work on the Web" })).toEqual([["open_target", { target: "https://mail.example.com" }]]);
+  const [event] = rows("budget", { connections: connected([meeting]) });
+  const its = describe(event, typing({ query: "budget" }), palette().fake);
+  // No body, no address, no web page of its account: only what it has.
+  expect(listed(its)).toEqual([["Open in Browser", "Preview (ctrl+y)"]]);
+  expect(await doing(event)).toEqual([["open_target", { target: "https://meet.example.com/b" }]]);
+  expect(await doing(event, { title: "Preview" })).toEqual([["preview_connection", { account: "team", id: "Budget sync" }]]);
 });

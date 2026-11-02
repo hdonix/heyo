@@ -11,6 +11,7 @@ import { foreground, runAs, scoped, type Current } from "../context";
 import { envelope } from "../heyo/caller";
 import { dispatch, mount, visibleChildren, type Container, type HostNode } from "../renderer";
 import { ClipboardHistory } from "./clipboard";
+import { ConnectionItemPreview } from "./connection";
 import { builtinExtension } from "./index";
 import { SelectionActions } from "./selection";
 import { AudioDevices, SearchFiles, SwitchWindows, systemCommands } from "./system";
@@ -457,4 +458,32 @@ test("none of Heyo's commands asks the host directly for what an extension can a
     for (const [, method] of fs.readFileSync(path.join(__dirname, file), "utf8").matchAll(/"(host\.[A-Za-z.]+)"/g)) used.add(method);
   }
   expect([...used].sort()).toEqual([...heyos].sort());
+});
+
+test("an item a connector synced is previewed with who it is from and to, and its body and sender can be copied", async () => {
+  const item = {
+    id: "m1",
+    kind: "email",
+    title: "Q4 budget review",
+    time: "2026-11-02T09:00:00Z",
+    text: "Could you look at the travel line?",
+    folder: "INBOX",
+    people: [
+      { name: "Zhang Wei", address: "zhang.wei@example.com", role: "from" },
+      { address: "me@example.com", role: "to" },
+    ],
+  };
+  // The host starts it itself, with the item and its account's name; the root search does not list it.
+  expect(builtinExtension.manifest.commands.find((c) => c.name === "connection-item")).toMatchObject({ mode: "view", title: "Preview" });
+  const view = await show("connection-item", createElement(ConnectionItemPreview, { arguments: { item: JSON.stringify(item), account: "Work" } }));
+  const detail = view.top();
+  expect(detail.props.markdown).toBe("# Q4 budget review\n\nCould you look at the travel line?");
+  const labels = view.deep("Metadata.Label").map((label) => [label.props.title, label.props.text]);
+  expect(labels).toContainEqual(["Account", "Work"]);
+  expect(labels).toContainEqual(["From", "Zhang Wei <zhang.wei@example.com>"]);
+  expect(labels).toContainEqual(["To", "me@example.com"]);
+  expect(labels).toContainEqual(["Folder", "INBOX"]);
+  expect(view.deep("Action").map((action) => action.props.title)).toEqual(["Copy Body", "Copy Sender Address", "Copy Title"]);
+  await view.act(detail, "Copy Sender Address");
+  expect(JSON.stringify(requests.map((r) => r.params))).toContain("zhang.wei@example.com");
 });

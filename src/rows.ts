@@ -1,9 +1,10 @@
 //! What a row of the root search is and does.
 //!
-//! The list has four kinds of row: what is in progress (the live
+//! The list has five kinds of row: what is in progress (the live
 //! activities), the calculator's answer, what the search found
-//! (applications, commands, quicklinks, snippets), and what else the query
-//! can be used with. `rowsFor` puts them in order, each with the key it is
+//! (applications, commands, quicklinks, snippets), what connectors synced
+//! that the query finds (mail, events, …), and what else the query can be
+//! used with. `rowsFor` puts them in order, each with the key it is
 //! told apart by and the heading it stands under. `describe` says what a row
 //! does: its actions in groups, the first of the first group being what
 //! Enter, a click on the row and the footer's button do.
@@ -13,6 +14,11 @@
 //! around the list.
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
+import type { ConnectionFound } from "../shared/bindings/ConnectionFound";
+import type { ConnectionsFound } from "../shared/bindings/ConnectionsFound";
+import type { ConnectionsFoundAccount } from "../shared/bindings/ConnectionsFoundAccount";
+import type { ItemKind } from "../shared/bindings/ItemKind";
+import { copyFromTitle, kindTitle, sender } from "../shared/connections";
 import type { Item } from "../shared/bindings/Item";
 import { expand, needsArgument } from "../shared/placeholders";
 import { afterAlias, argumentsOf, filled, missing, type Argument } from "./arguments";
@@ -66,6 +72,7 @@ export type Row = {
   | { type: "activity"; activity: ActivityView }
   | { type: "calc"; calc: Calculation }
   | { type: "item"; item: Item }
+  | { type: "connection"; found: ConnectionFound; account: ConnectionsFoundAccount }
   | { type: "fallback"; fallback: Fallback }
 );
 
@@ -92,6 +99,40 @@ export interface Found {
   items: Item[];
   /// Every quicklink: those that take a query double as fallbacks.
   quicklinks: Item[];
+  /// What connectors synced that the query finds, when it is answered.
+  connections?: ConnectionsFound | null;
+}
+
+/// How many of what connectors synced are listed at most.
+export const CONNECTIONS_SHOWN = 6;
+
+/// What connectors synced that the query finds, the best first, in groups
+/// of a kind: the group of the best first.
+function connectionRows(found: ConnectionsFound): Row[] {
+  const best = found.found.filter((one) => found.accounts[one.account]).slice(0, CONNECTIONS_SHOWN);
+  const kinds: ItemKind[] = [];
+  for (const one of best) if (!kinds.includes(one.item.kind)) kinds.push(one.item.kind);
+  return kinds.flatMap((kind) =>
+    best
+      .filter((one) => one.item.kind === kind)
+      .map((one, i): Row => ({
+        type: "connection",
+        key: `connection-${one.account}-${one.item.id}`,
+        heading: i === 0 ? kindTitle(kind) : undefined,
+        found: one,
+        account: found.accounts[one.account],
+      })),
+  );
+}
+
+/// Whether what connectors synced goes before the applications and
+/// commands: when the query names its kind ("邮件", "meetings"), or when
+/// the best of it has the query in its title and none of them does.
+function connectionsFirst(query: string, items: Item[], found: ConnectionsFound): boolean {
+  if (found.kind) return true;
+  const q = query.trim().toLowerCase();
+  const has = (title: string) => title.toLowerCase().includes(q);
+  return !!q && !!found.found[0] && has(found.found[0].item.title) && !items.some((item) => has(item.title));
 }
 
 /// What kind of thing an item is, as its row says it.
@@ -125,17 +166,20 @@ function activityMatches(activity: ActivityView, query: string): boolean {
 export function rowsFor(query: string, found: Found): Row[] {
   const text = query.trim();
   const activities = found.activities.filter((activity) => activityMatches(activity, query));
-  const above = activities.length > 0 || found.calc !== null;
+  const connected = text && found.connections ? connectionRows(found.connections) : [];
+  const first = connected.length > 0 && connectionsFirst(text, found.items, found.connections!);
+  const above = activities.length > 0 || found.calc !== null || first;
   let section: string | undefined;
+  const items = found.items.map((item, i): Row => {
+    // What was found needs a title only under something else.
+    const heading = item.section && item.section !== section ? sectionTitle(item.section) : above && i === 0 ? t("Results") : undefined;
+    section = item.section;
+    return { type: "item", key: item.id, heading, item };
+  });
   return [
     ...activities.map((activity, i): Row => ({ type: "activity", key: `activity-${activity.key}`, heading: i === 0 ? t("In Progress") : undefined, activity })),
     ...(found.calc ? [{ type: "calc", key: "calc", heading: t("Calculator"), calc: found.calc } satisfies Row] : []),
-    ...found.items.map((item, i): Row => {
-      // What was found needs a title only under something else.
-      const heading = item.section && item.section !== section ? sectionTitle(item.section) : above && i === 0 ? t("Results") : undefined;
-      section = item.section;
-      return { type: "item", key: item.id, heading, item };
-    }),
+    ...(first ? [...connected, ...items] : [...items, ...connected]),
     ...(text ? fallbacks(found.quicklinks) : []).map(
       (fallback, i): Row => ({ type: "fallback", key: `fallback-${fallback.id}`, heading: i === 0 ? t("Use “{0}” with…", text) : undefined, fallback }),
     ),
@@ -165,6 +209,8 @@ function ofKind(row: Row, context: Context, palette: Palette): Own {
       return ofCalculation(row.calc);
     case "item":
       return ofItem(row.item, context, palette);
+    case "connection":
+      return ofConnection(row.found, row.account, palette);
     case "fallback":
       return ofFallback(row.fallback, context, palette);
   }
@@ -205,6 +251,26 @@ function ofCalculation(calc: Calculation): Own {
       ],
     ],
   };
+}
+
+function ofConnection({ account: id, item }: ConnectionFound, account: ConnectionsFoundAccount, palette: Palette): Own {
+  const copy = (text: string) => void call("copy_text", { text, paste: false }).catch(reported(t("Could not copy")));
+  const openUrl = (url: string) => void call("open_target", { target: url }).catch((e) => palette.showError(t("Could not open"), String(e)));
+  const preview: RowAction = {
+    title: t("Preview"),
+    icon: "eye-16",
+    shortcut: item.url ? { modifiers: ["ctrl"], key: "y" } : undefined,
+    run: () => void call("preview_connection", { account: id, id: item.id }).catch((e) => palette.showError(t("Could not preview {0}", item.title), String(e))),
+  };
+  // Enter opens it where it is, if it says where; else it is previewed here.
+  const primary: RowAction[] = item.url ? [{ title: t("Open in Browser"), icon: "globe-01-16", run: () => openUrl(item.url!) }, preview] : [preview];
+  const address = sender(item)?.address;
+  const copying: RowAction[] = [
+    ...(item.text ? [{ title: t("Copy Body"), icon: "copy-clipboard-16", shortcut: { modifiers: ["ctrl", "shift"], key: "c" }, run: () => copy(item.text!) } satisfies RowAction] : []),
+    ...(address ? [{ title: copyFromTitle(item), icon: "at-symbol-16", shortcut: { modifiers: ["ctrl", "shift"], key: "a" }, run: () => copy(address) } satisfies RowAction] : []),
+    ...(account.web ? [{ title: t("Open {0} on the Web", account.name), icon: "globe-01-16", shortcut: { modifiers: ["ctrl"], key: "o" }, run: () => openUrl(account.web!) } satisfies RowAction] : []),
+  ];
+  return { title: item.title, groups: [primary, copying] };
 }
 
 function ofFallback(fallback: Fallback, context: Context, palette: Palette): Own {

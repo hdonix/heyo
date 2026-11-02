@@ -109,6 +109,7 @@ msgstr ""
 
 #: src-tauri/src/confirm.rs
 #: src-tauri/src/permissions.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
@@ -142,6 +143,10 @@ msgstr ""
 
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
+msgstr ""
+
+#: src-tauri/src/connections/commands.rs
+msgid "There is no item {0}."
 msgstr ""
 
 #: src-tauri/src/dictation/composed.rs
@@ -994,6 +999,7 @@ msgstr ""
 #: src-tauri/src/models/kinds/claude_code.rs
 #: src-tauri/src/models/kinds/openai.rs
 #: src-tauri/src/slint_windows/pages/about.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Checking…"
 msgstr ""
@@ -1150,6 +1156,7 @@ msgid "Connected: {0}."
 msgstr ""
 
 #: src-tauri/src/models/kinds/mod.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Not reachable"
 msgstr ""
@@ -1867,6 +1874,7 @@ msgid "what draws it failed; Heyo's log has the details"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Settings"
 msgstr ""
@@ -1998,6 +2006,260 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Settings File"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Mail"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Events"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Messages"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Documents"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Tasks"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgctxt "between the items of a list"
+msgid ", "
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "just now"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{n} min ago"
+msgid_plural "{n} min ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{n} hour ago"
+msgid_plural "{n} hours ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{n} day ago"
+msgid_plural "{n} days ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Connector missing"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Its connector is not installed any more: install its extension again, or remove the connection."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Syncing {0}%"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Syncing…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Wrong password"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Timed out"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Sync failed"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Wrong password. Type it again below, and it is synced at once."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Synced · {0}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Not synced yet"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It is synced in a moment."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{0} item"
+msgid_plural "{0} items"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Connection Works"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It signed in and can be read."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Connection Failed"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Connect mail, calendars and other services. What they hold is synced to this computer and found from the root search; nothing is sent anywhere else."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Connections"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Add Connection…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Several of one kind can be added, two mailboxes for instance."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Add Connection"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Choose what to connect."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "No connector is installed. Extensions that connect a service bring one."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "New {0}"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Other (Fill In Yourself)"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Service"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Fills in the server and the rest for a service it knows."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+#: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Name"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Typed — type again to replace it"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Check Connection"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Signs in as it would once added, and reads nothing yet."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Check"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Add This Connection"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It is synced at once; what it holds is then found from the root search."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It can be added once the check works."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Add"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Status"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Sync Now"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Last Error"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Items"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Found from the root search, and kept on this computer only."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Signs in as a sync would, and reads nothing."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Saved — type a new one to replace it"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Remove Connection"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Its items and its password are deleted from this computer."
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Remove…"
+msgstr ""
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Click Again to Remove"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/dictation.rs
@@ -2391,11 +2653,6 @@ msgid "Uninstall"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/extensions.rs
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Click Again to Remove"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/extensions.rs
 msgid "Click Again to Uninstall"
 msgstr ""
 
@@ -2553,27 +2810,7 @@ msgid "Add Provider"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
-msgid "Choose what to connect."
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-#: src-tauri/src/slint_windows/ui/settings.slint
-#: runtime/src/api/quicklook.tsx
-#: runtime/src/builtins/library.tsx
-#: runtime/src/builtins/selection.tsx
-msgid "Name"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Typed — type again to replace it"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Saved — type a new key to replace it"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "New {0}"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
@@ -2582,10 +2819,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Its models can then be chosen where each feature is set up. It can be changed or removed here later."
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Add"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
@@ -2605,22 +2838,6 @@ msgid "Used for {0}"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
-msgid "Status"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Check Connection"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Connection Failed"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Connection Works"
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
 msgid "What It Can Do"
 msgstr ""
 
@@ -2630,10 +2847,6 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "What uses its models says so until another is chosen."
-msgstr ""
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Remove…"
 msgstr ""
 
 #: src-tauri/src/slint_windows/pages/models.rs
@@ -2985,6 +3198,11 @@ msgstr ""
 
 #: src/RootSearch.tsx
 msgid "Ended"
+msgstr ""
+
+#: src/RootSearch.tsx
+#: shared/connections.ts
+msgid "(No Subject)"
 msgstr ""
 
 #: src/RootSearch.tsx
@@ -3436,13 +3654,13 @@ msgid "Suggestions"
 msgstr ""
 
 #: src/rows.ts
-msgid "In Progress"
-msgstr ""
-
-#: src/rows.ts
 #: runtime/src/builtins/clipboard.tsx
 #: runtime/src/builtins/emoji.tsx
 msgid "Results"
+msgstr ""
+
+#: src/rows.ts
+msgid "In Progress"
 msgstr ""
 
 #: src/rows.ts
@@ -3474,11 +3692,35 @@ msgid "Copy Question and Answer"
 msgstr ""
 
 #: src/rows.ts
-msgid "Could not ask AI"
+msgid "Could not open"
 msgstr ""
 
 #: src/rows.ts
-msgid "Could not open"
+#: runtime/src/builtins/index.ts
+msgid "Preview"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not preview {0}"
+msgstr ""
+
+#: src/rows.ts
+#: runtime/src/api/components.ts
+#: runtime/src/builtins/system.tsx
+msgid "Open in Browser"
+msgstr ""
+
+#: src/rows.ts
+#: runtime/src/builtins/connection.tsx
+msgid "Copy Body"
+msgstr ""
+
+#: src/rows.ts
+msgid "Open {0} on the Web"
+msgstr ""
+
+#: src/rows.ts
+msgid "Could not ask AI"
 msgstr ""
 
 #: src/rows.ts
@@ -3608,14 +3850,10 @@ msgstr ""
 #: runtime/src/builtins/ask.tsx
 #: runtime/src/builtins/chat.tsx
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/connection.tsx
 #: runtime/src/builtins/library.tsx
 #: runtime/src/builtins/selection.tsx
 msgid "Copied to Clipboard"
-msgstr ""
-
-#: runtime/src/api/components.ts
-#: runtime/src/builtins/system.tsx
-msgid "Open in Browser"
 msgstr ""
 
 #: runtime/src/api/components.ts
@@ -3984,6 +4222,7 @@ msgid "Delete All Conversations"
 msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/connection.tsx
 #: runtime/src/builtins/library.tsx
 msgid "Link"
 msgstr ""
@@ -4154,6 +4393,54 @@ msgstr ""
 
 #: runtime/src/builtins/clipboard.tsx
 msgid "Copy something and it will show up here."
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Account"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Kind"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Organizer"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "From"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Attendees"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "To"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Cc"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "When"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Location"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Folder"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Attachments"
+msgstr ""
+
+#: runtime/src/builtins/connection.tsx
+msgid "Copy Title"
 msgstr ""
 
 #: runtime/src/builtins/conversations.ts
@@ -4824,4 +5111,12 @@ msgstr ""
 
 #: runtime/src/session.ts
 msgid "Could not prepare {0} for Linux"
+msgstr ""
+
+#: shared/connections.ts
+msgid "Copy Organizer Address"
+msgstr ""
+
+#: shared/connections.ts
+msgid "Copy Sender Address"
 msgstr ""

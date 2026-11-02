@@ -394,7 +394,13 @@ and keeps the list of applications current. The rest, by what it is for:
   `ConnectorCall` one way and `ConnectorRequest` the other), whose
   writes to the index are answered once written, so that a cursor kept
   in `connections.json` never runs ahead of the items. `commands.rs` is
-  what the settings window and the palette ask of it. Its tests run the
+  what the settings window and the palette ask of it: the Connections
+  page (`slint_windows/pages/connections.rs`) lists, adds (an account is
+  tried, under an id of the trial's own, before it can be added), edits
+  and removes accounts; the root search asks `search_connections` beside
+  its own search and shows an item with `connection-item`, a command of
+  Heyo's own that the root search does not list
+  (`runtime/src/builtins/connection.tsx`). Its tests run the
   built runtime with a fake connector
   (`runtime/src/connections/fixtures/fake`).
 

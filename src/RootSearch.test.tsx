@@ -8,10 +8,18 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import type { Item } from "../shared/bindings/Item";
 
-const host = vi.hoisted(() => ({ results: [] as unknown[], activities: [] as unknown[], calc: null as unknown, calls: [] as [string, any][] }));
+const host = vi.hoisted(() => ({
+  results: [] as unknown[],
+  activities: [] as unknown[],
+  calc: null as unknown,
+  calls: [] as [string, any][],
+  // What connectors synced, by the query: an answer, and how long it takes.
+  connected: (_query: string): [unknown, number] => [{ found: [], complete: true, accounts: {} }, 0],
+}));
 vi.mock("./calculator", () => ({ calculate: () => host.calc, loadRates: async () => null }));
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
+import type { ConnectionsFound } from "../shared/bindings/ConnectionsFound";
 import { fakeHost } from "./host.fake";
 import { RootSearch } from "./RootSearch";
 
@@ -92,12 +100,17 @@ beforeEach(() => {
     list_quicklinks: [],
     activities: () => host.activities as ActivityView[],
     get_item: ({ id }) => found().find((item) => item.id === id) ?? null,
+    search_connections: ({ query }) => {
+      const [answer, after] = host.connected(query);
+      return new Promise((resolve) => setTimeout(() => resolve(answer as ConnectionsFound), after));
+    },
   }).calls as [string, any][];
 });
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
   host.calc = null;
+  host.connected = () => [{ found: [], complete: true, accounts: {} }, 0];
   given = {};
   vi.restoreAllMocks();
 });
@@ -383,4 +396,24 @@ test("the action panel is the selected row's, and runs what is chosen in it", as
   expect(host.calls.filter(([command]) => command === "activity_dismiss").map(([, args]) => args)).toEqual([{ key: "@heyo/timer-1" }]);
   expect(container.querySelector(".action-panel")).toBeNull();
   expect(document.activeElement).toBe(inputRef.current);
+});
+
+test("what connectors synced is shown for the query typed, and an answer to one typed before is dropped", async () => {
+  const mail = (title: string) => ({ account: "work", score: 1, item: { id: title, kind: "email", title, time: "2026-11-02T09:00:00Z", people: [{ name: "Zhang Wei", role: "from" }] } });
+  const answer = (titles: string[]) => ({ found: titles.map(mail), complete: true, accounts: { work: { name: "Work" } } });
+  // The first query's answer comes after the second's.
+  host.connected = (query) => (query === "bud" ? [answer(["Stale"]), 60] : [answer(["Budget review"]), 0]);
+  await show([]);
+  await type(inputRef.current!, "bud");
+  await type(inputRef.current!, "budget");
+  await act(() => new Promise<void>((resolve) => setTimeout(resolve, 100)));
+  const titles = () => [...container.querySelectorAll(".item .title")].map((e) => e.textContent);
+  expect(titles()).toEqual(["Budget review", "Search Google", "Ask AI", "Search Files"]);
+  expect(container.querySelector(".item .subtitle")?.textContent).toBe("Zhang Wei");
+  expect(container.querySelector(".item .kind")?.textContent).toBe("Work");
+  expect([...container.querySelectorAll(".section-title")].map((e) => e.textContent)).toEqual(["Mail", "Use “budget” with…"]);
+  // Enter previews it.
+  await press("Enter");
+  await settle();
+  expect(host.calls.filter(([command]) => command === "preview_connection").map(([, args]) => args)).toEqual([{ account: "work", id: "Budget review" }]);
 });

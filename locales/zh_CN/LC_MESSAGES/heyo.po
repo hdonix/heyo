@@ -112,6 +112,7 @@ msgstr "快捷键需要 GNOME。请改为在桌面环境中把快捷键绑定到
 
 #: src-tauri/src/confirm.rs
 #: src-tauri/src/permissions.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 #: src-tauri/src/slint_windows/screenshot/mod.rs
 #: src-tauri/src/slint_windows/ui/pill.slint
@@ -146,6 +147,10 @@ msgstr "连接需要一个名称。"
 #: src-tauri/src/connections/commands.rs
 msgid "{0} is not a connector that is installed."
 msgstr "{0} 不是已安装的连接器。"
+
+#: src-tauri/src/connections/commands.rs
+msgid "There is no item {0}."
+msgstr "没有条目 {0}。"
 
 #: src-tauri/src/dictation/composed.rs
 msgid "part of it had become the application's text as it was heard"
@@ -997,6 +1002,7 @@ msgstr "在这台电脑上运行，并把交给它的内容发送给 Anthropic�
 #: src-tauri/src/models/kinds/claude_code.rs
 #: src-tauri/src/models/kinds/openai.rs
 #: src-tauri/src/slint_windows/pages/about.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Checking…"
 msgstr "正在检查…"
@@ -1151,6 +1157,7 @@ msgid "Connected: {0}."
 msgstr "已连接：{0}。"
 
 #: src-tauri/src/models/kinds/mod.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Not reachable"
 msgstr "无法连接"
@@ -1865,6 +1872,7 @@ msgid "what draws it failed; Heyo's log has the details"
 msgstr "绘制它的部分出错了；详情见 Heyo 的日志"
 
 #: src-tauri/src/slint_windows/model.rs
+#: src-tauri/src/slint_windows/pages/connections.rs
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Settings"
 msgstr "设置"
@@ -1997,6 +2005,256 @@ msgstr "数据"
 #: src-tauri/src/slint_windows/pages/advanced.rs
 msgid "Settings File"
 msgstr "设置文件"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Mail"
+msgstr "邮件"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Events"
+msgstr "日程"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Messages"
+msgstr "消息"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Documents"
+msgstr "文档"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: shared/connections.ts
+msgid "Tasks"
+msgstr "任务"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgctxt "between the items of a list"
+msgid ", "
+msgstr "、"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "just now"
+msgstr "刚刚"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{n} min ago"
+msgid_plural "{n} min ago"
+msgstr[0] "{n} 分钟前"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{n} hour ago"
+msgid_plural "{n} hours ago"
+msgstr[0] "{n} 小时前"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{n} day ago"
+msgid_plural "{n} days ago"
+msgstr[0] "{n} 天前"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Connector missing"
+msgstr "连接器缺失"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Its connector is not installed any more: install its extension again, or remove the connection."
+msgstr "它的连接器已不再安装：请重新安装它的扩展，或移除这个连接。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Syncing {0}%"
+msgstr "同步中 {0}%"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Syncing…"
+msgstr "同步中…"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Wrong password"
+msgstr "密码错误"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Timed out"
+msgstr "超时"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Sync failed"
+msgstr "同步失败"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Wrong password. Type it again below, and it is synced at once."
+msgstr "密码错误。请在下方重新输入，输入后立即同步。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Synced · {0}"
+msgstr "已同步 · {0}"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Not synced yet"
+msgstr "尚未同步"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It is synced in a moment."
+msgstr "马上开始同步。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "{0} item"
+msgid_plural "{0} items"
+msgstr[0] "{0} 个条目"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Connection Works"
+msgstr "连接正常"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It signed in and can be read."
+msgstr "已登录，可以读取。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Connection Failed"
+msgstr "连接失败"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Connect mail, calendars and other services. What they hold is synced to this computer and found from the root search; nothing is sent anywhere else."
+msgstr "连接邮箱、日历和其他服务。其中的内容会同步到这台电脑，可在主搜索中找到，不会发送到任何其他地方。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Connections"
+msgstr "连接"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Add Connection…"
+msgstr "添加连接…"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Several of one kind can be added, two mailboxes for instance."
+msgstr "同一类型可以添加多个，比如两个邮箱。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Add Connection"
+msgstr "添加连接"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Choose what to connect."
+msgstr "选择要连接的内容。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "No connector is installed. Extensions that connect a service bring one."
+msgstr "没有安装任何连接器。连接服务的扩展会自带连接器。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "New {0}"
+msgstr "新的 {0}"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Other (Fill In Yourself)"
+msgstr "其他（自行填写）"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Service"
+msgstr "服务"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Fills in the server and the rest for a service it knows."
+msgstr "为已知的服务填好服务器等设置。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+#: src-tauri/src/slint_windows/ui/settings.slint
+#: runtime/src/api/quicklook.tsx
+#: runtime/src/builtins/library.tsx
+#: runtime/src/builtins/selection.tsx
+msgid "Name"
+msgstr "名称"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Typed — type again to replace it"
+msgstr "已输入 — 再次输入可替换"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Check Connection"
+msgstr "检查连接"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Signs in as it would once added, and reads nothing yet."
+msgstr "按添加后的方式登录一次，暂不读取任何内容。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Check"
+msgstr "检查"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Add This Connection"
+msgstr "添加此连接"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It is synced at once; what it holds is then found from the root search."
+msgstr "添加后立即同步，之后其中的内容可在主搜索中找到。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "It can be added once the check works."
+msgstr "检查通过后才能添加。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Add"
+msgstr "添加"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Status"
+msgstr "状态"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Sync Now"
+msgstr "立即同步"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Last Error"
+msgstr "最近一次错误"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Items"
+msgstr "条目"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Found from the root search, and kept on this computer only."
+msgstr "可在主搜索中找到，只保存在这台电脑上。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Signs in as a sync would, and reads nothing."
+msgstr "按同步时的方式登录一次，不读取任何内容。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Saved — type a new one to replace it"
+msgstr "已保存 — 输入新的即可替换"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Remove Connection"
+msgstr "移除连接"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+msgid "Its items and its password are deleted from this computer."
+msgstr "它的条目和密码都会从这台电脑上删除。"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Remove…"
+msgstr "移除…"
+
+#: src-tauri/src/slint_windows/pages/connections.rs
+#: src-tauri/src/slint_windows/pages/extensions.rs
+#: src-tauri/src/slint_windows/pages/models.rs
+msgid "Click Again to Remove"
+msgstr "再次点击以移除"
 
 #: src-tauri/src/slint_windows/pages/dictation.rs
 msgid "Off"
@@ -2387,11 +2645,6 @@ msgid "Uninstall"
 msgstr "卸载"
 
 #: src-tauri/src/slint_windows/pages/extensions.rs
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Click Again to Remove"
-msgstr "再次点击以移除"
-
-#: src-tauri/src/slint_windows/pages/extensions.rs
 msgid "Click Again to Uninstall"
 msgstr "再次点击以卸载"
 
@@ -2549,28 +2802,8 @@ msgid "Add Provider"
 msgstr "添加提供商"
 
 #: src-tauri/src/slint_windows/pages/models.rs
-msgid "Choose what to connect."
-msgstr "选择要连接的内容。"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-#: src-tauri/src/slint_windows/ui/settings.slint
-#: runtime/src/api/quicklook.tsx
-#: runtime/src/builtins/library.tsx
-#: runtime/src/builtins/selection.tsx
-msgid "Name"
-msgstr "名称"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Typed — type again to replace it"
-msgstr "已输入 — 再次输入可替换"
-
-#: src-tauri/src/slint_windows/pages/models.rs
 msgid "Saved — type a new key to replace it"
 msgstr "已保存 — 输入新密钥即可替换"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "New {0}"
-msgstr "新的{0}"
 
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Add This Provider"
@@ -2579,10 +2812,6 @@ msgstr "添加此提供商"
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "Its models can then be chosen where each feature is set up. It can be changed or removed here later."
 msgstr "之后可在各功能的设置处选择它的模型。以后可在此修改或移除。"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Add"
-msgstr "添加"
 
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "AI"
@@ -2601,22 +2830,6 @@ msgid "Used for {0}"
 msgstr "用于{0}"
 
 #: src-tauri/src/slint_windows/pages/models.rs
-msgid "Status"
-msgstr "状态"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Check Connection"
-msgstr "检查连接"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Connection Failed"
-msgstr "连接失败"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Connection Works"
-msgstr "连接正常"
-
-#: src-tauri/src/slint_windows/pages/models.rs
 msgid "What It Can Do"
 msgstr "能力"
 
@@ -2627,10 +2840,6 @@ msgstr "移除提供商"
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "What uses its models says so until another is chosen."
 msgstr "使用其模型的功能会提示这一点，直到选择了其他模型。"
-
-#: src-tauri/src/slint_windows/pages/models.rs
-msgid "Remove…"
-msgstr "移除…"
 
 #: src-tauri/src/slint_windows/pages/models.rs
 msgid "{0} MB"
@@ -2982,6 +3191,11 @@ msgstr "等你处理"
 #: src/RootSearch.tsx
 msgid "Ended"
 msgstr "已结束"
+
+#: src/RootSearch.tsx
+#: shared/connections.ts
+msgid "(No Subject)"
+msgstr "（无主题）"
 
 #: src/RootSearch.tsx
 msgid "Fallback"
@@ -3432,14 +3646,14 @@ msgid "Suggestions"
 msgstr "建议"
 
 #: src/rows.ts
-msgid "In Progress"
-msgstr "进行中"
-
-#: src/rows.ts
 #: runtime/src/builtins/clipboard.tsx
 #: runtime/src/builtins/emoji.tsx
 msgid "Results"
 msgstr "结果"
+
+#: src/rows.ts
+msgid "In Progress"
+msgstr "进行中"
 
 #: src/rows.ts
 msgid "Use “{0}” with…"
@@ -3470,12 +3684,36 @@ msgid "Copy Question and Answer"
 msgstr "复制问题和答案"
 
 #: src/rows.ts
-msgid "Could not ask AI"
-msgstr "无法问 AI"
-
-#: src/rows.ts
 msgid "Could not open"
 msgstr "无法打开"
+
+#: src/rows.ts
+#: runtime/src/builtins/index.ts
+msgid "Preview"
+msgstr "预览"
+
+#: src/rows.ts
+msgid "Could not preview {0}"
+msgstr "无法预览 {0}"
+
+#: src/rows.ts
+#: runtime/src/api/components.ts
+#: runtime/src/builtins/system.tsx
+msgid "Open in Browser"
+msgstr "在浏览器中打开"
+
+#: src/rows.ts
+#: runtime/src/builtins/connection.tsx
+msgid "Copy Body"
+msgstr "复制正文"
+
+#: src/rows.ts
+msgid "Open {0} on the Web"
+msgstr "在网页上打开 {0}"
+
+#: src/rows.ts
+msgid "Could not ask AI"
+msgstr "无法问 AI"
 
 #: src/rows.ts
 #: runtime/src/builtins/selection.tsx
@@ -3604,15 +3842,11 @@ msgstr "复制到剪贴板"
 #: runtime/src/builtins/ask.tsx
 #: runtime/src/builtins/chat.tsx
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/connection.tsx
 #: runtime/src/builtins/library.tsx
 #: runtime/src/builtins/selection.tsx
 msgid "Copied to Clipboard"
 msgstr "已复制到剪贴板"
-
-#: runtime/src/api/components.ts
-#: runtime/src/builtins/system.tsx
-msgid "Open in Browser"
-msgstr "在浏览器中打开"
 
 #: runtime/src/api/components.ts
 msgid "Open With"
@@ -3979,6 +4213,7 @@ msgid "Delete All Conversations"
 msgstr "删除所有对话"
 
 #: runtime/src/builtins/clipboard.tsx
+#: runtime/src/builtins/connection.tsx
 #: runtime/src/builtins/library.tsx
 msgid "Link"
 msgstr "链接"
@@ -4149,6 +4384,54 @@ msgstr "记录已暂停。运行“{0}”可重新开始记录。"
 #: runtime/src/builtins/clipboard.tsx
 msgid "Copy something and it will show up here."
 msgstr "复制点什么，它就会出现在这里。"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Account"
+msgstr "账户"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Kind"
+msgstr "类型"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Organizer"
+msgstr "组织者"
+
+#: runtime/src/builtins/connection.tsx
+msgid "From"
+msgstr "发件人"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Attendees"
+msgstr "参会人"
+
+#: runtime/src/builtins/connection.tsx
+msgid "To"
+msgstr "收件人"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Cc"
+msgstr "抄送"
+
+#: runtime/src/builtins/connection.tsx
+msgid "When"
+msgstr "时间"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Location"
+msgstr "地点"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Folder"
+msgstr "文件夹"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Attachments"
+msgstr "附件"
+
+#: runtime/src/builtins/connection.tsx
+msgid "Copy Title"
+msgstr "复制标题"
 
 #: runtime/src/builtins/conversations.ts
 msgid "The answer was cut short."
@@ -4818,3 +5101,11 @@ msgstr "下载的 Speedtest 与预期的文件不符，不会使用它。"
 #: runtime/src/session.ts
 msgid "Could not prepare {0} for Linux"
 msgstr "无法为 Linux 准备 {0}"
+
+#: shared/connections.ts
+msgid "Copy Organizer Address"
+msgstr "复制组织者地址"
+
+#: shared/connections.ts
+msgid "Copy Sender Address"
+msgstr "复制发件人地址"

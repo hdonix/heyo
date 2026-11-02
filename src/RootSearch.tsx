@@ -1,6 +1,7 @@
 // The root search: applications, commands, quicklinks, snippets and the
-// calculator, with favorites, aliases and a Ctrl+K action panel; and at the
-// top, what is in progress (the live activities, docs/live-activities.md 5.0).
+// calculator, with favorites, aliases and a Ctrl+K action panel; at the
+// top, what is in progress (the live activities, docs/live-activities.md 5.0);
+// and what connectors synced (mail, events, …) that the query finds.
 //
 // This is the list as it is drawn and the keys and clicks it takes. What a
 // row is and does, it asks `rows.ts`.
@@ -10,6 +11,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Star } from "lucide-react";
 
 import type { ActivityView } from "../shared/bindings/ActivityView";
+import type { ConnectionsFound } from "../shared/bindings/ConnectionsFound";
+import { kindIcon, otherParty, when } from "../shared/connections";
 import type { Item } from "../shared/bindings/Item";
 import { calculate, loadRates, type Calculation, type Rates } from "./calculator";
 import { call, listen } from "./host";
@@ -122,6 +125,10 @@ function CalculatorCard({ calc, selected }: { calc: Calculation; selected: boole
   );
 }
 
+/// How long after an incomplete answer of the connections' search it is
+/// asked again (ms).
+const CONNECTIONS_AGAIN = 150;
+
 export function RootSearch(props: {
   query: string;
   setQuery(query: string): void;
@@ -182,6 +189,29 @@ export function RootSearch(props: {
     });
   }, [query, props.version]);
 
+  // What connectors synced that the query finds. The host answers within
+  // its 50 ms or without; nothing waits for it, and an answer to a query
+  // no longer typed is dropped.
+  const [connected, setConnected] = useState<{ query: string; found: ConnectionsFound } | null>(null);
+  const connectionsAsked = useRef(0);
+  useEffect(() => {
+    const id = ++connectionsAsked.current;
+    if (!query.trim()) return setConnected(null);
+    // An answer without what took longer than the budget (a cold store, a
+    // query's meaning being read) is followed by one more question, once
+    // typing has paused.
+    const ask = (again: boolean) =>
+      call("search_connections", { query })
+        .then((found) => {
+          if (id !== connectionsAsked.current) return;
+          if (found.complete || !again) setConnected({ query, found });
+          else setTimeout(() => id === connectionsAsked.current && ask(false), CONNECTIONS_AGAIN);
+        })
+        .catch(() => {});
+    ask(true);
+  }, [query, props.version]);
+  const connections = connected?.query === query ? connected.found : null;
+
   useEffect(() => {
     loadRates().then(setRates);
   }, [props.version]);
@@ -207,7 +237,7 @@ export function RootSearch(props: {
   // What these say is said in the language spoken: another one makes them anew.
   const spoken = language();
   const calc = useMemo(() => calculate(query, rates), [query, rates, spoken]);
-  const rows = useMemo(() => rowsFor(query, { activities, calc, items, quicklinks }), [query, activities, calc, items, quicklinks, spoken]);
+  const rows = useMemo(() => rowsFor(query, { activities, calc, items, quicklinks, connections }), [query, activities, calc, items, quicklinks, connections, spoken]);
   const keys = useMemo(() => rows.map((row) => row.key), [rows]);
   const selected = locate(keys, held);
   const current = rows[selected];
@@ -379,6 +409,23 @@ export function RootSearch(props: {
             <CalculatorCard calc={row.calc} selected={isSelected} />
           </li>
         );
+      case "connection": {
+        const { item } = row.found;
+        return (
+          <li key={row.key} className="item-wrap">
+            {heading}
+            <div className={isSelected ? "item selected" : "item"} {...pointer}>
+              <ItemIcon icon={kindIcon(item.kind)} title={item.title} colorKey={`connection/${item.kind}`} />
+              <span className="title">{item.title || t("(No Subject)")}</span>
+              {otherParty(item) && <span className="subtitle">{otherParty(item)}</span>}
+              <span className="accessories">
+                <span className="accessory">{when(item)}</span>
+                <span className="kind">{row.account.name}</span>
+              </span>
+            </div>
+          </li>
+        );
+      }
       case "fallback":
         return (
           <li key={row.key} className="item-wrap">
