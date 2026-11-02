@@ -1039,7 +1039,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src-tauri/src/models/kinds/mod.rs
-msgid "Connected: {0}"
+msgid "Connected: {0}."
 msgstr ""
 
 #: src-tauri/src/models/kinds/mod.rs
@@ -2439,6 +2439,10 @@ msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "{0} MB"
+msgstr ""
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} · {1}. {2}"
 msgstr ""
 
 #: src-tauri/src/slint_windows/model.rs

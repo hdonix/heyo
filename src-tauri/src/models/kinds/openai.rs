@@ -66,9 +66,7 @@ impl ProviderKind for OpenaiCompatible {
             Address::Elsewhere { host, encrypted: true } => (tf("This address is not this computer: the text you select, ask about and dictate is sent to {0}.", &[&host]), true),
             Address::Elsewhere { host, encrypted: false } => (tf("This address is not this computer, and the connection is not encrypted: the text you select, ask about and dictate is sent to {0} over plain http, readable by anyone on the network in between. Use https, or a server on this computer.", &[&host]), true),
         };
-        // A sentence of its own, after one that may not have ended.
-        let end = if status.long.ends_with(['.', '…', '。']) { "" } else { "." };
-        Status { long: format!("{}{end} {whereabouts}", status.long), warning: status.warning || warning, ..status }
+        Status { long: format!("{} {whereabouts}", status.long), warning: status.warning || warning, ..status }
     }
     fn list(&self, provider: &Provider) -> Result<Vec<String>, String> {
         tauri::async_runtime::block_on(openai::list(provider.get(URL), provider.get(KEY), Some(Duration::from_secs(3)))).map_err(|e| e.message())

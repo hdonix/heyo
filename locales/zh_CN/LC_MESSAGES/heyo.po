@@ -1040,8 +1040,8 @@ msgid_plural "{0} models"
 msgstr[0] "{0} 个模型"
 
 #: src-tauri/src/models/kinds/mod.rs
-msgid "Connected: {0}"
-msgstr "已连接：{0}"
+msgid "Connected: {0}."
+msgstr "已连接：{0}。"
 
 #: src-tauri/src/models/kinds/mod.rs
 #: src-tauri/src/slint_windows/model.rs
@@ -2438,6 +2438,10 @@ msgstr "再次点击以移除"
 #: src-tauri/src/slint_windows/model.rs
 msgid "{0} MB"
 msgstr "{0} MB"
+
+#: src-tauri/src/slint_windows/model.rs
+msgid "{0} · {1}. {2}"
+msgstr "{0} · {1}。{2}"
 
 #: src-tauri/src/slint_windows/model.rs
 msgid "In Use"

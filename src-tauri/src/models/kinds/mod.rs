@@ -196,7 +196,7 @@ pub(crate) fn status(missing: Option<Missing>, known: &Known) -> Status {
     }
     match (&known.listed, &known.found, known.downloaded) {
         (Some(Ok(models)), ..) if models.is_empty() => Status::warns(t("No models"), t("Connected, but the server lists no models.")),
-        (Some(Ok(models)), ..) => Status::fine(&tn("{0} model", "{0} models", models.len() as u64, &[&models.len()]), tf("Connected: {0}", &[&models.join(", ")])),
+        (Some(Ok(models)), ..) => Status::fine(&tn("{0} model", "{0} models", models.len() as u64, &[&models.len()]), tf("Connected: {0}.", &[&models.join(", ")])),
         (Some(Err(e)), ..) => Status::warns(t("Not reachable"), tf("Not reachable: {0}.", &[e])),
         (_, Some(Ok((version, path))), _) => Status::fine(t("Set up"), tf("Using {0} at {1}.", &[version, path])),
         (_, Some(Err(why)), _) => Status::warns(t("Not found"), why.clone()),

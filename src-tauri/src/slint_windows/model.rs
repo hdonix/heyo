@@ -1076,7 +1076,7 @@ impl Model {
             .map(|entry| {
                 let id = text(entry, "id");
                 let size = tf("{0} MB", &[&entry["megabytes"].as_u64().unwrap_or(0)]);
-                let row = Line::row(Id::SpeechDownload(id.clone()), text(entry, "name")).says(format!("{} · {size}. {}", text(entry, "languages"), text(entry, "note")));
+                let row = Line::row(Id::SpeechDownload(id.clone()), text(entry, "name")).says(tf("{0} · {1}. {2}", &[&text(entry, "languages"), &size, &text(entry, "note")]));
                 let going = &entry["downloading"];
                 if !going.is_null() {
                     let percent = match (going["received"].as_f64(), going["total"].as_f64()) {
