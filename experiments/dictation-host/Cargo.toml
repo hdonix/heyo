@@ -1,0 +1,27 @@
+[package]
+name = "dictation-host-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Not part of Heyo's build: whether sherpa-onnx's own Rust API can do in
+# the host what the Node.js dictation helper did, and link for each target
+# Heyo ships. Windows takes the `shared` libraries:
+#
+#   cargo build --release --target x86_64-pc-windows-msvc --no-default-features --features shared
+#
+# with scripts/package/build.sh's environment for that target.
+[workspace]
+
+[dependencies]
+sherpa-onnx = { version = "=1.13.8", default-features = false }
+
+# Where cpal records (WASAPI, CoreAudio); on Linux it would link ALSA, and
+# Heyo speaks the PulseAudio protocol instead.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+cpal = "0.18"
+
+[features]
+default = ["static"]
+static = ["sherpa-onnx/static"]
+shared = ["sherpa-onnx/shared"]
